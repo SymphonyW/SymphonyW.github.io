@@ -369,6 +369,7 @@
             <li><a href="#类型断言机制">类型断言机制</a></li>
           </ol>
         </li>
+        <li><a href="#变量内置的pair结构详细说明">变量内置的pair结构详细说明</a></li>
       </ol>
     </li>
   </ol>
@@ -2079,7 +2080,121 @@
 </span></span><span class="line"><span class="cl">arg is not int type
 </span></span></code></pre></td></tr></table>
 </div>
+</div><h3 id="变量内置的pair结构详细说明">变量内置的pair结构详细说明
+</h3><p>在 Go 中，一个接口变量（interface variable）在运行时内部可以看作是一个<strong>pair：(Type, Value)</strong></p>
+<ul>
+<li><strong>Type(动态类型)</strong>：这是接口实际持有的具体类型（例如 *Book）。</li>
+<li><strong>Value (动态值)</strong>：这是持有具体数据的指针或值的副本。</li>
+</ul>
+<ol>
+<li>定义接口与结构体</li>
+</ol>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">Reader</span> <span class="kd">interface</span> <span class="p">{</span> <span class="nf">ReadBook</span><span class="p">()</span> <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">Writer</span> <span class="kd">interface</span> <span class="p">{</span> <span class="nf">WriteBook</span><span class="p">()</span> <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">Book</span> <span class="kd">struct</span> <span class="p">{}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// *Book 实现了 Reader 接口
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">func</span> <span class="p">(</span><span class="nx">b</span> <span class="o">*</span><span class="nx">Book</span><span class="p">)</span> <span class="nf">ReadBook</span><span class="p">()</span> <span class="p">{</span> <span class="nx">fmt</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;Read a book.&#34;</span><span class="p">)</span> <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="c1">// *Book 实现了 Writer 接口
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">func</span> <span class="p">(</span><span class="nx">b</span> <span class="o">*</span><span class="nx">Book</span><span class="p">)</span> <span class="nf">WriteBook</span><span class="p">()</span> <span class="p">{</span> <span class="nx">fmt</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;Write a book.&#34;</span><span class="p">)</span> <span class="p">}</span>
+</span></span></code></pre></td></tr></table>
 </div>
+</div><p>这里 *Book（Book 的指针类型）同时实现了 Reader 和 Writer 两个接口的全部方法。这意味着 *Book 类型的变量既可以赋值给 Reader，也可以赋值给 Writer。</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// b: pair&lt;type:Book, value:book{}地址&gt;
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">b</span> <span class="o">:=</span> <span class="o">&amp;</span><span class="nx">Book</span><span class="p">{</span><span class="s">&#34;To Live&#34;</span><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="c1">// r: pair&lt;type: , value: &gt;
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="kd">var</span> <span class="nx">r</span> <span class="nx">Reader</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">fmt</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="nx">reflect</span><span class="p">.</span><span class="nf">TypeOf</span><span class="p">(</span><span class="nx">r</span><span class="p">),</span> <span class="nx">r</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// r: pair&lt;type:Book, value:book{}地址&gt;
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">r</span> <span class="p">=</span> <span class="nx">b</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">fmt</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="nx">reflect</span><span class="p">.</span><span class="nf">TypeOf</span><span class="p">(</span><span class="nx">r</span><span class="p">),</span> <span class="nx">r</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">r</span><span class="p">.</span><span class="nf">ReadBook</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="c1">// w: pair&lt;type: , value: &gt;
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="kd">var</span> <span class="nx">w</span> <span class="nx">Writer</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">fmt</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="nx">reflect</span><span class="p">.</span><span class="nf">TypeOf</span><span class="p">(</span><span class="nx">w</span><span class="p">),</span> <span class="nx">w</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// w: pair&lt;type:Book, value:book{}地址&gt;
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">w</span> <span class="p">=</span> <span class="nx">r</span><span class="p">.(</span><span class="nx">Writer</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">fmt</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="nx">reflect</span><span class="p">.</span><span class="nf">TypeOf</span><span class="p">(</span><span class="nx">w</span><span class="p">),</span> <span class="nx">w</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">w</span><span class="p">.</span><span class="nf">WriteBook</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>输出：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">&lt;nil&gt; &lt;nil&gt;
+</span></span><span class="line"><span class="cl">*main.Book &amp;{To Live}
+</span></span><span class="line"><span class="cl">Read a book.
+</span></span><span class="line"><span class="cl">&lt;nil&gt; &lt;nil&gt;
+</span></span><span class="line"><span class="cl">*main.Book &amp;{To Live}
+</span></span><span class="line"><span class="cl">Write a book.
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>从上面的输出可以看出，接口类在未赋值时的pair为(nil,nil)。我们可以把 r 和 w 想象成两个不同的“窗口”，它们看着同一个“房间”（具体的 Book 对象）：</p>
+<p><strong>b (具体指针):</strong></p>
+<ul>
+<li>指向内存中的 Book{}。</li>
+</ul>
+<p><strong>r (Reader 接口):</strong></p>
+<ul>
+<li>动态类型: *Book</li>
+<li>动态值: 指向 b</li>
+<li>能力: 只能看见 ReadBook()</li>
+</ul>
+<p><strong>w (Writer 接口):</strong></p>
+<ul>
+<li>(通过 r.(Writer) 转换而来)</li>
+<li>动态类型: *Book (和 r 一样！)</li>
+<li>动态值: 指向 b (和 r 一样！)</li>
+<li>能力: 只能看见 WriteBook()</li>
+</ul>
 </section>
 
 
