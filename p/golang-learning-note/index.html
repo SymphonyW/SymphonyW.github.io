@@ -10,7 +10,7 @@
 <meta property='og:description' content="This is my Golang Learning Note">
 <meta property='og:url' content='https://SymphonyW.github.io/p/golang-learning-note/'>
 <meta property='og:site_name' content='SymphonyW'>
-<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='Golang' /><meta property='article:tag' content='Study' /><meta property='article:published_time' content='2026-01-05T21:44:12&#43;08:00'/><meta property='article:modified_time' content='2026-01-05T21:44:12&#43;08:00'/><meta property='og:image' content='https://SymphonyW.github.io/p/golang-learning-note/pawel-czerwinski-8uZPynIu-rQ-unsplash.jpg' />
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='Golang' /><meta property='article:tag' content='Study' /><meta property='article:published_time' content='2026-01-21T13:54:12&#43;08:00'/><meta property='article:modified_time' content='2026-01-21T13:54:12&#43;08:00'/><meta property='og:image' content='https://SymphonyW.github.io/p/golang-learning-note/pawel-czerwinski-8uZPynIu-rQ-unsplash.jpg' />
 <meta name="twitter:title" content="Golang Learning Note">
 <meta name="twitter:description" content="This is my Golang Learning Note"><meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:image" content='https://SymphonyW.github.io/p/golang-learning-note/pawel-czerwinski-8uZPynIu-rQ-unsplash.jpg' />
@@ -371,6 +371,23 @@
         </li>
       </ol>
     </li>
+    <li><a href="#第五部分">第五部分</a>
+      <ol>
+        <li><a href="#什么是go-modules">什么是Go Modules？</a></li>
+        <li><a href="#gopath的弊端">GOPATH的弊端</a></li>
+        <li><a href="#go-modules模式">Go Modules模式</a>
+          <ol>
+            <li><a href="#go111module">GO111MODULE</a></li>
+            <li><a href="#goproxy">GOPROXY</a></li>
+            <li><a href="#gosumdb">GOSUMDB</a></li>
+            <li><a href="#gonoproxygonosumdbgoprivate">GONOPROXY/GONOSUMDB/GOPRIVATE</a></li>
+            <li><a href="#总结">总结</a></li>
+          </ol>
+        </li>
+        <li><a href="#使用go-modules初始化项目">使用Go Modules初始化项目</a></li>
+        <li><a href="#改变模块依赖关系">改变模块依赖关系</a></li>
+      </ol>
+    </li>
   </ol>
 </nav>
         </div>
@@ -428,7 +445,7 @@
   <path d="M3 11h16" />
   <path d="M18 16.496v1.504l1 1" />
 </svg>
-                <time class="article-time--published">2026-01-05 21:44</time>
+                <time class="article-time--published">2026-01-21 13:54</time>
             </div>
         
 
@@ -463,7 +480,10 @@
     <section class="article-content">
     
     
-    <p>This blog is used to record notes while learning Golang.</p>
+    <p>This blog is used to record notes while learning Golang.
+Video URL: <a class="link" href="https://www.bilibili.com/video/BV1gf4y1r79E?spm_id_from=333.788.videopod.episodes&amp;vd_source=a28b0a61baf52e2de1f7120e1c9d88e1"  target="_blank" rel="noopener"
+    >https://www.bilibili.com/video/BV1gf4y1r79E?spm_id_from=333.788.videopod.episodes&vd_source=a28b0a61baf52e2de1f7120e1c9d88e1</a>
+Video Author: Liu Danbing</p>
 <h1 id="go学习笔记">Go学习笔记
 </h1><h2 id="第一部分">第一部分
 </h2><h3 id="基本结构">基本结构
@@ -3172,7 +3192,118 @@ close关键字可以关闭一个channel，channel关闭后只能读不能写，�
 </span></span><span class="line"><span class="cl">quit
 </span></span></code></pre></td></tr></table>
 </div>
+</div><h2 id="第五部分">第五部分
+</h2><h3 id="什么是go-modules">什么是Go Modules？
+</h3><p>Go modules是Go语言的依赖解决方案，发布于Go1.11，成长于Go1.12，丰富于Go1.13，正式于Go1.14，推荐在生产上使用。</p>
+<p>Go modules目前集成在Go的工具链中，只要安装了Go，自然而然也就可以使用Go modules了，而Go modules的出现也解决了在Go1.11前的几个常见争议问题：</p>
+<ul>
+<li>Go语言长久以来的依赖管理问题。</li>
+<li>“淘汰”现有的GOPATH的使用模式。</li>
+<li>同意社区中的其他的依赖管理工具（提供迁移功能）。</li>
+</ul>
+<h3 id="gopath的弊端">GOPATH的弊端
+</h3><p>在 GOPATH 的 $GOPATH/src 下进行 .go 文件或源代码的存储，我们可以称其为 GOPATH 的模式，这个模式拥有一些弊端。</p>
+<ul>
+<li>A. <strong>无版本控制概念。</strong> 在执行go get的时候，你无法传达任何的版本信息的期望，也就是说你也无法知道自己当前更新的是哪一个版本，也无法通过指定来拉取自己所期望的具体版本。</li>
+<li>B.<strong>无法同步一致第三方版本号。</strong> 在运行 Go 应用程序的时候，你无法保证其它人与你所期望依赖的第三方库是相同的版本，也就是说在项目依赖库的管理上，你无法保证所有人的依赖版本都一致。</li>
+<li>C.<strong>无法指定当前项目引用的第三方版本号。</strong> 没办法处理 v1、v2、v3 等等不同版本的引用问题，因为 GOPATH 模式下的导入路径都是一样的，都是github.com/foo/bar。</li>
+</ul>
+<h3 id="go-modules模式">Go Modules模式
+</h3><ol>
+<li>
+<p>go mod命令
+<div class="post-image-container" style="margin: 40px auto; text-align: center; width: 85%;">
+    <img src="go-mod-instruction.png" 
+         alt="go mod命令" 
+         
+         style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">go mod命令</span>
+    
+</div></p>
+</li>
+<li>
+<p>go mod环境变量
+可以通过 go env 命令来进行查看</p>
+</li>
+</ol>
+<h4 id="go111module">GO111MODULE
+</h4><p>GO111MODULE</p>
+<p>Go语言提供了 GO111MODULE这个环境变量来作为 Go modules 的开关，其允许设置以下参数：</p>
+<ul>
+<li>auto：只要项目包含了 go.mod 文件的话启用 Go modules，目前在 Go1.11 至 Go1.14 中仍然是默认值。</li>
+<li>on：启用 Go modules，推荐设置，将会是未来版本中的默认值。</li>
+<li>off：禁用 Go modules，不推荐设置。</li>
+</ul>
+<p>可以在终端执行：go env -w GO111MODULE=on 来设置。</p>
+<h4 id="goproxy">GOPROXY
+</h4><p>这个环境变量主要是用于设置 Go 模块代理（Go module proxy）,其作用是用于使 Go 在后续拉取模块版本时直接通过镜像站点来快速拉取。</p>
+<p>GOPROXY 的默认值是：https://proxy.golang.org,direct</p>
+<p>实际上 “direct” 是一个特殊指示符，用于指示 Go 回源到模块版本的源地址去抓取（比如 GitHub 等），场景如下：当值列表中上一个 Go 模块代理返回 404 或 410 错误时，Go 自动尝试列表中的下一个，遇见 “direct” 时回源，也就是回到源地址去抓取，而遇见 EOF 时终止并抛出类似 “invalid version: unknown revision&hellip;” 的错误。</p>
+<h4 id="gosumdb">GOSUMDB
+</h4><p>它的值是一个 Go checksum database，用于在拉取模块版本时（无论是从源站拉取还是通过 Go module proxy 拉取）保证拉取到的模块版本数据未经过篡改，若发现不一致，也就是可能存在篡改，将会立即中止。</p>
+<p>GOSUMDB 的默认值为：sum.golang.org，在国内也是无法访问的，但是 GOSUMDB 可以被 Go 模块代理所代理（详见：Proxying a Checksum Database）。</p>
+<p>因此我们可以通过设置 GOPROXY 来解决，而先前我们所设置的模块代理 goproxy.cn 就能支持代理 sum.golang.org，所以这一个问题在设置 GOPROXY 后，你可以不需要过度关心。</p>
+<p>另外若对 GOSUMDB 的值有自定义需求，其支持如下格式：</p>
+<ul>
+<li>格式 1：&lt;SUMDB_NAME&gt;+&lt;PUBLIC_KEY&gt;。</li>
+<li>格式 2：&lt;SUMDB_NAME&gt;+&lt;PUBLIC_KEY&gt; &lt;SUMDB_URL&gt;。</li>
+</ul>
+<p>也可以将其设置为“off”，也就是禁止 Go 在后续操作中校验模块版本。</p>
+<h4 id="gonoproxygonosumdbgoprivate">GONOPROXY/GONOSUMDB/GOPRIVATE
+</h4><p>这三个环境变量都是用在当前项目依赖了私有模块，例如像是你公司的私有 git 仓库，又或是 github 中的私有库，都是属于私有模块，都是要进行设置的，否则会拉取失败。</p>
+<p>更细致来讲，就是依赖了由 GOPROXY 指定的 Go 模块代理或由 GOSUMDB 指定 Go checksum database 都无法访问到的模块时的场景。</p>
+<p>而一般建议直接设置 GOPRIVATE，它的值将作为 GONOPROXY 和 GONOSUMDB 的默认值，所以建议的最佳姿势是直接使用 GOPRIVATE。</p>
+<p>并且它们的值都是一个以英文逗号 “,” 分割的模块路径前缀，也就是可以设置多个，例如：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">$ go env -w <span class="nv">GOPRIVATE</span><span class="o">=</span><span class="s2">&#34;git.example.com,github.com/eddycjy/mquote&#34;</span>
+</span></span></code></pre></td></tr></table>
 </div>
+</div><p>设置后，前缀为 git.xxx.com 和 github.com/eddycjy/mquote 的模块都会被认为是私有模块。</p>
+<p>如果不想每次都重新设置，我们也可以利用通配符，例如：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">$ go env -w <span class="nv">GOPRIVATE</span><span class="o">=</span><span class="s2">&#34;*.example.com&#34;</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这样子设置的话，所有模块路径为 example.com 的子域名（例如：git.example.com）都将不经过 Go module proxy 和 Go checksum database，需要注意的是不包括 example.com 本身。</p>
+<h4 id="总结">总结
+</h4><p><div class="post-image-container" style="margin: 40px auto; text-align: center; width: 85%;">
+    <img src="go-modules.png" 
+         alt="go modules模式的一些内容" 
+         
+         style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">go modules模式的一些内容</span>
+    
+</div></p>
+<h3 id="使用go-modules初始化项目">使用Go Modules初始化项目
+</h3><p><div class="post-image-container" style="margin: 40px auto; text-align: center; width: 85%;">
+    <img src="init-use-go-modules.png" 
+         alt="使用Go Modules初始化项目" 
+         
+         style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">使用Go Modules初始化项目</span>
+    
+</div></p>
+<h3 id="改变模块依赖关系">改变模块依赖关系
+</h3><p><div class="post-image-container" style="margin: 40px auto; text-align: center; width: 85%;">
+    <img src="change-independent-relate.png" 
+         alt="改变模块依赖关系" 
+         
+         style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">改变模块依赖关系</span>
+    
+</div></p>
 </section>
 
 
@@ -3196,6 +3327,39 @@ close关键字可以关闭一个channel，channel关闭后只能读不能写，�
     
 
     
+
+<aside class="related-content--wrapper">
+    <h2 class="section-title">Related content</h2>
+    <div class="related-content">
+        <div class="flex article-list--tile">
+            
+                
+<article class="has-image">
+    <a href="/p/instant-messaging-system/">
+        
+        
+            <div class="article-image">
+                <img src="/p/instant-messaging-system/_hud7e36f7e20e71be184458283bdae4646_55974_23a5d351d2fc2374f952239b6e9c423a.jpg" 
+                        width="250" 
+                        height="150" 
+                        loading="lazy"
+                        alt="Featured image of post Instant Messaging System"
+                        
+                        data-hash="md5-xRTZFpFxc6SKQuARS0aZYQ==">
+                
+            </div>
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Instant Messaging System</h2>
+        </div>
+    </a>
+</article>
+
+            
+        </div>
+    </div>
+</aside>
 
      
     
