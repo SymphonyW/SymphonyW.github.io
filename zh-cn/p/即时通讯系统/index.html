@@ -338,6 +338,12 @@
         <li><a href="#测试-2">测试</a></li>
       </ol>
     </li>
+    <li><a href="#v07-超时强踢功能">v0.7 超时强踢功能</a>
+      <ol>
+        <li><a href="#修改handler方法-1">修改Handler方法</a></li>
+        <li><a href="#测试-3">测试</a></li>
+      </ol>
+    </li>
   </ol>
 </nav>
         </div>
@@ -1388,6 +1394,164 @@
         
        target="_blank" 
        class="gallery-item"> <img src="v0.6-test.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<h2 id="v07-超时强踢功能">v0.7 超时强踢功能
+</h2><h3 id="修改handler方法-1">修改Handler方法
+</h3><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span><span class="lnt">25
+</span><span class="lnt">26
+</span><span class="lnt">27
+</span><span class="lnt">28
+</span><span class="lnt">29
+</span><span class="lnt">30
+</span><span class="lnt">31
+</span><span class="lnt">32
+</span><span class="lnt">33
+</span><span class="lnt">34
+</span><span class="lnt">35
+</span><span class="lnt">36
+</span><span class="lnt">37
+</span><span class="lnt">38
+</span><span class="lnt">39
+</span><span class="lnt">40
+</span><span class="lnt">41
+</span><span class="lnt">42
+</span><span class="lnt">43
+</span><span class="lnt">44
+</span><span class="lnt">45
+</span><span class="lnt">46
+</span><span class="lnt">47
+</span><span class="lnt">48
+</span><span class="lnt">49
+</span><span class="lnt">50
+</span><span class="lnt">51
+</span><span class="lnt">52
+</span><span class="lnt">53
+</span><span class="lnt">54
+</span><span class="lnt">55
+</span><span class="lnt">56
+</span><span class="lnt">57
+</span><span class="lnt">58
+</span><span class="lnt">59
+</span><span class="lnt">60
+</span><span class="lnt">61
+</span><span class="lnt">62
+</span><span class="lnt">63
+</span><span class="lnt">64
+</span><span class="lnt">65
+</span><span class="lnt">66
+</span><span class="lnt">67
+</span><span class="lnt">68
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">this</span> <span class="o">*</span><span class="nx">Server</span><span class="p">)</span> <span class="nf">Handler</span><span class="p">(</span><span class="nx">conn</span> <span class="nx">net</span><span class="p">.</span><span class="nx">Conn</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// ...当前链接的业务
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">fmt</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;链接建立成功！&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">user</span> <span class="o">:=</span> <span class="nf">NewUser</span><span class="p">(</span><span class="nx">conn</span><span class="p">,</span> <span class="nx">this</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">user</span><span class="p">.</span><span class="nf">Online</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="c1">// -----------修改位置-----------
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="c1">// 监听用户是否活跃的channel
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">isLive</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">(</span><span class="kd">chan</span> <span class="kt">bool</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// -----------------------------
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// 接收客户端发送的消息：对socket进行基本的read操作
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="k">go</span> <span class="kd">func</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">buf</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">([]</span><span class="kt">byte</span><span class="p">,</span> <span class="mi">4096</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="k">for</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="c1">// 从当前conn套接字中读取数据到buf中，返回值是读取的字节数n和错误信息err
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="nx">n</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">conn</span><span class="p">.</span><span class="nf">Read</span><span class="p">(</span><span class="nx">buf</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">			<span class="k">if</span> <span class="nx">n</span> <span class="o">==</span> <span class="mi">0</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">				<span class="nx">user</span><span class="p">.</span><span class="nf">Offline</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">				<span class="k">return</span>
+</span></span><span class="line"><span class="cl">			<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">			<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="o">&amp;&amp;</span> <span class="nx">err</span> <span class="o">!=</span> <span class="nx">io</span><span class="p">.</span><span class="nx">EOF</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">				<span class="nx">fmt</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;Conn Read err:&#34;</span><span class="p">,</span> <span class="nx">err</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">				<span class="k">return</span>
+</span></span><span class="line"><span class="cl">			<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">			<span class="c1">// 提取用户的消息并去除结尾的&#39;\r\n&#39;
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="nx">msg</span> <span class="o">:=</span> <span class="nb">string</span><span class="p">(</span><span class="nx">buf</span><span class="p">[:</span><span class="nx">n</span><span class="o">-</span><span class="mi">2</span><span class="p">])</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">			<span class="c1">// 用户针对msg进行消息处理
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="nx">user</span><span class="p">.</span><span class="nf">DoMessage</span><span class="p">(</span><span class="nx">msg</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">			<span class="c1">// 用户的任意消息，都能代表用户当前是活跃的
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="nx">isLive</span> <span class="o">&lt;-</span> <span class="kc">true</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}()</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="c1">// -----------修改位置-----------
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="c1">// 当前handler阻塞：若当前handler结束，则所有子go程也都会结束
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="k">for</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">select</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">case</span> <span class="o">&lt;-</span><span class="nx">isLive</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">			<span class="c1">// 当前用户是活跃的，应该充值定时器
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="c1">// 不用做任何事情，只是为了结束本次的select，循环进入新的一个select，以重置下面的定时器，妙妙妙
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>
+</span></span><span class="line"><span class="cl">		<span class="k">case</span> <span class="o">&lt;-</span><span class="nx">time</span><span class="p">.</span><span class="nf">After</span><span class="p">(</span><span class="nx">time</span><span class="p">.</span><span class="nx">Minute</span> <span class="o">*</span> <span class="mi">30</span><span class="p">):</span> <span class="c1">// time.After也是一个channel，作为计时器使用，这里计时30分钟，超时后channel中就会有一个数据
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="c1">// 已经超时
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="c1">// 将当前的user强制关闭
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>
+</span></span><span class="line"><span class="cl">			<span class="nx">user</span><span class="p">.</span><span class="nf">SendMsg</span><span class="p">(</span><span class="s">&#34;由于长时间未操作，你被踢了。\n&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">			<span class="c1">// 销毁用户资源
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="nb">close</span><span class="p">(</span><span class="nx">user</span><span class="p">.</span><span class="nx">C</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">			<span class="c1">// 关闭连接
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="nx">conn</span><span class="p">.</span><span class="nf">Close</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">			<span class="c1">// 退出当前handler
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="c1">// runtime.Goexit()
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="k">return</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// -----------------------------
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p><strong>select在这个地方起到了非常妙的效果，具体详见注释。</strong></p>
+<h3 id="测试-3">测试
+</h3><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="v0.7-test.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="v0.7-test.png" 
              alt="" 
              style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
              
