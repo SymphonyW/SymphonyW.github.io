@@ -350,7 +350,41 @@
         <li><a href="#测试-4">测试</a></li>
       </ol>
     </li>
-    <li><a href="#v09-客户端实现">v0.9 客户端实现</a></li>
+    <li><a href="#v09-客户端实现">v0.9 客户端实现</a>
+      <ol>
+        <li><a href="#v091-建立连接">v0.9.1 建立连接</a>
+          <ol>
+            <li><a href="#定义client类型">定义client类型</a></li>
+            <li><a href="#创建client对象同时连接服务器">创建client对象，同时连接服务器</a></li>
+            <li><a href="#主业务创建client对象">主业务创建client对象</a></li>
+            <li><a href="#测试-5">测试</a></li>
+          </ol>
+        </li>
+        <li><a href="#v092-命令行解析">v0.9.2 命令行解析</a>
+          <ol>
+            <li><a href="#修改clientgo">修改client.go</a></li>
+            <li><a href="#测试-6">测试</a></li>
+          </ol>
+        </li>
+        <li><a href="#v093-菜单显示">v0.9.3 菜单显示</a>
+          <ol>
+            <li><a href="#client新增flag属性">Client新增flag属性</a></li>
+            <li><a href="#新增menu方法获取用户输入的模式">新增menu方法，获取用户输入的模式</a></li>
+            <li><a href="#新增run主业务循环">新增Run主业务循环</a></li>
+            <li><a href="#测试-7">测试</a></li>
+          </ol>
+        </li>
+        <li><a href="#v094-更新用户名封装版">v0.9.4 更新用户名(封装版)</a>
+          <ol>
+            <li><a href="#新增updatename更新用户名">新增UpdateName()更新用户名</a></li>
+            <li><a href="#把updatename加入到run业务分支中">把UpdateName加入到Run业务分支中</a></li>
+            <li><a href="#添加处理server回执消息的dealresponse方法">添加处理server回执消息的DealResponse()方法</a></li>
+            <li><a href="#在main方法中开启一个go去承载dealresponse流程">在main方法中开启一个go，去承载DealResponse()流程</a></li>
+            <li><a href="#测试-8">测试</a></li>
+          </ol>
+        </li>
+      </ol>
+    </li>
   </ol>
 </nav>
         </div>
@@ -1705,7 +1739,518 @@
     
 </div></p>
 <h2 id="v09-客户端实现">v0.9 客户端实现
-</h2><div class="highlight"><div class="chroma">
+</h2><h3 id="v091-建立连接">v0.9.1 建立连接
+</h3><p><strong>在这个版本中，要新创建一个client.go。但当前服务器的ip和端口是写死的，在后续版本中会实现在客户端指定服务器的ip和端口。</strong></p>
+<h4 id="定义client类型">定义client类型
+</h4><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">Client</span> <span class="kd">struct</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">ServerIp</span>   <span class="kt">string</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">ServerPort</span> <span class="kt">int</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">Name</span>       <span class="kt">string</span>   <span class="c1">// 重命名后在赋值
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">conn</span>       <span class="nx">net</span><span class="p">.</span><span class="nx">Conn</span> <span class="c1">// 连成功后再赋值
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h4 id="创建client对象同时连接服务器">创建client对象，同时连接服务器
+</h4><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">NewClient</span><span class="p">(</span><span class="nx">serverIp</span> <span class="kt">string</span><span class="p">,</span> <span class="nx">serverPort</span> <span class="kt">int</span><span class="p">)</span> <span class="o">*</span><span class="nx">Client</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// 创建客户端对象
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">client</span> <span class="o">:=</span> <span class="o">&amp;</span><span class="nx">Client</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">ServerIp</span><span class="p">:</span>   <span class="nx">serverIp</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">ServerPort</span><span class="p">:</span> <span class="nx">serverPort</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="c1">// 连接server，net.Dial是 Go 语言 net 标准库中最核心的函数之一，用于从客户端发起一个网络连接。参数是协议和地址(network, address)，升级版本加了超时控制参数
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="c1">// conn, err := net.Dial(&#34;tcp&#34;, fmt.Sprintf(&#34;%s:%d&#34;, serverIp, serverPort))
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">conn</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">net</span><span class="p">.</span><span class="nf">DialTimeout</span><span class="p">(</span><span class="s">&#34;tcp&#34;</span><span class="p">,</span> <span class="nx">fmt</span><span class="p">.</span><span class="nf">Sprintf</span><span class="p">(</span><span class="s">&#34;%s:%d&#34;</span><span class="p">,</span> <span class="nx">serverIp</span><span class="p">,</span> <span class="nx">serverPort</span><span class="p">),</span> <span class="mi">5</span><span class="o">*</span><span class="nx">time</span><span class="p">.</span><span class="nx">Second</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="c1">// 如果连接失败
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">fmt</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;net.DialTimeout error:&#34;</span><span class="p">,</span> <span class="nx">err</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="kc">nil</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">client</span><span class="p">.</span><span class="nx">conn</span> <span class="p">=</span> <span class="nx">conn</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="c1">// 返回对象
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="k">return</span> <span class="nx">client</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h4 id="主业务创建client对象">主业务创建client对象
+</h4><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">client</span> <span class="o">:=</span> <span class="nf">NewClient</span><span class="p">(</span><span class="s">&#34;127.0.0.1&#34;</span><span class="p">,</span> <span class="mi">8888</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">client</span> <span class="o">==</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">fmt</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;&gt;&gt;&gt;&gt;&gt; 连接服务器失败...&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">fmt</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;&gt;&gt;&gt;&gt;&gt; 连接服务器成功！&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="c1">// 启动客户端的业务
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="k">for</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h4 id="测试-5">测试
+</h4><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="v0.9.1-connect.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="v0.9.1-connect.png" 
+             alt="测试结果" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">测试结果</span>
+    
+</div></p>
+<h3 id="v092-命令行解析">v0.9.2 命令行解析
+</h3><h4 id="修改clientgo">修改client.go
+</h4><p>**NewClient方法无需修改，只需将NewClient方法之后的代码替换成如下代码即可。</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span><span class="lnt">25
+</span><span class="lnt">26
+</span><span class="lnt">27
+</span><span class="lnt">28
+</span><span class="lnt">29
+</span><span class="lnt">30
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="c1">// 定义了两个全局变量，用来存储最终要连接的 IP 和端口。
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">var</span> <span class="nx">serverIp</span> <span class="kt">string</span>
+</span></span><span class="line"><span class="cl"><span class="kd">var</span> <span class="nx">serverPort</span> <span class="kt">int</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// init() 函数会在 main() 函数执行之前自动被调用。这确保了程序一开始就配置好了这些参数规则。
+</span></span></span><span class="line"><span class="cl"><span class="c1">// flag包，用于实现命令行参数解析的功能，允许在运行程序（.exe）时，通过命令行动态地指定服务器的IP和端口，而不是把IP写死在代码里。
+</span></span></span><span class="line"><span class="cl"><span class="c1">// .\client -ip 127.0.0.1 -port 8888
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">func</span> <span class="nf">init</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">flag</span><span class="p">.</span><span class="nf">StringVar</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">serverIp</span><span class="p">,</span> <span class="s">&#34;ip&#34;</span><span class="p">,</span> <span class="s">&#34;127.0.0.1&#34;</span><span class="p">,</span> <span class="s">&#34;设置服务器IP地址(默认为127.0.0.1)&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">flag</span><span class="p">.</span><span class="nf">IntVar</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">serverPort</span><span class="p">,</span> <span class="s">&#34;port&#34;</span><span class="p">,</span> <span class="mi">8888</span><span class="p">,</span> <span class="s">&#34;设置服务器IP地址(默认为8888)&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// 用于读取并解析用户输入的命令
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">flag</span><span class="p">.</span><span class="nf">Parse</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="c1">// client := NewClient(&#34;127.0.0.1&#34;, 8888)
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">client</span> <span class="o">:=</span> <span class="nf">NewClient</span><span class="p">(</span><span class="nx">serverIp</span><span class="p">,</span> <span class="nx">serverPort</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">client</span> <span class="o">==</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">fmt</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;&gt;&gt;&gt;&gt;&gt; 连接服务器失败...&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">fmt</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;&gt;&gt;&gt;&gt;&gt; 连接服务器成功！&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="c1">// 启动客户端的业务
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="k">for</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h4 id="测试-6">测试
+</h4><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="v0.9.2-test.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="v0.9.2-test.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<h3 id="v093-菜单显示">v0.9.3 菜单显示
+</h3><h4 id="client新增flag属性">Client新增flag属性
+</h4><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">Client</span> <span class="kd">struct</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">ServerIp</span>   <span class="kt">string</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">ServerPort</span> <span class="kt">int</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">Name</span>       <span class="kt">string</span>   <span class="c1">// 重命名后在赋值
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">conn</span>       <span class="nx">net</span><span class="p">.</span><span class="nx">Conn</span> <span class="c1">// 连成功后再赋值
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">flag</span>       <span class="kt">int</span>      <span class="c1">// 表示当前client的模式
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h4 id="新增menu方法获取用户输入的模式">新增menu方法，获取用户输入的模式
+</h4><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">client</span> <span class="o">*</span><span class="nx">Client</span><span class="p">)</span> <span class="nf">menu</span><span class="p">()</span> <span class="kt">bool</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="kd">var</span> <span class="nx">flag</span> <span class="kt">int</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">fmt</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;1.公聊模式&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">fmt</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;2.私聊模式&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">fmt</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;3.更新用户名&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">fmt</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;0.退出&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">fmt</span><span class="p">.</span><span class="nf">Scanln</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">flag</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">flag</span> <span class="o">&gt;=</span> <span class="mi">0</span> <span class="o">&amp;&amp;</span> <span class="nx">flag</span> <span class="o">&lt;=</span> <span class="mi">3</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">client</span><span class="p">.</span><span class="nx">flag</span> <span class="p">=</span> <span class="nx">flag</span> <span class="c1">// flag合法，赋值给用户的状态
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="k">return</span> <span class="kc">true</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">fmt</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;&gt;&gt;&gt;&gt;&gt;请输入合法范围内的谁&lt;&lt;&lt;&lt;&lt;&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="kc">false</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h4 id="新增run主业务循环">新增Run主业务循环
+</h4><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">client</span> <span class="o">*</span><span class="nx">Client</span><span class="p">)</span> <span class="nf">Run</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// 应该根据用户menu的提示结果来选择不同的模式
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>
+</span></span><span class="line"><span class="cl">	<span class="k">for</span> <span class="nx">client</span><span class="p">.</span><span class="nx">flag</span> <span class="o">!=</span> <span class="mi">0</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">for</span> <span class="nx">client</span><span class="p">.</span><span class="nf">menu</span><span class="p">()</span> <span class="o">!=</span> <span class="kc">true</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">		<span class="c1">// 根据不同的模式处理不同的业务
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="c1">// 在 Go 语言中的 switch 是默认不穿透的，每个 case 执行完后会自动退出，因此不需要显式地写 break。
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="c1">// 如果希望执行完 case 1 后，继续执行 case 2（就像 C 语言那样），就需要显式使用 fallthrough 关键字
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="k">switch</span> <span class="nx">client</span><span class="p">.</span><span class="nx">flag</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">case</span> <span class="mi">1</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">			<span class="c1">// 公聊模式
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="nx">fmt</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;公聊模式选择...&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">			<span class="c1">// fallthrough		// case穿透
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="k">case</span> <span class="mi">2</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">			<span class="c1">// 私聊模式
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="nx">fmt</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;私聊模式选择...&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="k">case</span> <span class="mi">3</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">			<span class="c1">// 更新用户名
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="nx">fmt</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;更新用户名选择...&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h4 id="测试-7">测试
+</h4><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="v0.9.3-test.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="v0.9.3-test.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<h3 id="v094-更新用户名封装版">v0.9.4 更新用户名(封装版)
+</h3><h4 id="新增updatename更新用户名">新增UpdateName()更新用户名
+</h4><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">client</span> <span class="o">*</span><span class="nx">Client</span><span class="p">)</span> <span class="nf">UpdateName</span><span class="p">()</span> <span class="kt">bool</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// 提示输入用户名-&gt;用户输入-&gt;发给服务器
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>
+</span></span><span class="line"><span class="cl">	<span class="nx">fmt</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;&gt;&gt;&gt;&gt;&gt;请输入用户名:&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">fmt</span><span class="p">.</span><span class="nf">Scanln</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">client</span><span class="p">.</span><span class="nx">Name</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">fmt</span><span class="p">.</span><span class="nf">Printf</span><span class="p">(</span><span class="s">&#34;%q&#34;</span><span class="p">,</span> <span class="nx">client</span><span class="p">.</span><span class="nx">Name</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">sendMsg</span> <span class="o">:=</span> <span class="s">&#34;rename|&#34;</span> <span class="o">+</span> <span class="nx">client</span><span class="p">.</span><span class="nx">Name</span> <span class="o">+</span> <span class="s">&#34;\r\n&#34;</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">_</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">client</span><span class="p">.</span><span class="nx">conn</span><span class="p">.</span><span class="nf">Write</span><span class="p">([]</span><span class="nb">byte</span><span class="p">(</span><span class="nx">sendMsg</span><span class="p">))</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">fmt</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;conn.Write err:&#34;</span><span class="p">,</span> <span class="nx">err</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="kc">false</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="kc">true</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h4 id="把updatename加入到run业务分支中">把UpdateName加入到Run业务分支中
+</h4><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span><span class="lnt">25
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">client</span> <span class="o">*</span><span class="nx">Client</span><span class="p">)</span> <span class="nf">Run</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// 应该根据用户menu的提示结果来选择不同的模式
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>
+</span></span><span class="line"><span class="cl">	<span class="k">for</span> <span class="nx">client</span><span class="p">.</span><span class="nx">flag</span> <span class="o">!=</span> <span class="mi">0</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">for</span> <span class="nx">client</span><span class="p">.</span><span class="nf">menu</span><span class="p">()</span> <span class="o">!=</span> <span class="kc">true</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">		<span class="c1">// 根据不同的模式处理不同的业务
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="c1">// 在 Go 语言中的 switch 是默认不穿透的，每个 case 执行完后会自动退出，因此不需要显式地写 break。
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="c1">// 如果希望执行完 case 1 后，继续执行 case 2（就像 C 语言那样），就需要显式使用 fallthrough 关键字
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="k">switch</span> <span class="nx">client</span><span class="p">.</span><span class="nx">flag</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">case</span> <span class="mi">1</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">			<span class="c1">// 公聊模式
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="nx">fmt</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;公聊模式选择...&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">			<span class="c1">// fallthrough		// case穿透
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="k">case</span> <span class="mi">2</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">			<span class="c1">// 私聊模式
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="nx">fmt</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;私聊模式选择...&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="k">case</span> <span class="mi">3</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">			<span class="c1">// 更新用户名
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="c1">// fmt.Println(&#34;更新用户名选择...&#34;)
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>			<span class="nx">client</span><span class="p">.</span><span class="nf">UpdateName</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h4 id="添加处理server回执消息的dealresponse方法">添加处理server回执消息的DealResponse()方法
+</h4><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="c1">// 处理server回应的消息，直接显示到标准输出即可
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">func</span> <span class="p">(</span><span class="nx">client</span> <span class="o">*</span><span class="nx">Client</span><span class="p">)</span> <span class="nf">DealResponse</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// 建立一条直通管道，把服务器发来的所有原始数据，原封不动地直接打印到屏幕上
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="c1">// 一旦client.conn有数据，就直接copy到stdout标准输出上，io.Copy内部自带了一个死循环，永久阻塞监听
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">io</span><span class="p">.</span><span class="nf">Copy</span><span class="p">(</span><span class="nx">os</span><span class="p">.</span><span class="nx">Stdout</span><span class="p">,</span> <span class="nx">client</span><span class="p">.</span><span class="nx">conn</span><span class="p">)</span> <span class="c1">// 不断阻塞等待client.conn中的数据，如果有数据就直接反倒os.Stdout中，而且是永久阻塞
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h4 id="在main方法中开启一个go去承载dealresponse流程">在main方法中开启一个go，去承载DealResponse()流程
+</h4><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="c1">// 用于读取并解析用户输入的命令
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">flag</span><span class="p">.</span><span class="nf">Parse</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="c1">// client := NewClient(&#34;127.0.0.1&#34;, 8888)
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">client</span> <span class="o">:=</span> <span class="nf">NewClient</span><span class="p">(</span><span class="nx">serverIp</span><span class="p">,</span> <span class="nx">serverPort</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">client</span> <span class="o">==</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">fmt</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;&gt;&gt;&gt;&gt;&gt; 连接服务器失败...&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="c1">// 单独开启一个goroutine去从处理server的回执消息
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="k">go</span> <span class="nx">client</span><span class="p">.</span><span class="nf">DealResponse</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">fmt</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;&gt;&gt;&gt;&gt;&gt; 连接服务器成功！&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="c1">// 启动客户端的业务
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">client</span><span class="p">.</span><span class="nf">Run</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h4 id="测试-8">测试
+</h4><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="v0.9.4-test.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="v0.9.4-test.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
 <pre tabindex="0" class="chroma"><code></code></pre></td>
 <td class="lntd">
