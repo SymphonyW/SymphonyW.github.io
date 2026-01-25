@@ -344,6 +344,13 @@
         <li><a href="#测试-3">测试</a></li>
       </ol>
     </li>
+    <li><a href="#v08-用户私聊功能">v0.8 用户私聊功能</a>
+      <ol>
+        <li><a href="#修改domessage">修改DoMessage</a></li>
+        <li><a href="#测试-4">测试</a></li>
+      </ol>
+    </li>
+    <li><a href="#v09-客户端实现">v0.9 客户端实现</a></li>
   </ol>
 </nav>
         </div>
@@ -1558,7 +1565,147 @@
     </a>
     
 </div></p>
+<h2 id="v08-用户私聊功能">v0.8 用户私聊功能
+</h2><h3 id="修改domessage">修改DoMessage
+</h3><p><strong>此版本只需在DoMessage方法中新增一个分支即可：</strong></p>
 <div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span><span class="lnt">25
+</span><span class="lnt">26
+</span><span class="lnt">27
+</span><span class="lnt">28
+</span><span class="lnt">29
+</span><span class="lnt">30
+</span><span class="lnt">31
+</span><span class="lnt">32
+</span><span class="lnt">33
+</span><span class="lnt">34
+</span><span class="lnt">35
+</span><span class="lnt">36
+</span><span class="lnt">37
+</span><span class="lnt">38
+</span><span class="lnt">39
+</span><span class="lnt">40
+</span><span class="lnt">41
+</span><span class="lnt">42
+</span><span class="lnt">43
+</span><span class="lnt">44
+</span><span class="lnt">45
+</span><span class="lnt">46
+</span><span class="lnt">47
+</span><span class="lnt">48
+</span><span class="lnt">49
+</span><span class="lnt">50
+</span><span class="lnt">51
+</span><span class="lnt">52
+</span><span class="lnt">53
+</span><span class="lnt">54
+</span><span class="lnt">55
+</span><span class="lnt">56
+</span><span class="lnt">57
+</span><span class="lnt">58
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="c1">// 用户处理消息的业务
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">func</span> <span class="p">(</span><span class="nx">this</span> <span class="o">*</span><span class="nx">User</span><span class="p">)</span> <span class="nf">DoMessage</span><span class="p">(</span><span class="nx">msg</span> <span class="kt">string</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">msg</span> <span class="o">==</span> <span class="s">&#34;who&#34;</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="c1">// 查询当前在线用户都有哪些
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="nx">this</span><span class="p">.</span><span class="nx">server</span><span class="p">.</span><span class="nx">mapLock</span><span class="p">.</span><span class="nf">Lock</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">		<span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">user</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">this</span><span class="p">.</span><span class="nx">server</span><span class="p">.</span><span class="nx">OnlineMap</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">onlineMesg</span> <span class="o">:=</span> <span class="s">&#34;[&#34;</span> <span class="o">+</span> <span class="nx">user</span><span class="p">.</span><span class="nx">Addr</span> <span class="o">+</span> <span class="s">&#34;]&#34;</span> <span class="o">+</span> <span class="nx">user</span><span class="p">.</span><span class="nx">Name</span> <span class="o">+</span> <span class="s">&#34;:&#34;</span> <span class="o">+</span> <span class="s">&#34;在线\n&#34;</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">this</span><span class="p">.</span><span class="nf">SendMsg</span><span class="p">(</span><span class="nx">onlineMesg</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">this</span><span class="p">.</span><span class="nx">server</span><span class="p">.</span><span class="nx">mapLock</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span> <span class="k">else</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="nx">msg</span><span class="p">)</span> <span class="p">&gt;</span> <span class="mi">4</span> <span class="o">&amp;&amp;</span> <span class="nx">msg</span><span class="p">[:</span><span class="mi">3</span><span class="p">]</span> <span class="o">==</span> <span class="s">&#34;to|&#34;</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="c1">// 私聊消息格式：to|张三|消息内容
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>
+</span></span><span class="line"><span class="cl">		<span class="c1">// 1.获取对方用户名
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="nx">remoteName</span> <span class="o">:=</span> <span class="nx">strings</span><span class="p">.</span><span class="nf">Split</span><span class="p">(</span><span class="nx">msg</span><span class="p">,</span> <span class="s">&#34;|&#34;</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span>
+</span></span><span class="line"><span class="cl">		<span class="k">if</span> <span class="nx">remoteName</span> <span class="o">==</span> <span class="s">&#34;&#34;</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">this</span><span class="p">.</span><span class="nf">SendMsg</span><span class="p">(</span><span class="s">&#34;消息格式不正确，请使用 \&#34;to|张三|你好啊\&#34;的格式.\n&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">			<span class="k">return</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">		<span class="c1">// 2.根据用户名得到对方的User对象
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="nx">remoteUser</span><span class="p">,</span> <span class="nx">ok</span> <span class="o">:=</span> <span class="nx">this</span><span class="p">.</span><span class="nx">server</span><span class="p">.</span><span class="nx">OnlineMap</span><span class="p">[</span><span class="nx">remoteName</span><span class="p">]</span>
+</span></span><span class="line"><span class="cl">		<span class="k">if</span> <span class="p">!</span><span class="nx">ok</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">this</span><span class="p">.</span><span class="nf">SendMsg</span><span class="p">(</span><span class="nx">remoteName</span> <span class="o">+</span> <span class="s">&#34;当前不在线!\n&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">		<span class="c1">// 3.获取消息内容，通过对方的User对象将消息内容发送过去
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="nx">content</span> <span class="o">:=</span> <span class="nx">strings</span><span class="p">.</span><span class="nf">Split</span><span class="p">(</span><span class="nx">msg</span><span class="p">,</span> <span class="s">&#34;|&#34;</span><span class="p">)[</span><span class="mi">2</span><span class="p">]</span>
+</span></span><span class="line"><span class="cl">		<span class="k">if</span> <span class="nx">content</span> <span class="o">==</span> <span class="s">&#34;&#34;</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">this</span><span class="p">.</span><span class="nf">SendMsg</span><span class="p">(</span><span class="s">&#34;无消息内容，请重发。\n&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">			<span class="k">return</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">remoteUser</span><span class="p">.</span><span class="nf">SendMsg</span><span class="p">(</span><span class="nx">this</span><span class="p">.</span><span class="nx">Name</span> <span class="o">+</span> <span class="s">&#34;对您说：&#34;</span> <span class="o">+</span> <span class="nx">content</span> <span class="o">+</span> <span class="s">&#34;\n&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span> <span class="k">else</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="nx">msg</span><span class="p">)</span> <span class="p">&gt;</span> <span class="mi">7</span> <span class="o">&amp;&amp;</span> <span class="nx">msg</span><span class="p">[:</span><span class="mi">7</span><span class="p">]</span> <span class="o">==</span> <span class="s">&#34;rename|&#34;</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="c1">// 修改用户名消息格式：rename|张三
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="c1">// string.Split(msg, &#34;sign&#34;)可以将字符串msg以sign为断点来切分，返回的是一个字符串数组
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="nx">newName</span> <span class="o">:=</span> <span class="nx">strings</span><span class="p">.</span><span class="nf">Split</span><span class="p">(</span><span class="nx">msg</span><span class="p">,</span> <span class="s">&#34;|&#34;</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">		<span class="c1">// 判断name是否存在
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>		<span class="nx">_</span><span class="p">,</span> <span class="nx">ok</span> <span class="o">:=</span> <span class="nx">this</span><span class="p">.</span><span class="nx">server</span><span class="p">.</span><span class="nx">OnlineMap</span><span class="p">[</span><span class="nx">newName</span><span class="p">]</span>
+</span></span><span class="line"><span class="cl">		<span class="k">if</span> <span class="nx">ok</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">this</span><span class="p">.</span><span class="nf">SendMsg</span><span class="p">(</span><span class="s">&#34;当前用户名已被使用!\n&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">this</span><span class="p">.</span><span class="nx">server</span><span class="p">.</span><span class="nx">mapLock</span><span class="p">.</span><span class="nf">Lock</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">			<span class="nb">delete</span><span class="p">(</span><span class="nx">this</span><span class="p">.</span><span class="nx">server</span><span class="p">.</span><span class="nx">OnlineMap</span><span class="p">,</span> <span class="nx">this</span><span class="p">.</span><span class="nx">Name</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">this</span><span class="p">.</span><span class="nx">server</span><span class="p">.</span><span class="nx">OnlineMap</span><span class="p">[</span><span class="nx">newName</span><span class="p">]</span> <span class="p">=</span> <span class="nx">this</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">this</span><span class="p">.</span><span class="nx">server</span><span class="p">.</span><span class="nx">mapLock</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">			<span class="nx">this</span><span class="p">.</span><span class="nx">Name</span> <span class="p">=</span> <span class="nx">newName</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">this</span><span class="p">.</span><span class="nf">SendMsg</span><span class="p">(</span><span class="s">&#34;您已成功更新用户名:&#34;</span> <span class="o">+</span> <span class="nx">this</span><span class="p">.</span><span class="nx">Name</span> <span class="o">+</span> <span class="s">&#34;!\n&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">if</span> <span class="nx">msg</span> <span class="o">==</span> <span class="s">&#34;&#34;</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">this</span><span class="p">.</span><span class="nf">SendMsg</span><span class="p">(</span><span class="s">&#34;无消息内容，请重发。\n&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">			<span class="k">return</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">this</span><span class="p">.</span><span class="nx">server</span><span class="p">.</span><span class="nf">BroadCast</span><span class="p">(</span><span class="nx">this</span><span class="p">,</span> <span class="nx">msg</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h3 id="测试-4">测试
+</h3><p><strong>实现预期功能：</strong>
+<div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="v0.8-test.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="v0.8-test.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<h2 id="v09-客户端实现">v0.9 客户端实现
+</h2><div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
 <pre tabindex="0" class="chroma"><code></code></pre></td>
 <td class="lntd">
