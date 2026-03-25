@@ -7,7 +7,1230 @@
         <generator>Hugo -- gohugo.io</generator>
         <language>zh-cn</language>
         <copyright>SymphonyW</copyright>
-        <lastBuildDate>Tue, 24 Mar 2026 17:05:27 +0800</lastBuildDate><atom:link href="https://SymphonyW.github.io/zh-cn/post/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Wed, 25 Mar 2026 22:14:11 +0800</lastBuildDate><atom:link href="https://SymphonyW.github.io/zh-cn/post/index.xml" rel="self" type="application/rss+xml" /><item>
+        <title>TCP/IP协议栈面试八股文（持续更新）</title>
+        <link>https://SymphonyW.github.io/zh-cn/p/tcp/ip%E5%8D%8F%E8%AE%AE%E6%A0%88%E9%9D%A2%E8%AF%95%E5%85%AB%E8%82%A1%E6%96%87%E6%8C%81%E7%BB%AD%E6%9B%B4%E6%96%B0/</link>
+        <pubDate>Wed, 25 Mar 2026 22:14:11 +0800</pubDate>
+        
+        <guid>https://SymphonyW.github.io/zh-cn/p/tcp/ip%E5%8D%8F%E8%AE%AE%E6%A0%88%E9%9D%A2%E8%AF%95%E5%85%AB%E8%82%A1%E6%96%87%E6%8C%81%E7%BB%AD%E6%9B%B4%E6%96%B0/</guid>
+        <description>&lt;h1 id=&#34;计算机网络---tcpip-面试八股文硬核整理&#34;&gt;&lt;strong&gt;计算机网络 - TCP/IP 面试八股文（硬核整理）&lt;/strong&gt;
+&lt;/h1&gt;&lt;p&gt;本文档整理了后端开发、客户端开发等技术岗位面试中，关于 TCP/IP 协议栈及核心网络协议最常被问到的高频面试题和深度解析。&lt;/p&gt;
+&lt;h2 id=&#34;一-网络模型基础&#34;&gt;&lt;strong&gt;一、 网络模型基础&lt;/strong&gt;
+&lt;/h2&gt;&lt;h3 id=&#34;1-讲一下-osi-七层模型tcpip-四层模型和五层体系结构&#34;&gt;&lt;strong&gt;1. 讲一下 OSI 七层模型、TCP/IP 四层模型和五层体系结构？&lt;/strong&gt;
+&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;OSI 七层模型（从上到下）&lt;/strong&gt;：应用层、表示层、会话层、传输层、网络层、数据链路层、物理层。（理论模型，实际未广泛应用）&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;TCP/IP 四层模型（从上到下）&lt;/strong&gt;：应用层、传输层、网际层（网络层）、网络接口层。（实际广泛应用的模型）&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;五层体系结构（学习专用，从上到下）&lt;/strong&gt;：应用层、传输层、网络层、数据链路层、物理层。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;各层核心功能及常见协议&lt;/strong&gt;：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;应用层&lt;/strong&gt;：为用户提供应用接口，解决特定网络应用问题。（HTTP, HTTPS, FTP, DNS, SMTP, POP3）&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;传输层&lt;/strong&gt;：为两台主机中的&lt;strong&gt;进程&lt;/strong&gt;提供通用的数据传输服务。（TCP, UDP）&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;网络层&lt;/strong&gt;：负责为分组交换网上的不同&lt;strong&gt;主机&lt;/strong&gt;提供通信服务，路由选择。（IP, ICMP, ARP, OSPF, BGP）&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;数据链路层&lt;/strong&gt;：将网络层交下来的 IP 数据报组装成帧，在相邻节点的链路上传送。（以太网协议、PPP）&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;物理层&lt;/strong&gt;：透明地传送比特流。（RJ45等）&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id=&#34;二-tcp-与-udp-基础&#34;&gt;&lt;strong&gt;二、 TCP 与 UDP 基础&lt;/strong&gt;
+&lt;/h2&gt;&lt;h3 id=&#34;2-tcp-和-udp-的区别是什么&#34;&gt;&lt;strong&gt;2. TCP 和 UDP 的区别是什么？&lt;/strong&gt;
+&lt;/h3&gt;&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:left&#34;&gt;特性&lt;/th&gt;
+&lt;th style=&#34;text-align:left&#34;&gt;TCP (Transmission Control Protocol)&lt;/th&gt;
+&lt;th style=&#34;text-align:left&#34;&gt;UDP (User Datagram Protocol)&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;连接性&lt;/strong&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;面向连接（需三次握手）&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;无连接（直接发）&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;可靠性&lt;/strong&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;可靠传输（不丢包、不乱序）&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;不可靠传输（尽最大努力交付，可能丢包）&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;工作方式&lt;/strong&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;字节流（会出现粘包拆包问题）&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;数据报文（报文边界明确）&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;传输效率&lt;/strong&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;较慢（开销大，有头部、确认、重传机制）&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;较快（开销小）&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;头部大小&lt;/strong&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;至少 20 字节，可变&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;8 字节（固定）&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;拥塞控制/流量控制&lt;/strong&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;有&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;无&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;适用场景&lt;/strong&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;文件传输、HTTP/HTTPS、邮件（要求准确无误）&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;视频流媒体、直播、DNS查询、实时游戏（要求实时性）&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;h2 id=&#34;三-tcp-连接管理绝对重点&#34;&gt;&lt;strong&gt;三、 TCP 连接管理（绝对重点）&lt;/strong&gt;
+&lt;/h2&gt;&lt;h3 id=&#34;3-请详细画出描述-tcp-的三次握手过程&#34;&gt;&lt;strong&gt;3. 请详细画出/描述 TCP 的三次握手过程？&lt;/strong&gt;
+&lt;/h3&gt;&lt;p&gt;三次握手是为了建立可靠的连接，同步双方的序列号和窗口大小。&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;第一次握手（Client -&amp;gt; Server）&lt;/strong&gt;：客户端生成一个随机序列号 seq = x，并把标志位 SYN 设为 1。客户端进入 SYN_SENT 状态。此时报文不携带数据。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;第二次握手（Server -&amp;gt; Client）&lt;/strong&gt;：服务端收到 SYN 报文，同意建立连接，生成自己的随机序列号 seq = y，并将确认号 ack = x + 1，同时将 SYN 和 ACK 标志位都设为 1。服务端进入 SYN_RCVD 状态。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;第三次握手（Client -&amp;gt; Server）&lt;/strong&gt;：客户端收到服务端的 SYN+ACK 报文，检查 ack 是否为 x+1。如果正确，则将标志位 ACK 设为 1，确认号 ack = y + 1。客户端进入 ESTABLISHED 状态。服务端收到后也进入 ESTABLISHED 状态，连接建立。此报文&lt;strong&gt;可以携带数据&lt;/strong&gt;。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h3 id=&#34;4-为什么是三次握手两次不行吗四次不行吗&#34;&gt;&lt;strong&gt;4. 为什么是三次握手？两次不行吗？四次不行吗？&lt;/strong&gt;
+&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;为什么不能是两次？（防止已失效的连接请求报文段突然又传送到了服务端）&lt;/strong&gt;&lt;br&gt;
+假设客户端发送了第一个 SYN 报文（因为网络延迟滞留了），客户端超时后重发了第二个 SYN 并完成了两次握手建立连接，数据传完后断开。此时，第一个滞留的 SYN 终于到了服务端。如果是两次握手，服务端会以为客户端又要建立连接，直接单方面进入 ESTABLISHED 状态并分配资源，导致服务端资源浪费（即“历史连接”问题）。三次握手可以让客户端在第三步拒绝这个历史连接。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;为什么不需要四次？&lt;/strong&gt;&lt;br&gt;
+服务端的确认报文（ACK）和同步报文（SYN）是可以合并在一起发送的（即第二次握手），没必要拆成两步，所以三次足够了。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;5-请详细画出描述-tcp-的四次挥手过程&#34;&gt;&lt;strong&gt;5. 请详细画出/描述 TCP 的四次挥手过程？&lt;/strong&gt;
+&lt;/h3&gt;&lt;p&gt;由于 TCP 是全双工的，因此每个方向都必须单独进行关闭。&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;第一次挥手（Client -&amp;gt; Server）&lt;/strong&gt;：客户端应用进程发出连接释放报文，FIN = 1, seq = u。客户端进入 FIN_WAIT_1 状态。表示客户端没有数据要发了。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;第二次挥手（Server -&amp;gt; Client）&lt;/strong&gt;：服务端收到 FIN，发出确认报文 ACK = 1, ack = u + 1, seq = v。服务端进入 CLOSE_WAIT 状态。此时 TCP 连接处于&lt;strong&gt;半关闭状态&lt;/strong&gt;，客户端不能发数据，但服务端如果还有数据没发完，可以继续发。客户端收到 ACK 后进入 FIN_WAIT_2 状态。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;第三次挥手（Server -&amp;gt; Client）&lt;/strong&gt;：服务端数据发送完毕，发出连接释放报文，FIN = 1, ACK = 1, seq = w, ack = u + 1。服务端进入 LAST_ACK 状态。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;第四次挥手（Client -&amp;gt; Server）&lt;/strong&gt;：客户端收到 FIN 后，发出确认报文 ACK = 1, ack = w + 1, seq = u + 1。客户端进入 TIME_WAIT 状态。服务端收到 ACK 后进入 CLOSED 状态。客户端经过 2MSL 时间后，也进入 CLOSED 状态。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h3 id=&#34;6-为什么挥手需要四次而握手只需要三次&#34;&gt;&lt;strong&gt;6. 为什么挥手需要四次，而握手只需要三次？&lt;/strong&gt;
+&lt;/h3&gt;&lt;p&gt;因为 TCP 是全双工通信。握手时，服务端的 SYN 和 ACK 可以一起发送。但挥手时，当收到对方的 FIN 报文时，仅仅表示对方不再发送数据了，但&lt;strong&gt;接收方自己可能还有数据需要发送&lt;/strong&gt;。所以接收方先回复一个 ACK，等自己数据发送完毕后，再发送 FIN 报文。因此通常需要四次。&lt;/p&gt;
+&lt;h3 id=&#34;7-什么是-time_wait-状态为什么需要等待-2msl&#34;&gt;&lt;strong&gt;7. 什么是 TIME_WAIT 状态？为什么需要等待 2MSL？&lt;/strong&gt;
+&lt;/h3&gt;&lt;p&gt;TIME_WAIT 是主动关闭连接的一方在发送完最后一个 ACK 后进入的状态。等待 2MSL（最大报文生存时间的2倍）原因有二：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;保证可靠关闭&lt;/strong&gt;：如果最后的 ACK 丢失，服务端会重传 FIN。客户端在 2MSL 内可再次收到 FIN 并重发 ACK。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;防止“已失效报文”干扰&lt;/strong&gt;：保证本次连接的所有报文从网络中消失，不会影响后续的新连接。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h2 id=&#34;四-tcp-可靠传输与控制&#34;&gt;&lt;strong&gt;四、 TCP 可靠传输与控制&lt;/strong&gt;
+&lt;/h2&gt;&lt;h3 id=&#34;8-tcp-是如何保证可靠传输的&#34;&gt;&lt;strong&gt;8. TCP 是如何保证可靠传输的？&lt;/strong&gt;
+&lt;/h3&gt;&lt;p&gt;TCP 保证可靠传输主要依靠：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;数据分块与校验和&lt;/strong&gt;：验证数据在传输过程中是否损坏。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;序列号与确认应答 (Seq &amp;amp; ACK)&lt;/strong&gt;：保证数据不乱序、不丢失。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;超时重传机制&lt;/strong&gt;：未在 RTO 内收到 ACK，则重新发送。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;连接管理&lt;/strong&gt;：三次握手、四次挥手。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;流量控制（滑动窗口）&lt;/strong&gt;：控制发送速度，防止接收缓冲区溢出。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;拥塞控制&lt;/strong&gt;：网络拥塞时减少发送量。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h3 id=&#34;9-详细说说-tcp-的拥塞控制&#34;&gt;&lt;strong&gt;9. 详细说说 TCP 的拥塞控制？&lt;/strong&gt;
+&lt;/h3&gt;&lt;p&gt;拥塞控制包含四个算法：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;慢启动&lt;/strong&gt;：刚建立连接时，拥塞窗口 cwnd 较小，随后每经过一个 RTT 呈&lt;strong&gt;指数级增长&lt;/strong&gt;，直到达到阈值 ssthresh。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;拥塞避免&lt;/strong&gt;：当 cwnd &amp;gt;= ssthresh 时，每经过一个 RTT cwnd 加 1，呈&lt;strong&gt;线性增长&lt;/strong&gt;。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;快速重传&lt;/strong&gt;：收到&lt;strong&gt;连续 3 个相同的重复 ACK&lt;/strong&gt; 时，立刻重传丢失报文，不等待超时。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;快速恢复&lt;/strong&gt;：配合快速重传，将 ssthresh 减半，cwnd 设为 ssthresh，进入拥塞避免阶段。&lt;em&gt;(注：超时丢包通常回退到慢启动)&lt;/em&gt;&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h2 id=&#34;五-网络层与其他核心协议&#34;&gt;&lt;strong&gt;五、 网络层与其他核心协议&lt;/strong&gt;
+&lt;/h2&gt;&lt;h3 id=&#34;10-ip-协议是干什么的ipv4-和-ipv6-的区别&#34;&gt;&lt;strong&gt;10. IP 协议是干什么的？IPv4 和 IPv6 的区别？&lt;/strong&gt;
+&lt;/h3&gt;&lt;p&gt;IP 协议负责在网络中进行路由寻址和数据包的分片。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;IPv4&lt;/strong&gt;：32 位地址，资源已枯竭。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;IPv6&lt;/strong&gt;：128 位地址，号称“给地球上每一粒沙子分配一个 IP”。简化了头部，原生支持 IPSec，安全性更高。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;11-arp-协议的作用是什么&#34;&gt;&lt;strong&gt;11. ARP 协议的作用是什么？&lt;/strong&gt;
+&lt;/h3&gt;&lt;p&gt;将 &lt;strong&gt;IP 地址转换为 MAC 地址&lt;/strong&gt;。通过局域网广播请求，目标主机单播回复。&lt;/p&gt;
+&lt;h2 id=&#34;六-应用层协议核心http--https--dns&#34;&gt;&lt;strong&gt;六、 应用层协议核心（HTTP / HTTPS / DNS）&lt;/strong&gt;
+&lt;/h2&gt;&lt;h3 id=&#34;12-http-10112030-的主要区别是什么&#34;&gt;&lt;strong&gt;12. HTTP 1.0、1.1、2.0、3.0 的主要区别是什么？&lt;/strong&gt;
+&lt;/h3&gt;&lt;p&gt;这是极其高频的面试题，体现对 Web 协议演进的理解：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;HTTP 1.0&lt;/strong&gt;：默认&lt;strong&gt;短连接&lt;/strong&gt;（每次请求都需建立 TCP 连接），存在队头阻塞问题。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;HTTP 1.1&lt;/strong&gt;：默认&lt;strong&gt;长连接&lt;/strong&gt;（Keep-Alive），引入了管道化机制（但存在服务端的队头阻塞），增加了缓存控制（Cache-Control）、断点续传（Range 头部）等功能。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;HTTP 2.0&lt;/strong&gt;：
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;多路复用&lt;/strong&gt;：一个 TCP 连接上可以并发交错发送多个请求/响应（彻底解决 HTTP 层的队头阻塞）。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;二进制分帧&lt;/strong&gt;：数据解析更高效。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;头部压缩（HPACK）&lt;/strong&gt;：减少传输体积。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;服务端推送（Server Push）&lt;/strong&gt;：服务端可以主动向客户端推送资源。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;HTTP 3.0&lt;/strong&gt;：
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;基于 QUIC 协议（底层为 UDP）&lt;/strong&gt;：彻底解决了 TCP 级别的队头阻塞问题。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;连接迁移&lt;/strong&gt;：基于连接 ID 而非 IP+端口 识别连接，切换网络（如 Wi-Fi 换到 4G）时连接不断开。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;13-get-和-post-的区别&#34;&gt;&lt;strong&gt;13. GET 和 POST 的区别？&lt;/strong&gt;
+&lt;/h3&gt;&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:left&#34;&gt;特性&lt;/th&gt;
+&lt;th style=&#34;text-align:left&#34;&gt;GET&lt;/th&gt;
+&lt;th style=&#34;text-align:left&#34;&gt;POST&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;语义&lt;/strong&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;获取资源（读取）&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;提交/修改资源（写入）&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;参数位置&lt;/strong&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;放在 URL 中（?key=value）&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;放在 HTTP 报文的 Body（请求体）中&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;安全性&lt;/strong&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;较低（参数暴露在 URL，可被浏览器历史记录保存）&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;相对较高（参数在 Body 中，但不加密仍可抓包）&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;长度限制&lt;/strong&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;受限于浏览器和服务器对 URL 长度的限制&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;理论上无限制（受限于服务器配置）&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;幂等性&lt;/strong&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;幂等&lt;/strong&gt;（执行多次结果相同）&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;不幂等&lt;/strong&gt;（执行多次可能会创建多个资源）&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;缓存&lt;/strong&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;浏览器默认会缓存 GET 请求&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;浏览器默认不会缓存 POST 请求&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;h3 id=&#34;14-http-常见的状态码有哪些&#34;&gt;&lt;strong&gt;14. HTTP 常见的状态码有哪些？&lt;/strong&gt;
+&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;2xx (成功)&lt;/strong&gt;：
+&lt;ul&gt;
+&lt;li&gt;200 OK：请求成功。&lt;/li&gt;
+&lt;li&gt;204 No Content：请求成功，但响应报文不包含实体的主体部分。&lt;/li&gt;
+&lt;li&gt;206 Partial Content：客户端进行了范围请求（断点续传），服务器成功执行。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;3xx (重定向)&lt;/strong&gt;：
+&lt;ul&gt;
+&lt;li&gt;301 Moved Permanently：永久重定向（资源换了新 URL）。&lt;/li&gt;
+&lt;li&gt;302 Found：临时重定向。&lt;/li&gt;
+&lt;li&gt;304 Not Modified：资源未修改，走&lt;strong&gt;协商缓存&lt;/strong&gt;（非常重要，面试常考浏览器缓存机制）。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;4xx (客户端错误)&lt;/strong&gt;：
+&lt;ul&gt;
+&lt;li&gt;400 Bad Request：请求报文有语法错误。&lt;/li&gt;
+&lt;li&gt;401 Unauthorized：请求需要认证信息。&lt;/li&gt;
+&lt;li&gt;403 Forbidden：服务器拒绝访问（通常是权限不足）。&lt;/li&gt;
+&lt;li&gt;404 Not Found：找不到请求的资源。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;5xx (服务器错误)&lt;/strong&gt;：
+&lt;ul&gt;
+&lt;li&gt;500 Internal Server Error：服务器内部错误（代码抛异常了）。&lt;/li&gt;
+&lt;li&gt;502 Bad Gateway：网关或代理服务器收到无效响应（常见于 Nginx 转发给后端服务失败）。&lt;/li&gt;
+&lt;li&gt;504 Gateway Timeout：网关超时（后端服务处理太慢）。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;15-https-的工作原理是什么详细描述-tlsssl-握手过程&#34;&gt;&lt;strong&gt;15. HTTPS 的工作原理是什么？（详细描述 TLS/SSL 握手过程）&lt;/strong&gt;
+&lt;/h3&gt;&lt;p&gt;HTTPS = HTTP + SSL/TLS。它通过&lt;strong&gt;非对称加密&lt;/strong&gt;协商密钥，再通过&lt;strong&gt;对称加密&lt;/strong&gt;传输数据，并利用&lt;strong&gt;数字证书&lt;/strong&gt;验证身份。&lt;/p&gt;
+&lt;p&gt;简化的 TLS 1.2 握手过程如下：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;Client Hello&lt;/strong&gt;：客户端向服务端发送自己支持的 TLS 版本、加密套件列表，以及一个&lt;strong&gt;客户端随机数 (Random1)&lt;/strong&gt;。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Server Hello&lt;/strong&gt;：服务端确认 TLS 版本和加密套件，发送一个&lt;strong&gt;服务端随机数 (Random2)&lt;/strong&gt;，并把包含公钥的&lt;strong&gt;数字证书&lt;/strong&gt;发送给客户端。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;客户端验证证书&lt;/strong&gt;：客户端确保证书是由权威 CA 签发的，域名一致且未过期。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;生成 Pre-Master Secret&lt;/strong&gt;：客户端生成一个新的随机数 &lt;strong&gt;Pre-Master Secret&lt;/strong&gt;，用证书里的&lt;strong&gt;公钥进行加密&lt;/strong&gt;，发送给服务端。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;服务端解密&lt;/strong&gt;：服务端用自己的&lt;strong&gt;私钥&lt;/strong&gt;解密，得到 Pre-Master Secret。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;生成最终对称密钥 (Master Secret)&lt;/strong&gt;：此时双方都有了 Random1、Random2 和 Pre-Master Secret，双方使用相同的算法计算出最终的&lt;strong&gt;对称密钥&lt;/strong&gt;（会话密钥）。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;加密通信&lt;/strong&gt;：后续的 HTTP 数据传输全部使用这个&lt;strong&gt;对称密钥&lt;/strong&gt;进行加密和解密。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h3 id=&#34;16-dns-的解析过程是怎样的为什么-dns-既使用-tcp-又使用-udp&#34;&gt;&lt;strong&gt;16. DNS 的解析过程是怎样的？为什么 DNS 既使用 TCP 又使用 UDP？&lt;/strong&gt;
+&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;解析过程&lt;/strong&gt;（浏览器输入域名后）：
+&lt;ol&gt;
+&lt;li&gt;查&lt;strong&gt;浏览器缓存&lt;/strong&gt;。&lt;/li&gt;
+&lt;li&gt;查&lt;strong&gt;操作系统缓存&lt;/strong&gt;（如 hosts 文件）。&lt;/li&gt;
+&lt;li&gt;查&lt;strong&gt;本地 DNS 服务器&lt;/strong&gt;（通常由 ISP 提供，这步是&lt;strong&gt;递归查询&lt;/strong&gt;）。&lt;/li&gt;
+&lt;li&gt;本地 DNS 服务器依次向&lt;strong&gt;根域名服务器&lt;/strong&gt; -&amp;gt; &lt;strong&gt;顶级域名服务器&lt;/strong&gt; (.com) -&amp;gt; &lt;strong&gt;权威域名服务器&lt;/strong&gt; 发起&lt;strong&gt;迭代查询&lt;/strong&gt;，最终获取 IP 并返回给客户端。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;TCP 还是 UDP？&lt;/strong&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;默认使用 UDP (端口 53)&lt;/strong&gt;：因为一次 UDP 请求和响应就能完成，无连接、速度快、负载低。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;使用 TCP 的场景&lt;/strong&gt;：
+&lt;ol&gt;
+&lt;li&gt;当响应报文大小&lt;strong&gt;超过 512 字节&lt;/strong&gt;时（为了防止 UDP 报文被截断）。&lt;/li&gt;
+&lt;li&gt;DNS 服务器之间进行&lt;strong&gt;区域传送&lt;/strong&gt;（主从 DNS 数据同步）时，因为需要传输大量数据，必须保证可靠性，所以使用 TCP。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id=&#34;七-综合场景题&#34;&gt;&lt;strong&gt;七、 综合场景题&lt;/strong&gt;
+&lt;/h2&gt;&lt;h3 id=&#34;17-经典终极必考题在浏览器中输入-url-到页面显示经历了什么过程&#34;&gt;&lt;strong&gt;17. 【经典终极必考题】在浏览器中输入 URL 到页面显示，经历了什么过程？&lt;/strong&gt;
+&lt;/h3&gt;&lt;p&gt;这是一个贯穿整个网络体系的题目，必须对答如流：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;URL 解析&lt;/strong&gt;：浏览器解析 URL，确定协议（HTTP/HTTPS）、域名、端口、路径。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;DNS 域名解析&lt;/strong&gt;：依次查找各级缓存及 DNS 服务器，最终得到目标 IP 地址。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;建立 TCP 连接&lt;/strong&gt;：浏览器与目标服务器发起 TCP 三次握手。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;TLS 握手（如果是 HTTPS）&lt;/strong&gt;：进行密钥协商，验证证书，建立加密通道。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;发送 HTTP 请求&lt;/strong&gt;：浏览器构建 HTTP 请求报文并发送。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;服务器处理并响应&lt;/strong&gt;：服务器接收请求，由 Web Server（如 Nginx, Tomcat）处理，返回 HTTP 响应报文。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;浏览器渲染页面&lt;/strong&gt;：解析 HTML/CSS，生成 DOM 树和 CSSOM 树，合并为渲染树，布局并绘制到屏幕上。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;断开 TCP 连接&lt;/strong&gt;：通过 TCP 四次挥手释放连接（若为 Keep-Alive 则暂时保持）。&lt;/li&gt;
+&lt;/ol&gt;
+</description>
+        </item>
+        <item>
+        <title>MySQL面试八股文（持续更新）</title>
+        <link>https://SymphonyW.github.io/zh-cn/p/mysql%E9%9D%A2%E8%AF%95%E5%85%AB%E8%82%A1%E6%96%87%E6%8C%81%E7%BB%AD%E6%9B%B4%E6%96%B0/</link>
+        <pubDate>Wed, 25 Mar 2026 22:12:10 +0800</pubDate>
+        
+        <guid>https://SymphonyW.github.io/zh-cn/p/mysql%E9%9D%A2%E8%AF%95%E5%85%AB%E8%82%A1%E6%96%87%E6%8C%81%E7%BB%AD%E6%9B%B4%E6%96%B0/</guid>
+        <description>&lt;h1 id=&#34;数据库---mysql-面试八股文硬核整理&#34;&gt;&lt;strong&gt;数据库 - MySQL 面试八股文（硬核整理）&lt;/strong&gt;
+&lt;/h1&gt;&lt;p&gt;本文档整理了后端开发面试中关于 MySQL 数据库最常被问到的高频面试题和深度解析，重点聚焦于 InnoDB 存储引擎。&lt;/p&gt;
+&lt;h2 id=&#34;一-mysql-基础架构与执行流程&#34;&gt;&lt;strong&gt;一、 MySQL 基础架构与执行流程&lt;/strong&gt;
+&lt;/h2&gt;&lt;h3 id=&#34;1-mysql-的逻辑架构是怎样的&#34;&gt;&lt;strong&gt;1. MySQL 的逻辑架构是怎样的？&lt;/strong&gt;
+&lt;/h3&gt;&lt;p&gt;MySQL 的逻辑架构大致分为两层：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Server 层&lt;/strong&gt;：涵盖了 MySQL 的大多数核心服务功能，以及所有的内置函数（如日期、时间、数学和加密函数等）。所有跨存储引擎的功能都在这一层实现，比如存储过程、触发器、视图等。
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;连接器&lt;/strong&gt;：负责跟客户端建立连接、获取权限、维持和管理连接。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;查询缓存&lt;/strong&gt;：MySQL 8.0 已废弃。之前用于缓存执行过的 SQL 语句及其结果。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;分析器&lt;/strong&gt;：对 SQL 进行词法分析和语法分析，检查 SQL 是否合法。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;优化器&lt;/strong&gt;：决定使用哪个索引，或者在一个语句有多表关联时决定各个表的连接顺序。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;执行器&lt;/strong&gt;：调用存储引擎的 API 接口来执行 SQL，并返回结果。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;存储引擎层&lt;/strong&gt;：负责数据的存储和提取。其架构模式是插件式的，支持 InnoDB、MyISAM、Memory 等多个存储引擎。MySQL 5.5.5 版本开始，&lt;strong&gt;InnoDB 成为了默认存储引擎&lt;/strong&gt;。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;2-一条-sql-语句在-mysql-中是如何执行的&#34;&gt;&lt;strong&gt;2. 一条 SQL 语句在 MySQL 中是如何执行的？&lt;/strong&gt;
+&lt;/h3&gt;&lt;ol&gt;
+&lt;li&gt;客户端通过&lt;strong&gt;连接器&lt;/strong&gt;与 MySQL Server 建立连接。&lt;/li&gt;
+&lt;li&gt;（MySQL 8.0 之前）查询&lt;strong&gt;缓存&lt;/strong&gt;，命中则直接返回，否则继续。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;分析器&lt;/strong&gt;进行词法和语法分析，判断 SQL 是否正确。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;优化器&lt;/strong&gt;生成执行计划，选择最优的索引。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;执行器&lt;/strong&gt;检查用户权限，调用&lt;strong&gt;存储引擎&lt;/strong&gt;接口进行数据的读写，最后将结果返回给客户端。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h2 id=&#34;二-存储引擎&#34;&gt;&lt;strong&gt;二、 存储引擎&lt;/strong&gt;
+&lt;/h2&gt;&lt;h3 id=&#34;3-innodb-和-myisam-的主要区别是什么&#34;&gt;&lt;strong&gt;3. InnoDB 和 MyISAM 的主要区别是什么？&lt;/strong&gt;
+&lt;/h3&gt;&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:left&#34;&gt;特性&lt;/th&gt;
+&lt;th style=&#34;text-align:left&#34;&gt;InnoDB&lt;/th&gt;
+&lt;th style=&#34;text-align:left&#34;&gt;MyISAM&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;事务 (Transaction)&lt;/strong&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;支持&lt;/strong&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;不支持&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;锁级别&lt;/strong&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;行级锁&lt;/strong&gt;（默认）、表级锁&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;仅支持表级锁&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;外键 (Foreign Key)&lt;/strong&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;支持&lt;/strong&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;不支持&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;崩溃恢复&lt;/strong&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;支持&lt;/strong&gt;（通过 Redo Log 实现安全恢复）&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;不支持&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;索引结构&lt;/strong&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;聚簇索引（数据和主键索引绑在一起）&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;非聚簇索引（索引和数据分离）&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;适用场景&lt;/strong&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;绝大多数场景，特别是需要事务和高并发读写&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;以读为主，对事务完整性要求不高的老旧系统&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;h2 id=&#34;三-索引机制绝对重点&#34;&gt;&lt;strong&gt;三、 索引机制（绝对重点）&lt;/strong&gt;
+&lt;/h2&gt;&lt;h3 id=&#34;4-什么是索引mysql-为什么默认使用-b-树作为索引结构&#34;&gt;&lt;strong&gt;4. 什么是索引？MySQL 为什么默认使用 B+ 树作为索引结构？&lt;/strong&gt;
+&lt;/h3&gt;&lt;p&gt;索引是帮助 MySQL 高效获取数据的数据结构（就像书的目录）。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;为什么使用 B+ 树？（对比其他结构）&lt;/strong&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;对比 Hash 索引&lt;/strong&gt;：Hash 虽然单条查询最快（O(1)），但不支持范围查询（&amp;gt;、&amp;lt;、between）、不支持模糊匹配和最左前缀原则。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;对比 二叉搜索树 / 红黑树&lt;/strong&gt;：树的层级太深，会导致磁盘 I/O 次数过多，查询效率低下。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;对比 B 树&lt;/strong&gt;：B 树的所有节点都存储数据，而 B+ 树只有叶子节点存储数据，非叶子节点只存键值。因此 B+ 树一个节点可以容纳更多的键，&lt;strong&gt;树的高度更低（通常 3-4 层），磁盘 I/O 更少&lt;/strong&gt;。同时，B+ 树的叶子节点用双向链表连接，&lt;strong&gt;非常适合范围查询&lt;/strong&gt;。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;5-什么是聚簇索引和非聚簇索引二级索引什么是回表&#34;&gt;&lt;strong&gt;5. 什么是聚簇索引和非聚簇索引（二级索引）？什么是回表？&lt;/strong&gt;
+&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;聚簇索引&lt;/strong&gt;：将数据存储与索引放到了一块，找到索引也就找到了数据。在 InnoDB 中，通常&lt;strong&gt;主键就是聚簇索引&lt;/strong&gt;（如果没有主键，会选择第一个非空的唯一索引；如果还没有，会隐式生成一个 row_id 作为聚簇索引）。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;非聚簇索引（二级索引）&lt;/strong&gt;：叶子节点不存储完整的行数据，而是&lt;strong&gt;存储主键的值&lt;/strong&gt;。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;回表&lt;/strong&gt;：如果通过二级索引查询数据，由于二级索引叶子节点只存了主键值，要想获取除主键外的其他字段数据，就需要拿着这个主键值回到聚簇索引中再查一次，这个过程叫做“回表”。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;6-什么是覆盖索引最左前缀原则索引下推&#34;&gt;&lt;strong&gt;6. 什么是覆盖索引、最左前缀原则、索引下推？&lt;/strong&gt;
+&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;覆盖索引&lt;/strong&gt;：在一个查询中，如果一个索引包含了（或覆盖了）所有需要查询的字段的值，就不需要回表查询了，这叫覆盖索引。（例如 SELECT id, name FROM table WHERE name = &amp;lsquo;张三&amp;rsquo;，如果给 name 建了索引，因为二级索引本身包含主键 id，所以直接在二级索引就能拿到结果，无需回表）。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;最左前缀原则&lt;/strong&gt;：在联合索引中（如 (a, b, c)），查询条件必须从索引的最左前列开始并且不跳过中间的列。即可以匹配 (a)、(a, b)、(a, b, c)，但不能直接匹配 (b) 或 (b, c)。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;索引下推 (ICP)&lt;/strong&gt;：MySQL 5.6 引入的优化。在联合索引匹配时，如果遇到范围查询（如 &amp;gt;），其后的字段无法走索引。但在索引下推优化下，存储引擎会在遍历索引时，直接把判断条件“下推”给存储引擎层进行过滤，减少了回表的次数。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;7-导致索引失效的常见场景有哪些&#34;&gt;&lt;strong&gt;7. 导致索引失效的常见场景有哪些？&lt;/strong&gt;
+&lt;/h3&gt;&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;使用了 SELECT *&lt;/strong&gt;（极易导致不走覆盖索引而全表扫描）。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;对索引列进行了计算、函数操作或类型转换&lt;/strong&gt;（如 WHERE DATE(create_time) = &amp;lsquo;2023-01-01&amp;rsquo; 或隐式类型转换如字符串传了数字）。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;使用了前导模糊查询&lt;/strong&gt;（如 LIKE &amp;lsquo;%abc&amp;rsquo;，但 LIKE &amp;lsquo;abc%&amp;rsquo; 是走索引的）。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;违反最左前缀原则&lt;/strong&gt;（联合索引没有使用第一列）。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;使用了 OR&lt;/strong&gt;，且 OR 前后不是都有索引。&lt;/li&gt;
+&lt;li&gt;MySQL 优化器认为全表扫描比走索引成本更低时（如表数据极少，或查询的数据占全表很大比例）。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h2 id=&#34;四-事务与并发控制&#34;&gt;&lt;strong&gt;四、 事务与并发控制&lt;/strong&gt;
+&lt;/h2&gt;&lt;h3 id=&#34;8-事务的-acid-特性是什么底层是如何保证的&#34;&gt;&lt;strong&gt;8. 事务的 ACID 特性是什么？底层是如何保证的？&lt;/strong&gt;
+&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;原子性 (Atomicity)&lt;/strong&gt;：事务是最小执行单位，不可分割，要么全成功，要么全失败。&lt;strong&gt;由 Undo Log（回滚日志）保证&lt;/strong&gt;，失败时执行回滚。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;隔离性 (Isolation)&lt;/strong&gt;：并发访问时，一个事务的执行不影响其他事务。&lt;strong&gt;由 MVCC（多版本并发控制）和 锁 保证&lt;/strong&gt;。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;持久性 (Durability)&lt;/strong&gt;：事务一旦提交，对数据的改变是永久的。&lt;strong&gt;由 Redo Log（重做日志）保证&lt;/strong&gt;（WAL 机制，先写日志后写磁盘）。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;一致性 (Consistency)&lt;/strong&gt;：事务执行前后，数据保持一致状态（如转账前后总金额不变）。&lt;strong&gt;一致性是目的，由原子性、隔离性、持久性共同保证&lt;/strong&gt;。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;9-并发事务会带来哪些问题脏读不可重复读幻读&#34;&gt;&lt;strong&gt;9. 并发事务会带来哪些问题？（脏读、不可重复读、幻读）&lt;/strong&gt;
+&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;脏读&lt;/strong&gt;：事务 A 读到了事务 B &lt;strong&gt;已修改但未提交&lt;/strong&gt;的数据。如果 B 回滚，A 读到的就是脏数据。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;不可重复读&lt;/strong&gt;：事务 A 两次读取同一条数据，期间事务 B &lt;strong&gt;修改并提交&lt;/strong&gt;了该数据，导致 A 两次读到的数据不一致。（侧重于数据被&lt;strong&gt;修改或删除&lt;/strong&gt;）。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;幻读&lt;/strong&gt;：事务 A 执行两次相同的范围查询，期间事务 B &lt;strong&gt;插入&lt;/strong&gt;了新的满足条件的数据并提交，导致 A 第二次查出了更多的“幻影”行。（侧重于数据被&lt;strong&gt;新增&lt;/strong&gt;）。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;10-mysql-的事务隔离级别有哪些默认是哪个&#34;&gt;&lt;strong&gt;10. MySQL 的事务隔离级别有哪些？默认是哪个？&lt;/strong&gt;
+&lt;/h3&gt;&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;读未提交 (Read Uncommitted)&lt;/strong&gt;：最低级别，会发生脏读、不可重复读、幻读。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;读已提交 (Read Committed, RC)&lt;/strong&gt;：解决了脏读，但会发生不可重复读和幻读。（Oracle 默认）。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;可重复读 (Repeatable Read, RR)&lt;/strong&gt;：解决了脏读、不可重复读。在 InnoDB 中，通过 MVCC 和 Next-Key Lock 很大程度上&lt;strong&gt;解决了幻读&lt;/strong&gt;问题。&lt;strong&gt;（MySQL 默认隔离级别）&lt;/strong&gt;。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;串行化 (Serializable)&lt;/strong&gt;：最高级别，强制事务串行执行，解决所有问题，但性能极差。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h2 id=&#34;五-mvcc-多版本并发控制&#34;&gt;&lt;strong&gt;五、 MVCC (多版本并发控制)&lt;/strong&gt;
+&lt;/h2&gt;&lt;h3 id=&#34;11-什么是-mvcc它是如何工作的&#34;&gt;&lt;strong&gt;11. 什么是 MVCC？它是如何工作的？&lt;/strong&gt;
+&lt;/h3&gt;&lt;p&gt;MVCC (Multi-Version Concurrency Control) 是 InnoDB 实现隔离级别的一种核心机制，主要用于处理读写冲突，做到&lt;strong&gt;读写不阻塞&lt;/strong&gt;（无锁读）。&lt;/p&gt;
+&lt;p&gt;MVCC 主要由三个组件实现：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;隐藏字段&lt;/strong&gt;：InnoDB 会在每行数据后面增加两个隐藏列：
+&lt;ul&gt;
+&lt;li&gt;trx_id：最近一次修改该行数据的事务 ID。&lt;/li&gt;
+&lt;li&gt;roll_pointer：回滚指针，指向 Undo Log 中该行的历史版本。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Undo Log（版本链）&lt;/strong&gt;：记录数据修改前的状态。每次更新数据时，旧数据会被存入 Undo Log，并通过 roll_pointer 串联成一个单链表（版本链）。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Read View（读视图）&lt;/strong&gt;：事务进行&lt;strong&gt;快照读&lt;/strong&gt;（普通的 SELECT）时产生的一个数据结构，用来判断当前事务能看到版本链中的哪个版本。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h3 id=&#34;12-read-view-的核心机制是什么rc-和-rr-下的区别&#34;&gt;&lt;strong&gt;12. Read View 的核心机制是什么？RC 和 RR 下的区别？&lt;/strong&gt;
+&lt;/h3&gt;&lt;p&gt;Read View 包含四个核心字段：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;creator_trx_id：创建该 Read View 的事务 ID。&lt;/li&gt;
+&lt;li&gt;m_ids：创建 Read View 时，当前系统中**活跃的（未提交的）**事务 ID 列表。&lt;/li&gt;
+&lt;li&gt;min_trx_id：m_ids 中的最小值。&lt;/li&gt;
+&lt;li&gt;max_trx_id：系统将分配给下一个事务的 ID。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;可见性判断规则&lt;/strong&gt;（基于被访问行的 trx_id）：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;如果 trx_id &amp;lt; min_trx_id：说明修改该行的事务在生成 Read View 前已提交，&lt;strong&gt;可见&lt;/strong&gt;。&lt;/li&gt;
+&lt;li&gt;如果 trx_id &amp;gt;= max_trx_id：说明修改该行的事务在生成 Read View 之后才开始，&lt;strong&gt;不可见&lt;/strong&gt;。&lt;/li&gt;
+&lt;li&gt;如果 min_trx_id &amp;lt;= trx_id &amp;lt; max_trx_id：
+&lt;ul&gt;
+&lt;li&gt;若 trx_id 在 m_ids 列表中：说明修改该行的事务还在活跃（未提交），&lt;strong&gt;不可见&lt;/strong&gt;。&lt;/li&gt;
+&lt;li&gt;若 trx_id 不在 m_ids 列表中：说明修改该行的事务已经提交，&lt;strong&gt;可见&lt;/strong&gt;。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;如果不可见，就顺着版本链 (roll_pointer) 往下找，直到找到可见的版本。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;&lt;strong&gt;RC 和 RR 的核心区别：&lt;/strong&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;RC（读已提交）&lt;/strong&gt;：&lt;strong&gt;每次执行 SELECT 时都会生成一个新的 Read View&lt;/strong&gt;。因此能读到其他事务新提交的数据，产生不可重复读。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;RR（可重复读）&lt;/strong&gt;：&lt;strong&gt;只在事务第一次执行 SELECT 时生成一个 Read View&lt;/strong&gt;，之后的整个事务期间都复用这个 Read View。因此同一事务内多次读取结果相同，实现了可重复读。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id=&#34;六-mysql-锁机制&#34;&gt;&lt;strong&gt;六、 MySQL 锁机制&lt;/strong&gt;
+&lt;/h2&gt;&lt;h3 id=&#34;13-innodb-的行级锁有哪些&#34;&gt;&lt;strong&gt;13. InnoDB 的行级锁有哪些？&lt;/strong&gt;
+&lt;/h3&gt;&lt;p&gt;InnoDB 的行锁是通过给&lt;strong&gt;索引项&lt;/strong&gt;加锁来实现的，而不是给表的行记录加锁。&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;Record Lock（记录锁）&lt;/strong&gt;：仅仅锁住某一条记录。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Gap Lock（间隙锁）&lt;/strong&gt;：锁定一个范围，但不包括记录本身。目的是为了防止其他事务在这个范围内插入数据，从而&lt;strong&gt;解决幻读&lt;/strong&gt;。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Next-Key Lock（临键锁）&lt;/strong&gt;：Record Lock + Gap Lock 的结合，锁定一个范围，并且锁定记录本身（左开右闭区间）。InnoDB RR 隔离级别默认使用 Next-Key Lock。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h3 id=&#34;14-什么是死锁如何解决&#34;&gt;&lt;strong&gt;14. 什么是死锁？如何解决？&lt;/strong&gt;
+&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;死锁&lt;/strong&gt;：两个或多个事务在执行过程中，因争夺资源而造成的一种互相等待的现象。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;解决/预防&lt;/strong&gt;：
+&lt;ol&gt;
+&lt;li&gt;InnoDB 内部有死锁检测机制（innodb_deadlock_detect=on），检测到死锁会自动回滚代价较小的事务。&lt;/li&gt;
+&lt;li&gt;业务层面预防：以&lt;strong&gt;固定的顺序&lt;/strong&gt;访问表和行数据。&lt;/li&gt;
+&lt;li&gt;大事务拆小，缩短事务持有锁的时间。&lt;/li&gt;
+&lt;li&gt;为表添加合理的索引，避免全表扫描退化为表锁，减少锁冲突的概率。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id=&#34;七-核心日志-binlog--redo-log--undo-log&#34;&gt;&lt;strong&gt;七、 核心日志 (Binlog / Redo Log / Undo Log)&lt;/strong&gt;
+&lt;/h2&gt;&lt;h3 id=&#34;15-说说-binlogredo-logundo-log-的区别&#34;&gt;&lt;strong&gt;15. 说说 Binlog、Redo Log、Undo Log 的区别？&lt;/strong&gt;
+&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Undo Log (回滚日志)&lt;/strong&gt;：
+&lt;ul&gt;
+&lt;li&gt;作用：实现事务的&lt;strong&gt;原子性&lt;/strong&gt;和 &lt;strong&gt;MVCC&lt;/strong&gt;。&lt;/li&gt;
+&lt;li&gt;内容：逻辑日志，记录数据的历史版本（比如你执行了 INSERT，它就记录一条对应的 DELETE）。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Redo Log (重做日志)&lt;/strong&gt;：
+&lt;ul&gt;
+&lt;li&gt;作用：实现事务的&lt;strong&gt;持久性&lt;/strong&gt;（Crash-safe）。MySQL 宕机重启后，靠它恢复未落盘的数据。&lt;/li&gt;
+&lt;li&gt;内容：物理日志，记录了“在某个数据页上做了什么修改”。&lt;/li&gt;
+&lt;li&gt;特点：InnoDB 引擎特有，大小固定，循环写入（WAL 机制，Write-Ahead Logging）。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Binlog (归档日志)&lt;/strong&gt;：
+&lt;ul&gt;
+&lt;li&gt;作用：用于&lt;strong&gt;数据备份&lt;/strong&gt;和&lt;strong&gt;主从复制&lt;/strong&gt;。&lt;/li&gt;
+&lt;li&gt;内容：逻辑日志，记录的是 SQL 语句（或行修改的数据）。&lt;/li&gt;
+&lt;li&gt;特点：Server 层实现，所有引擎共有，追加写入，不会覆盖旧日志。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;16-什么是两阶段提交-two-phase-commit为什么需要它&#34;&gt;&lt;strong&gt;16. 什么是两阶段提交 (Two-Phase Commit)？为什么需要它？&lt;/strong&gt;
+&lt;/h3&gt;&lt;p&gt;在执行更新语句时，Redo Log 和 Binlog 必须保持数据一致性。MySQL 采用两阶段提交来保证：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;Prepare 阶段&lt;/strong&gt;：将更新写入 Redo Log，将 Redo Log 标记为 prepare 状态。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Commit 阶段&lt;/strong&gt;：将更新写入 Binlog，然后将 Redo Log 标记为 commit 状态。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;&lt;strong&gt;为什么需要两阶段提交？&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;如果在写完 Redo Log 还没写 Binlog 时发生宕机（或者反过来），会导致主库（依靠 Redo Log 恢复）和从库（依靠 Binlog 同步）的数据不一致。两阶段提交配合内部的事务 XID，确保了崩溃恢复时，Binlog 和 Redo Log 的状态绝对一致。&lt;/p&gt;
+</description>
+        </item>
+        <item>
+        <title>Redis面试八股文（持续更新）</title>
+        <link>https://SymphonyW.github.io/zh-cn/p/redis%E9%9D%A2%E8%AF%95%E5%85%AB%E8%82%A1%E6%96%87%E6%8C%81%E7%BB%AD%E6%9B%B4%E6%96%B0/</link>
+        <pubDate>Wed, 25 Mar 2026 22:08:57 +0800</pubDate>
+        
+        <guid>https://SymphonyW.github.io/zh-cn/p/redis%E9%9D%A2%E8%AF%95%E5%85%AB%E8%82%A1%E6%96%87%E6%8C%81%E7%BB%AD%E6%9B%B4%E6%96%B0/</guid>
+        <description>&lt;h1 id=&#34;数据库---redis-面试八股文硬核整理&#34;&gt;&lt;strong&gt;数据库 - Redis 面试八股文（硬核整理）&lt;/strong&gt;
+&lt;/h1&gt;&lt;p&gt;本文档整理了后端开发面试中关于 Redis 最常被问到的高频面试题和深度解析，重点聚焦于底层原理、高并发场景下的缓存设计及高可用架构。&lt;/p&gt;
+&lt;h2 id=&#34;一-核心基础与数据结构&#34;&gt;&lt;strong&gt;一、 核心基础与数据结构&lt;/strong&gt;
+&lt;/h2&gt;&lt;h3 id=&#34;1-redis-为什么这么快&#34;&gt;&lt;strong&gt;1. Redis 为什么这么快？&lt;/strong&gt;
+&lt;/h3&gt;&lt;p&gt;官方测试 Redis 的 QPS 可以达到 10万+，主要原因有：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;完全基于内存&lt;/strong&gt;：绝大部分请求是纯粹的内存操作，速度极快。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;高效的数据结构&lt;/strong&gt;：Redis 专门设计了如 SDS（简单动态字符串）、跳表（SkipList）、压缩列表（ZipList）等高效的数据结构。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;单线程模型&lt;/strong&gt;：Redis 的网络 IO 和键值对读写是由一个线程来完成的，避免了不必要的上下文切换和竞争条件，不存在加锁释放锁操作造成的性能损耗。（注：Redis 6.0 引入了多线程，但也只是用于网络 I/O 阶段，命令执行依然是单线程）。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;I/O 多路复用模型&lt;/strong&gt;：采用 epoll 作为 I/O 多路复用技术的实现，非阻塞 I/O，可以同时监听多个 Socket。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h3 id=&#34;2-redis-的五种基本数据类型及其底层数据结构&#34;&gt;&lt;strong&gt;2. Redis 的五种基本数据类型及其底层数据结构？&lt;/strong&gt;
+&lt;/h3&gt;&lt;p&gt;面试不仅会问应用场景，一定会深挖底层结构：&lt;/p&gt;
+&lt;p&gt;| 数据类型 | 应用场景 | 底层数据结构（Redis 3.2+ / 7.0+ 有所演进） |&lt;/p&gt;
+&lt;p&gt;| :&amp;mdash; | :&amp;mdash; | :&amp;mdash; |&lt;/p&gt;
+&lt;p&gt;| &lt;strong&gt;String&lt;/strong&gt; | 缓存、计数器、分布式锁、Session | &lt;strong&gt;SDS&lt;/strong&gt; (简单动态字符串)。比 C 字符串更安全、获取长度 O(1)、防止缓冲区溢出。 |&lt;/p&gt;
+&lt;p&gt;| &lt;strong&gt;List&lt;/strong&gt; | 消息队列、文章列表、粉丝列表 | &lt;strong&gt;QuickList&lt;/strong&gt; (快速列表，双向链表 + 压缩列表的组合)。 |&lt;/p&gt;
+&lt;p&gt;| &lt;strong&gt;Hash&lt;/strong&gt; | 存储对象、购物车 | &lt;strong&gt;ZipList&lt;/strong&gt; (压缩列表，数据少时) / &lt;strong&gt;HashTable&lt;/strong&gt; (哈希表/字典，数据多时)。&lt;em&gt;注：Redis 7.0 后 ZipList 替换为 ListPack。&lt;/em&gt; |&lt;/p&gt;
+&lt;p&gt;| &lt;strong&gt;Set&lt;/strong&gt; | 共同好友、点赞、抽奖 | &lt;strong&gt;IntSet&lt;/strong&gt; (整数集合，元素全为整数且较少时) / &lt;strong&gt;HashTable&lt;/strong&gt; (字典)。 |&lt;/p&gt;
+&lt;p&gt;| &lt;strong&gt;ZSet (Sorted Set)&lt;/strong&gt;| 排行榜、延时队列 | &lt;strong&gt;ZipList&lt;/strong&gt; (数据少时) / &lt;strong&gt;SkipList + HashTable&lt;/strong&gt; (跳跃表+字典)。跳表保证范围查询效率 O(logN)，字典保证单点查询 O(1)。 |&lt;/p&gt;
+&lt;h3 id=&#34;3-zset-为什么使用跳表skiplist而不是红黑树或-b-树&#34;&gt;&lt;strong&gt;3. ZSet 为什么使用跳表（SkipList）而不是红黑树或 B+ 树？&lt;/strong&gt;
+&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;对比红黑树&lt;/strong&gt;：跳表实现更简单；在进行范围查找（如排行榜获取前 10 名）时，跳表只需要找到起点然后顺着底层链表遍历即可，而红黑树需要中序遍历，跳表效率更高；跳表的插入/删除只需修改相邻节点的指针，不需要像红黑树那样做复杂的旋转。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;对比 B+ 树&lt;/strong&gt;：B+ 树是为了最大限度减少磁盘 I/O 而设计的，树的高度较矮。但 Redis 是内存数据库，不需要考虑磁盘 I/O，跳表作为内存数据结构，其随机层数机制和简单的节点维护成本更低。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id=&#34;二-持久化机制&#34;&gt;&lt;strong&gt;二、 持久化机制&lt;/strong&gt;
+&lt;/h2&gt;&lt;h3 id=&#34;4-rdb-和-aof-持久化的区别&#34;&gt;&lt;strong&gt;4. RDB 和 AOF 持久化的区别？&lt;/strong&gt;
+&lt;/h3&gt;&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:left&#34;&gt;特性&lt;/th&gt;
+&lt;th style=&#34;text-align:left&#34;&gt;RDB (Redis DataBase)&lt;/th&gt;
+&lt;th style=&#34;text-align:left&#34;&gt;AOF (Append Only File)&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;原理&lt;/strong&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;快照&lt;/strong&gt;：将某个时间点的所有内存数据以二进制文件（dump.rdb）保存。&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;日志&lt;/strong&gt;：记录服务器执行的所有写操作命令（appendonly.aof）。&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;触发方式&lt;/strong&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;save (阻塞), bgsave (异步，fork 子进程), 自动触发配置&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;always (每次写), everysec (每秒，默认), no (交由操作系统)&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;文件大小&lt;/strong&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;较小（二进制压缩格式）&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;较大（文本格式记录了所有写命令）&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;恢复速度&lt;/strong&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;快&lt;/strong&gt;（直接把数据读入内存即可）&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;慢&lt;/strong&gt;（需要把所有命令重新执行一遍）&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;数据安全性&lt;/strong&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;容易丢数据（两次快照之间的数据会丢失）&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;安全性高（最多丢一秒的数据）&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;h3 id=&#34;5-什么是-aof-重写aof-rewrite&#34;&gt;&lt;strong&gt;5. 什么是 AOF 重写（AOF Rewrite）？&lt;/strong&gt;
+&lt;/h3&gt;&lt;p&gt;随着命令不断写入，AOF 文件会越来越大。AOF 重写机制就是用来压缩 AOF 文件的。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;原理&lt;/strong&gt;：Redis 会 fork 出一个 bgrewriteaof 子进程，它会扫描当前内存中的数据，为每一个键值对生成一条对应的插入命令，写入到新的 AOF 文件中。比如以前对一个 key 进行了 100 次自增，重写后只会变成一条 SET key 100 的命令，大大减小了体积。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;混合持久化&lt;/strong&gt;：Redis 4.0 引入，AOF 重写时，将当前内存数据以 &lt;strong&gt;RDB 格式&lt;/strong&gt;写入新 AOF 文件的开头，之后的新写入命令继续以 &lt;strong&gt;AOF 格式&lt;/strong&gt;追加。结合了 RDB 恢复快和 AOF 数据不丢失的优点。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id=&#34;三-内存淘汰与过期策略&#34;&gt;&lt;strong&gt;三、 内存淘汰与过期策略&lt;/strong&gt;
+&lt;/h2&gt;&lt;h3 id=&#34;6-redis-的过期键删除策略是什么&#34;&gt;&lt;strong&gt;6. Redis 的过期键删除策略是什么？&lt;/strong&gt;
+&lt;/h3&gt;&lt;p&gt;Redis 使用了 &lt;strong&gt;惰性删除 + 定期删除&lt;/strong&gt; 的配合策略：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;惰性删除&lt;/strong&gt;：平时不主动管，只有当客户端试图访问某个 key 时，Redis 才去检查它是否过期，如果过期了就删除并返回空。优点是省 CPU，缺点是如果过期 key 一直不被访问，会造成内存泄漏。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;定期删除&lt;/strong&gt;：Redis 默认每秒执行 10 次清理操作，随机抽取一部分设置了过期时间的 key，检查并删除已过期的。这种机制可以防止内存被大量无人访问的过期 key 占满。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h3 id=&#34;7-redis-的内存淘汰策略有哪些当内存满了怎么办&#34;&gt;&lt;strong&gt;7. Redis 的内存淘汰策略有哪些？（当内存满了怎么办）&lt;/strong&gt;
+&lt;/h3&gt;&lt;p&gt;当 Redis 内存使用达到 maxmemory 限制时，会触发淘汰策略：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;noeviction（默认）：不淘汰数据，如果有写请求直接报错 (OOM)。&lt;/li&gt;
+&lt;li&gt;allkeys-lru：在所有 key 中，淘汰最近最少使用的 key（最常用）。&lt;/li&gt;
+&lt;li&gt;volatile-lru：在设置了过期时间的 key 中，淘汰最近最少使用的。&lt;/li&gt;
+&lt;li&gt;allkeys-random / volatile-random：随机淘汰。&lt;/li&gt;
+&lt;li&gt;volatile-ttl：淘汰即将过期的 key。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;allkeys-lfu / volatile-lfu&lt;/strong&gt;（Redis 4.0+ 引入）：淘汰使用频率最少的 key（Least Frequently Used）。解决了 LRU 无法应对偶发性冷数据全表扫描的问题。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h2 id=&#34;四-缓存高并发经典问题穿透击穿雪崩&#34;&gt;&lt;strong&gt;四、 缓存高并发经典问题（穿透、击穿、雪崩）&lt;/strong&gt;
+&lt;/h2&gt;&lt;h3 id=&#34;8-什么是缓存穿透如何解决&#34;&gt;&lt;strong&gt;8. 什么是缓存穿透？如何解决？&lt;/strong&gt;
+&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;定义&lt;/strong&gt;：查询一个&lt;strong&gt;根本不存在的数据&lt;/strong&gt;，缓存中肯定查不到（不命中），导致请求每次都要去数据库查，如果有人恶意疯狂请求这个不存在的 key，数据库可能会被瞬间压垮。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;解决方案&lt;/strong&gt;：
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;缓存空对象/默认值&lt;/strong&gt;：当数据库查不到时，依然把这个空结果（如 null）存入缓存，设置一个较短的过期时间。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;布隆过滤器 (Bloom Filter)&lt;/strong&gt;：在请求到达缓存之前，先经过布隆过滤器判断该 key 是否存在。如果布隆过滤器说不存在，那一定不存在，直接返回；如果说存在（有极小误判率），再去查缓存和 DB。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;9-什么是缓存击穿如何解决&#34;&gt;&lt;strong&gt;9. 什么是缓存击穿？如何解决？&lt;/strong&gt;
+&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;定义&lt;/strong&gt;：一个&lt;strong&gt;极度热点的数据&lt;/strong&gt;（比如秒杀商品），在&lt;strong&gt;缓存过期的瞬间&lt;/strong&gt;，有极其庞大的并发请求过来。因为缓存失效了，这几万个请求会同时去穿透到数据库，导致数据库瞬间崩溃。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;解决方案&lt;/strong&gt;：
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;互斥锁 (Mutex Lock)&lt;/strong&gt;：在缓存失效去数据库查询重建缓存的这个步骤加上分布式锁（如 Redis 的 SETNX）。保证只有一个请求能打到 DB 并更新缓存，其他请求拿不到锁就休眠重试。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;逻辑过期 (热点数据永不过期)&lt;/strong&gt;：物理上不设置 TTL，而是在 value 内部维护一个逻辑过期时间字段。发现逻辑过期时，异步开启一个线程去更新缓存，当前请求先返回旧数据。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;10-什么是缓存雪崩如何解决&#34;&gt;&lt;strong&gt;10. 什么是缓存雪崩？如何解决？&lt;/strong&gt;
+&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;定义&lt;/strong&gt;：&lt;strong&gt;大量的热点 key 在同一时间集中过期&lt;/strong&gt;，或者 &lt;strong&gt;Redis 服务宕机&lt;/strong&gt;。导致海量请求直接打到数据库，引发数据库宕机乃至整个系统雪崩。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;解决方案&lt;/strong&gt;：
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;打散过期时间&lt;/strong&gt;：在设置 TTL 时，给基础时间加上一个随机值（如 1-5 分钟），避免大量 key 在同一秒过期。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;服务高可用&lt;/strong&gt;：搭建 Redis 哨兵 (Sentinel) 或 集群 (Cluster) 架构，防止 Redis 单点故障。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;限流降级&lt;/strong&gt;：在应用层（如使用 Sentinel/Hystrix）做好限流熔断，保护底层数据库。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id=&#34;五-分布式锁与双写一致性&#34;&gt;&lt;strong&gt;五、 分布式锁与双写一致性&lt;/strong&gt;
+&lt;/h2&gt;&lt;h3 id=&#34;11-如何用-redis-实现分布式锁&#34;&gt;&lt;strong&gt;11. 如何用 Redis 实现分布式锁？&lt;/strong&gt;
+&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;基础版本&lt;/strong&gt;：使用 SET resource_name my_random_value NX PX 30000。
+&lt;ul&gt;
+&lt;li&gt;NX：表示 Not eXists，只有 key 不存在时才设置成功（保证互斥性）。&lt;/li&gt;
+&lt;li&gt;PX 30000：设置过期时间为 30 秒（防止宕机死锁）。&lt;/li&gt;
+&lt;li&gt;my_random_value：必须是客户端唯一的随机 ID，解锁时通过 Lua 脚本比对这个值，保证“谁加的锁只有谁能解”，防止误删别人的锁。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;进阶版本 (Redisson)&lt;/strong&gt;：基础版本的锁如果业务执行时间太长，锁提前过期了怎么办？Redisson 框架提供了 &lt;strong&gt;看门狗 (Watch Dog)&lt;/strong&gt; 机制。加锁成功后，会开启一个后台线程，每隔 10 秒（默认超时时间 30s 的 1/3）检查一下业务是否还在执行，如果还在执行就将锁的过期时间续期回 30s。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;12-redis-和-mysql-如何保证双写一致性&#34;&gt;&lt;strong&gt;12. Redis 和 MySQL 如何保证双写一致性？&lt;/strong&gt;
+&lt;/h3&gt;&lt;p&gt;这是面试高频必杀题。标准的处理模式是 &lt;strong&gt;Cache Aside Pattern（旁路缓存模式）&lt;/strong&gt;。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;标准操作&lt;/strong&gt;：&lt;strong&gt;先更新数据库，再删除缓存&lt;/strong&gt;。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;为什么不能先更新缓存再更新 DB？&lt;/strong&gt; 如果 DB 更新失败，缓存就是脏数据。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;为什么不能先删缓存再更新 DB？&lt;/strong&gt; 在并发环境下，线程 A 删了缓存还没更新 DB，线程 B 进来查缓存没命中，去 DB 读到了旧数据并写入缓存。然后 A 更新了 DB。导致缓存里永远是旧数据。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;先更新 DB 再删缓存，有没有可能出问题？&lt;/strong&gt; 有。A 查 DB 读到旧数据（还未写缓存），B 更新 DB 并删缓存，A 将刚才的旧数据写入缓存。但这种情况概率极低（要求写操作比读操作还快）。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;终极保障方案（延迟双删 / 消息队列）&lt;/strong&gt;：
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;延迟双删&lt;/strong&gt;：先删缓存 -&amp;gt; 更新 DB -&amp;gt; 睡眠（如 500ms） -&amp;gt; 再次删缓存。确保把读请求可能产生的脏缓存删掉。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;基于 Canal + 消息队列（推荐）&lt;/strong&gt;：业务代码只管更新数据库。通过 Canal 伪装成 MySQL 从节点监听 binlog，提取出修改的数据后扔到 MQ 中，消费者订阅 MQ 去异步且可靠地删除 Redis 缓存。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id=&#34;六-高可用与集群架构&#34;&gt;&lt;strong&gt;六、 高可用与集群架构&lt;/strong&gt;
+&lt;/h2&gt;&lt;h3 id=&#34;13-主从复制的原理是什么&#34;&gt;&lt;strong&gt;13. 主从复制的原理是什么？&lt;/strong&gt;
+&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;全量同步&lt;/strong&gt;：当从节点第一次连接主节点时。主节点执行 bgsave 生成 RDB 文件发送给从节点，从节点加载。期间主节点的新写命令会存入 replication buffer，RDB 发送完后再把 buffer 里的命令发给从节点。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;增量同步&lt;/strong&gt;：网络断开重连后，主节点根据从节点上报的 offset，从 &lt;strong&gt;repl_backlog_buffer&lt;/strong&gt;（环形缓冲区）中把断开期间的命令发给从节点，无需重新全量同步。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;14-什么是哨兵模式-sentinel&#34;&gt;&lt;strong&gt;14. 什么是哨兵模式 (Sentinel)？&lt;/strong&gt;
+&lt;/h3&gt;&lt;p&gt;主从复制无法自动故障转移。哨兵就是用来监控主从节点的：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;监控&lt;/strong&gt;：不断向主从节点发送 PING 检查是否在线（主观下线、客观下线）。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;故障转移 (Failover)&lt;/strong&gt;：主节点挂了，哨兵集群会通过 Raft 算法选举出一个 Leader 哨兵，由它在从节点中选出一个新的主节点（根据优先级、复制偏移量 offset、RunID 选举）。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;通知&lt;/strong&gt;：将新的主节点信息通知给客户端和其他从节点。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h3 id=&#34;15-redis-cluster-集群的原理什么是哈希槽-hash-slot&#34;&gt;&lt;strong&gt;15. Redis Cluster 集群的原理？什么是哈希槽 (Hash Slot)？&lt;/strong&gt;
+&lt;/h3&gt;&lt;p&gt;哨兵模式解决了高可用，但无法解决单机内存上限和写并发能力瓶颈。Redis Cluster 提供了**分布式（分片）**方案。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;哈希槽&lt;/strong&gt;：Redis 集群没有使用一致性 Hash，而是引入了 16384 个哈希槽。集群的每个主节点负责一部分槽。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;寻址过程&lt;/strong&gt;：当客户端发送命令时，对 key 使用 CRC16 算法取模 16384，计算出该 key 属于哪个槽。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;去中心化&lt;/strong&gt;：集群中没有中心节点，节点之间通过 &lt;strong&gt;Gossip 协议&lt;/strong&gt;交换彼此的状态和槽信息。如果客户端请求打到了错误的节点，节点会返回 MOVED 重定向指令，让客户端去正确的节点操作。&lt;/li&gt;
+&lt;/ul&gt;
+</description>
+        </item>
+        <item>
+        <title>C&#43;&#43; STL的底层实现</title>
+        <link>https://SymphonyW.github.io/zh-cn/p/c-stl%E7%9A%84%E5%BA%95%E5%B1%82%E5%AE%9E%E7%8E%B0/</link>
+        <pubDate>Wed, 25 Mar 2026 22:03:05 +0800</pubDate>
+        
+        <guid>https://SymphonyW.github.io/zh-cn/p/c-stl%E7%9A%84%E5%BA%95%E5%B1%82%E5%AE%9E%E7%8E%B0/</guid>
+        <description>&lt;h1 id=&#34;stl底层实现详解&#34;&gt;STL底层实现详解
+&lt;/h1&gt;&lt;p&gt;C++ 标准模板库（STL）是 C++ 标准中最核心的组件之一，它提供了一套通用、高效的数据结构和算法。理解 STL 各个组件的底层实现，不仅能帮助我们写出更高效的代码，还能让我们避开各种潜在的陷阱。&lt;/p&gt;
+&lt;p&gt;本文将基于主流的 SGI STL（GCC libstdc++ 的基础实现），深入剖析 STL 六大组件中核心模板类的底层数据结构与实现原理。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;stl-整体架构&#34;&gt;STL 整体架构
+&lt;/h2&gt;&lt;p&gt;STL 的设计遵循了&lt;strong&gt;泛型编程&lt;/strong&gt;和&lt;strong&gt;分离关注点&lt;/strong&gt;的原则，将数据结构与算法解耦，通过迭代器作为中间层实现无缝连接。其核心分为六大组件：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;容器 (Containers)&lt;/strong&gt;：封装了常用的数据结构，如动态数组、链表、树、哈希表等。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;算法 (Algorithms)&lt;/strong&gt;：提供了通用的排序、查找、遍历等算法，独立于具体容器。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;迭代器 (Iterators)&lt;/strong&gt;：充当容器与算法之间的桥梁，为不同容器提供统一的遍历接口。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;仿函数 (Functors)&lt;/strong&gt;：为算法提供可定制的策略，如比较函数。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;适配器 (Adapters)&lt;/strong&gt;：用于转换接口，如将 deque 转换为 stack。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;空间配置器 (Allocators)&lt;/strong&gt;：负责内存的分配与管理，为容器提供高效的内存服务。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;空间配置器-allocator内存管理的基石&#34;&gt;空间配置器 (Allocator)：内存管理的基石
+&lt;/h2&gt;&lt;p&gt;STL 的默认分配器并不是简单的封装 &lt;code&gt;new&lt;/code&gt; 和 &lt;code&gt;delete&lt;/code&gt;，SGI STL 实现了一套精妙的&lt;strong&gt;两级分配器&lt;/strong&gt;，专门针对小对象的频繁分配做了优化，极大地减少了内存碎片和系统调用开销。&lt;/p&gt;
+&lt;h3 id=&#34;两级分配策略&#34;&gt;两级分配策略
+&lt;/h3&gt;&lt;p&gt;为了应对不同大小的内存申请，分配器将内存申请分为两类处理：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;第一级分配器&lt;/strong&gt;：当申请的内存大小 &lt;strong&gt;大于 128 字节&lt;/strong&gt; 时，直接调用 &lt;code&gt;malloc&lt;/code&gt; 和 &lt;code&gt;free&lt;/code&gt; 向系统堆申请内存，行为类似于标准的内存分配。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;第二级分配器&lt;/strong&gt;：当申请的内存大小 &lt;strong&gt;小于等于 128 字节&lt;/strong&gt; 时，使用内存池 + 空闲链表的方式进行管理，避免了小额内存频繁分配带来的碎片问题。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;第二级分配器空闲链表与内存池&#34;&gt;第二级分配器：空闲链表与内存池
+&lt;/h3&gt;&lt;p&gt;第二级分配器的核心是维护了 16 个空闲链表（free_list），每个链表负责管理特定大小的内存块，大小以 8 字节为步长对齐：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;第 0 个链表：管理 8 字节的块&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;第 1 个链表：管理 16 字节的块&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;...&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;第 15 个链表：管理 128 字节的块&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4 id=&#34;分配流程&#34;&gt;分配流程
+&lt;/h4&gt;&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;对齐调整&lt;/strong&gt;：将申请的内存大小向上取整为 8 的倍数，找到对应的空闲链表。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;取空闲块&lt;/strong&gt;：如果对应的链表有空闲块，直接取下链表头的块返回给用户。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;内存池补充&lt;/strong&gt;：如果链表为空，则从内存池（memory pool）中申请一批相同大小的块，分割后串成链表，再取第一个返回。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;内存池耗尽&lt;/strong&gt;：如果内存池也不够了，则调用第一级分配器申请新的大块内存，补充到内存池中。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h4 id=&#34;内存分配与对象构造的分离&#34;&gt;内存分配与对象构造的分离
+&lt;/h4&gt;&lt;p&gt;STL 分配器严格区分了&lt;strong&gt;内存分配&lt;/strong&gt;和&lt;strong&gt;对象构造&lt;/strong&gt;：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;allocate\(\)&lt;/code&gt;：只负责分配原始的内存空间，不调用构造函数。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;construct\(\)&lt;/code&gt;：在已分配的内存上调用 placement new 构造对象。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;destroy\(\)&lt;/code&gt;：调用对象的析构函数，不释放内存。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;deallocate\(\)&lt;/code&gt;：释放原始的内存空间。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这种分离使得容器可以批量申请内存，然后按需构造对象，极大地提升了效率。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;迭代器与萃取机制容器与算法的桥梁&#34;&gt;迭代器与萃取机制：容器与算法的桥梁
+&lt;/h2&gt;&lt;p&gt;迭代器是一种 “泛化的指针”，它为不同的容器提供了统一的遍历接口，使得算法可以无视容器的底层差异，只通过迭代器来操作数据。&lt;/p&gt;
+&lt;h3 id=&#34;迭代器的分类与能力&#34;&gt;迭代器的分类与能力
+&lt;/h3&gt;&lt;p&gt;STL 根据迭代器支持的操作，将其分为 5 类，能力依次增强：&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;迭代器类型&lt;/th&gt;
+&lt;th&gt;支持的操作&lt;/th&gt;
+&lt;th&gt;典型容器&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;输入迭代器 (Input)&lt;/td&gt;
+&lt;td&gt;只读，单向遍历，只能读一次&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;istream\_iterator&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;输出迭代器 (Output)&lt;/td&gt;
+&lt;td&gt;只写，单向遍历&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;ostream\_iterator&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;前向迭代器 (Forward)&lt;/td&gt;
+&lt;td&gt;读写，单向遍历，可多次遍历&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;forward\_list&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;双向迭代器 (Bidirectional)&lt;/td&gt;
+&lt;td&gt;读写，双向遍历 (&lt;code&gt;\+\+&lt;/code&gt;/&lt;code&gt;\-\-&lt;/code&gt;)&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;list&lt;/code&gt;, &lt;code&gt;map&lt;/code&gt;, &lt;code&gt;set&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;随机访问迭代器 (Random Access)&lt;/td&gt;
+&lt;td&gt;读写，随机跳转 (&lt;code&gt;it\+n&lt;/code&gt;, &lt;code&gt;it\-n&lt;/code&gt;)&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;vector&lt;/code&gt;, &lt;code&gt;deque&lt;/code&gt;, &lt;code&gt;string&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;h3 id=&#34;萃取机制-traits编译期的类型查询&#34;&gt;萃取机制 (Traits)：编译期的类型查询
+&lt;/h3&gt;&lt;p&gt;为了让算法能够在编译期知道迭代器的类型，从而选择最优的实现（例如对随机访问迭代器直接用指针减法计算距离，而对双向迭代器只能逐个递增），STL 引入了 &lt;code&gt;iterator\_traits&lt;/code&gt; 萃取机。&lt;/p&gt;
+&lt;p&gt;它的核心原理是&lt;strong&gt;模板偏特化&lt;/strong&gt;：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;12
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;13
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;14
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;15
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;16
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;17
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;18
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-cpp&#34; data-lang=&#34;cpp&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;// 通用版本，用于自定义迭代器
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;template&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;class&lt;/span&gt; &lt;span class=&#34;nc&#34;&gt;Iter&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;k&#34;&gt;struct&lt;/span&gt; &lt;span class=&#34;nc&#34;&gt;iterator_traits&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;k&#34;&gt;typedef&lt;/span&gt; &lt;span class=&#34;k&#34;&gt;typename&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;Iter&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;::&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;value_type&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;value_type&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;k&#34;&gt;typedef&lt;/span&gt; &lt;span class=&#34;k&#34;&gt;typename&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;Iter&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;::&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;difference_type&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;difference_type&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;k&#34;&gt;typedef&lt;/span&gt; &lt;span class=&#34;k&#34;&gt;typename&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;Iter&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;::&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;iterator_category&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;iterator_category&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;c1&#34;&gt;// ... 其他属性
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;};&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;// 偏特化版本，用于原生指针
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;template&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;class&lt;/span&gt; &lt;span class=&#34;nc&#34;&gt;T&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;k&#34;&gt;struct&lt;/span&gt; &lt;span class=&#34;nc&#34;&gt;iterator_traits&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;T&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;*&amp;gt;&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;k&#34;&gt;typedef&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;T&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;value_type&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;k&#34;&gt;typedef&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;ptrdiff_t&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;difference_type&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;c1&#34;&gt;// 原生指针天生就是随机访问迭代器
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;&lt;/span&gt;  &lt;span class=&#34;k&#34;&gt;typedef&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;random_access_iterator_tag&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;iterator_category&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;c1&#34;&gt;// ... 其他属性
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;};&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;通过这个机制，算法可以在编译期自动 “萃取” 出迭代器的属性，从而实现零成本的抽象。&lt;/p&gt;
+&lt;h3 id=&#34;迭代器失效问题&#34;&gt;迭代器失效问题
+&lt;/h3&gt;&lt;p&gt;迭代器失效是指当容器的内存结构发生变化时，原来的迭代器指向的内存可能已经失效，继续使用会导致未定义行为。不同容器的失效规则不同：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;vector&lt;/strong&gt;：扩容时所有迭代器失效；插入 / 删除点之后的迭代器失效。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;deque&lt;/strong&gt;：两端插入不会导致迭代器失效，但中间插入会导致所有迭代器失效。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;list&lt;/strong&gt;：只有指向被删除元素的迭代器失效，其他全部有效。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;map/set&lt;/strong&gt;：插入不会导致迭代器失效；只有指向被删除元素的迭代器失效。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;序列式容器线性数据的组织&#34;&gt;序列式容器：线性数据的组织
+&lt;/h2&gt;&lt;p&gt;序列式容器以线性顺序存储元素，元素的位置与插入顺序相关。&lt;/p&gt;
+&lt;h3 id=&#34;stdvector动态数组&#34;&gt;std::vector：动态数组
+&lt;/h3&gt;&lt;p&gt;&lt;code&gt;vector&lt;/code&gt; 是最常用的容器，其底层是一块&lt;strong&gt;连续的动态数组&lt;/strong&gt;。&lt;/p&gt;
+&lt;h4 id=&#34;内存布局&#34;&gt;内存布局
+&lt;/h4&gt;&lt;p&gt;&lt;code&gt;vector&lt;/code&gt; 对象内部只维护了三个指针：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;7
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-cpp&#34; data-lang=&#34;cpp&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;k&#34;&gt;template&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;class&lt;/span&gt; &lt;span class=&#34;nc&#34;&gt;T&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;k&#34;&gt;class&lt;/span&gt; &lt;span class=&#34;nc&#34;&gt;Alloc&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;k&#34;&gt;class&lt;/span&gt; &lt;span class=&#34;nc&#34;&gt;vector&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;k&#34;&gt;protected&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;:&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;n&#34;&gt;T&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;*&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;_start&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;        &lt;span class=&#34;c1&#34;&gt;// 指向数组起始位置
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;&lt;/span&gt;  &lt;span class=&#34;n&#34;&gt;T&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;*&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;_finish&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;       &lt;span class=&#34;c1&#34;&gt;// 指向最后一个元素的下一个位置
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;&lt;/span&gt;  &lt;span class=&#34;n&#34;&gt;T&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;*&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;_end_of_storage&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt; &lt;span class=&#34;c1&#34;&gt;// 指向分配的内存的末尾
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;};&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;size\(\)&lt;/code&gt;：&lt;code&gt;\_finish \- \_start&lt;/code&gt;，当前元素个数。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;capacity\(\)&lt;/code&gt;：&lt;code&gt;\_end\_of\_storage \- \_start&lt;/code&gt;，当前分配的最大容量。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4 id=&#34;动态扩容机制&#34;&gt;动态扩容机制
+&lt;/h4&gt;&lt;p&gt;当 &lt;code&gt;push\_back&lt;/code&gt; 导致 &lt;code&gt;size\(\) == capacity\(\)&lt;/code&gt; 时，vector 会触发扩容：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;申请一块新的、更大的内存（通常是原来的 1.5~2 倍，GCC 为 2 倍，MSVC 为 1.5 倍）。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;将旧内存中的元素拷贝 / 移动到新内存。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;释放旧的内存。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;更新三个指针。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;由于成倍扩容，vector 的 &lt;code&gt;push\_back&lt;/code&gt; 均摊时间复杂度是 O (1)。&lt;/p&gt;
+&lt;h3 id=&#34;stdlist双向循环链表&#34;&gt;std::list：双向循环链表
+&lt;/h3&gt;&lt;p&gt;&lt;code&gt;list&lt;/code&gt; 的底层是一个&lt;strong&gt;双向循环链表&lt;/strong&gt;，每个节点包含数据、前驱指针和后继指针。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-cpp&#34; data-lang=&#34;cpp&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;k&#34;&gt;template&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;class&lt;/span&gt; &lt;span class=&#34;nc&#34;&gt;T&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;k&#34;&gt;struct&lt;/span&gt; &lt;span class=&#34;nc&#34;&gt;list_node&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;n&#34;&gt;T&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;data&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;n&#34;&gt;list_node&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;*&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;prev&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;n&#34;&gt;list_node&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;*&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;next&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;};&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;为了简化边界处理，list 使用了一个&lt;strong&gt;哨兵节点（Sentinel Node）&lt;/strong&gt;，&lt;code&gt;begin\(\)&lt;/code&gt; 指向哨兵的 &lt;code&gt;next&lt;/code&gt;，&lt;code&gt;end\(\)&lt;/code&gt; 指向哨兵自己，形成一个环。&lt;/p&gt;
+&lt;h4 id=&#34;核心特性&#34;&gt;核心特性
+&lt;/h4&gt;&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;内存不连续，不支持随机访问。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;任意位置的插入和删除都是 O (1) 时间复杂度，只需调整指针。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;提供了独特的 &lt;code&gt;splice&lt;/code&gt; 操作，可以在 O (1) 时间内将一个 list 的元素转移到另一个 list，无需拷贝元素。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;stddeque双端队列的分段魔法&#34;&gt;std::deque：双端队列的分段魔法
+&lt;/h3&gt;&lt;p&gt;&lt;code&gt;deque&lt;/code&gt; 是 STL 中最复杂的序列容器，它是 vector 和 list 的折中：既支持 O (1) 的双端插入删除，又支持 O (1) 的随机访问。&lt;/p&gt;
+&lt;p&gt;它的底层既不是连续内存，也不是链表，而是&lt;strong&gt;分段连续内存 + 中控器&lt;/strong&gt;的设计。&lt;/p&gt;
+&lt;h4 id=&#34;底层结构&#34;&gt;底层结构
+&lt;/h4&gt;&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;缓冲区 (Buffer)&lt;/strong&gt;：多个固定大小的连续内存块，用于存储实际元素。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;中控器 (Map)&lt;/strong&gt;：一个指针数组，每个元素指向一个缓冲区的起始地址。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h4 id=&#34;迭代器的实现&#34;&gt;迭代器的实现
+&lt;/h4&gt;&lt;p&gt;为了模拟连续内存的假象，deque 的迭代器是一个复杂的对象，包含四个指针：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-cpp&#34; data-lang=&#34;cpp&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;k&#34;&gt;struct&lt;/span&gt; &lt;span class=&#34;nc&#34;&gt;deque_iterator&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;n&#34;&gt;T&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;*&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;cur&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;        &lt;span class=&#34;c1&#34;&gt;// 当前指向的元素
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;&lt;/span&gt;  &lt;span class=&#34;n&#34;&gt;T&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;*&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;first&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;      &lt;span class=&#34;c1&#34;&gt;// 当前缓冲区的起始
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;&lt;/span&gt;  &lt;span class=&#34;n&#34;&gt;T&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;*&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;last&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;       &lt;span class=&#34;c1&#34;&gt;// 当前缓冲区的末尾
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;&lt;/span&gt;  &lt;span class=&#34;n&#34;&gt;T&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;**&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;node&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;      &lt;span class=&#34;c1&#34;&gt;// 指向中控器 map 中的对应位置
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;};&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;当迭代器递增时，如果 &lt;code&gt;cur&lt;/code&gt; 到达了当前缓冲区的末尾，就会通过 &lt;code&gt;node&lt;/code&gt; 跳转到下一个缓冲区的起始位置。这对用户是完全透明的。&lt;/p&gt;
+&lt;h4 id=&#34;随机访问的实现&#34;&gt;随机访问的实现
+&lt;/h4&gt;&lt;p&gt;虽然内存是分段的，但 deque 依然支持 &lt;code&gt;operator\[\]&lt;/code&gt;：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-cpp&#34; data-lang=&#34;cpp&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;n&#34;&gt;reference&lt;/span&gt; &lt;span class=&#34;k&#34;&gt;operator&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;[](&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;size_type&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;n&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;n&#34;&gt;size_type&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;offset&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;=&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;n&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;+&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;start&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;cur&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;-&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;start&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;first&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;n&#34;&gt;size_type&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;node_idx&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;=&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;offset&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;/&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;buffer_size&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;();&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;n&#34;&gt;size_type&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;elem_idx&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;=&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;offset&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;%&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;buffer_size&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;();&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;k&#34;&gt;return&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;map&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;[&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;start&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;node&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;-&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;map&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;+&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;node_idx&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;][&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;elem_idx&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;];&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;}&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;通过一次计算就能定位到元素，时间复杂度依然是 O (1)。&lt;/p&gt;
+&lt;h3 id=&#34;stdstring小字符串优化-sso&#34;&gt;std::string：小字符串优化 (SSO)
+&lt;/h3&gt;&lt;p&gt;&lt;code&gt;std::string&lt;/code&gt; 本质上是一个 &lt;code&gt;vector\&amp;amp;lt;char\&amp;amp;gt;&lt;/code&gt;，但现代实现都加入了&lt;strong&gt;小字符串优化 (Small String Optimization)&lt;/strong&gt;，以避免短字符串的堆分配开销。&lt;/p&gt;
+&lt;h4 id=&#34;sso-的原理&#34;&gt;SSO 的原理
+&lt;/h4&gt;&lt;p&gt;string 对象内部通常有一个 union，用来区分短字符串和长字符串：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;短字符串&lt;/strong&gt;：当字符串长度小于阈值（GCC/libstdc++ 是 15，Clang/libc++ 是 22）时，字符直接存储在 string 对象内部的栈上缓冲区中，无需调用 &lt;code&gt;malloc&lt;/code&gt;。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;长字符串&lt;/strong&gt;：当超过阈值时，才会在堆上分配内存，像传统的 string 一样存储指针、大小和容量。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这就是为什么创建一个 &lt;code&gt;\&amp;amp;\#34;hello\&amp;amp;\#34;&lt;/code&gt; 字符串比长字符串快得多的原因，它完全在栈上完成，没有系统调用开销。&lt;/p&gt;
+&lt;h3 id=&#34;stdvector特殊的位压缩&#34;&gt;std::vector：特殊的位压缩
+&lt;/h3&gt;&lt;p&gt;&lt;code&gt;vector\&amp;amp;lt;bool\&amp;amp;gt;&lt;/code&gt; 是 &lt;code&gt;vector&lt;/code&gt; 的一个&lt;strong&gt;特化版本&lt;/strong&gt;，它不是一个真正的 STL 容器。为了节省空间，它将 8 个 bool 值压缩到了 1 个字节中，每个元素只占 1 bit。&lt;/p&gt;
+&lt;h4 id=&#34;存在的问题&#34;&gt;存在的问题
+&lt;/h4&gt;&lt;p&gt;这种压缩带来了很多问题：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;operator\[\]&lt;/code&gt; 返回的不是 &lt;code&gt;bool\&amp;amp;amp;&lt;/code&gt;，而是一个&lt;strong&gt;代理对象 (proxy reference)&lt;/strong&gt;，因为你无法取一个 bit 的地址。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;不支持 &lt;code&gt;data\(\)&lt;/code&gt; 方法，因为没有连续的 bool 数组。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;位操作带来了额外的性能开销，比普通的 &lt;code&gt;vector\&amp;amp;lt;char\&amp;amp;gt;&lt;/code&gt; 慢。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;因此，在很多场景下，&lt;code&gt;vector\&amp;amp;lt;bool\&amp;amp;gt;&lt;/code&gt; 被认为是 STL 的一个设计失误。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;有序关联式容器红黑树的平衡艺术&#34;&gt;有序关联式容器：红黑树的平衡艺术
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;std::map&lt;/code&gt;, &lt;code&gt;std::set&lt;/code&gt;, &lt;code&gt;std::multimap&lt;/code&gt;, &lt;code&gt;std::multiset&lt;/code&gt; 这四个有序关联容器，底层全部基于&lt;strong&gt;红黑树 (Red-Black Tree)&lt;/strong&gt; 实现。&lt;/p&gt;
+&lt;h3 id=&#34;红黑树自平衡的二叉搜索树&#34;&gt;红黑树：自平衡的二叉搜索树
+&lt;/h3&gt;&lt;p&gt;普通的二叉搜索树 (BST) 在最坏情况下会退化成链表，导致操作时间复杂度变为 O (n)。红黑树通过给节点着色和旋转操作，保证了树的近似平衡。&lt;/p&gt;
+&lt;p&gt;红黑树必须满足以下 5 条性质：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;节点要么是红色，要么是黑色。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;根节点必须是黑色。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;所有叶子节点（NIL 空节点）都是黑色。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;如果一个节点是红色，那么它的两个子节点都是黑色（不能有连续的红节点）。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;从任意节点到其每个叶子的所有路径都包含相同数目的黑色节点。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;这些性质保证了红黑树的最长路径不会超过最短路径的两倍，因此树的高度始终维持在 O (log n)，保证了所有操作的时间复杂度都是 O (log n)。&lt;/p&gt;
+&lt;h3 id=&#34;插入与删除的调整&#34;&gt;插入与删除的调整
+&lt;/h3&gt;&lt;p&gt;当插入或删除节点破坏了红黑树的性质时，会通过&lt;strong&gt;变色&lt;/strong&gt;和 \&lt;em&gt;\&lt;/em&gt; 旋转（左旋 / 右旋）\&lt;em&gt;\&lt;/em&gt; 操作来修复，最多只需要 O (log n) 次旋转，效率极高。&lt;/p&gt;
+&lt;h3 id=&#34;容器与红黑树的关系&#34;&gt;容器与红黑树的关系
+&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;set&lt;/code&gt;：红黑树存储的是键本身，保证键的唯一性和有序性。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;map&lt;/code&gt;：红黑树存储的是 &lt;code&gt;pair\&amp;amp;lt;const Key, Value\&amp;amp;gt;&lt;/code&gt;，以 Key 作为排序依据。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;multiset&lt;/code&gt;/&lt;code&gt;multimap&lt;/code&gt;：允许键重复的红黑树版本。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;无序关联式容器哈希表的极速查找&#34;&gt;无序关联式容器：哈希表的极速查找
+&lt;/h2&gt;&lt;p&gt;C++11 引入的 &lt;code&gt;std::unordered\_map&lt;/code&gt;, &lt;code&gt;std::unordered\_set&lt;/code&gt; 等无序容器，底层基于 \&lt;em&gt;\&lt;/em&gt; 哈希表（Hash Table）\&lt;em&gt;\&lt;/em&gt; 实现，牺牲了有序性，换取了平均 O (1) 的查找效率。&lt;/p&gt;
+&lt;h3 id=&#34;链地址法解决哈希冲突&#34;&gt;链地址法：解决哈希冲突
+&lt;/h3&gt;&lt;p&gt;STL 的哈希表采用 \&lt;em&gt;\&lt;/em&gt; 链地址法（Separate Chaining）\&lt;em&gt;\&lt;/em&gt; 来解决哈希冲突：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;维护一个&lt;strong&gt;桶数组 (Bucket Array)&lt;/strong&gt;，每个桶是一个链表的头节点。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;通过哈希函数将 Key 映射到桶的索引。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;如果多个 Key 映射到了同一个桶，就将它们挂在该桶的链表上。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h3 id=&#34;扩容与重哈希&#34;&gt;扩容与重哈希
+&lt;/h3&gt;&lt;p&gt;哈希表有一个&lt;strong&gt;负载因子 (Load Factor)&lt;/strong&gt; 的概念，即 &lt;code&gt;元素个数 / 桶的个数&lt;/code&gt;。当负载因子超过阈值（默认是 1.0）时，哈希表会触发扩容：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;申请一个更大的桶数组（通常是原来的 2 倍，且为质数）。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;将所有旧的元素重新计算哈希值，映射到新的桶中。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;释放旧的桶数组。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;这个过程虽然单次是 O (n)，但由于频率很低，均摊到每次插入的开销可以忽略。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;容器适配器接口的封装与转换&#34;&gt;容器适配器：接口的封装与转换
+&lt;/h2&gt;&lt;p&gt;容器适配器并不是独立的容器，而是对其他容器的接口进行封装，提供特定的行为。&lt;/p&gt;
+&lt;h3 id=&#34;stdstack--stdqueue&#34;&gt;std::stack / std::queue
+&lt;/h3&gt;&lt;p&gt;这两个适配器默认都使用 &lt;code&gt;deque&lt;/code&gt; 作为底层容器：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;stack&lt;/code&gt;：封装了 deque 的 &lt;code&gt;push\_back&lt;/code&gt;, &lt;code&gt;pop\_back&lt;/code&gt;, &lt;code&gt;back&lt;/code&gt; 接口，实现后进先出 (LIFO)。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;queue&lt;/code&gt;：封装了 deque 的 &lt;code&gt;push\_back&lt;/code&gt;, &lt;code&gt;pop\_front&lt;/code&gt;, &lt;code&gt;front&lt;/code&gt; 接口，实现先进先出 (FIFO)。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;为什么默认用 deque 而不是 vector？因为 deque 的双端操作效率更高，且扩容时不需要移动所有元素。&lt;/p&gt;
+&lt;h3 id=&#34;stdpriority_queue&#34;&gt;std::priority_queue
+&lt;/h3&gt;&lt;p&gt;优先队列的底层默认使用 &lt;code&gt;vector&lt;/code&gt;，并在其上维护了一个&lt;strong&gt;大顶堆 (Max-Heap)&lt;/strong&gt; 结构。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;堆是一个完全二叉树，可以用数组连续存储，父节点和子节点可以通过索引快速计算。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;push&lt;/code&gt; 操作会将元素插入到末尾，然后执行&lt;strong&gt;上浮 (percolate up)&lt;/strong&gt; 调整堆。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;pop&lt;/code&gt; 操作会弹出堆顶元素，然后将最后一个元素放到堆顶，执行&lt;strong&gt;下沉 (percolate down)&lt;/strong&gt; 调整堆。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;容器性能对比与选择指南&#34;&gt;容器性能对比与选择指南
+&lt;/h2&gt;&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;容器&lt;/th&gt;
+&lt;th&gt;随机访问&lt;/th&gt;
+&lt;th&gt;头部插入&lt;/th&gt;
+&lt;th&gt;尾部插入&lt;/th&gt;
+&lt;th&gt;中间插入&lt;/th&gt;
+&lt;th&gt;查找&lt;/th&gt;
+&lt;th&gt;底层结构&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;vector&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;&lt;strong&gt;O(1)&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;O(n)&lt;/td&gt;
+&lt;td&gt;&lt;strong&gt;O(1)\&lt;/strong&gt;*&lt;/td&gt;
+&lt;td&gt;O(n)&lt;/td&gt;
+&lt;td&gt;O(n)&lt;/td&gt;
+&lt;td&gt;动态数组&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;list&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;O(n)&lt;/td&gt;
+&lt;td&gt;&lt;strong&gt;O(1)&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;&lt;strong&gt;O(1)&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;&lt;strong&gt;O(1)&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;O(n)&lt;/td&gt;
+&lt;td&gt;双向链表&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;deque&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;&lt;strong&gt;O(1)&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;&lt;strong&gt;O(1)&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;&lt;strong&gt;O(1)&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;O(n)&lt;/td&gt;
+&lt;td&gt;O(n)&lt;/td&gt;
+&lt;td&gt;分段数组&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;map/set&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;-&lt;/td&gt;
+&lt;td&gt;O(log n)&lt;/td&gt;
+&lt;td&gt;O(log n)&lt;/td&gt;
+&lt;td&gt;O(log n)&lt;/td&gt;
+&lt;td&gt;&lt;strong&gt;O(log n)&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;红黑树&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;unordered\_map/set&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;-&lt;/td&gt;
+&lt;td&gt;&lt;strong&gt;O(1)&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;&lt;strong&gt;O(1)&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;&lt;strong&gt;O(1)&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;&lt;strong&gt;O(1)\&lt;/strong&gt;&lt;em&gt;&lt;strong&gt;\&lt;/strong&gt;&lt;/em&gt;&lt;/td&gt;
+&lt;td&gt;哈希表&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;string&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;&lt;strong&gt;O(1)&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;O(n)&lt;/td&gt;
+&lt;td&gt;&lt;strong&gt;O(1)\&lt;/strong&gt;*&lt;/td&gt;
+&lt;td&gt;O(n)&lt;/td&gt;
+&lt;td&gt;O(n)&lt;/td&gt;
+&lt;td&gt;字符数组 + SSO&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;blockquote&gt;
+&lt;p&gt;* 均摊时间复杂度，扩容时为 O (n)
+\&lt;em&gt;\&lt;/em&gt; 平均时间复杂度，最坏情况为 O (n)&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;h3 id=&#34;选择建议&#34;&gt;选择建议
+&lt;/h3&gt;&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;需要随机访问，且主要在尾部操作&lt;/strong&gt;：选 &lt;code&gt;vector&lt;/code&gt;，缓存友好，速度最快。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;需要频繁在两端操作&lt;/strong&gt;：选 &lt;code&gt;deque&lt;/code&gt;。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;需要频繁在任意位置插入删除&lt;/strong&gt;：选 &lt;code&gt;list&lt;/code&gt;。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;需要有序键值对，且需要稳定的 O (log n)&lt;/strong&gt;：选 &lt;code&gt;map&lt;/code&gt;/&lt;code&gt;set&lt;/code&gt;。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;不需要顺序，只需要最快的查找&lt;/strong&gt;：选 &lt;code&gt;unordered\_map&lt;/code&gt;/&lt;code&gt;unordered\_set&lt;/code&gt;。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;hr&gt;
+&lt;p&gt;&lt;strong&gt;总结&lt;/strong&gt;：STL 并不是一个黑盒，其背后的每一个设计都蕴含着精妙的数据结构与算法思想。理解这些底层实现，才能真正做到 “知其然，知其所以然”，在实际开发中做出最优的技术选型。&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;（注：文档部分内容可能由 AI 生成）&lt;/p&gt;
+&lt;/blockquote&gt;
+</description>
+        </item>
+        <item>
         <title>Redis学习文档</title>
         <link>https://SymphonyW.github.io/zh-cn/p/redis%E5%AD%A6%E4%B9%A0%E6%96%87%E6%A1%A3/</link>
         <pubDate>Tue, 24 Mar 2026 17:05:27 +0800</pubDate>
@@ -7564,22 +8787,6 @@ $$&lt;/p&gt;
 &lt;/ol&gt;
 &lt;/div&gt;
 </description>
-        </item>
-        <item>
-        <title>生日</title>
-        <link>https://SymphonyW.github.io/zh-cn/p/%E7%94%9F%E6%97%A5/</link>
-        <pubDate>Tue, 06 Jan 2026 11:10:12 +0800</pubDate>
-        
-        <guid>https://SymphonyW.github.io/zh-cn/p/%E7%94%9F%E6%97%A5/</guid>
-        <description>&lt;img src="https://SymphonyW.github.io/zh-cn/p/%E7%94%9F%E6%97%A5/pawel-czerwinski-8uZPynIu-rQ-unsplash.jpg" alt="Featured image of post 生日" /&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
-&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
-&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
-&lt;td class=&#34;lntd&#34;&gt;
-&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-go&#34; data-lang=&#34;go&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nx&#34;&gt;hhhhhhhhhhhhhhh&lt;/span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
-&lt;/div&gt;
-&lt;/div&gt;</description>
         </item>
         
     </channel>

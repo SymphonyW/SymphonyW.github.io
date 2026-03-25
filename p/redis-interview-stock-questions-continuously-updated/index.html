@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="数据库 - Redis 面试八股文（硬核整理） 本文档整理了后端开发面试中关于 Redis 最常被问到的高频面试题和深度解析，重点聚焦于底层原理、高并发场景下的缓存设计及高可用架构。 一、 核心基础与数据结构 1. Redis 为什么这么快？ 官方测试 Redis 的 QPS 可以达到 10万+，主要原因有： 完全基于内存：绝大部分请求是纯粹的内存操作，速度极快。 高效的数据结构：Redis 专门设计了如 SDS（简单动态字符串）、跳表（SkipList）、压缩列表（ZipList）等高效的数据结构。 单线程模型：Redis 的网络 IO 和键值对读写是由一个线程来完成的，避免了不必要的上下文切换和竞争条件，不存在加锁释放锁操作造成的性能损耗。（注：Redis 6.0 引入了多线程，但也只是用于网络 I/O 阶段，命令执行依然是单线程）。 I/O 多路复用模型：采用 epoll 作为 I/O 多路复用技术的实现，非阻塞 I/O，可以同时监听多个 Socket。 2. Redis 的五种基本数据类型及其底层数据结构？ 面试不仅会问应用场景，一定会深挖底层结构： | 数据类型 | 应用场景 | 底层数据结构（Redis 3.2+ / 7.0+ 有所演进） | | :&mdash; | :&mdash; | :&mdash; | | String | 缓存、计数器、分布式锁、Session | SDS (简单动态字符串)。比 C 字符串更安全、获取长度 O(1)、防止缓冲区溢出。 |">
+<title>Redis Interview Stock Questions (Continuously Updated)</title>
+
+<link rel='canonical' href='https://SymphonyW.github.io/p/redis-interview-stock-questions-continuously-updated/'>
+
+<link rel="stylesheet" href="/scss/style.min.fcb8ae9ec4ce6e601e4b352c4eb06a952a123e46064b9bae06de6961bd51fd81.css"><meta property='og:title' content="Redis Interview Stock Questions (Continuously Updated)">
+<meta property='og:description' content="数据库 - Redis 面试八股文（硬核整理） 本文档整理了后端开发面试中关于 Redis 最常被问到的高频面试题和深度解析，重点聚焦于底层原理、高并发场景下的缓存设计及高可用架构。 一、 核心基础与数据结构 1. Redis 为什么这么快？ 官方测试 Redis 的 QPS 可以达到 10万+，主要原因有： 完全基于内存：绝大部分请求是纯粹的内存操作，速度极快。 高效的数据结构：Redis 专门设计了如 SDS（简单动态字符串）、跳表（SkipList）、压缩列表（ZipList）等高效的数据结构。 单线程模型：Redis 的网络 IO 和键值对读写是由一个线程来完成的，避免了不必要的上下文切换和竞争条件，不存在加锁释放锁操作造成的性能损耗。（注：Redis 6.0 引入了多线程，但也只是用于网络 I/O 阶段，命令执行依然是单线程）。 I/O 多路复用模型：采用 epoll 作为 I/O 多路复用技术的实现，非阻塞 I/O，可以同时监听多个 Socket。 2. Redis 的五种基本数据类型及其底层数据结构？ 面试不仅会问应用场景，一定会深挖底层结构： | 数据类型 | 应用场景 | 底层数据结构（Redis 3.2+ / 7.0+ 有所演进） | | :&mdash; | :&mdash; | :&mdash; | | String | 缓存、计数器、分布式锁、Session | SDS (简单动态字符串)。比 C 字符串更安全、获取长度 O(1)、防止缓冲区溢出。 |">
+<meta property='og:url' content='https://SymphonyW.github.io/p/redis-interview-stock-questions-continuously-updated/'>
+<meta property='og:site_name' content='SymphonyW'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='Redis' /><meta property='article:tag' content='Backend' /><meta property='article:tag' content='Interview' /><meta property='article:published_time' content='2026-03-25T22:08:57&#43;08:00'/><meta property='article:modified_time' content='2026-03-25T22:08:57&#43;08:00'/>
+<meta name="twitter:title" content="Redis Interview Stock Questions (Continuously Updated)">
+<meta name="twitter:description" content="数据库 - Redis 面试八股文（硬核整理） 本文档整理了后端开发面试中关于 Redis 最常被问到的高频面试题和深度解析，重点聚焦于底层原理、高并发场景下的缓存设计及高可用架构。 一、 核心基础与数据结构 1. Redis 为什么这么快？ 官方测试 Redis 的 QPS 可以达到 10万+，主要原因有： 完全基于内存：绝大部分请求是纯粹的内存操作，速度极快。 高效的数据结构：Redis 专门设计了如 SDS（简单动态字符串）、跳表（SkipList）、压缩列表（ZipList）等高效的数据结构。 单线程模型：Redis 的网络 IO 和键值对读写是由一个线程来完成的，避免了不必要的上下文切换和竞争条件，不存在加锁释放锁操作造成的性能损耗。（注：Redis 6.0 引入了多线程，但也只是用于网络 I/O 阶段，命令执行依然是单线程）。 I/O 多路复用模型：采用 epoll 作为 I/O 多路复用技术的实现，非阻塞 I/O，可以同时监听多个 Socket。 2. Redis 的五种基本数据类型及其底层数据结构？ 面试不仅会问应用场景，一定会深挖底层结构： | 数据类型 | 应用场景 | 底层数据结构（Redis 3.2+ / 7.0+ 有所演进） | | :&mdash; | :&mdash; | :&mdash; | | String | 缓存、计数器、分布式锁、Session | SDS (简单动态字符串)。比 C 字符串更安全、获取长度 O(1)、防止缓冲区溢出。 |">
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="Toggle Menu">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hua20e9d08cce84e79524a418ee5d4524c_7426_300x0_resize_box_3.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">😁</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">SymphonyW</a></h1>
+            <h2 class="site-description">Welcome to my Blog.</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0'
+                        target="_blank"
+                        title="Bilibili"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.0.0-beta2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M488.6 104.1C505.3 122.2 513 143.8 511.9 169.8V372.2C511.5 398.6 502.7 420.3 485.4 437.3C468.2 454.3 446.3 463.2 419.9 464H92.02C65.57 463.2 43.81 454.2 26.74 436.8C9.682 419.4 .7667 396.5 0 368.2V169.8C.7667 143.8 9.682 122.2 26.74 104.1C43.81 87.75 65.57 78.77 92.02 78H121.4L96.05 52.19C90.3 46.46 87.42 39.19 87.42 30.4C87.42 21.6 90.3 14.34 96.05 8.603C101.8 2.868 109.1 0 117.9 0C126.7 0 134 2.868 139.8 8.603L213.1 78H301.1L375.6 8.603C381.7 2.868 389.2 0 398 0C406.8 0 414.1 2.868 419.9 8.603C425.6 14.34 428.5 21.6 428.5 30.4C428.5 39.19 425.6 46.46 419.9 52.19L394.6 78L423.9 78C450.3 78.77 471.9 87.75 488.6 104.1H488.6zM449.8 173.8C449.4 164.2 446.1 156.4 439.1 150.3C433.9 144.2 425.1 140.9 416.4 140.5H96.05C86.46 140.9 78.6 144.2 72.47 150.3C66.33 156.4 63.07 164.2 62.69 173.8V368.2C62.69 377.4 65.95 385.2 72.47 391.7C78.99 398.2 86.85 401.5 96.05 401.5H416.4C425.6 401.5 433.4 398.2 439.7 391.7C446 385.2 449.4 377.4 449.8 368.2L449.8 173.8zM185.5 216.5C191.8 222.8 195.2 230.6 195.6 239.7V273C195.2 282.2 191.9 289.9 185.8 296.2C179.6 302.5 171.8 305.7 162.2 305.7C152.6 305.7 144.7 302.5 138.6 296.2C132.5 289.9 129.2 282.2 128.8 273V239.7C129.2 230.6 132.6 222.8 138.9 216.5C145.2 210.2 152.1 206.9 162.2 206.5C171.4 206.9 179.2 210.2 185.5 216.5H185.5zM377 216.5C383.3 222.8 386.7 230.6 387.1 239.7V273C386.7 282.2 383.4 289.9 377.3 296.2C371.2 302.5 363.3 305.7 353.7 305.7C344.1 305.7 336.3 302.5 330.1 296.2C323.1 289.9 320.7 282.2 320.4 273V239.7C320.7 230.6 324.1 222.8 330.4 216.5C336.7 210.2 344.5 206.9 353.7 206.5C362.9 206.9 370.7 210.2 377 216.5H377z"/></svg>
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://github.com/SymphonyW'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>Home</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://SymphonyW.github.io/" selected>English</option>
+                                
+                                    <option value="https://SymphonyW.github.io/zh-cn/" >中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>Dark Mode</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">Table of contents</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#一-核心基础与数据结构"><strong>一、 核心基础与数据结构</strong></a>
+      <ol>
+        <li><a href="#1-redis-为什么这么快"><strong>1. Redis 为什么这么快？</strong></a></li>
+        <li><a href="#2-redis-的五种基本数据类型及其底层数据结构"><strong>2. Redis 的五种基本数据类型及其底层数据结构？</strong></a></li>
+        <li><a href="#3-zset-为什么使用跳表skiplist而不是红黑树或-b-树"><strong>3. ZSet 为什么使用跳表（SkipList）而不是红黑树或 B+ 树？</strong></a></li>
+      </ol>
+    </li>
+    <li><a href="#二-持久化机制"><strong>二、 持久化机制</strong></a>
+      <ol>
+        <li><a href="#4-rdb-和-aof-持久化的区别"><strong>4. RDB 和 AOF 持久化的区别？</strong></a></li>
+        <li><a href="#5-什么是-aof-重写aof-rewrite"><strong>5. 什么是 AOF 重写（AOF Rewrite）？</strong></a></li>
+      </ol>
+    </li>
+    <li><a href="#三-内存淘汰与过期策略"><strong>三、 内存淘汰与过期策略</strong></a>
+      <ol>
+        <li><a href="#6-redis-的过期键删除策略是什么"><strong>6. Redis 的过期键删除策略是什么？</strong></a></li>
+        <li><a href="#7-redis-的内存淘汰策略有哪些当内存满了怎么办"><strong>7. Redis 的内存淘汰策略有哪些？（当内存满了怎么办）</strong></a></li>
+      </ol>
+    </li>
+    <li><a href="#四-缓存高并发经典问题穿透击穿雪崩"><strong>四、 缓存高并发经典问题（穿透、击穿、雪崩）</strong></a>
+      <ol>
+        <li><a href="#8-什么是缓存穿透如何解决"><strong>8. 什么是缓存穿透？如何解决？</strong></a></li>
+        <li><a href="#9-什么是缓存击穿如何解决"><strong>9. 什么是缓存击穿？如何解决？</strong></a></li>
+        <li><a href="#10-什么是缓存雪崩如何解决"><strong>10. 什么是缓存雪崩？如何解决？</strong></a></li>
+      </ol>
+    </li>
+    <li><a href="#五-分布式锁与双写一致性"><strong>五、 分布式锁与双写一致性</strong></a>
+      <ol>
+        <li><a href="#11-如何用-redis-实现分布式锁"><strong>11. 如何用 Redis 实现分布式锁？</strong></a></li>
+        <li><a href="#12-redis-和-mysql-如何保证双写一致性"><strong>12. Redis 和 MySQL 如何保证双写一致性？</strong></a></li>
+      </ol>
+    </li>
+    <li><a href="#六-高可用与集群架构"><strong>六、 高可用与集群架构</strong></a>
+      <ol>
+        <li><a href="#13-主从复制的原理是什么"><strong>13. 主从复制的原理是什么？</strong></a></li>
+        <li><a href="#14-什么是哨兵模式-sentinel"><strong>14. 什么是哨兵模式 (Sentinel)？</strong></a></li>
+        <li><a href="#15-redis-cluster-集群的原理什么是哈希槽-hash-slot"><strong>15. Redis Cluster 集群的原理？什么是哈希槽 (Hash Slot)？</strong></a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/p/redis-interview-stock-questions-continuously-updated/">Redis Interview Stock Questions (Continuously Updated)</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published">2026-03-25 22:08</time>
+            </div>
+        
+
+        
+    </footer>
+    
+
+    
+        <footer class="article-translations">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+            <div>
+                
+                    <a href="https://SymphonyW.github.io/zh-cn/p/redis%E9%9D%A2%E8%AF%95%E5%85%AB%E8%82%A1%E6%96%87%E6%8C%81%E7%BB%AD%E6%9B%B4%E6%96%B0/" class="link">中文</a>
+                
+            </div>
+        </footer>
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="数据库---redis-面试八股文硬核整理"><strong>数据库 - Redis 面试八股文（硬核整理）</strong>
+</h1><p>本文档整理了后端开发面试中关于 Redis 最常被问到的高频面试题和深度解析，重点聚焦于底层原理、高并发场景下的缓存设计及高可用架构。</p>
+<h2 id="一-核心基础与数据结构"><strong>一、 核心基础与数据结构</strong>
+</h2><h3 id="1-redis-为什么这么快"><strong>1. Redis 为什么这么快？</strong>
+</h3><p>官方测试 Redis 的 QPS 可以达到 10万+，主要原因有：</p>
+<ol>
+<li><strong>完全基于内存</strong>：绝大部分请求是纯粹的内存操作，速度极快。</li>
+<li><strong>高效的数据结构</strong>：Redis 专门设计了如 SDS（简单动态字符串）、跳表（SkipList）、压缩列表（ZipList）等高效的数据结构。</li>
+<li><strong>单线程模型</strong>：Redis 的网络 IO 和键值对读写是由一个线程来完成的，避免了不必要的上下文切换和竞争条件，不存在加锁释放锁操作造成的性能损耗。（注：Redis 6.0 引入了多线程，但也只是用于网络 I/O 阶段，命令执行依然是单线程）。</li>
+<li><strong>I/O 多路复用模型</strong>：采用 epoll 作为 I/O 多路复用技术的实现，非阻塞 I/O，可以同时监听多个 Socket。</li>
+</ol>
+<h3 id="2-redis-的五种基本数据类型及其底层数据结构"><strong>2. Redis 的五种基本数据类型及其底层数据结构？</strong>
+</h3><p>面试不仅会问应用场景，一定会深挖底层结构：</p>
+<p>| 数据类型 | 应用场景 | 底层数据结构（Redis 3.2+ / 7.0+ 有所演进） |</p>
+<p>| :&mdash; | :&mdash; | :&mdash; |</p>
+<p>| <strong>String</strong> | 缓存、计数器、分布式锁、Session | <strong>SDS</strong> (简单动态字符串)。比 C 字符串更安全、获取长度 O(1)、防止缓冲区溢出。 |</p>
+<p>| <strong>List</strong> | 消息队列、文章列表、粉丝列表 | <strong>QuickList</strong> (快速列表，双向链表 + 压缩列表的组合)。 |</p>
+<p>| <strong>Hash</strong> | 存储对象、购物车 | <strong>ZipList</strong> (压缩列表，数据少时) / <strong>HashTable</strong> (哈希表/字典，数据多时)。<em>注：Redis 7.0 后 ZipList 替换为 ListPack。</em> |</p>
+<p>| <strong>Set</strong> | 共同好友、点赞、抽奖 | <strong>IntSet</strong> (整数集合，元素全为整数且较少时) / <strong>HashTable</strong> (字典)。 |</p>
+<p>| <strong>ZSet (Sorted Set)</strong>| 排行榜、延时队列 | <strong>ZipList</strong> (数据少时) / <strong>SkipList + HashTable</strong> (跳跃表+字典)。跳表保证范围查询效率 O(logN)，字典保证单点查询 O(1)。 |</p>
+<h3 id="3-zset-为什么使用跳表skiplist而不是红黑树或-b-树"><strong>3. ZSet 为什么使用跳表（SkipList）而不是红黑树或 B+ 树？</strong>
+</h3><ul>
+<li><strong>对比红黑树</strong>：跳表实现更简单；在进行范围查找（如排行榜获取前 10 名）时，跳表只需要找到起点然后顺着底层链表遍历即可，而红黑树需要中序遍历，跳表效率更高；跳表的插入/删除只需修改相邻节点的指针，不需要像红黑树那样做复杂的旋转。</li>
+<li><strong>对比 B+ 树</strong>：B+ 树是为了最大限度减少磁盘 I/O 而设计的，树的高度较矮。但 Redis 是内存数据库，不需要考虑磁盘 I/O，跳表作为内存数据结构，其随机层数机制和简单的节点维护成本更低。</li>
+</ul>
+<h2 id="二-持久化机制"><strong>二、 持久化机制</strong>
+</h2><h3 id="4-rdb-和-aof-持久化的区别"><strong>4. RDB 和 AOF 持久化的区别？</strong>
+</h3><div class="table-wrapper"><table>
+<thead>
+<tr>
+<th style="text-align:left">特性</th>
+<th style="text-align:left">RDB (Redis DataBase)</th>
+<th style="text-align:left">AOF (Append Only File)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>原理</strong></td>
+<td style="text-align:left"><strong>快照</strong>：将某个时间点的所有内存数据以二进制文件（dump.rdb）保存。</td>
+<td style="text-align:left"><strong>日志</strong>：记录服务器执行的所有写操作命令（appendonly.aof）。</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>触发方式</strong></td>
+<td style="text-align:left">save (阻塞), bgsave (异步，fork 子进程), 自动触发配置</td>
+<td style="text-align:left">always (每次写), everysec (每秒，默认), no (交由操作系统)</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>文件大小</strong></td>
+<td style="text-align:left">较小（二进制压缩格式）</td>
+<td style="text-align:left">较大（文本格式记录了所有写命令）</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>恢复速度</strong></td>
+<td style="text-align:left"><strong>快</strong>（直接把数据读入内存即可）</td>
+<td style="text-align:left"><strong>慢</strong>（需要把所有命令重新执行一遍）</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>数据安全性</strong></td>
+<td style="text-align:left">容易丢数据（两次快照之间的数据会丢失）</td>
+<td style="text-align:left">安全性高（最多丢一秒的数据）</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="5-什么是-aof-重写aof-rewrite"><strong>5. 什么是 AOF 重写（AOF Rewrite）？</strong>
+</h3><p>随着命令不断写入，AOF 文件会越来越大。AOF 重写机制就是用来压缩 AOF 文件的。</p>
+<ul>
+<li><strong>原理</strong>：Redis 会 fork 出一个 bgrewriteaof 子进程，它会扫描当前内存中的数据，为每一个键值对生成一条对应的插入命令，写入到新的 AOF 文件中。比如以前对一个 key 进行了 100 次自增，重写后只会变成一条 SET key 100 的命令，大大减小了体积。</li>
+<li><strong>混合持久化</strong>：Redis 4.0 引入，AOF 重写时，将当前内存数据以 <strong>RDB 格式</strong>写入新 AOF 文件的开头，之后的新写入命令继续以 <strong>AOF 格式</strong>追加。结合了 RDB 恢复快和 AOF 数据不丢失的优点。</li>
+</ul>
+<h2 id="三-内存淘汰与过期策略"><strong>三、 内存淘汰与过期策略</strong>
+</h2><h3 id="6-redis-的过期键删除策略是什么"><strong>6. Redis 的过期键删除策略是什么？</strong>
+</h3><p>Redis 使用了 <strong>惰性删除 + 定期删除</strong> 的配合策略：</p>
+<ol>
+<li><strong>惰性删除</strong>：平时不主动管，只有当客户端试图访问某个 key 时，Redis 才去检查它是否过期，如果过期了就删除并返回空。优点是省 CPU，缺点是如果过期 key 一直不被访问，会造成内存泄漏。</li>
+<li><strong>定期删除</strong>：Redis 默认每秒执行 10 次清理操作，随机抽取一部分设置了过期时间的 key，检查并删除已过期的。这种机制可以防止内存被大量无人访问的过期 key 占满。</li>
+</ol>
+<h3 id="7-redis-的内存淘汰策略有哪些当内存满了怎么办"><strong>7. Redis 的内存淘汰策略有哪些？（当内存满了怎么办）</strong>
+</h3><p>当 Redis 内存使用达到 maxmemory 限制时，会触发淘汰策略：</p>
+<ol>
+<li>noeviction（默认）：不淘汰数据，如果有写请求直接报错 (OOM)。</li>
+<li>allkeys-lru：在所有 key 中，淘汰最近最少使用的 key（最常用）。</li>
+<li>volatile-lru：在设置了过期时间的 key 中，淘汰最近最少使用的。</li>
+<li>allkeys-random / volatile-random：随机淘汰。</li>
+<li>volatile-ttl：淘汰即将过期的 key。</li>
+<li><strong>allkeys-lfu / volatile-lfu</strong>（Redis 4.0+ 引入）：淘汰使用频率最少的 key（Least Frequently Used）。解决了 LRU 无法应对偶发性冷数据全表扫描的问题。</li>
+</ol>
+<h2 id="四-缓存高并发经典问题穿透击穿雪崩"><strong>四、 缓存高并发经典问题（穿透、击穿、雪崩）</strong>
+</h2><h3 id="8-什么是缓存穿透如何解决"><strong>8. 什么是缓存穿透？如何解决？</strong>
+</h3><ul>
+<li><strong>定义</strong>：查询一个<strong>根本不存在的数据</strong>，缓存中肯定查不到（不命中），导致请求每次都要去数据库查，如果有人恶意疯狂请求这个不存在的 key，数据库可能会被瞬间压垮。</li>
+<li><strong>解决方案</strong>：
+<ol>
+<li><strong>缓存空对象/默认值</strong>：当数据库查不到时，依然把这个空结果（如 null）存入缓存，设置一个较短的过期时间。</li>
+<li><strong>布隆过滤器 (Bloom Filter)</strong>：在请求到达缓存之前，先经过布隆过滤器判断该 key 是否存在。如果布隆过滤器说不存在，那一定不存在，直接返回；如果说存在（有极小误判率），再去查缓存和 DB。</li>
+</ol>
+</li>
+</ul>
+<h3 id="9-什么是缓存击穿如何解决"><strong>9. 什么是缓存击穿？如何解决？</strong>
+</h3><ul>
+<li><strong>定义</strong>：一个<strong>极度热点的数据</strong>（比如秒杀商品），在<strong>缓存过期的瞬间</strong>，有极其庞大的并发请求过来。因为缓存失效了，这几万个请求会同时去穿透到数据库，导致数据库瞬间崩溃。</li>
+<li><strong>解决方案</strong>：
+<ol>
+<li><strong>互斥锁 (Mutex Lock)</strong>：在缓存失效去数据库查询重建缓存的这个步骤加上分布式锁（如 Redis 的 SETNX）。保证只有一个请求能打到 DB 并更新缓存，其他请求拿不到锁就休眠重试。</li>
+<li><strong>逻辑过期 (热点数据永不过期)</strong>：物理上不设置 TTL，而是在 value 内部维护一个逻辑过期时间字段。发现逻辑过期时，异步开启一个线程去更新缓存，当前请求先返回旧数据。</li>
+</ol>
+</li>
+</ul>
+<h3 id="10-什么是缓存雪崩如何解决"><strong>10. 什么是缓存雪崩？如何解决？</strong>
+</h3><ul>
+<li><strong>定义</strong>：<strong>大量的热点 key 在同一时间集中过期</strong>，或者 <strong>Redis 服务宕机</strong>。导致海量请求直接打到数据库，引发数据库宕机乃至整个系统雪崩。</li>
+<li><strong>解决方案</strong>：
+<ol>
+<li><strong>打散过期时间</strong>：在设置 TTL 时，给基础时间加上一个随机值（如 1-5 分钟），避免大量 key 在同一秒过期。</li>
+<li><strong>服务高可用</strong>：搭建 Redis 哨兵 (Sentinel) 或 集群 (Cluster) 架构，防止 Redis 单点故障。</li>
+<li><strong>限流降级</strong>：在应用层（如使用 Sentinel/Hystrix）做好限流熔断，保护底层数据库。</li>
+</ol>
+</li>
+</ul>
+<h2 id="五-分布式锁与双写一致性"><strong>五、 分布式锁与双写一致性</strong>
+</h2><h3 id="11-如何用-redis-实现分布式锁"><strong>11. 如何用 Redis 实现分布式锁？</strong>
+</h3><ul>
+<li><strong>基础版本</strong>：使用 SET resource_name my_random_value NX PX 30000。
+<ul>
+<li>NX：表示 Not eXists，只有 key 不存在时才设置成功（保证互斥性）。</li>
+<li>PX 30000：设置过期时间为 30 秒（防止宕机死锁）。</li>
+<li>my_random_value：必须是客户端唯一的随机 ID，解锁时通过 Lua 脚本比对这个值，保证“谁加的锁只有谁能解”，防止误删别人的锁。</li>
+</ul>
+</li>
+<li><strong>进阶版本 (Redisson)</strong>：基础版本的锁如果业务执行时间太长，锁提前过期了怎么办？Redisson 框架提供了 <strong>看门狗 (Watch Dog)</strong> 机制。加锁成功后，会开启一个后台线程，每隔 10 秒（默认超时时间 30s 的 1/3）检查一下业务是否还在执行，如果还在执行就将锁的过期时间续期回 30s。</li>
+</ul>
+<h3 id="12-redis-和-mysql-如何保证双写一致性"><strong>12. Redis 和 MySQL 如何保证双写一致性？</strong>
+</h3><p>这是面试高频必杀题。标准的处理模式是 <strong>Cache Aside Pattern（旁路缓存模式）</strong>。</p>
+<ul>
+<li><strong>标准操作</strong>：<strong>先更新数据库，再删除缓存</strong>。</li>
+<li><strong>为什么不能先更新缓存再更新 DB？</strong> 如果 DB 更新失败，缓存就是脏数据。</li>
+<li><strong>为什么不能先删缓存再更新 DB？</strong> 在并发环境下，线程 A 删了缓存还没更新 DB，线程 B 进来查缓存没命中，去 DB 读到了旧数据并写入缓存。然后 A 更新了 DB。导致缓存里永远是旧数据。</li>
+<li><strong>先更新 DB 再删缓存，有没有可能出问题？</strong> 有。A 查 DB 读到旧数据（还未写缓存），B 更新 DB 并删缓存，A 将刚才的旧数据写入缓存。但这种情况概率极低（要求写操作比读操作还快）。</li>
+<li><strong>终极保障方案（延迟双删 / 消息队列）</strong>：
+<ol>
+<li><strong>延迟双删</strong>：先删缓存 -&gt; 更新 DB -&gt; 睡眠（如 500ms） -&gt; 再次删缓存。确保把读请求可能产生的脏缓存删掉。</li>
+<li><strong>基于 Canal + 消息队列（推荐）</strong>：业务代码只管更新数据库。通过 Canal 伪装成 MySQL 从节点监听 binlog，提取出修改的数据后扔到 MQ 中，消费者订阅 MQ 去异步且可靠地删除 Redis 缓存。</li>
+</ol>
+</li>
+</ul>
+<h2 id="六-高可用与集群架构"><strong>六、 高可用与集群架构</strong>
+</h2><h3 id="13-主从复制的原理是什么"><strong>13. 主从复制的原理是什么？</strong>
+</h3><ul>
+<li><strong>全量同步</strong>：当从节点第一次连接主节点时。主节点执行 bgsave 生成 RDB 文件发送给从节点，从节点加载。期间主节点的新写命令会存入 replication buffer，RDB 发送完后再把 buffer 里的命令发给从节点。</li>
+<li><strong>增量同步</strong>：网络断开重连后，主节点根据从节点上报的 offset，从 <strong>repl_backlog_buffer</strong>（环形缓冲区）中把断开期间的命令发给从节点，无需重新全量同步。</li>
+</ul>
+<h3 id="14-什么是哨兵模式-sentinel"><strong>14. 什么是哨兵模式 (Sentinel)？</strong>
+</h3><p>主从复制无法自动故障转移。哨兵就是用来监控主从节点的：</p>
+<ol>
+<li><strong>监控</strong>：不断向主从节点发送 PING 检查是否在线（主观下线、客观下线）。</li>
+<li><strong>故障转移 (Failover)</strong>：主节点挂了，哨兵集群会通过 Raft 算法选举出一个 Leader 哨兵，由它在从节点中选出一个新的主节点（根据优先级、复制偏移量 offset、RunID 选举）。</li>
+<li><strong>通知</strong>：将新的主节点信息通知给客户端和其他从节点。</li>
+</ol>
+<h3 id="15-redis-cluster-集群的原理什么是哈希槽-hash-slot"><strong>15. Redis Cluster 集群的原理？什么是哈希槽 (Hash Slot)？</strong>
+</h3><p>哨兵模式解决了高可用，但无法解决单机内存上限和写并发能力瓶颈。Redis Cluster 提供了**分布式（分片）**方案。</p>
+<ul>
+<li><strong>哈希槽</strong>：Redis 集群没有使用一致性 Hash，而是引入了 16384 个哈希槽。集群的每个主节点负责一部分槽。</li>
+<li><strong>寻址过程</strong>：当客户端发送命令时，对 key 使用 CRC16 算法取模 16384，计算出该 key 属于哪个槽。</li>
+<li><strong>去中心化</strong>：集群中没有中心节点，节点之间通过 <strong>Gossip 协议</strong>交换彼此的状态和槽信息。如果客户端请求打到了错误的节点，节点会返回 MOVED 重定向指令，让客户端去正确的节点操作。</li>
+</ul>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/redis/">Redis</a>
+        
+            <a href="/tags/backend/">Backend</a>
+        
+            <a href="/tags/interview/">Interview</a>
+        
+    </section>
+
+
+    </footer>
+
+
+    
+</article>
+
+    
+
+    
+
+<aside class="related-content--wrapper">
+    <h2 class="section-title">Related content</h2>
+    <div class="related-content">
+        <div class="flex article-list--tile">
+            
+                
+<article class="">
+    <a href="/p/mysql-interview-stock-questions-continuously-updated/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">MySQL Interview Stock Questions (Continuously Updated)</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="">
+    <a href="/p/redislearningnote/">
+        
+        
+
+        <div class="article-details">
+            <h2 class="article-title">RedisLearningNote</h2>
+        </div>
+    </a>
+</article>
+
+            
+        </div>
+    </div>
+</aside>
+
+     
+    
+        
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+        2026 SymphonyW
+    </section>
+    
+    <section class="powerby">
+        Built with <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> <br />
+        Theme <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.26.0">Stack</a></b> designed by <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a>
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>

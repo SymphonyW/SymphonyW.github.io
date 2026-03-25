@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+    <channel>
+        <title>MySQL on SymphonyW</title>
+        <link>https://SymphonyW.github.io/tags/mysql/</link>
+        <description>Recent content in MySQL on SymphonyW</description>
+        <generator>Hugo -- gohugo.io</generator>
+        <language>en</language>
+        <copyright>SymphonyW</copyright>
+        <lastBuildDate>Wed, 25 Mar 2026 22:12:10 +0800</lastBuildDate><atom:link href="https://SymphonyW.github.io/tags/mysql/index.xml" rel="self" type="application/rss+xml" /><item>
+        <title>MySQL Interview Stock Questions (Continuously Updated)</title>
+        <link>https://SymphonyW.github.io/p/mysql-interview-stock-questions-continuously-updated/</link>
+        <pubDate>Wed, 25 Mar 2026 22:12:10 +0800</pubDate>
+        
+        <guid>https://SymphonyW.github.io/p/mysql-interview-stock-questions-continuously-updated/</guid>
+        <description>&lt;h1 id=&#34;数据库---mysql-面试八股文硬核整理&#34;&gt;&lt;strong&gt;数据库 - MySQL 面试八股文（硬核整理）&lt;/strong&gt;
+&lt;/h1&gt;&lt;p&gt;本文档整理了后端开发面试中关于 MySQL 数据库最常被问到的高频面试题和深度解析，重点聚焦于 InnoDB 存储引擎。&lt;/p&gt;
+&lt;h2 id=&#34;一-mysql-基础架构与执行流程&#34;&gt;&lt;strong&gt;一、 MySQL 基础架构与执行流程&lt;/strong&gt;
+&lt;/h2&gt;&lt;h3 id=&#34;1-mysql-的逻辑架构是怎样的&#34;&gt;&lt;strong&gt;1. MySQL 的逻辑架构是怎样的？&lt;/strong&gt;
+&lt;/h3&gt;&lt;p&gt;MySQL 的逻辑架构大致分为两层：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Server 层&lt;/strong&gt;：涵盖了 MySQL 的大多数核心服务功能，以及所有的内置函数（如日期、时间、数学和加密函数等）。所有跨存储引擎的功能都在这一层实现，比如存储过程、触发器、视图等。
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;连接器&lt;/strong&gt;：负责跟客户端建立连接、获取权限、维持和管理连接。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;查询缓存&lt;/strong&gt;：MySQL 8.0 已废弃。之前用于缓存执行过的 SQL 语句及其结果。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;分析器&lt;/strong&gt;：对 SQL 进行词法分析和语法分析，检查 SQL 是否合法。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;优化器&lt;/strong&gt;：决定使用哪个索引，或者在一个语句有多表关联时决定各个表的连接顺序。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;执行器&lt;/strong&gt;：调用存储引擎的 API 接口来执行 SQL，并返回结果。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;存储引擎层&lt;/strong&gt;：负责数据的存储和提取。其架构模式是插件式的，支持 InnoDB、MyISAM、Memory 等多个存储引擎。MySQL 5.5.5 版本开始，&lt;strong&gt;InnoDB 成为了默认存储引擎&lt;/strong&gt;。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;2-一条-sql-语句在-mysql-中是如何执行的&#34;&gt;&lt;strong&gt;2. 一条 SQL 语句在 MySQL 中是如何执行的？&lt;/strong&gt;
+&lt;/h3&gt;&lt;ol&gt;
+&lt;li&gt;客户端通过&lt;strong&gt;连接器&lt;/strong&gt;与 MySQL Server 建立连接。&lt;/li&gt;
+&lt;li&gt;（MySQL 8.0 之前）查询&lt;strong&gt;缓存&lt;/strong&gt;，命中则直接返回，否则继续。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;分析器&lt;/strong&gt;进行词法和语法分析，判断 SQL 是否正确。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;优化器&lt;/strong&gt;生成执行计划，选择最优的索引。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;执行器&lt;/strong&gt;检查用户权限，调用&lt;strong&gt;存储引擎&lt;/strong&gt;接口进行数据的读写，最后将结果返回给客户端。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h2 id=&#34;二-存储引擎&#34;&gt;&lt;strong&gt;二、 存储引擎&lt;/strong&gt;
+&lt;/h2&gt;&lt;h3 id=&#34;3-innodb-和-myisam-的主要区别是什么&#34;&gt;&lt;strong&gt;3. InnoDB 和 MyISAM 的主要区别是什么？&lt;/strong&gt;
+&lt;/h3&gt;&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th style=&#34;text-align:left&#34;&gt;特性&lt;/th&gt;
+&lt;th style=&#34;text-align:left&#34;&gt;InnoDB&lt;/th&gt;
+&lt;th style=&#34;text-align:left&#34;&gt;MyISAM&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;事务 (Transaction)&lt;/strong&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;支持&lt;/strong&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;不支持&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;锁级别&lt;/strong&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;行级锁&lt;/strong&gt;（默认）、表级锁&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;仅支持表级锁&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;外键 (Foreign Key)&lt;/strong&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;支持&lt;/strong&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;不支持&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;崩溃恢复&lt;/strong&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;支持&lt;/strong&gt;（通过 Redo Log 实现安全恢复）&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;不支持&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;索引结构&lt;/strong&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;聚簇索引（数据和主键索引绑在一起）&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;非聚簇索引（索引和数据分离）&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;适用场景&lt;/strong&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;绝大多数场景，特别是需要事务和高并发读写&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;以读为主，对事务完整性要求不高的老旧系统&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;h2 id=&#34;三-索引机制绝对重点&#34;&gt;&lt;strong&gt;三、 索引机制（绝对重点）&lt;/strong&gt;
+&lt;/h2&gt;&lt;h3 id=&#34;4-什么是索引mysql-为什么默认使用-b-树作为索引结构&#34;&gt;&lt;strong&gt;4. 什么是索引？MySQL 为什么默认使用 B+ 树作为索引结构？&lt;/strong&gt;
+&lt;/h3&gt;&lt;p&gt;索引是帮助 MySQL 高效获取数据的数据结构（就像书的目录）。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;为什么使用 B+ 树？（对比其他结构）&lt;/strong&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;对比 Hash 索引&lt;/strong&gt;：Hash 虽然单条查询最快（O(1)），但不支持范围查询（&amp;gt;、&amp;lt;、between）、不支持模糊匹配和最左前缀原则。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;对比 二叉搜索树 / 红黑树&lt;/strong&gt;：树的层级太深，会导致磁盘 I/O 次数过多，查询效率低下。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;对比 B 树&lt;/strong&gt;：B 树的所有节点都存储数据，而 B+ 树只有叶子节点存储数据，非叶子节点只存键值。因此 B+ 树一个节点可以容纳更多的键，&lt;strong&gt;树的高度更低（通常 3-4 层），磁盘 I/O 更少&lt;/strong&gt;。同时，B+ 树的叶子节点用双向链表连接，&lt;strong&gt;非常适合范围查询&lt;/strong&gt;。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;5-什么是聚簇索引和非聚簇索引二级索引什么是回表&#34;&gt;&lt;strong&gt;5. 什么是聚簇索引和非聚簇索引（二级索引）？什么是回表？&lt;/strong&gt;
+&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;聚簇索引&lt;/strong&gt;：将数据存储与索引放到了一块，找到索引也就找到了数据。在 InnoDB 中，通常&lt;strong&gt;主键就是聚簇索引&lt;/strong&gt;（如果没有主键，会选择第一个非空的唯一索引；如果还没有，会隐式生成一个 row_id 作为聚簇索引）。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;非聚簇索引（二级索引）&lt;/strong&gt;：叶子节点不存储完整的行数据，而是&lt;strong&gt;存储主键的值&lt;/strong&gt;。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;回表&lt;/strong&gt;：如果通过二级索引查询数据，由于二级索引叶子节点只存了主键值，要想获取除主键外的其他字段数据，就需要拿着这个主键值回到聚簇索引中再查一次，这个过程叫做“回表”。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;6-什么是覆盖索引最左前缀原则索引下推&#34;&gt;&lt;strong&gt;6. 什么是覆盖索引、最左前缀原则、索引下推？&lt;/strong&gt;
+&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;覆盖索引&lt;/strong&gt;：在一个查询中，如果一个索引包含了（或覆盖了）所有需要查询的字段的值，就不需要回表查询了，这叫覆盖索引。（例如 SELECT id, name FROM table WHERE name = &amp;lsquo;张三&amp;rsquo;，如果给 name 建了索引，因为二级索引本身包含主键 id，所以直接在二级索引就能拿到结果，无需回表）。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;最左前缀原则&lt;/strong&gt;：在联合索引中（如 (a, b, c)），查询条件必须从索引的最左前列开始并且不跳过中间的列。即可以匹配 (a)、(a, b)、(a, b, c)，但不能直接匹配 (b) 或 (b, c)。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;索引下推 (ICP)&lt;/strong&gt;：MySQL 5.6 引入的优化。在联合索引匹配时，如果遇到范围查询（如 &amp;gt;），其后的字段无法走索引。但在索引下推优化下，存储引擎会在遍历索引时，直接把判断条件“下推”给存储引擎层进行过滤，减少了回表的次数。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;7-导致索引失效的常见场景有哪些&#34;&gt;&lt;strong&gt;7. 导致索引失效的常见场景有哪些？&lt;/strong&gt;
+&lt;/h3&gt;&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;使用了 SELECT *&lt;/strong&gt;（极易导致不走覆盖索引而全表扫描）。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;对索引列进行了计算、函数操作或类型转换&lt;/strong&gt;（如 WHERE DATE(create_time) = &amp;lsquo;2023-01-01&amp;rsquo; 或隐式类型转换如字符串传了数字）。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;使用了前导模糊查询&lt;/strong&gt;（如 LIKE &amp;lsquo;%abc&amp;rsquo;，但 LIKE &amp;lsquo;abc%&amp;rsquo; 是走索引的）。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;违反最左前缀原则&lt;/strong&gt;（联合索引没有使用第一列）。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;使用了 OR&lt;/strong&gt;，且 OR 前后不是都有索引。&lt;/li&gt;
+&lt;li&gt;MySQL 优化器认为全表扫描比走索引成本更低时（如表数据极少，或查询的数据占全表很大比例）。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h2 id=&#34;四-事务与并发控制&#34;&gt;&lt;strong&gt;四、 事务与并发控制&lt;/strong&gt;
+&lt;/h2&gt;&lt;h3 id=&#34;8-事务的-acid-特性是什么底层是如何保证的&#34;&gt;&lt;strong&gt;8. 事务的 ACID 特性是什么？底层是如何保证的？&lt;/strong&gt;
+&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;原子性 (Atomicity)&lt;/strong&gt;：事务是最小执行单位，不可分割，要么全成功，要么全失败。&lt;strong&gt;由 Undo Log（回滚日志）保证&lt;/strong&gt;，失败时执行回滚。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;隔离性 (Isolation)&lt;/strong&gt;：并发访问时，一个事务的执行不影响其他事务。&lt;strong&gt;由 MVCC（多版本并发控制）和 锁 保证&lt;/strong&gt;。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;持久性 (Durability)&lt;/strong&gt;：事务一旦提交，对数据的改变是永久的。&lt;strong&gt;由 Redo Log（重做日志）保证&lt;/strong&gt;（WAL 机制，先写日志后写磁盘）。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;一致性 (Consistency)&lt;/strong&gt;：事务执行前后，数据保持一致状态（如转账前后总金额不变）。&lt;strong&gt;一致性是目的，由原子性、隔离性、持久性共同保证&lt;/strong&gt;。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;9-并发事务会带来哪些问题脏读不可重复读幻读&#34;&gt;&lt;strong&gt;9. 并发事务会带来哪些问题？（脏读、不可重复读、幻读）&lt;/strong&gt;
+&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;脏读&lt;/strong&gt;：事务 A 读到了事务 B &lt;strong&gt;已修改但未提交&lt;/strong&gt;的数据。如果 B 回滚，A 读到的就是脏数据。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;不可重复读&lt;/strong&gt;：事务 A 两次读取同一条数据，期间事务 B &lt;strong&gt;修改并提交&lt;/strong&gt;了该数据，导致 A 两次读到的数据不一致。（侧重于数据被&lt;strong&gt;修改或删除&lt;/strong&gt;）。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;幻读&lt;/strong&gt;：事务 A 执行两次相同的范围查询，期间事务 B &lt;strong&gt;插入&lt;/strong&gt;了新的满足条件的数据并提交，导致 A 第二次查出了更多的“幻影”行。（侧重于数据被&lt;strong&gt;新增&lt;/strong&gt;）。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;10-mysql-的事务隔离级别有哪些默认是哪个&#34;&gt;&lt;strong&gt;10. MySQL 的事务隔离级别有哪些？默认是哪个？&lt;/strong&gt;
+&lt;/h3&gt;&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;读未提交 (Read Uncommitted)&lt;/strong&gt;：最低级别，会发生脏读、不可重复读、幻读。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;读已提交 (Read Committed, RC)&lt;/strong&gt;：解决了脏读，但会发生不可重复读和幻读。（Oracle 默认）。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;可重复读 (Repeatable Read, RR)&lt;/strong&gt;：解决了脏读、不可重复读。在 InnoDB 中，通过 MVCC 和 Next-Key Lock 很大程度上&lt;strong&gt;解决了幻读&lt;/strong&gt;问题。&lt;strong&gt;（MySQL 默认隔离级别）&lt;/strong&gt;。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;串行化 (Serializable)&lt;/strong&gt;：最高级别，强制事务串行执行，解决所有问题，但性能极差。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h2 id=&#34;五-mvcc-多版本并发控制&#34;&gt;&lt;strong&gt;五、 MVCC (多版本并发控制)&lt;/strong&gt;
+&lt;/h2&gt;&lt;h3 id=&#34;11-什么是-mvcc它是如何工作的&#34;&gt;&lt;strong&gt;11. 什么是 MVCC？它是如何工作的？&lt;/strong&gt;
+&lt;/h3&gt;&lt;p&gt;MVCC (Multi-Version Concurrency Control) 是 InnoDB 实现隔离级别的一种核心机制，主要用于处理读写冲突，做到&lt;strong&gt;读写不阻塞&lt;/strong&gt;（无锁读）。&lt;/p&gt;
+&lt;p&gt;MVCC 主要由三个组件实现：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;隐藏字段&lt;/strong&gt;：InnoDB 会在每行数据后面增加两个隐藏列：
+&lt;ul&gt;
+&lt;li&gt;trx_id：最近一次修改该行数据的事务 ID。&lt;/li&gt;
+&lt;li&gt;roll_pointer：回滚指针，指向 Undo Log 中该行的历史版本。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Undo Log（版本链）&lt;/strong&gt;：记录数据修改前的状态。每次更新数据时，旧数据会被存入 Undo Log，并通过 roll_pointer 串联成一个单链表（版本链）。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Read View（读视图）&lt;/strong&gt;：事务进行&lt;strong&gt;快照读&lt;/strong&gt;（普通的 SELECT）时产生的一个数据结构，用来判断当前事务能看到版本链中的哪个版本。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h3 id=&#34;12-read-view-的核心机制是什么rc-和-rr-下的区别&#34;&gt;&lt;strong&gt;12. Read View 的核心机制是什么？RC 和 RR 下的区别？&lt;/strong&gt;
+&lt;/h3&gt;&lt;p&gt;Read View 包含四个核心字段：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;creator_trx_id：创建该 Read View 的事务 ID。&lt;/li&gt;
+&lt;li&gt;m_ids：创建 Read View 时，当前系统中**活跃的（未提交的）**事务 ID 列表。&lt;/li&gt;
+&lt;li&gt;min_trx_id：m_ids 中的最小值。&lt;/li&gt;
+&lt;li&gt;max_trx_id：系统将分配给下一个事务的 ID。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;可见性判断规则&lt;/strong&gt;（基于被访问行的 trx_id）：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;如果 trx_id &amp;lt; min_trx_id：说明修改该行的事务在生成 Read View 前已提交，&lt;strong&gt;可见&lt;/strong&gt;。&lt;/li&gt;
+&lt;li&gt;如果 trx_id &amp;gt;= max_trx_id：说明修改该行的事务在生成 Read View 之后才开始，&lt;strong&gt;不可见&lt;/strong&gt;。&lt;/li&gt;
+&lt;li&gt;如果 min_trx_id &amp;lt;= trx_id &amp;lt; max_trx_id：
+&lt;ul&gt;
+&lt;li&gt;若 trx_id 在 m_ids 列表中：说明修改该行的事务还在活跃（未提交），&lt;strong&gt;不可见&lt;/strong&gt;。&lt;/li&gt;
+&lt;li&gt;若 trx_id 不在 m_ids 列表中：说明修改该行的事务已经提交，&lt;strong&gt;可见&lt;/strong&gt;。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;如果不可见，就顺着版本链 (roll_pointer) 往下找，直到找到可见的版本。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;&lt;strong&gt;RC 和 RR 的核心区别：&lt;/strong&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;RC（读已提交）&lt;/strong&gt;：&lt;strong&gt;每次执行 SELECT 时都会生成一个新的 Read View&lt;/strong&gt;。因此能读到其他事务新提交的数据，产生不可重复读。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;RR（可重复读）&lt;/strong&gt;：&lt;strong&gt;只在事务第一次执行 SELECT 时生成一个 Read View&lt;/strong&gt;，之后的整个事务期间都复用这个 Read View。因此同一事务内多次读取结果相同，实现了可重复读。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id=&#34;六-mysql-锁机制&#34;&gt;&lt;strong&gt;六、 MySQL 锁机制&lt;/strong&gt;
+&lt;/h2&gt;&lt;h3 id=&#34;13-innodb-的行级锁有哪些&#34;&gt;&lt;strong&gt;13. InnoDB 的行级锁有哪些？&lt;/strong&gt;
+&lt;/h3&gt;&lt;p&gt;InnoDB 的行锁是通过给&lt;strong&gt;索引项&lt;/strong&gt;加锁来实现的，而不是给表的行记录加锁。&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;Record Lock（记录锁）&lt;/strong&gt;：仅仅锁住某一条记录。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Gap Lock（间隙锁）&lt;/strong&gt;：锁定一个范围，但不包括记录本身。目的是为了防止其他事务在这个范围内插入数据，从而&lt;strong&gt;解决幻读&lt;/strong&gt;。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Next-Key Lock（临键锁）&lt;/strong&gt;：Record Lock + Gap Lock 的结合，锁定一个范围，并且锁定记录本身（左开右闭区间）。InnoDB RR 隔离级别默认使用 Next-Key Lock。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h3 id=&#34;14-什么是死锁如何解决&#34;&gt;&lt;strong&gt;14. 什么是死锁？如何解决？&lt;/strong&gt;
+&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;死锁&lt;/strong&gt;：两个或多个事务在执行过程中，因争夺资源而造成的一种互相等待的现象。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;解决/预防&lt;/strong&gt;：
+&lt;ol&gt;
+&lt;li&gt;InnoDB 内部有死锁检测机制（innodb_deadlock_detect=on），检测到死锁会自动回滚代价较小的事务。&lt;/li&gt;
+&lt;li&gt;业务层面预防：以&lt;strong&gt;固定的顺序&lt;/strong&gt;访问表和行数据。&lt;/li&gt;
+&lt;li&gt;大事务拆小，缩短事务持有锁的时间。&lt;/li&gt;
+&lt;li&gt;为表添加合理的索引，避免全表扫描退化为表锁，减少锁冲突的概率。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id=&#34;七-核心日志-binlog--redo-log--undo-log&#34;&gt;&lt;strong&gt;七、 核心日志 (Binlog / Redo Log / Undo Log)&lt;/strong&gt;
+&lt;/h2&gt;&lt;h3 id=&#34;15-说说-binlogredo-logundo-log-的区别&#34;&gt;&lt;strong&gt;15. 说说 Binlog、Redo Log、Undo Log 的区别？&lt;/strong&gt;
+&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Undo Log (回滚日志)&lt;/strong&gt;：
+&lt;ul&gt;
+&lt;li&gt;作用：实现事务的&lt;strong&gt;原子性&lt;/strong&gt;和 &lt;strong&gt;MVCC&lt;/strong&gt;。&lt;/li&gt;
+&lt;li&gt;内容：逻辑日志，记录数据的历史版本（比如你执行了 INSERT，它就记录一条对应的 DELETE）。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Redo Log (重做日志)&lt;/strong&gt;：
+&lt;ul&gt;
+&lt;li&gt;作用：实现事务的&lt;strong&gt;持久性&lt;/strong&gt;（Crash-safe）。MySQL 宕机重启后，靠它恢复未落盘的数据。&lt;/li&gt;
+&lt;li&gt;内容：物理日志，记录了“在某个数据页上做了什么修改”。&lt;/li&gt;
+&lt;li&gt;特点：InnoDB 引擎特有，大小固定，循环写入（WAL 机制，Write-Ahead Logging）。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Binlog (归档日志)&lt;/strong&gt;：
+&lt;ul&gt;
+&lt;li&gt;作用：用于&lt;strong&gt;数据备份&lt;/strong&gt;和&lt;strong&gt;主从复制&lt;/strong&gt;。&lt;/li&gt;
+&lt;li&gt;内容：逻辑日志，记录的是 SQL 语句（或行修改的数据）。&lt;/li&gt;
+&lt;li&gt;特点：Server 层实现，所有引擎共有，追加写入，不会覆盖旧日志。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;16-什么是两阶段提交-two-phase-commit为什么需要它&#34;&gt;&lt;strong&gt;16. 什么是两阶段提交 (Two-Phase Commit)？为什么需要它？&lt;/strong&gt;
+&lt;/h3&gt;&lt;p&gt;在执行更新语句时，Redo Log 和 Binlog 必须保持数据一致性。MySQL 采用两阶段提交来保证：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;Prepare 阶段&lt;/strong&gt;：将更新写入 Redo Log，将 Redo Log 标记为 prepare 状态。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Commit 阶段&lt;/strong&gt;：将更新写入 Binlog，然后将 Redo Log 标记为 commit 状态。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;&lt;strong&gt;为什么需要两阶段提交？&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;如果在写完 Redo Log 还没写 Binlog 时发生宕机（或者反过来），会导致主库（依靠 Redo Log 恢复）和从库（依靠 Binlog 同步）的数据不一致。两阶段提交配合内部的事务 XID，确保了崩溃恢复时，Binlog 和 Redo Log 的状态绝对一致。&lt;/p&gt;
+</description>
+        </item>
+        
+    </channel>
+</rss>

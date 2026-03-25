@@ -7,7 +7,566 @@
         <generator>Hugo -- gohugo.io</generator>
         <language>zh-cn</language>
         <copyright>SymphonyW</copyright>
-        <lastBuildDate>Fri, 06 Mar 2026 15:34:25 +0800</lastBuildDate><atom:link href="https://SymphonyW.github.io/zh-cn/tags/c++/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Wed, 25 Mar 2026 22:03:05 +0800</lastBuildDate><atom:link href="https://SymphonyW.github.io/zh-cn/tags/c++/index.xml" rel="self" type="application/rss+xml" /><item>
+        <title>C&#43;&#43; STL的底层实现</title>
+        <link>https://SymphonyW.github.io/zh-cn/p/c-stl%E7%9A%84%E5%BA%95%E5%B1%82%E5%AE%9E%E7%8E%B0/</link>
+        <pubDate>Wed, 25 Mar 2026 22:03:05 +0800</pubDate>
+        
+        <guid>https://SymphonyW.github.io/zh-cn/p/c-stl%E7%9A%84%E5%BA%95%E5%B1%82%E5%AE%9E%E7%8E%B0/</guid>
+        <description>&lt;h1 id=&#34;stl底层实现详解&#34;&gt;STL底层实现详解
+&lt;/h1&gt;&lt;p&gt;C++ 标准模板库（STL）是 C++ 标准中最核心的组件之一，它提供了一套通用、高效的数据结构和算法。理解 STL 各个组件的底层实现，不仅能帮助我们写出更高效的代码，还能让我们避开各种潜在的陷阱。&lt;/p&gt;
+&lt;p&gt;本文将基于主流的 SGI STL（GCC libstdc++ 的基础实现），深入剖析 STL 六大组件中核心模板类的底层数据结构与实现原理。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;stl-整体架构&#34;&gt;STL 整体架构
+&lt;/h2&gt;&lt;p&gt;STL 的设计遵循了&lt;strong&gt;泛型编程&lt;/strong&gt;和&lt;strong&gt;分离关注点&lt;/strong&gt;的原则，将数据结构与算法解耦，通过迭代器作为中间层实现无缝连接。其核心分为六大组件：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;容器 (Containers)&lt;/strong&gt;：封装了常用的数据结构，如动态数组、链表、树、哈希表等。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;算法 (Algorithms)&lt;/strong&gt;：提供了通用的排序、查找、遍历等算法，独立于具体容器。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;迭代器 (Iterators)&lt;/strong&gt;：充当容器与算法之间的桥梁，为不同容器提供统一的遍历接口。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;仿函数 (Functors)&lt;/strong&gt;：为算法提供可定制的策略，如比较函数。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;适配器 (Adapters)&lt;/strong&gt;：用于转换接口，如将 deque 转换为 stack。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;空间配置器 (Allocators)&lt;/strong&gt;：负责内存的分配与管理，为容器提供高效的内存服务。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;空间配置器-allocator内存管理的基石&#34;&gt;空间配置器 (Allocator)：内存管理的基石
+&lt;/h2&gt;&lt;p&gt;STL 的默认分配器并不是简单的封装 &lt;code&gt;new&lt;/code&gt; 和 &lt;code&gt;delete&lt;/code&gt;，SGI STL 实现了一套精妙的&lt;strong&gt;两级分配器&lt;/strong&gt;，专门针对小对象的频繁分配做了优化，极大地减少了内存碎片和系统调用开销。&lt;/p&gt;
+&lt;h3 id=&#34;两级分配策略&#34;&gt;两级分配策略
+&lt;/h3&gt;&lt;p&gt;为了应对不同大小的内存申请，分配器将内存申请分为两类处理：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;第一级分配器&lt;/strong&gt;：当申请的内存大小 &lt;strong&gt;大于 128 字节&lt;/strong&gt; 时，直接调用 &lt;code&gt;malloc&lt;/code&gt; 和 &lt;code&gt;free&lt;/code&gt; 向系统堆申请内存，行为类似于标准的内存分配。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;第二级分配器&lt;/strong&gt;：当申请的内存大小 &lt;strong&gt;小于等于 128 字节&lt;/strong&gt; 时，使用内存池 + 空闲链表的方式进行管理，避免了小额内存频繁分配带来的碎片问题。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;第二级分配器空闲链表与内存池&#34;&gt;第二级分配器：空闲链表与内存池
+&lt;/h3&gt;&lt;p&gt;第二级分配器的核心是维护了 16 个空闲链表（free_list），每个链表负责管理特定大小的内存块，大小以 8 字节为步长对齐：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;第 0 个链表：管理 8 字节的块&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;第 1 个链表：管理 16 字节的块&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;...&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;第 15 个链表：管理 128 字节的块&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4 id=&#34;分配流程&#34;&gt;分配流程
+&lt;/h4&gt;&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;对齐调整&lt;/strong&gt;：将申请的内存大小向上取整为 8 的倍数，找到对应的空闲链表。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;取空闲块&lt;/strong&gt;：如果对应的链表有空闲块，直接取下链表头的块返回给用户。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;内存池补充&lt;/strong&gt;：如果链表为空，则从内存池（memory pool）中申请一批相同大小的块，分割后串成链表，再取第一个返回。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;内存池耗尽&lt;/strong&gt;：如果内存池也不够了，则调用第一级分配器申请新的大块内存，补充到内存池中。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h4 id=&#34;内存分配与对象构造的分离&#34;&gt;内存分配与对象构造的分离
+&lt;/h4&gt;&lt;p&gt;STL 分配器严格区分了&lt;strong&gt;内存分配&lt;/strong&gt;和&lt;strong&gt;对象构造&lt;/strong&gt;：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;allocate\(\)&lt;/code&gt;：只负责分配原始的内存空间，不调用构造函数。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;construct\(\)&lt;/code&gt;：在已分配的内存上调用 placement new 构造对象。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;destroy\(\)&lt;/code&gt;：调用对象的析构函数，不释放内存。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;deallocate\(\)&lt;/code&gt;：释放原始的内存空间。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这种分离使得容器可以批量申请内存，然后按需构造对象，极大地提升了效率。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;迭代器与萃取机制容器与算法的桥梁&#34;&gt;迭代器与萃取机制：容器与算法的桥梁
+&lt;/h2&gt;&lt;p&gt;迭代器是一种 “泛化的指针”，它为不同的容器提供了统一的遍历接口，使得算法可以无视容器的底层差异，只通过迭代器来操作数据。&lt;/p&gt;
+&lt;h3 id=&#34;迭代器的分类与能力&#34;&gt;迭代器的分类与能力
+&lt;/h3&gt;&lt;p&gt;STL 根据迭代器支持的操作，将其分为 5 类，能力依次增强：&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;迭代器类型&lt;/th&gt;
+&lt;th&gt;支持的操作&lt;/th&gt;
+&lt;th&gt;典型容器&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;输入迭代器 (Input)&lt;/td&gt;
+&lt;td&gt;只读，单向遍历，只能读一次&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;istream\_iterator&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;输出迭代器 (Output)&lt;/td&gt;
+&lt;td&gt;只写，单向遍历&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;ostream\_iterator&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;前向迭代器 (Forward)&lt;/td&gt;
+&lt;td&gt;读写，单向遍历，可多次遍历&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;forward\_list&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;双向迭代器 (Bidirectional)&lt;/td&gt;
+&lt;td&gt;读写，双向遍历 (&lt;code&gt;\+\+&lt;/code&gt;/&lt;code&gt;\-\-&lt;/code&gt;)&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;list&lt;/code&gt;, &lt;code&gt;map&lt;/code&gt;, &lt;code&gt;set&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;随机访问迭代器 (Random Access)&lt;/td&gt;
+&lt;td&gt;读写，随机跳转 (&lt;code&gt;it\+n&lt;/code&gt;, &lt;code&gt;it\-n&lt;/code&gt;)&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;vector&lt;/code&gt;, &lt;code&gt;deque&lt;/code&gt;, &lt;code&gt;string&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;h3 id=&#34;萃取机制-traits编译期的类型查询&#34;&gt;萃取机制 (Traits)：编译期的类型查询
+&lt;/h3&gt;&lt;p&gt;为了让算法能够在编译期知道迭代器的类型，从而选择最优的实现（例如对随机访问迭代器直接用指针减法计算距离，而对双向迭代器只能逐个递增），STL 引入了 &lt;code&gt;iterator\_traits&lt;/code&gt; 萃取机。&lt;/p&gt;
+&lt;p&gt;它的核心原理是&lt;strong&gt;模板偏特化&lt;/strong&gt;：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;12
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;13
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;14
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;15
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;16
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;17
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;18
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-cpp&#34; data-lang=&#34;cpp&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;// 通用版本，用于自定义迭代器
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;template&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;class&lt;/span&gt; &lt;span class=&#34;nc&#34;&gt;Iter&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;k&#34;&gt;struct&lt;/span&gt; &lt;span class=&#34;nc&#34;&gt;iterator_traits&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;k&#34;&gt;typedef&lt;/span&gt; &lt;span class=&#34;k&#34;&gt;typename&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;Iter&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;::&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;value_type&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;value_type&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;k&#34;&gt;typedef&lt;/span&gt; &lt;span class=&#34;k&#34;&gt;typename&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;Iter&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;::&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;difference_type&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;difference_type&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;k&#34;&gt;typedef&lt;/span&gt; &lt;span class=&#34;k&#34;&gt;typename&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;Iter&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;::&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;iterator_category&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;iterator_category&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;c1&#34;&gt;// ... 其他属性
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;};&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;// 偏特化版本，用于原生指针
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;template&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;class&lt;/span&gt; &lt;span class=&#34;nc&#34;&gt;T&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;k&#34;&gt;struct&lt;/span&gt; &lt;span class=&#34;nc&#34;&gt;iterator_traits&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;T&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;*&amp;gt;&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;k&#34;&gt;typedef&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;T&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;value_type&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;k&#34;&gt;typedef&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;ptrdiff_t&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;difference_type&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;c1&#34;&gt;// 原生指针天生就是随机访问迭代器
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;&lt;/span&gt;  &lt;span class=&#34;k&#34;&gt;typedef&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;random_access_iterator_tag&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;iterator_category&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;c1&#34;&gt;// ... 其他属性
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;};&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;通过这个机制，算法可以在编译期自动 “萃取” 出迭代器的属性，从而实现零成本的抽象。&lt;/p&gt;
+&lt;h3 id=&#34;迭代器失效问题&#34;&gt;迭代器失效问题
+&lt;/h3&gt;&lt;p&gt;迭代器失效是指当容器的内存结构发生变化时，原来的迭代器指向的内存可能已经失效，继续使用会导致未定义行为。不同容器的失效规则不同：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;vector&lt;/strong&gt;：扩容时所有迭代器失效；插入 / 删除点之后的迭代器失效。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;deque&lt;/strong&gt;：两端插入不会导致迭代器失效，但中间插入会导致所有迭代器失效。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;list&lt;/strong&gt;：只有指向被删除元素的迭代器失效，其他全部有效。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;map/set&lt;/strong&gt;：插入不会导致迭代器失效；只有指向被删除元素的迭代器失效。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;序列式容器线性数据的组织&#34;&gt;序列式容器：线性数据的组织
+&lt;/h2&gt;&lt;p&gt;序列式容器以线性顺序存储元素，元素的位置与插入顺序相关。&lt;/p&gt;
+&lt;h3 id=&#34;stdvector动态数组&#34;&gt;std::vector：动态数组
+&lt;/h3&gt;&lt;p&gt;&lt;code&gt;vector&lt;/code&gt; 是最常用的容器，其底层是一块&lt;strong&gt;连续的动态数组&lt;/strong&gt;。&lt;/p&gt;
+&lt;h4 id=&#34;内存布局&#34;&gt;内存布局
+&lt;/h4&gt;&lt;p&gt;&lt;code&gt;vector&lt;/code&gt; 对象内部只维护了三个指针：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;7
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-cpp&#34; data-lang=&#34;cpp&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;k&#34;&gt;template&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;class&lt;/span&gt; &lt;span class=&#34;nc&#34;&gt;T&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;k&#34;&gt;class&lt;/span&gt; &lt;span class=&#34;nc&#34;&gt;Alloc&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;k&#34;&gt;class&lt;/span&gt; &lt;span class=&#34;nc&#34;&gt;vector&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;k&#34;&gt;protected&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;:&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;n&#34;&gt;T&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;*&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;_start&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;        &lt;span class=&#34;c1&#34;&gt;// 指向数组起始位置
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;&lt;/span&gt;  &lt;span class=&#34;n&#34;&gt;T&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;*&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;_finish&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;       &lt;span class=&#34;c1&#34;&gt;// 指向最后一个元素的下一个位置
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;&lt;/span&gt;  &lt;span class=&#34;n&#34;&gt;T&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;*&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;_end_of_storage&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt; &lt;span class=&#34;c1&#34;&gt;// 指向分配的内存的末尾
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;};&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;size\(\)&lt;/code&gt;：&lt;code&gt;\_finish \- \_start&lt;/code&gt;，当前元素个数。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;capacity\(\)&lt;/code&gt;：&lt;code&gt;\_end\_of\_storage \- \_start&lt;/code&gt;，当前分配的最大容量。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4 id=&#34;动态扩容机制&#34;&gt;动态扩容机制
+&lt;/h4&gt;&lt;p&gt;当 &lt;code&gt;push\_back&lt;/code&gt; 导致 &lt;code&gt;size\(\) == capacity\(\)&lt;/code&gt; 时，vector 会触发扩容：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;申请一块新的、更大的内存（通常是原来的 1.5~2 倍，GCC 为 2 倍，MSVC 为 1.5 倍）。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;将旧内存中的元素拷贝 / 移动到新内存。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;释放旧的内存。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;更新三个指针。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;由于成倍扩容，vector 的 &lt;code&gt;push\_back&lt;/code&gt; 均摊时间复杂度是 O (1)。&lt;/p&gt;
+&lt;h3 id=&#34;stdlist双向循环链表&#34;&gt;std::list：双向循环链表
+&lt;/h3&gt;&lt;p&gt;&lt;code&gt;list&lt;/code&gt; 的底层是一个&lt;strong&gt;双向循环链表&lt;/strong&gt;，每个节点包含数据、前驱指针和后继指针。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-cpp&#34; data-lang=&#34;cpp&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;k&#34;&gt;template&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;class&lt;/span&gt; &lt;span class=&#34;nc&#34;&gt;T&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;k&#34;&gt;struct&lt;/span&gt; &lt;span class=&#34;nc&#34;&gt;list_node&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;n&#34;&gt;T&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;data&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;n&#34;&gt;list_node&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;*&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;prev&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;n&#34;&gt;list_node&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;*&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;next&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;};&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;为了简化边界处理，list 使用了一个&lt;strong&gt;哨兵节点（Sentinel Node）&lt;/strong&gt;，&lt;code&gt;begin\(\)&lt;/code&gt; 指向哨兵的 &lt;code&gt;next&lt;/code&gt;，&lt;code&gt;end\(\)&lt;/code&gt; 指向哨兵自己，形成一个环。&lt;/p&gt;
+&lt;h4 id=&#34;核心特性&#34;&gt;核心特性
+&lt;/h4&gt;&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;内存不连续，不支持随机访问。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;任意位置的插入和删除都是 O (1) 时间复杂度，只需调整指针。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;提供了独特的 &lt;code&gt;splice&lt;/code&gt; 操作，可以在 O (1) 时间内将一个 list 的元素转移到另一个 list，无需拷贝元素。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;stddeque双端队列的分段魔法&#34;&gt;std::deque：双端队列的分段魔法
+&lt;/h3&gt;&lt;p&gt;&lt;code&gt;deque&lt;/code&gt; 是 STL 中最复杂的序列容器，它是 vector 和 list 的折中：既支持 O (1) 的双端插入删除，又支持 O (1) 的随机访问。&lt;/p&gt;
+&lt;p&gt;它的底层既不是连续内存，也不是链表，而是&lt;strong&gt;分段连续内存 + 中控器&lt;/strong&gt;的设计。&lt;/p&gt;
+&lt;h4 id=&#34;底层结构&#34;&gt;底层结构
+&lt;/h4&gt;&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;缓冲区 (Buffer)&lt;/strong&gt;：多个固定大小的连续内存块，用于存储实际元素。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;中控器 (Map)&lt;/strong&gt;：一个指针数组，每个元素指向一个缓冲区的起始地址。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h4 id=&#34;迭代器的实现&#34;&gt;迭代器的实现
+&lt;/h4&gt;&lt;p&gt;为了模拟连续内存的假象，deque 的迭代器是一个复杂的对象，包含四个指针：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-cpp&#34; data-lang=&#34;cpp&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;k&#34;&gt;struct&lt;/span&gt; &lt;span class=&#34;nc&#34;&gt;deque_iterator&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;n&#34;&gt;T&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;*&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;cur&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;        &lt;span class=&#34;c1&#34;&gt;// 当前指向的元素
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;&lt;/span&gt;  &lt;span class=&#34;n&#34;&gt;T&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;*&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;first&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;      &lt;span class=&#34;c1&#34;&gt;// 当前缓冲区的起始
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;&lt;/span&gt;  &lt;span class=&#34;n&#34;&gt;T&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;*&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;last&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;       &lt;span class=&#34;c1&#34;&gt;// 当前缓冲区的末尾
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;&lt;/span&gt;  &lt;span class=&#34;n&#34;&gt;T&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;**&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;node&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;      &lt;span class=&#34;c1&#34;&gt;// 指向中控器 map 中的对应位置
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;};&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;当迭代器递增时，如果 &lt;code&gt;cur&lt;/code&gt; 到达了当前缓冲区的末尾，就会通过 &lt;code&gt;node&lt;/code&gt; 跳转到下一个缓冲区的起始位置。这对用户是完全透明的。&lt;/p&gt;
+&lt;h4 id=&#34;随机访问的实现&#34;&gt;随机访问的实现
+&lt;/h4&gt;&lt;p&gt;虽然内存是分段的，但 deque 依然支持 &lt;code&gt;operator\[\]&lt;/code&gt;：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-cpp&#34; data-lang=&#34;cpp&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;n&#34;&gt;reference&lt;/span&gt; &lt;span class=&#34;k&#34;&gt;operator&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;[](&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;size_type&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;n&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;n&#34;&gt;size_type&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;offset&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;=&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;n&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;+&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;start&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;cur&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;-&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;start&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;first&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;n&#34;&gt;size_type&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;node_idx&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;=&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;offset&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;/&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;buffer_size&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;();&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;n&#34;&gt;size_type&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;elem_idx&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;=&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;offset&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;%&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;buffer_size&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;();&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;k&#34;&gt;return&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;map&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;[&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;start&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;node&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;-&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;map&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;+&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;node_idx&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;][&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;elem_idx&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;];&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;}&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;通过一次计算就能定位到元素，时间复杂度依然是 O (1)。&lt;/p&gt;
+&lt;h3 id=&#34;stdstring小字符串优化-sso&#34;&gt;std::string：小字符串优化 (SSO)
+&lt;/h3&gt;&lt;p&gt;&lt;code&gt;std::string&lt;/code&gt; 本质上是一个 &lt;code&gt;vector\&amp;amp;lt;char\&amp;amp;gt;&lt;/code&gt;，但现代实现都加入了&lt;strong&gt;小字符串优化 (Small String Optimization)&lt;/strong&gt;，以避免短字符串的堆分配开销。&lt;/p&gt;
+&lt;h4 id=&#34;sso-的原理&#34;&gt;SSO 的原理
+&lt;/h4&gt;&lt;p&gt;string 对象内部通常有一个 union，用来区分短字符串和长字符串：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;短字符串&lt;/strong&gt;：当字符串长度小于阈值（GCC/libstdc++ 是 15，Clang/libc++ 是 22）时，字符直接存储在 string 对象内部的栈上缓冲区中，无需调用 &lt;code&gt;malloc&lt;/code&gt;。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;长字符串&lt;/strong&gt;：当超过阈值时，才会在堆上分配内存，像传统的 string 一样存储指针、大小和容量。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这就是为什么创建一个 &lt;code&gt;\&amp;amp;\#34;hello\&amp;amp;\#34;&lt;/code&gt; 字符串比长字符串快得多的原因，它完全在栈上完成，没有系统调用开销。&lt;/p&gt;
+&lt;h3 id=&#34;stdvector特殊的位压缩&#34;&gt;std::vector：特殊的位压缩
+&lt;/h3&gt;&lt;p&gt;&lt;code&gt;vector\&amp;amp;lt;bool\&amp;amp;gt;&lt;/code&gt; 是 &lt;code&gt;vector&lt;/code&gt; 的一个&lt;strong&gt;特化版本&lt;/strong&gt;，它不是一个真正的 STL 容器。为了节省空间，它将 8 个 bool 值压缩到了 1 个字节中，每个元素只占 1 bit。&lt;/p&gt;
+&lt;h4 id=&#34;存在的问题&#34;&gt;存在的问题
+&lt;/h4&gt;&lt;p&gt;这种压缩带来了很多问题：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;operator\[\]&lt;/code&gt; 返回的不是 &lt;code&gt;bool\&amp;amp;amp;&lt;/code&gt;，而是一个&lt;strong&gt;代理对象 (proxy reference)&lt;/strong&gt;，因为你无法取一个 bit 的地址。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;不支持 &lt;code&gt;data\(\)&lt;/code&gt; 方法，因为没有连续的 bool 数组。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;位操作带来了额外的性能开销，比普通的 &lt;code&gt;vector\&amp;amp;lt;char\&amp;amp;gt;&lt;/code&gt; 慢。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;因此，在很多场景下，&lt;code&gt;vector\&amp;amp;lt;bool\&amp;amp;gt;&lt;/code&gt; 被认为是 STL 的一个设计失误。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;有序关联式容器红黑树的平衡艺术&#34;&gt;有序关联式容器：红黑树的平衡艺术
+&lt;/h2&gt;&lt;p&gt;&lt;code&gt;std::map&lt;/code&gt;, &lt;code&gt;std::set&lt;/code&gt;, &lt;code&gt;std::multimap&lt;/code&gt;, &lt;code&gt;std::multiset&lt;/code&gt; 这四个有序关联容器，底层全部基于&lt;strong&gt;红黑树 (Red-Black Tree)&lt;/strong&gt; 实现。&lt;/p&gt;
+&lt;h3 id=&#34;红黑树自平衡的二叉搜索树&#34;&gt;红黑树：自平衡的二叉搜索树
+&lt;/h3&gt;&lt;p&gt;普通的二叉搜索树 (BST) 在最坏情况下会退化成链表，导致操作时间复杂度变为 O (n)。红黑树通过给节点着色和旋转操作，保证了树的近似平衡。&lt;/p&gt;
+&lt;p&gt;红黑树必须满足以下 5 条性质：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;节点要么是红色，要么是黑色。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;根节点必须是黑色。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;所有叶子节点（NIL 空节点）都是黑色。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;如果一个节点是红色，那么它的两个子节点都是黑色（不能有连续的红节点）。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;从任意节点到其每个叶子的所有路径都包含相同数目的黑色节点。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;这些性质保证了红黑树的最长路径不会超过最短路径的两倍，因此树的高度始终维持在 O (log n)，保证了所有操作的时间复杂度都是 O (log n)。&lt;/p&gt;
+&lt;h3 id=&#34;插入与删除的调整&#34;&gt;插入与删除的调整
+&lt;/h3&gt;&lt;p&gt;当插入或删除节点破坏了红黑树的性质时，会通过&lt;strong&gt;变色&lt;/strong&gt;和 \&lt;em&gt;\&lt;/em&gt; 旋转（左旋 / 右旋）\&lt;em&gt;\&lt;/em&gt; 操作来修复，最多只需要 O (log n) 次旋转，效率极高。&lt;/p&gt;
+&lt;h3 id=&#34;容器与红黑树的关系&#34;&gt;容器与红黑树的关系
+&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;set&lt;/code&gt;：红黑树存储的是键本身，保证键的唯一性和有序性。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;map&lt;/code&gt;：红黑树存储的是 &lt;code&gt;pair\&amp;amp;lt;const Key, Value\&amp;amp;gt;&lt;/code&gt;，以 Key 作为排序依据。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;multiset&lt;/code&gt;/&lt;code&gt;multimap&lt;/code&gt;：允许键重复的红黑树版本。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;无序关联式容器哈希表的极速查找&#34;&gt;无序关联式容器：哈希表的极速查找
+&lt;/h2&gt;&lt;p&gt;C++11 引入的 &lt;code&gt;std::unordered\_map&lt;/code&gt;, &lt;code&gt;std::unordered\_set&lt;/code&gt; 等无序容器，底层基于 \&lt;em&gt;\&lt;/em&gt; 哈希表（Hash Table）\&lt;em&gt;\&lt;/em&gt; 实现，牺牲了有序性，换取了平均 O (1) 的查找效率。&lt;/p&gt;
+&lt;h3 id=&#34;链地址法解决哈希冲突&#34;&gt;链地址法：解决哈希冲突
+&lt;/h3&gt;&lt;p&gt;STL 的哈希表采用 \&lt;em&gt;\&lt;/em&gt; 链地址法（Separate Chaining）\&lt;em&gt;\&lt;/em&gt; 来解决哈希冲突：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;维护一个&lt;strong&gt;桶数组 (Bucket Array)&lt;/strong&gt;，每个桶是一个链表的头节点。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;通过哈希函数将 Key 映射到桶的索引。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;如果多个 Key 映射到了同一个桶，就将它们挂在该桶的链表上。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h3 id=&#34;扩容与重哈希&#34;&gt;扩容与重哈希
+&lt;/h3&gt;&lt;p&gt;哈希表有一个&lt;strong&gt;负载因子 (Load Factor)&lt;/strong&gt; 的概念，即 &lt;code&gt;元素个数 / 桶的个数&lt;/code&gt;。当负载因子超过阈值（默认是 1.0）时，哈希表会触发扩容：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;申请一个更大的桶数组（通常是原来的 2 倍，且为质数）。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;将所有旧的元素重新计算哈希值，映射到新的桶中。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;释放旧的桶数组。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;这个过程虽然单次是 O (n)，但由于频率很低，均摊到每次插入的开销可以忽略。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;容器适配器接口的封装与转换&#34;&gt;容器适配器：接口的封装与转换
+&lt;/h2&gt;&lt;p&gt;容器适配器并不是独立的容器，而是对其他容器的接口进行封装，提供特定的行为。&lt;/p&gt;
+&lt;h3 id=&#34;stdstack--stdqueue&#34;&gt;std::stack / std::queue
+&lt;/h3&gt;&lt;p&gt;这两个适配器默认都使用 &lt;code&gt;deque&lt;/code&gt; 作为底层容器：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;stack&lt;/code&gt;：封装了 deque 的 &lt;code&gt;push\_back&lt;/code&gt;, &lt;code&gt;pop\_back&lt;/code&gt;, &lt;code&gt;back&lt;/code&gt; 接口，实现后进先出 (LIFO)。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;queue&lt;/code&gt;：封装了 deque 的 &lt;code&gt;push\_back&lt;/code&gt;, &lt;code&gt;pop\_front&lt;/code&gt;, &lt;code&gt;front&lt;/code&gt; 接口，实现先进先出 (FIFO)。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;为什么默认用 deque 而不是 vector？因为 deque 的双端操作效率更高，且扩容时不需要移动所有元素。&lt;/p&gt;
+&lt;h3 id=&#34;stdpriority_queue&#34;&gt;std::priority_queue
+&lt;/h3&gt;&lt;p&gt;优先队列的底层默认使用 &lt;code&gt;vector&lt;/code&gt;，并在其上维护了一个&lt;strong&gt;大顶堆 (Max-Heap)&lt;/strong&gt; 结构。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;堆是一个完全二叉树，可以用数组连续存储，父节点和子节点可以通过索引快速计算。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;push&lt;/code&gt; 操作会将元素插入到末尾，然后执行&lt;strong&gt;上浮 (percolate up)&lt;/strong&gt; 调整堆。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;code&gt;pop&lt;/code&gt; 操作会弹出堆顶元素，然后将最后一个元素放到堆顶，执行&lt;strong&gt;下沉 (percolate down)&lt;/strong&gt; 调整堆。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;容器性能对比与选择指南&#34;&gt;容器性能对比与选择指南
+&lt;/h2&gt;&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;容器&lt;/th&gt;
+&lt;th&gt;随机访问&lt;/th&gt;
+&lt;th&gt;头部插入&lt;/th&gt;
+&lt;th&gt;尾部插入&lt;/th&gt;
+&lt;th&gt;中间插入&lt;/th&gt;
+&lt;th&gt;查找&lt;/th&gt;
+&lt;th&gt;底层结构&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;vector&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;&lt;strong&gt;O(1)&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;O(n)&lt;/td&gt;
+&lt;td&gt;&lt;strong&gt;O(1)\&lt;/strong&gt;*&lt;/td&gt;
+&lt;td&gt;O(n)&lt;/td&gt;
+&lt;td&gt;O(n)&lt;/td&gt;
+&lt;td&gt;动态数组&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;list&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;O(n)&lt;/td&gt;
+&lt;td&gt;&lt;strong&gt;O(1)&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;&lt;strong&gt;O(1)&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;&lt;strong&gt;O(1)&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;O(n)&lt;/td&gt;
+&lt;td&gt;双向链表&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;deque&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;&lt;strong&gt;O(1)&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;&lt;strong&gt;O(1)&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;&lt;strong&gt;O(1)&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;O(n)&lt;/td&gt;
+&lt;td&gt;O(n)&lt;/td&gt;
+&lt;td&gt;分段数组&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;map/set&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;-&lt;/td&gt;
+&lt;td&gt;O(log n)&lt;/td&gt;
+&lt;td&gt;O(log n)&lt;/td&gt;
+&lt;td&gt;O(log n)&lt;/td&gt;
+&lt;td&gt;&lt;strong&gt;O(log n)&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;红黑树&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;unordered\_map/set&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;-&lt;/td&gt;
+&lt;td&gt;&lt;strong&gt;O(1)&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;&lt;strong&gt;O(1)&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;&lt;strong&gt;O(1)&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;&lt;strong&gt;O(1)\&lt;/strong&gt;&lt;em&gt;&lt;strong&gt;\&lt;/strong&gt;&lt;/em&gt;&lt;/td&gt;
+&lt;td&gt;哈希表&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;string&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;&lt;strong&gt;O(1)&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;O(n)&lt;/td&gt;
+&lt;td&gt;&lt;strong&gt;O(1)\&lt;/strong&gt;*&lt;/td&gt;
+&lt;td&gt;O(n)&lt;/td&gt;
+&lt;td&gt;O(n)&lt;/td&gt;
+&lt;td&gt;字符数组 + SSO&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;blockquote&gt;
+&lt;p&gt;* 均摊时间复杂度，扩容时为 O (n)
+\&lt;em&gt;\&lt;/em&gt; 平均时间复杂度，最坏情况为 O (n)&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;h3 id=&#34;选择建议&#34;&gt;选择建议
+&lt;/h3&gt;&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;需要随机访问，且主要在尾部操作&lt;/strong&gt;：选 &lt;code&gt;vector&lt;/code&gt;，缓存友好，速度最快。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;需要频繁在两端操作&lt;/strong&gt;：选 &lt;code&gt;deque&lt;/code&gt;。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;需要频繁在任意位置插入删除&lt;/strong&gt;：选 &lt;code&gt;list&lt;/code&gt;。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;需要有序键值对，且需要稳定的 O (log n)&lt;/strong&gt;：选 &lt;code&gt;map&lt;/code&gt;/&lt;code&gt;set&lt;/code&gt;。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;不需要顺序，只需要最快的查找&lt;/strong&gt;：选 &lt;code&gt;unordered\_map&lt;/code&gt;/&lt;code&gt;unordered\_set&lt;/code&gt;。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;hr&gt;
+&lt;p&gt;&lt;strong&gt;总结&lt;/strong&gt;：STL 并不是一个黑盒，其背后的每一个设计都蕴含着精妙的数据结构与算法思想。理解这些底层实现，才能真正做到 “知其然，知其所以然”，在实际开发中做出最优的技术选型。&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;（注：文档部分内容可能由 AI 生成）&lt;/p&gt;
+&lt;/blockquote&gt;
+</description>
+        </item>
+        <item>
         <title>C&#43;&#43;各版本的特性</title>
         <link>https://SymphonyW.github.io/zh-cn/p/c-%E5%90%84%E7%89%88%E6%9C%AC%E7%9A%84%E7%89%B9%E6%80%A7/</link>
         <pubDate>Fri, 06 Mar 2026 15:34:25 +0800</pubDate>

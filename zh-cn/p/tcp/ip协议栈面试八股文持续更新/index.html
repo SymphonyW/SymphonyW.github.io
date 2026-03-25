@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="zh-cn" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="计算机网络 - TCP/IP 面试八股文（硬核整理） 本文档整理了后端开发、客户端开发等技术岗位面试中，关于 TCP/IP 协议栈及核心网络协议最常被问到的高频面试题和深度解析。 一、 网络模型基础 1. 讲一下 OSI 七层模型、TCP/IP 四层模型和五层体系结构？ OSI 七层模型（从上到下）：应用层、表示层、会话层、传输层、网络层、数据链路层、物理层。（理论模型，实际未广泛应用） TCP/IP 四层模型（从上到下）：应用层、传输层、网际层（网络层）、网络接口层。（实际广泛应用的模型） 五层体系结构（学习专用，从上到下）：应用层、传输层、网络层、数据链路层、物理层。 各层核心功能及常见协议： 应用层：为用户提供应用接口，解决特定网络应用问题。（HTTP, HTTPS, FTP, DNS, SMTP, POP3） 传输层：为两台主机中的进程提供通用的数据传输服务。（TCP, UDP） 网络层：负责为分组交换网上的不同主机提供通信服务，路由选择。（IP, ICMP, ARP, OSPF, BGP） 数据链路层：将网络层交下来的 IP 数据报组装成帧，在相邻节点的链路上传送。（以太网协议、PPP） 物理层：透明地传送比特流。（RJ45等） 二、 TCP 与 UDP 基础 2. TCP 和 UDP 的区别是什么？ 特性 TCP (Transmission Control Protocol) UDP (User Datagram Protocol) 连接性 面向连接（需三次握手） 无连接（直接发） 可靠性 可靠传输（不丢包、不乱序） 不可靠传输（尽最大努力交付，可能丢包） 工作方式 字节流（会出现粘包拆包问题） 数据报文（报文边界明确） 传输效率 较慢（开销大，有头部、确认、重传机制） 较快（开销小） 头部大小 至少 20 字节，可变 8 字节（固定） 拥塞控制/流量控制 有 无 适用场景 文件传输、HTTP/HTTPS、邮件（要求准确无误） 视频流媒体、直播、DNS查询、实时游戏（要求实时性） 三、 TCP 连接管理（绝对重点） 3.">
+<title>TCP/IP协议栈面试八股文（持续更新）</title>
+
+<link rel='canonical' href='https://SymphonyW.github.io/zh-cn/p/tcp/ip%E5%8D%8F%E8%AE%AE%E6%A0%88%E9%9D%A2%E8%AF%95%E5%85%AB%E8%82%A1%E6%96%87%E6%8C%81%E7%BB%AD%E6%9B%B4%E6%96%B0/'>
+
+<link rel="stylesheet" href="/scss/style.min.fcb8ae9ec4ce6e601e4b352c4eb06a952a123e46064b9bae06de6961bd51fd81.css"><meta property='og:title' content="TCP/IP协议栈面试八股文（持续更新）">
+<meta property='og:description' content="计算机网络 - TCP/IP 面试八股文（硬核整理） 本文档整理了后端开发、客户端开发等技术岗位面试中，关于 TCP/IP 协议栈及核心网络协议最常被问到的高频面试题和深度解析。 一、 网络模型基础 1. 讲一下 OSI 七层模型、TCP/IP 四层模型和五层体系结构？ OSI 七层模型（从上到下）：应用层、表示层、会话层、传输层、网络层、数据链路层、物理层。（理论模型，实际未广泛应用） TCP/IP 四层模型（从上到下）：应用层、传输层、网际层（网络层）、网络接口层。（实际广泛应用的模型） 五层体系结构（学习专用，从上到下）：应用层、传输层、网络层、数据链路层、物理层。 各层核心功能及常见协议： 应用层：为用户提供应用接口，解决特定网络应用问题。（HTTP, HTTPS, FTP, DNS, SMTP, POP3） 传输层：为两台主机中的进程提供通用的数据传输服务。（TCP, UDP） 网络层：负责为分组交换网上的不同主机提供通信服务，路由选择。（IP, ICMP, ARP, OSPF, BGP） 数据链路层：将网络层交下来的 IP 数据报组装成帧，在相邻节点的链路上传送。（以太网协议、PPP） 物理层：透明地传送比特流。（RJ45等） 二、 TCP 与 UDP 基础 2. TCP 和 UDP 的区别是什么？ 特性 TCP (Transmission Control Protocol) UDP (User Datagram Protocol) 连接性 面向连接（需三次握手） 无连接（直接发） 可靠性 可靠传输（不丢包、不乱序） 不可靠传输（尽最大努力交付，可能丢包） 工作方式 字节流（会出现粘包拆包问题） 数据报文（报文边界明确） 传输效率 较慢（开销大，有头部、确认、重传机制） 较快（开销小） 头部大小 至少 20 字节，可变 8 字节（固定） 拥塞控制/流量控制 有 无 适用场景 文件传输、HTTP/HTTPS、邮件（要求准确无误） 视频流媒体、直播、DNS查询、实时游戏（要求实时性） 三、 TCP 连接管理（绝对重点） 3.">
+<meta property='og:url' content='https://SymphonyW.github.io/zh-cn/p/tcp/ip%E5%8D%8F%E8%AE%AE%E6%A0%88%E9%9D%A2%E8%AF%95%E5%85%AB%E8%82%A1%E6%96%87%E6%8C%81%E7%BB%AD%E6%9B%B4%E6%96%B0/'>
+<meta property='og:site_name' content='SymphonyW'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='TCP/IP' /><meta property='article:tag' content='Interview' /><meta property='article:tag' content='Networking' /><meta property='article:published_time' content='2026-03-25T22:14:11&#43;08:00'/><meta property='article:modified_time' content='2026-03-25T22:14:11&#43;08:00'/>
+<meta name="twitter:title" content="TCP/IP协议栈面试八股文（持续更新）">
+<meta name="twitter:description" content="计算机网络 - TCP/IP 面试八股文（硬核整理） 本文档整理了后端开发、客户端开发等技术岗位面试中，关于 TCP/IP 协议栈及核心网络协议最常被问到的高频面试题和深度解析。 一、 网络模型基础 1. 讲一下 OSI 七层模型、TCP/IP 四层模型和五层体系结构？ OSI 七层模型（从上到下）：应用层、表示层、会话层、传输层、网络层、数据链路层、物理层。（理论模型，实际未广泛应用） TCP/IP 四层模型（从上到下）：应用层、传输层、网际层（网络层）、网络接口层。（实际广泛应用的模型） 五层体系结构（学习专用，从上到下）：应用层、传输层、网络层、数据链路层、物理层。 各层核心功能及常见协议： 应用层：为用户提供应用接口，解决特定网络应用问题。（HTTP, HTTPS, FTP, DNS, SMTP, POP3） 传输层：为两台主机中的进程提供通用的数据传输服务。（TCP, UDP） 网络层：负责为分组交换网上的不同主机提供通信服务，路由选择。（IP, ICMP, ARP, OSPF, BGP） 数据链路层：将网络层交下来的 IP 数据报组装成帧，在相邻节点的链路上传送。（以太网协议、PPP） 物理层：透明地传送比特流。（RJ45等） 二、 TCP 与 UDP 基础 2. TCP 和 UDP 的区别是什么？ 特性 TCP (Transmission Control Protocol) UDP (User Datagram Protocol) 连接性 面向连接（需三次握手） 无连接（直接发） 可靠性 可靠传输（不丢包、不乱序） 不可靠传输（尽最大努力交付，可能丢包） 工作方式 字节流（会出现粘包拆包问题） 数据报文（报文边界明确） 传输效率 较慢（开销大，有头部、确认、重传机制） 较快（开销小） 头部大小 至少 20 字节，可变 8 字节（固定） 拥塞控制/流量控制 有 无 适用场景 文件传输、HTTP/HTTPS、邮件（要求准确无误） 视频流媒体、直播、DNS查询、实时游戏（要求实时性） 三、 TCP 连接管理（绝对重点） 3.">
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/zh-cn/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hua20e9d08cce84e79524a418ee5d4524c_7426_300x0_resize_box_3.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">😁</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/zh-cn">SymphonyW</a></h1>
+            <h2 class="site-description">Welcome to my Blog.</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0'
+                        target="_blank"
+                        title="Bilibili"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.0.0-beta2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M488.6 104.1C505.3 122.2 513 143.8 511.9 169.8V372.2C511.5 398.6 502.7 420.3 485.4 437.3C468.2 454.3 446.3 463.2 419.9 464H92.02C65.57 463.2 43.81 454.2 26.74 436.8C9.682 419.4 .7667 396.5 0 368.2V169.8C.7667 143.8 9.682 122.2 26.74 104.1C43.81 87.75 65.57 78.77 92.02 78H121.4L96.05 52.19C90.3 46.46 87.42 39.19 87.42 30.4C87.42 21.6 90.3 14.34 96.05 8.603C101.8 2.868 109.1 0 117.9 0C126.7 0 134 2.868 139.8 8.603L213.1 78H301.1L375.6 8.603C381.7 2.868 389.2 0 398 0C406.8 0 414.1 2.868 419.9 8.603C425.6 14.34 428.5 21.6 428.5 30.4C428.5 39.19 425.6 46.46 419.9 52.19L394.6 78L423.9 78C450.3 78.77 471.9 87.75 488.6 104.1H488.6zM449.8 173.8C449.4 164.2 446.1 156.4 439.1 150.3C433.9 144.2 425.1 140.9 416.4 140.5H96.05C86.46 140.9 78.6 144.2 72.47 150.3C66.33 156.4 63.07 164.2 62.69 173.8V368.2C62.69 377.4 65.95 385.2 72.47 391.7C78.99 398.2 86.85 401.5 96.05 401.5H416.4C425.6 401.5 433.4 398.2 439.7 391.7C446 385.2 449.4 377.4 449.8 368.2L449.8 173.8zM185.5 216.5C191.8 222.8 195.2 230.6 195.6 239.7V273C195.2 282.2 191.9 289.9 185.8 296.2C179.6 302.5 171.8 305.7 162.2 305.7C152.6 305.7 144.7 302.5 138.6 296.2C132.5 289.9 129.2 282.2 128.8 273V239.7C129.2 230.6 132.6 222.8 138.9 216.5C145.2 210.2 152.1 206.9 162.2 206.5C171.4 206.9 179.2 210.2 185.5 216.5H185.5zM377 216.5C383.3 222.8 386.7 230.6 387.1 239.7V273C386.7 282.2 383.4 289.9 377.3 296.2C371.2 302.5 363.3 305.7 353.7 305.7C344.1 305.7 336.3 302.5 330.1 296.2C323.1 289.9 320.7 282.2 320.4 273V239.7C320.7 230.6 324.1 222.8 330.4 216.5C336.7 210.2 344.5 206.9 353.7 206.5C362.9 206.9 370.7 210.2 377 216.5H377z"/></svg>
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://github.com/SymphonyW'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/zh-cn/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>归档</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>搜索</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/%E9%93%BE%E6%8E%A5/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>链接</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://SymphonyW.github.io/" >English</option>
+                                
+                                    <option value="https://SymphonyW.github.io/zh-cn/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#一-网络模型基础"><strong>一、 网络模型基础</strong></a>
+      <ol>
+        <li><a href="#1-讲一下-osi-七层模型tcpip-四层模型和五层体系结构"><strong>1. 讲一下 OSI 七层模型、TCP/IP 四层模型和五层体系结构？</strong></a></li>
+      </ol>
+    </li>
+    <li><a href="#二-tcp-与-udp-基础"><strong>二、 TCP 与 UDP 基础</strong></a>
+      <ol>
+        <li><a href="#2-tcp-和-udp-的区别是什么"><strong>2. TCP 和 UDP 的区别是什么？</strong></a></li>
+      </ol>
+    </li>
+    <li><a href="#三-tcp-连接管理绝对重点"><strong>三、 TCP 连接管理（绝对重点）</strong></a>
+      <ol>
+        <li><a href="#3-请详细画出描述-tcp-的三次握手过程"><strong>3. 请详细画出/描述 TCP 的三次握手过程？</strong></a></li>
+        <li><a href="#4-为什么是三次握手两次不行吗四次不行吗"><strong>4. 为什么是三次握手？两次不行吗？四次不行吗？</strong></a></li>
+        <li><a href="#5-请详细画出描述-tcp-的四次挥手过程"><strong>5. 请详细画出/描述 TCP 的四次挥手过程？</strong></a></li>
+        <li><a href="#6-为什么挥手需要四次而握手只需要三次"><strong>6. 为什么挥手需要四次，而握手只需要三次？</strong></a></li>
+        <li><a href="#7-什么是-time_wait-状态为什么需要等待-2msl"><strong>7. 什么是 TIME_WAIT 状态？为什么需要等待 2MSL？</strong></a></li>
+      </ol>
+    </li>
+    <li><a href="#四-tcp-可靠传输与控制"><strong>四、 TCP 可靠传输与控制</strong></a>
+      <ol>
+        <li><a href="#8-tcp-是如何保证可靠传输的"><strong>8. TCP 是如何保证可靠传输的？</strong></a></li>
+        <li><a href="#9-详细说说-tcp-的拥塞控制"><strong>9. 详细说说 TCP 的拥塞控制？</strong></a></li>
+      </ol>
+    </li>
+    <li><a href="#五-网络层与其他核心协议"><strong>五、 网络层与其他核心协议</strong></a>
+      <ol>
+        <li><a href="#10-ip-协议是干什么的ipv4-和-ipv6-的区别"><strong>10. IP 协议是干什么的？IPv4 和 IPv6 的区别？</strong></a></li>
+        <li><a href="#11-arp-协议的作用是什么"><strong>11. ARP 协议的作用是什么？</strong></a></li>
+      </ol>
+    </li>
+    <li><a href="#六-应用层协议核心http--https--dns"><strong>六、 应用层协议核心（HTTP / HTTPS / DNS）</strong></a>
+      <ol>
+        <li><a href="#12-http-10112030-的主要区别是什么"><strong>12. HTTP 1.0、1.1、2.0、3.0 的主要区别是什么？</strong></a></li>
+        <li><a href="#13-get-和-post-的区别"><strong>13. GET 和 POST 的区别？</strong></a></li>
+        <li><a href="#14-http-常见的状态码有哪些"><strong>14. HTTP 常见的状态码有哪些？</strong></a></li>
+        <li><a href="#15-https-的工作原理是什么详细描述-tlsssl-握手过程"><strong>15. HTTPS 的工作原理是什么？（详细描述 TLS/SSL 握手过程）</strong></a></li>
+        <li><a href="#16-dns-的解析过程是怎样的为什么-dns-既使用-tcp-又使用-udp"><strong>16. DNS 的解析过程是怎样的？为什么 DNS 既使用 TCP 又使用 UDP？</strong></a></li>
+      </ol>
+    </li>
+    <li><a href="#七-综合场景题"><strong>七、 综合场景题</strong></a>
+      <ol>
+        <li><a href="#17-经典终极必考题在浏览器中输入-url-到页面显示经历了什么过程"><strong>17. 【经典终极必考题】在浏览器中输入 URL 到页面显示，经历了什么过程？</strong></a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/zh-cn/p/tcp/ip%E5%8D%8F%E8%AE%AE%E6%A0%88%E9%9D%A2%E8%AF%95%E5%85%AB%E8%82%A1%E6%96%87%E6%8C%81%E7%BB%AD%E6%9B%B4%E6%96%B0/">TCP/IP协议栈面试八股文（持续更新）</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published">2026-03-25 22:14</time>
+            </div>
+        
+
+        
+    </footer>
+    
+
+    
+        <footer class="article-translations">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+            <div>
+                
+                    <a href="https://SymphonyW.github.io/p/tcp/ip-protocol-stack-interview-clich%C3%A9-questions-continuously-updated/" class="link">English</a>
+                
+            </div>
+        </footer>
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="计算机网络---tcpip-面试八股文硬核整理"><strong>计算机网络 - TCP/IP 面试八股文（硬核整理）</strong>
+</h1><p>本文档整理了后端开发、客户端开发等技术岗位面试中，关于 TCP/IP 协议栈及核心网络协议最常被问到的高频面试题和深度解析。</p>
+<h2 id="一-网络模型基础"><strong>一、 网络模型基础</strong>
+</h2><h3 id="1-讲一下-osi-七层模型tcpip-四层模型和五层体系结构"><strong>1. 讲一下 OSI 七层模型、TCP/IP 四层模型和五层体系结构？</strong>
+</h3><ul>
+<li><strong>OSI 七层模型（从上到下）</strong>：应用层、表示层、会话层、传输层、网络层、数据链路层、物理层。（理论模型，实际未广泛应用）</li>
+<li><strong>TCP/IP 四层模型（从上到下）</strong>：应用层、传输层、网际层（网络层）、网络接口层。（实际广泛应用的模型）</li>
+<li><strong>五层体系结构（学习专用，从上到下）</strong>：应用层、传输层、网络层、数据链路层、物理层。</li>
+</ul>
+<p><strong>各层核心功能及常见协议</strong>：</p>
+<ul>
+<li><strong>应用层</strong>：为用户提供应用接口，解决特定网络应用问题。（HTTP, HTTPS, FTP, DNS, SMTP, POP3）</li>
+<li><strong>传输层</strong>：为两台主机中的<strong>进程</strong>提供通用的数据传输服务。（TCP, UDP）</li>
+<li><strong>网络层</strong>：负责为分组交换网上的不同<strong>主机</strong>提供通信服务，路由选择。（IP, ICMP, ARP, OSPF, BGP）</li>
+<li><strong>数据链路层</strong>：将网络层交下来的 IP 数据报组装成帧，在相邻节点的链路上传送。（以太网协议、PPP）</li>
+<li><strong>物理层</strong>：透明地传送比特流。（RJ45等）</li>
+</ul>
+<h2 id="二-tcp-与-udp-基础"><strong>二、 TCP 与 UDP 基础</strong>
+</h2><h3 id="2-tcp-和-udp-的区别是什么"><strong>2. TCP 和 UDP 的区别是什么？</strong>
+</h3><div class="table-wrapper"><table>
+<thead>
+<tr>
+<th style="text-align:left">特性</th>
+<th style="text-align:left">TCP (Transmission Control Protocol)</th>
+<th style="text-align:left">UDP (User Datagram Protocol)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>连接性</strong></td>
+<td style="text-align:left">面向连接（需三次握手）</td>
+<td style="text-align:left">无连接（直接发）</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>可靠性</strong></td>
+<td style="text-align:left">可靠传输（不丢包、不乱序）</td>
+<td style="text-align:left">不可靠传输（尽最大努力交付，可能丢包）</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>工作方式</strong></td>
+<td style="text-align:left">字节流（会出现粘包拆包问题）</td>
+<td style="text-align:left">数据报文（报文边界明确）</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>传输效率</strong></td>
+<td style="text-align:left">较慢（开销大，有头部、确认、重传机制）</td>
+<td style="text-align:left">较快（开销小）</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>头部大小</strong></td>
+<td style="text-align:left">至少 20 字节，可变</td>
+<td style="text-align:left">8 字节（固定）</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>拥塞控制/流量控制</strong></td>
+<td style="text-align:left">有</td>
+<td style="text-align:left">无</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>适用场景</strong></td>
+<td style="text-align:left">文件传输、HTTP/HTTPS、邮件（要求准确无误）</td>
+<td style="text-align:left">视频流媒体、直播、DNS查询、实时游戏（要求实时性）</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="三-tcp-连接管理绝对重点"><strong>三、 TCP 连接管理（绝对重点）</strong>
+</h2><h3 id="3-请详细画出描述-tcp-的三次握手过程"><strong>3. 请详细画出/描述 TCP 的三次握手过程？</strong>
+</h3><p>三次握手是为了建立可靠的连接，同步双方的序列号和窗口大小。</p>
+<ol>
+<li><strong>第一次握手（Client -&gt; Server）</strong>：客户端生成一个随机序列号 seq = x，并把标志位 SYN 设为 1。客户端进入 SYN_SENT 状态。此时报文不携带数据。</li>
+<li><strong>第二次握手（Server -&gt; Client）</strong>：服务端收到 SYN 报文，同意建立连接，生成自己的随机序列号 seq = y，并将确认号 ack = x + 1，同时将 SYN 和 ACK 标志位都设为 1。服务端进入 SYN_RCVD 状态。</li>
+<li><strong>第三次握手（Client -&gt; Server）</strong>：客户端收到服务端的 SYN+ACK 报文，检查 ack 是否为 x+1。如果正确，则将标志位 ACK 设为 1，确认号 ack = y + 1。客户端进入 ESTABLISHED 状态。服务端收到后也进入 ESTABLISHED 状态，连接建立。此报文<strong>可以携带数据</strong>。</li>
+</ol>
+<h3 id="4-为什么是三次握手两次不行吗四次不行吗"><strong>4. 为什么是三次握手？两次不行吗？四次不行吗？</strong>
+</h3><ul>
+<li><strong>为什么不能是两次？（防止已失效的连接请求报文段突然又传送到了服务端）</strong><br>
+假设客户端发送了第一个 SYN 报文（因为网络延迟滞留了），客户端超时后重发了第二个 SYN 并完成了两次握手建立连接，数据传完后断开。此时，第一个滞留的 SYN 终于到了服务端。如果是两次握手，服务端会以为客户端又要建立连接，直接单方面进入 ESTABLISHED 状态并分配资源，导致服务端资源浪费（即“历史连接”问题）。三次握手可以让客户端在第三步拒绝这个历史连接。</li>
+<li><strong>为什么不需要四次？</strong><br>
+服务端的确认报文（ACK）和同步报文（SYN）是可以合并在一起发送的（即第二次握手），没必要拆成两步，所以三次足够了。</li>
+</ul>
+<h3 id="5-请详细画出描述-tcp-的四次挥手过程"><strong>5. 请详细画出/描述 TCP 的四次挥手过程？</strong>
+</h3><p>由于 TCP 是全双工的，因此每个方向都必须单独进行关闭。</p>
+<ol>
+<li><strong>第一次挥手（Client -&gt; Server）</strong>：客户端应用进程发出连接释放报文，FIN = 1, seq = u。客户端进入 FIN_WAIT_1 状态。表示客户端没有数据要发了。</li>
+<li><strong>第二次挥手（Server -&gt; Client）</strong>：服务端收到 FIN，发出确认报文 ACK = 1, ack = u + 1, seq = v。服务端进入 CLOSE_WAIT 状态。此时 TCP 连接处于<strong>半关闭状态</strong>，客户端不能发数据，但服务端如果还有数据没发完，可以继续发。客户端收到 ACK 后进入 FIN_WAIT_2 状态。</li>
+<li><strong>第三次挥手（Server -&gt; Client）</strong>：服务端数据发送完毕，发出连接释放报文，FIN = 1, ACK = 1, seq = w, ack = u + 1。服务端进入 LAST_ACK 状态。</li>
+<li><strong>第四次挥手（Client -&gt; Server）</strong>：客户端收到 FIN 后，发出确认报文 ACK = 1, ack = w + 1, seq = u + 1。客户端进入 TIME_WAIT 状态。服务端收到 ACK 后进入 CLOSED 状态。客户端经过 2MSL 时间后，也进入 CLOSED 状态。</li>
+</ol>
+<h3 id="6-为什么挥手需要四次而握手只需要三次"><strong>6. 为什么挥手需要四次，而握手只需要三次？</strong>
+</h3><p>因为 TCP 是全双工通信。握手时，服务端的 SYN 和 ACK 可以一起发送。但挥手时，当收到对方的 FIN 报文时，仅仅表示对方不再发送数据了，但<strong>接收方自己可能还有数据需要发送</strong>。所以接收方先回复一个 ACK，等自己数据发送完毕后，再发送 FIN 报文。因此通常需要四次。</p>
+<h3 id="7-什么是-time_wait-状态为什么需要等待-2msl"><strong>7. 什么是 TIME_WAIT 状态？为什么需要等待 2MSL？</strong>
+</h3><p>TIME_WAIT 是主动关闭连接的一方在发送完最后一个 ACK 后进入的状态。等待 2MSL（最大报文生存时间的2倍）原因有二：</p>
+<ol>
+<li><strong>保证可靠关闭</strong>：如果最后的 ACK 丢失，服务端会重传 FIN。客户端在 2MSL 内可再次收到 FIN 并重发 ACK。</li>
+<li><strong>防止“已失效报文”干扰</strong>：保证本次连接的所有报文从网络中消失，不会影响后续的新连接。</li>
+</ol>
+<h2 id="四-tcp-可靠传输与控制"><strong>四、 TCP 可靠传输与控制</strong>
+</h2><h3 id="8-tcp-是如何保证可靠传输的"><strong>8. TCP 是如何保证可靠传输的？</strong>
+</h3><p>TCP 保证可靠传输主要依靠：</p>
+<ol>
+<li><strong>数据分块与校验和</strong>：验证数据在传输过程中是否损坏。</li>
+<li><strong>序列号与确认应答 (Seq &amp; ACK)</strong>：保证数据不乱序、不丢失。</li>
+<li><strong>超时重传机制</strong>：未在 RTO 内收到 ACK，则重新发送。</li>
+<li><strong>连接管理</strong>：三次握手、四次挥手。</li>
+<li><strong>流量控制（滑动窗口）</strong>：控制发送速度，防止接收缓冲区溢出。</li>
+<li><strong>拥塞控制</strong>：网络拥塞时减少发送量。</li>
+</ol>
+<h3 id="9-详细说说-tcp-的拥塞控制"><strong>9. 详细说说 TCP 的拥塞控制？</strong>
+</h3><p>拥塞控制包含四个算法：</p>
+<ol>
+<li><strong>慢启动</strong>：刚建立连接时，拥塞窗口 cwnd 较小，随后每经过一个 RTT 呈<strong>指数级增长</strong>，直到达到阈值 ssthresh。</li>
+<li><strong>拥塞避免</strong>：当 cwnd &gt;= ssthresh 时，每经过一个 RTT cwnd 加 1，呈<strong>线性增长</strong>。</li>
+<li><strong>快速重传</strong>：收到<strong>连续 3 个相同的重复 ACK</strong> 时，立刻重传丢失报文，不等待超时。</li>
+<li><strong>快速恢复</strong>：配合快速重传，将 ssthresh 减半，cwnd 设为 ssthresh，进入拥塞避免阶段。<em>(注：超时丢包通常回退到慢启动)</em></li>
+</ol>
+<h2 id="五-网络层与其他核心协议"><strong>五、 网络层与其他核心协议</strong>
+</h2><h3 id="10-ip-协议是干什么的ipv4-和-ipv6-的区别"><strong>10. IP 协议是干什么的？IPv4 和 IPv6 的区别？</strong>
+</h3><p>IP 协议负责在网络中进行路由寻址和数据包的分片。</p>
+<ul>
+<li><strong>IPv4</strong>：32 位地址，资源已枯竭。</li>
+<li><strong>IPv6</strong>：128 位地址，号称“给地球上每一粒沙子分配一个 IP”。简化了头部，原生支持 IPSec，安全性更高。</li>
+</ul>
+<h3 id="11-arp-协议的作用是什么"><strong>11. ARP 协议的作用是什么？</strong>
+</h3><p>将 <strong>IP 地址转换为 MAC 地址</strong>。通过局域网广播请求，目标主机单播回复。</p>
+<h2 id="六-应用层协议核心http--https--dns"><strong>六、 应用层协议核心（HTTP / HTTPS / DNS）</strong>
+</h2><h3 id="12-http-10112030-的主要区别是什么"><strong>12. HTTP 1.0、1.1、2.0、3.0 的主要区别是什么？</strong>
+</h3><p>这是极其高频的面试题，体现对 Web 协议演进的理解：</p>
+<ul>
+<li><strong>HTTP 1.0</strong>：默认<strong>短连接</strong>（每次请求都需建立 TCP 连接），存在队头阻塞问题。</li>
+<li><strong>HTTP 1.1</strong>：默认<strong>长连接</strong>（Keep-Alive），引入了管道化机制（但存在服务端的队头阻塞），增加了缓存控制（Cache-Control）、断点续传（Range 头部）等功能。</li>
+<li><strong>HTTP 2.0</strong>：
+<ul>
+<li><strong>多路复用</strong>：一个 TCP 连接上可以并发交错发送多个请求/响应（彻底解决 HTTP 层的队头阻塞）。</li>
+<li><strong>二进制分帧</strong>：数据解析更高效。</li>
+<li><strong>头部压缩（HPACK）</strong>：减少传输体积。</li>
+<li><strong>服务端推送（Server Push）</strong>：服务端可以主动向客户端推送资源。</li>
+</ul>
+</li>
+<li><strong>HTTP 3.0</strong>：
+<ul>
+<li><strong>基于 QUIC 协议（底层为 UDP）</strong>：彻底解决了 TCP 级别的队头阻塞问题。</li>
+<li><strong>连接迁移</strong>：基于连接 ID 而非 IP+端口 识别连接，切换网络（如 Wi-Fi 换到 4G）时连接不断开。</li>
+</ul>
+</li>
+</ul>
+<h3 id="13-get-和-post-的区别"><strong>13. GET 和 POST 的区别？</strong>
+</h3><div class="table-wrapper"><table>
+<thead>
+<tr>
+<th style="text-align:left">特性</th>
+<th style="text-align:left">GET</th>
+<th style="text-align:left">POST</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>语义</strong></td>
+<td style="text-align:left">获取资源（读取）</td>
+<td style="text-align:left">提交/修改资源（写入）</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>参数位置</strong></td>
+<td style="text-align:left">放在 URL 中（?key=value）</td>
+<td style="text-align:left">放在 HTTP 报文的 Body（请求体）中</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>安全性</strong></td>
+<td style="text-align:left">较低（参数暴露在 URL，可被浏览器历史记录保存）</td>
+<td style="text-align:left">相对较高（参数在 Body 中，但不加密仍可抓包）</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>长度限制</strong></td>
+<td style="text-align:left">受限于浏览器和服务器对 URL 长度的限制</td>
+<td style="text-align:left">理论上无限制（受限于服务器配置）</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>幂等性</strong></td>
+<td style="text-align:left"><strong>幂等</strong>（执行多次结果相同）</td>
+<td style="text-align:left"><strong>不幂等</strong>（执行多次可能会创建多个资源）</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>缓存</strong></td>
+<td style="text-align:left">浏览器默认会缓存 GET 请求</td>
+<td style="text-align:left">浏览器默认不会缓存 POST 请求</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="14-http-常见的状态码有哪些"><strong>14. HTTP 常见的状态码有哪些？</strong>
+</h3><ul>
+<li><strong>2xx (成功)</strong>：
+<ul>
+<li>200 OK：请求成功。</li>
+<li>204 No Content：请求成功，但响应报文不包含实体的主体部分。</li>
+<li>206 Partial Content：客户端进行了范围请求（断点续传），服务器成功执行。</li>
+</ul>
+</li>
+<li><strong>3xx (重定向)</strong>：
+<ul>
+<li>301 Moved Permanently：永久重定向（资源换了新 URL）。</li>
+<li>302 Found：临时重定向。</li>
+<li>304 Not Modified：资源未修改，走<strong>协商缓存</strong>（非常重要，面试常考浏览器缓存机制）。</li>
+</ul>
+</li>
+<li><strong>4xx (客户端错误)</strong>：
+<ul>
+<li>400 Bad Request：请求报文有语法错误。</li>
+<li>401 Unauthorized：请求需要认证信息。</li>
+<li>403 Forbidden：服务器拒绝访问（通常是权限不足）。</li>
+<li>404 Not Found：找不到请求的资源。</li>
+</ul>
+</li>
+<li><strong>5xx (服务器错误)</strong>：
+<ul>
+<li>500 Internal Server Error：服务器内部错误（代码抛异常了）。</li>
+<li>502 Bad Gateway：网关或代理服务器收到无效响应（常见于 Nginx 转发给后端服务失败）。</li>
+<li>504 Gateway Timeout：网关超时（后端服务处理太慢）。</li>
+</ul>
+</li>
+</ul>
+<h3 id="15-https-的工作原理是什么详细描述-tlsssl-握手过程"><strong>15. HTTPS 的工作原理是什么？（详细描述 TLS/SSL 握手过程）</strong>
+</h3><p>HTTPS = HTTP + SSL/TLS。它通过<strong>非对称加密</strong>协商密钥，再通过<strong>对称加密</strong>传输数据，并利用<strong>数字证书</strong>验证身份。</p>
+<p>简化的 TLS 1.2 握手过程如下：</p>
+<ol>
+<li><strong>Client Hello</strong>：客户端向服务端发送自己支持的 TLS 版本、加密套件列表，以及一个<strong>客户端随机数 (Random1)</strong>。</li>
+<li><strong>Server Hello</strong>：服务端确认 TLS 版本和加密套件，发送一个<strong>服务端随机数 (Random2)</strong>，并把包含公钥的<strong>数字证书</strong>发送给客户端。</li>
+<li><strong>客户端验证证书</strong>：客户端确保证书是由权威 CA 签发的，域名一致且未过期。</li>
+<li><strong>生成 Pre-Master Secret</strong>：客户端生成一个新的随机数 <strong>Pre-Master Secret</strong>，用证书里的<strong>公钥进行加密</strong>，发送给服务端。</li>
+<li><strong>服务端解密</strong>：服务端用自己的<strong>私钥</strong>解密，得到 Pre-Master Secret。</li>
+<li><strong>生成最终对称密钥 (Master Secret)</strong>：此时双方都有了 Random1、Random2 和 Pre-Master Secret，双方使用相同的算法计算出最终的<strong>对称密钥</strong>（会话密钥）。</li>
+<li><strong>加密通信</strong>：后续的 HTTP 数据传输全部使用这个<strong>对称密钥</strong>进行加密和解密。</li>
+</ol>
+<h3 id="16-dns-的解析过程是怎样的为什么-dns-既使用-tcp-又使用-udp"><strong>16. DNS 的解析过程是怎样的？为什么 DNS 既使用 TCP 又使用 UDP？</strong>
+</h3><ul>
+<li><strong>解析过程</strong>（浏览器输入域名后）：
+<ol>
+<li>查<strong>浏览器缓存</strong>。</li>
+<li>查<strong>操作系统缓存</strong>（如 hosts 文件）。</li>
+<li>查<strong>本地 DNS 服务器</strong>（通常由 ISP 提供，这步是<strong>递归查询</strong>）。</li>
+<li>本地 DNS 服务器依次向<strong>根域名服务器</strong> -&gt; <strong>顶级域名服务器</strong> (.com) -&gt; <strong>权威域名服务器</strong> 发起<strong>迭代查询</strong>，最终获取 IP 并返回给客户端。</li>
+</ol>
+</li>
+<li><strong>TCP 还是 UDP？</strong>
+<ul>
+<li><strong>默认使用 UDP (端口 53)</strong>：因为一次 UDP 请求和响应就能完成，无连接、速度快、负载低。</li>
+<li><strong>使用 TCP 的场景</strong>：
+<ol>
+<li>当响应报文大小<strong>超过 512 字节</strong>时（为了防止 UDP 报文被截断）。</li>
+<li>DNS 服务器之间进行<strong>区域传送</strong>（主从 DNS 数据同步）时，因为需要传输大量数据，必须保证可靠性，所以使用 TCP。</li>
+</ol>
+</li>
+</ul>
+</li>
+</ul>
+<h2 id="七-综合场景题"><strong>七、 综合场景题</strong>
+</h2><h3 id="17-经典终极必考题在浏览器中输入-url-到页面显示经历了什么过程"><strong>17. 【经典终极必考题】在浏览器中输入 URL 到页面显示，经历了什么过程？</strong>
+</h3><p>这是一个贯穿整个网络体系的题目，必须对答如流：</p>
+<ol>
+<li><strong>URL 解析</strong>：浏览器解析 URL，确定协议（HTTP/HTTPS）、域名、端口、路径。</li>
+<li><strong>DNS 域名解析</strong>：依次查找各级缓存及 DNS 服务器，最终得到目标 IP 地址。</li>
+<li><strong>建立 TCP 连接</strong>：浏览器与目标服务器发起 TCP 三次握手。</li>
+<li><strong>TLS 握手（如果是 HTTPS）</strong>：进行密钥协商，验证证书，建立加密通道。</li>
+<li><strong>发送 HTTP 请求</strong>：浏览器构建 HTTP 请求报文并发送。</li>
+<li><strong>服务器处理并响应</strong>：服务器接收请求，由 Web Server（如 Nginx, Tomcat）处理，返回 HTTP 响应报文。</li>
+<li><strong>浏览器渲染页面</strong>：解析 HTML/CSS，生成 DOM 树和 CSSOM 树，合并为渲染树，布局并绘制到屏幕上。</li>
+<li><strong>断开 TCP 连接</strong>：通过 TCP 四次挥手释放连接（若为 Keep-Alive 则暂时保持）。</li>
+</ol>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/zh-cn/tags/tcp/ip/">TCP/IP</a>
+        
+            <a href="/zh-cn/tags/interview/">Interview</a>
+        
+            <a href="/zh-cn/tags/networking/">Networking</a>
+        
+    </section>
+
+
+    </footer>
+
+
+    
+</article>
+
+    
+
+    
+
+     
+    
+        
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+        2026 SymphonyW
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.26.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>
