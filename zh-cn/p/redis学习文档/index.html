@@ -1,0 +1,1231 @@
+<!DOCTYPE html>
+<html lang="zh-cn" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Redis学习文档 基础篇 Redis数据结构介绍 Redis是一个key-value的数据库，key一般是String类型，value的类型多种多样： Redis的数据类型 我们可以在官网（https://redis.io/commands）查看不同的命令用法。同时我们也可以在命令行通过help指令来查找命令。 Redis的通用命令 通用命令是部分数据类型的，都可以使用的命令，常见的有： KEYS：查看符合模板的所有key。模糊查询的效率不高，又因为Redis是单线程的，所以不建议在生产环境设备上使用 KEYS命令用法 DEL：删除一个或多个指定的key DEL命令用法 EXISTS：检查一个或多个key是否存在 EXISTS命令用法 EXPIRE：为一个key设置有效期（过期时间），单位为秒，有效期到期时，key会被自动删除 TTL：查看一个key的剩余有效期，单位为秒 EXPIRE和TTL命令用法 注意：当一个key设置了过期时间后，如果在过期时间到期之前再次设置了过期时间，那么原来的过期时间会被覆盖掉，新的过期时间会重新计算。并且过期后TTL命令会返回-2，表示key不存在了；如果一个key没有设置过期时间，那么TTL命令会返回-1，表示这个key是永久有效的。 String类型 String类型是Redis中最基本的数据类型，key和value都是字符串类型。不过根据字符串的格式不同，String类型又可以分为以下几种： 普通字符串：普通的字符串类型，可以存储任何文本数据，最大长度为512MB。 数字字符串：可以存储整数或浮点数，可以进行数学运算和自增操作。 二进制字符串：可以存储二进制数据，如图片、音频等非文本数据。 JSON字符串：可以存储JSON格式的数据，可以方便地进行数据交换和存储复杂的数据结构。 不管是哪种格式，底层都是字节数组形式存储，只不过是编码方式不同。字符串类型的最大空间不能超过512MB，如果超过了这个限制，Redis会返回错误。 String类型的不同格式 String类型的常用命令有： SET：设置一个key的值，如果key已经存在，则覆盖原来的值 GET：获取一个key的值，如果key不存在，则返回nil MSET：同时设置多个key的值 MGET：同时获取多个key的值 SET、GET、MSET、MGET命令用法 INCR：将一个key的值加1，如果key不存在，则先将其设置 INCRBY：将一个key的值加上指定的整数，如果key不存在，则先将其设置。也可以实现自减的效果。 INCRBYFLOAT：将一个key的值加上指定的浮点数，如果key不存在，则先将其设置 INCR、INCRBY、INCRBYFLOAT命令用法 DECR：将一个key的值减1，如果key不存在，则先将其设置 DECRBY：将一个key的值减去指定的整数，如果key不存在，则先将其设置 DECR、DECRBY命令用法 SETNX：只有当key不存在时才设置key的值，如果key已经存在，则不做任何操作 SETNX命令用法 SETEX：设置一个key的值，并为key设置过期时间，单位为秒 SETEX命令用法 PSETEX：设置一个key的值，并为key设置过期时间，单位为毫秒 KEY的层级结构 Redis的key是一个字符串，可以包含任何字符，包括空格和特殊字符。为了方便管理和组织key，Redis没有提供真正的层级结构，但我们可以通过在key中使用分隔符（如冒号:）来模拟层级结构。 例如，我们有一个项目叫heima，有user和product两种不同类型的数据，我们可以这样定义key： user相关的key：heima:user:1、heima:user:2、heima:user:3等 product相关的key：heima:product:1、heima:product:2、heima:product:3等 如果value是一个对象，例如一个user对象，我们可以将其序列化成JSON字符串存储在Redis中，这样就可以方便地进行数据交换和存储复杂的数据结构。 KEY的层级结构 Hash类型 Hash类型，也叫散列，其value是一个无序字典，类似于C++中的unordered_map。Hash类型的key是一个字符串，而value是一个包含多个field和value的字典。每个field都是一个字符串，每个value也是一个字符串。主要特征有： Hash类型的元素是无序的，不能通过索引访问 Hash类型的元素是唯一的，不能重复 Hash类型的元素可以在字典中添加或删除 查询速度快，适合于需要频繁查询的场景，例如用户信息、商品信息等。 Hash类型的结构 Hash类型的常用命令有： HSET key field value：设置hash表key中field的值为value，如果key不存在，则创建一个新的hash表；如果field已经存在，则覆盖原来的值 HGET key field：获取hash表key中field的值，如果key不存在或field不存在，则返回nil HMSET key field1 value1 field2 value2 &hellip;：同时设置hash表key中多个field的值，如果key不存在，则创建一个新的hash表；如果field已经存在，则覆盖原来的值">
+<title>Redis学习文档</title>
+
+<link rel='canonical' href='https://SymphonyW.github.io/zh-cn/p/redis%E5%AD%A6%E4%B9%A0%E6%96%87%E6%A1%A3/'>
+
+<link rel="stylesheet" href="/scss/style.min.fcb8ae9ec4ce6e601e4b352c4eb06a952a123e46064b9bae06de6961bd51fd81.css"><meta property='og:title' content="Redis学习文档">
+<meta property='og:description' content="Redis学习文档 基础篇 Redis数据结构介绍 Redis是一个key-value的数据库，key一般是String类型，value的类型多种多样： Redis的数据类型 我们可以在官网（https://redis.io/commands）查看不同的命令用法。同时我们也可以在命令行通过help指令来查找命令。 Redis的通用命令 通用命令是部分数据类型的，都可以使用的命令，常见的有： KEYS：查看符合模板的所有key。模糊查询的效率不高，又因为Redis是单线程的，所以不建议在生产环境设备上使用 KEYS命令用法 DEL：删除一个或多个指定的key DEL命令用法 EXISTS：检查一个或多个key是否存在 EXISTS命令用法 EXPIRE：为一个key设置有效期（过期时间），单位为秒，有效期到期时，key会被自动删除 TTL：查看一个key的剩余有效期，单位为秒 EXPIRE和TTL命令用法 注意：当一个key设置了过期时间后，如果在过期时间到期之前再次设置了过期时间，那么原来的过期时间会被覆盖掉，新的过期时间会重新计算。并且过期后TTL命令会返回-2，表示key不存在了；如果一个key没有设置过期时间，那么TTL命令会返回-1，表示这个key是永久有效的。 String类型 String类型是Redis中最基本的数据类型，key和value都是字符串类型。不过根据字符串的格式不同，String类型又可以分为以下几种： 普通字符串：普通的字符串类型，可以存储任何文本数据，最大长度为512MB。 数字字符串：可以存储整数或浮点数，可以进行数学运算和自增操作。 二进制字符串：可以存储二进制数据，如图片、音频等非文本数据。 JSON字符串：可以存储JSON格式的数据，可以方便地进行数据交换和存储复杂的数据结构。 不管是哪种格式，底层都是字节数组形式存储，只不过是编码方式不同。字符串类型的最大空间不能超过512MB，如果超过了这个限制，Redis会返回错误。 String类型的不同格式 String类型的常用命令有： SET：设置一个key的值，如果key已经存在，则覆盖原来的值 GET：获取一个key的值，如果key不存在，则返回nil MSET：同时设置多个key的值 MGET：同时获取多个key的值 SET、GET、MSET、MGET命令用法 INCR：将一个key的值加1，如果key不存在，则先将其设置 INCRBY：将一个key的值加上指定的整数，如果key不存在，则先将其设置。也可以实现自减的效果。 INCRBYFLOAT：将一个key的值加上指定的浮点数，如果key不存在，则先将其设置 INCR、INCRBY、INCRBYFLOAT命令用法 DECR：将一个key的值减1，如果key不存在，则先将其设置 DECRBY：将一个key的值减去指定的整数，如果key不存在，则先将其设置 DECR、DECRBY命令用法 SETNX：只有当key不存在时才设置key的值，如果key已经存在，则不做任何操作 SETNX命令用法 SETEX：设置一个key的值，并为key设置过期时间，单位为秒 SETEX命令用法 PSETEX：设置一个key的值，并为key设置过期时间，单位为毫秒 KEY的层级结构 Redis的key是一个字符串，可以包含任何字符，包括空格和特殊字符。为了方便管理和组织key，Redis没有提供真正的层级结构，但我们可以通过在key中使用分隔符（如冒号:）来模拟层级结构。 例如，我们有一个项目叫heima，有user和product两种不同类型的数据，我们可以这样定义key： user相关的key：heima:user:1、heima:user:2、heima:user:3等 product相关的key：heima:product:1、heima:product:2、heima:product:3等 如果value是一个对象，例如一个user对象，我们可以将其序列化成JSON字符串存储在Redis中，这样就可以方便地进行数据交换和存储复杂的数据结构。 KEY的层级结构 Hash类型 Hash类型，也叫散列，其value是一个无序字典，类似于C++中的unordered_map。Hash类型的key是一个字符串，而value是一个包含多个field和value的字典。每个field都是一个字符串，每个value也是一个字符串。主要特征有： Hash类型的元素是无序的，不能通过索引访问 Hash类型的元素是唯一的，不能重复 Hash类型的元素可以在字典中添加或删除 查询速度快，适合于需要频繁查询的场景，例如用户信息、商品信息等。 Hash类型的结构 Hash类型的常用命令有： HSET key field value：设置hash表key中field的值为value，如果key不存在，则创建一个新的hash表；如果field已经存在，则覆盖原来的值 HGET key field：获取hash表key中field的值，如果key不存在或field不存在，则返回nil HMSET key field1 value1 field2 value2 &hellip;：同时设置hash表key中多个field的值，如果key不存在，则创建一个新的hash表；如果field已经存在，则覆盖原来的值">
+<meta property='og:url' content='https://SymphonyW.github.io/zh-cn/p/redis%E5%AD%A6%E4%B9%A0%E6%96%87%E6%A1%A3/'>
+<meta property='og:site_name' content='SymphonyW'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='Redis' /><meta property='article:published_time' content='2026-03-24T17:05:27&#43;08:00'/><meta property='article:modified_time' content='2026-03-24T17:05:27&#43;08:00'/>
+<meta name="twitter:title" content="Redis学习文档">
+<meta name="twitter:description" content="Redis学习文档 基础篇 Redis数据结构介绍 Redis是一个key-value的数据库，key一般是String类型，value的类型多种多样： Redis的数据类型 我们可以在官网（https://redis.io/commands）查看不同的命令用法。同时我们也可以在命令行通过help指令来查找命令。 Redis的通用命令 通用命令是部分数据类型的，都可以使用的命令，常见的有： KEYS：查看符合模板的所有key。模糊查询的效率不高，又因为Redis是单线程的，所以不建议在生产环境设备上使用 KEYS命令用法 DEL：删除一个或多个指定的key DEL命令用法 EXISTS：检查一个或多个key是否存在 EXISTS命令用法 EXPIRE：为一个key设置有效期（过期时间），单位为秒，有效期到期时，key会被自动删除 TTL：查看一个key的剩余有效期，单位为秒 EXPIRE和TTL命令用法 注意：当一个key设置了过期时间后，如果在过期时间到期之前再次设置了过期时间，那么原来的过期时间会被覆盖掉，新的过期时间会重新计算。并且过期后TTL命令会返回-2，表示key不存在了；如果一个key没有设置过期时间，那么TTL命令会返回-1，表示这个key是永久有效的。 String类型 String类型是Redis中最基本的数据类型，key和value都是字符串类型。不过根据字符串的格式不同，String类型又可以分为以下几种： 普通字符串：普通的字符串类型，可以存储任何文本数据，最大长度为512MB。 数字字符串：可以存储整数或浮点数，可以进行数学运算和自增操作。 二进制字符串：可以存储二进制数据，如图片、音频等非文本数据。 JSON字符串：可以存储JSON格式的数据，可以方便地进行数据交换和存储复杂的数据结构。 不管是哪种格式，底层都是字节数组形式存储，只不过是编码方式不同。字符串类型的最大空间不能超过512MB，如果超过了这个限制，Redis会返回错误。 String类型的不同格式 String类型的常用命令有： SET：设置一个key的值，如果key已经存在，则覆盖原来的值 GET：获取一个key的值，如果key不存在，则返回nil MSET：同时设置多个key的值 MGET：同时获取多个key的值 SET、GET、MSET、MGET命令用法 INCR：将一个key的值加1，如果key不存在，则先将其设置 INCRBY：将一个key的值加上指定的整数，如果key不存在，则先将其设置。也可以实现自减的效果。 INCRBYFLOAT：将一个key的值加上指定的浮点数，如果key不存在，则先将其设置 INCR、INCRBY、INCRBYFLOAT命令用法 DECR：将一个key的值减1，如果key不存在，则先将其设置 DECRBY：将一个key的值减去指定的整数，如果key不存在，则先将其设置 DECR、DECRBY命令用法 SETNX：只有当key不存在时才设置key的值，如果key已经存在，则不做任何操作 SETNX命令用法 SETEX：设置一个key的值，并为key设置过期时间，单位为秒 SETEX命令用法 PSETEX：设置一个key的值，并为key设置过期时间，单位为毫秒 KEY的层级结构 Redis的key是一个字符串，可以包含任何字符，包括空格和特殊字符。为了方便管理和组织key，Redis没有提供真正的层级结构，但我们可以通过在key中使用分隔符（如冒号:）来模拟层级结构。 例如，我们有一个项目叫heima，有user和product两种不同类型的数据，我们可以这样定义key： user相关的key：heima:user:1、heima:user:2、heima:user:3等 product相关的key：heima:product:1、heima:product:2、heima:product:3等 如果value是一个对象，例如一个user对象，我们可以将其序列化成JSON字符串存储在Redis中，这样就可以方便地进行数据交换和存储复杂的数据结构。 KEY的层级结构 Hash类型 Hash类型，也叫散列，其value是一个无序字典，类似于C++中的unordered_map。Hash类型的key是一个字符串，而value是一个包含多个field和value的字典。每个field都是一个字符串，每个value也是一个字符串。主要特征有： Hash类型的元素是无序的，不能通过索引访问 Hash类型的元素是唯一的，不能重复 Hash类型的元素可以在字典中添加或删除 查询速度快，适合于需要频繁查询的场景，例如用户信息、商品信息等。 Hash类型的结构 Hash类型的常用命令有： HSET key field value：设置hash表key中field的值为value，如果key不存在，则创建一个新的hash表；如果field已经存在，则覆盖原来的值 HGET key field：获取hash表key中field的值，如果key不存在或field不存在，则返回nil HMSET key field1 value1 field2 value2 &hellip;：同时设置hash表key中多个field的值，如果key不存在，则创建一个新的hash表；如果field已经存在，则覆盖原来的值">
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/zh-cn/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hua20e9d08cce84e79524a418ee5d4524c_7426_300x0_resize_box_3.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">😁</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/zh-cn">SymphonyW</a></h1>
+            <h2 class="site-description">Welcome to my Blog.</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0'
+                        target="_blank"
+                        title="Bilibili"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.0.0-beta2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M488.6 104.1C505.3 122.2 513 143.8 511.9 169.8V372.2C511.5 398.6 502.7 420.3 485.4 437.3C468.2 454.3 446.3 463.2 419.9 464H92.02C65.57 463.2 43.81 454.2 26.74 436.8C9.682 419.4 .7667 396.5 0 368.2V169.8C.7667 143.8 9.682 122.2 26.74 104.1C43.81 87.75 65.57 78.77 92.02 78H121.4L96.05 52.19C90.3 46.46 87.42 39.19 87.42 30.4C87.42 21.6 90.3 14.34 96.05 8.603C101.8 2.868 109.1 0 117.9 0C126.7 0 134 2.868 139.8 8.603L213.1 78H301.1L375.6 8.603C381.7 2.868 389.2 0 398 0C406.8 0 414.1 2.868 419.9 8.603C425.6 14.34 428.5 21.6 428.5 30.4C428.5 39.19 425.6 46.46 419.9 52.19L394.6 78L423.9 78C450.3 78.77 471.9 87.75 488.6 104.1H488.6zM449.8 173.8C449.4 164.2 446.1 156.4 439.1 150.3C433.9 144.2 425.1 140.9 416.4 140.5H96.05C86.46 140.9 78.6 144.2 72.47 150.3C66.33 156.4 63.07 164.2 62.69 173.8V368.2C62.69 377.4 65.95 385.2 72.47 391.7C78.99 398.2 86.85 401.5 96.05 401.5H416.4C425.6 401.5 433.4 398.2 439.7 391.7C446 385.2 449.4 377.4 449.8 368.2L449.8 173.8zM185.5 216.5C191.8 222.8 195.2 230.6 195.6 239.7V273C195.2 282.2 191.9 289.9 185.8 296.2C179.6 302.5 171.8 305.7 162.2 305.7C152.6 305.7 144.7 302.5 138.6 296.2C132.5 289.9 129.2 282.2 128.8 273V239.7C129.2 230.6 132.6 222.8 138.9 216.5C145.2 210.2 152.1 206.9 162.2 206.5C171.4 206.9 179.2 210.2 185.5 216.5H185.5zM377 216.5C383.3 222.8 386.7 230.6 387.1 239.7V273C386.7 282.2 383.4 289.9 377.3 296.2C371.2 302.5 363.3 305.7 353.7 305.7C344.1 305.7 336.3 302.5 330.1 296.2C323.1 289.9 320.7 282.2 320.4 273V239.7C320.7 230.6 324.1 222.8 330.4 216.5C336.7 210.2 344.5 206.9 353.7 206.5C362.9 206.9 370.7 210.2 377 216.5H377z"/></svg>
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://github.com/SymphonyW'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/zh-cn/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>归档</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>搜索</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/%E9%93%BE%E6%8E%A5/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>链接</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://SymphonyW.github.io/" >English</option>
+                                
+                                    <option value="https://SymphonyW.github.io/zh-cn/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#基础篇">基础篇</a>
+      <ol>
+        <li><a href="#redis数据结构介绍">Redis数据结构介绍</a></li>
+        <li><a href="#redis的通用命令">Redis的通用命令</a></li>
+        <li><a href="#string类型">String类型</a></li>
+        <li><a href="#key的层级结构">KEY的层级结构</a></li>
+        <li><a href="#hash类型">Hash类型</a></li>
+        <li><a href="#list类型">List类型</a></li>
+        <li><a href="#set类型">Set类型</a></li>
+        <li><a href="#sorted-set类型">Sorted Set类型</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/zh-cn/p/redis%E5%AD%A6%E4%B9%A0%E6%96%87%E6%A1%A3/">Redis学习文档</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published">2026-03-24 17:05</time>
+            </div>
+        
+
+        
+    </footer>
+    
+
+    
+        <footer class="article-translations">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+            <div>
+                
+                    <a href="https://SymphonyW.github.io/p/redislearningnote/" class="link">English</a>
+                
+            </div>
+        </footer>
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="redis学习文档">Redis学习文档
+</h1><h2 id="基础篇">基础篇
+</h2><h3 id="redis数据结构介绍">Redis数据结构介绍
+</h3><p>Redis是一个key-value的数据库，key一般是String类型，value的类型多种多样：
+<div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="dataType.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="dataType.png" 
+             alt="Redis的数据类型" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">Redis的数据类型</span>
+    
+</div>
+我们可以在官网（https://redis.io/commands）查看不同的命令用法。同时我们也可以在命令行通过help指令来查找命令。</p>
+<h3 id="redis的通用命令">Redis的通用命令
+</h3><p>通用命令是部分数据类型的，都可以使用的命令，常见的有：</p>
+<ul>
+<li>
+<p>KEYS：查看符合模板的所有key。模糊查询的效率不高，又因为Redis是单线程的，所以<strong>不建议在生产环境设备上使用</strong>
+<div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="KEYS.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="KEYS.png" 
+             alt="KEYS命令用法" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">KEYS命令用法</span>
+    
+</div></p>
+</li>
+<li>
+<p>DEL：删除一个或多个指定的key
+<div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="DEL.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="DEL.png" 
+             alt="DEL命令用法" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">DEL命令用法</span>
+    
+</div></p>
+</li>
+<li>
+<p>EXISTS：检查一个或多个key是否存在
+<div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="EXISTS.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="EXISTS.png" 
+             alt="EXISTS命令用法" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">EXISTS命令用法</span>
+    
+</div></p>
+</li>
+<li>
+<p>EXPIRE：为一个key设置有效期（过期时间），单位为秒，有效期到期时，key会被自动删除</p>
+</li>
+<li>
+<p>TTL：查看一个key的剩余有效期，单位为秒
+<div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="EXPIRE_TTL.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="EXPIRE_TTL.png" 
+             alt="EXPIRE和TTL命令用法" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">EXPIRE和TTL命令用法</span>
+    
+</div>
+注意：当一个key设置了过期时间后，如果在过期时间到期之前再次设置了过期时间，那么原来的过期时间会被覆盖掉，新的过期时间会重新计算。并且过期后TTL命令会返回-2，表示key不存在了；如果一个key没有设置过期时间，那么TTL命令会返回-1，表示这个key是永久有效的。</p>
+</li>
+</ul>
+<h3 id="string类型">String类型
+</h3><p>String类型是Redis中最基本的数据类型，key和value都是字符串类型。不过根据字符串的格式不同，String类型又可以分为以下几种：</p>
+<ul>
+<li>普通字符串：普通的字符串类型，可以存储任何文本数据，最大长度为512MB。</li>
+<li>数字字符串：可以存储整数或浮点数，可以进行数学运算和自增操作。</li>
+<li>二进制字符串：可以存储二进制数据，如图片、音频等非文本数据。</li>
+<li>JSON字符串：可以存储JSON格式的数据，可以方便地进行数据交换和存储复杂的数据结构。</li>
+</ul>
+<p>不管是哪种格式，底层都是字节数组形式存储，只不过是编码方式不同。字符串类型的最大空间不能超过512MB，如果超过了这个限制，Redis会返回错误。
+<div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="String.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="String.png" 
+             alt="String类型的不同格式" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">String类型的不同格式</span>
+    
+</div></p>
+<p>String类型的常用命令有：</p>
+<ul>
+<li>SET：设置一个key的值，如果key已经存在，则覆盖原来的值</li>
+<li>GET：获取一个key的值，如果key不存在，则返回nil</li>
+<li>MSET：同时设置多个key的值</li>
+<li>MGET：同时获取多个key的值
+<div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="SET_GET.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="SET_GET.png" 
+             alt="SET、GET、MSET、MGET命令用法" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">SET、GET、MSET、MGET命令用法</span>
+    
+</div></li>
+<li>INCR：将一个key的值加1，如果key不存在，则先将其设置</li>
+<li>INCRBY：将一个key的值加上指定的整数，如果key不存在，则先将其设置。也可以实现自减的效果。</li>
+<li>INCRBYFLOAT：将一个key的值加上指定的浮点数，如果key不存在，则先将其设置
+<div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="INCR.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="INCR.png" 
+             alt="INCR、INCRBY、INCRBYFLOAT命令用法" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">INCR、INCRBY、INCRBYFLOAT命令用法</span>
+    
+</div></li>
+<li>DECR：将一个key的值减1，如果key不存在，则先将其设置</li>
+<li>DECRBY：将一个key的值减去指定的整数，如果key不存在，则先将其设置
+<div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="DECR.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="DECR.png" 
+             alt="DECR、DECRBY命令用法" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">DECR、DECRBY命令用法</span>
+    
+</div></li>
+<li>SETNX：只有当key不存在时才设置key的值，如果key已经存在，则不做任何操作
+<div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="SETNX.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="SETNX.png" 
+             alt="SETNX命令用法" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">SETNX命令用法</span>
+    
+</div></li>
+<li>SETEX：设置一个key的值，并为key设置过期时间，单位为秒
+<div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="SETEX.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="SETEX.png" 
+             alt="SETEX命令用法" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">SETEX命令用法</span>
+    
+</div></li>
+<li>PSETEX：设置一个key的值，并为key设置过期时间，单位为毫秒</li>
+</ul>
+<h3 id="key的层级结构">KEY的层级结构
+</h3><p>Redis的key是一个字符串，可以包含任何字符，包括空格和特殊字符。为了方便管理和组织key，Redis没有提供真正的层级结构，但我们可以通过在key中使用分隔符（如冒号:）来模拟层级结构。
+例如，我们有一个项目叫heima，有user和product两种不同类型的数据，我们可以这样定义key：</p>
+<ul>
+<li>user相关的key：heima:user:1、heima:user:2、heima:user:3等</li>
+<li>product相关的key：heima:product:1、heima:product:2、heima:product:3等</li>
+</ul>
+<p>如果value是一个对象，例如一个user对象，我们可以将其序列化成JSON字符串存储在Redis中，这样就可以方便地进行数据交换和存储复杂的数据结构。
+<div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="eg1.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="eg1.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div>
+<div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="eg2.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="eg2.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div>
+<div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="KEYLAYER.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="KEYLAYER.png" 
+             alt="KEY的层级结构" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">KEY的层级结构</span>
+    
+</div></p>
+<h3 id="hash类型">Hash类型
+</h3><p>Hash类型，也叫散列，其value是一个无序字典，类似于C++中的unordered_map。Hash类型的key是一个字符串，而value是一个包含多个field和value的字典。每个field都是一个字符串，每个value也是一个字符串。主要特征有：</p>
+<ul>
+<li>Hash类型的元素是无序的，不能通过索引访问</li>
+<li>Hash类型的元素是唯一的，不能重复</li>
+<li>Hash类型的元素可以在字典中添加或删除</li>
+<li>查询速度快，适合于需要频繁查询的场景，例如用户信息、商品信息等。
+<div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="Hash.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="Hash.png" 
+             alt="Hash类型的结构" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">Hash类型的结构</span>
+    
+</div></li>
+</ul>
+<p>Hash类型的常用命令有：</p>
+<ul>
+<li>
+<p>HSET key field value：设置hash表key中field的值为value，如果key不存在，则创建一个新的hash表；如果field已经存在，则覆盖原来的值</p>
+</li>
+<li>
+<p>HGET key field：获取hash表key中field的值，如果key不存在或field不存在，则返回nil</p>
+</li>
+<li>
+<p>HMSET key field1 value1 field2 value2 &hellip;：同时设置hash表key中多个field的值，如果key不存在，则创建一个新的hash表；如果field已经存在，则覆盖原来的值</p>
+</li>
+<li>
+<p>HMGET key field1 field2 &hellip;：同时获取hash表key中多个field的值，如果key不存在或field不存在，则返回nil
+<div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="eg3.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="eg3.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div>
+<div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="HSET_HGET.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="HSET_HGET.png" 
+             alt="HSET、HGET、HMSET、HMGET命令用法" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">HSET、HGET、HMSET、HMGET命令用法</span>
+    
+</div></p>
+</li>
+<li>
+<p>HGETALL key：获取hash表key中所有field和value的值，如果key不存在，则返回nil</p>
+</li>
+<li>
+<p>HKEYS key：获取hash表key中所有field的值，如果key不存在，则返回nil</p>
+</li>
+<li>
+<p>HVALS key：获取hash表key中所有value的值，如果key不存在，则返回nil
+<div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="HGETALL.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="HGETALL.png" 
+             alt="HGETALL、HKEYS、HVALS命令用法" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">HGETALL、HKEYS、HVALS命令用法</span>
+    
+</div></p>
+</li>
+<li>
+<p>HDEL key field1 field2 &hellip;：删除hash表key中指定的field，如果key不存在或field不存在，则不做任何操作</p>
+</li>
+<li>
+<p>HLEN key：获取hash表key中field的数量，如果key不存在，则返回0
+<div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="HDEL_HLEN.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="HDEL_HLEN.png" 
+             alt="HDEL、HLEN命令用法" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">HDEL、HLEN命令用法</span>
+    
+</div></p>
+</li>
+<li>
+<p>HEXISTS key field：检查hash表key中是否存在field，如果key不存在或field不存在，则返回0；如果存在，则返回1
+<div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="HEXISTS.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="HEXISTS.png" 
+             alt="HEXISTS命令用法" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">HEXISTS命令用法</span>
+    
+</div></p>
+</li>
+<li>
+<p>HINCRBY key field increment：将hash表key中field的值加上指定的整数increment，如果key不存在，则先创建一个新的hash表；如果field不存在，则先将其设置为0；如果field的值不是一个整数，则返回错误</p>
+</li>
+<li>
+<p>HSETNX key field value：只有当hash表key中field不存在时才设置field的值为value，如果key不存在，则先创建一个新的hash表；如果field已经存在，则不做任何操作
+<div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="HINCRBY_HSETNX.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="HINCRBY_HSETNX.png" 
+             alt="HINCRBY、HSETNX命令用法" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">HINCRBY、HSETNX命令用法</span>
+    
+</div></p>
+</li>
+</ul>
+<h3 id="list类型">List类型
+</h3><p>Redis的List类型与C++中的std::list类似，是一个<strong>双向链表</strong>。List类型的key是一个字符串，而value是一个包含多个元素的列表，每个元素都是一个字符串。特征也与std::list类似：</p>
+<ul>
+<li>List类型的元素是有序的，可以通过索引访问</li>
+<li>List类型的元素可以重复</li>
+<li>List类型的元素可以在头部或尾部添加或删除</li>
+<li>查询速度一般，适合于需要频繁插入和删除的场景，例如消息队列、任务列表等。
+常用来存储一个有序数据，例如朋友圈点赞列表、微博评论列表等。</li>
+</ul>
+<p>List类型的常用命令有：</p>
+<ul>
+<li>
+<p>LRANGE key start stop：获取列表key中指定范围内的元素，start和stop都是索引，索引从0开始，负数表示从列表尾部开始计算，例如-1表示最后一个元素，-2表示倒数第二个元素，以此类推。如果key不存在，则返回nil；如果start或stop超出范围，则返回空列表
+<div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="LRANGE.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="LRANGE.png" 
+             alt="LRANGE命令用法" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">LRANGE命令用法</span>
+    
+</div></p>
+</li>
+<li>
+<p>LPUSH key value1 value2 &hellip;：将一个或多个值插入到列表key的头部，如果key不存在，则创建一个新的列表；如果key存在但不是列表类型，则返回错误</p>
+</li>
+<li>
+<p>LPOP key：移除并返回列表key的头部元素，如果key不存在或列表为空，则返回nil</p>
+</li>
+<li>
+<p>RPUSH key value1 value2 &hellip;：将一个或多个值插入到列表key的尾部，如果key不存在，则创建一个新的列表；如果key存在但不是列表类型，则返回错误</p>
+</li>
+<li>
+<p>RPOP key：移除并返回列表key的尾部元素，如果key不存在或列表为空，则返回nil
+<div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="LPUSH_RPUSH.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="LPUSH_RPUSH.png" 
+             alt="LPUSH、RPUSH命令用法" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">LPUSH、RPUSH命令用法</span>
+    
+</div></p>
+</li>
+<li>
+<p>LLEN key：获取列表key中元素的数量，如果key不存在，则返回0</p>
+</li>
+<li>
+<p>LINDEX key index：获取列表key中指定索引位置的元素，如果key不存在或索引超出范围，则返回nil</p>
+</li>
+<li>
+<p>LSET key index value：设置列表key中指定索引位置的元素为value，如果key不存在或索引超出范围，则返回错误
+<div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="LLEN_LINDEX_LSET.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="LLEN_LINDEX_LSET.png" 
+             alt="LLEN、LINDEX、LSET命令用法" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">LLEN、LINDEX、LSET命令用法</span>
+    
+</div></p>
+</li>
+<li>
+<p>BLPOP key [key &hellip;] timeout：移除并返回一个或多个列表key的头部元素，如果key不存在或列表为空，则返回nil；如果timeout为0，表示永远等待；如果timeout为正整数，表示等待指定的秒数，如果在等待期间有元素被添加到列表中，则立即返回；如果在等待期间没有元素被添加到列表中，则返回nil</p>
+</li>
+<li>
+<p>BRPOP key [key &hellip;] timeout：移除并返回一个或多个列表key的尾部元素，如果key不存在或列表为空，则返回nil；如果timeout为0，表示永远等待；如果timeout为正整数，表示等待指定的秒数，如果在等待期间有元素被添加到列表中，则立即返回；如果在等待期间没有元素被添加到列表中，则返回nil
+<div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="BLPOP_BRPOP.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="BLPOP_BRPOP.png" 
+             alt="BLPOP、BRPOP命令用法" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">BLPOP、BRPOP命令用法</span>
+    
+</div>
+<strong>BLPOP和BRPOP命令常用于实现消息队列的功能，例如生产者将消息推送到列表中，消费者从列表中弹出消息进行处理。如果消费者在等待期间没有收到消息，可以设置一个超时时间来避免无限等待。</strong></p>
+</li>
+</ul>
+<h3 id="set类型">Set类型
+</h3><p>Redis的Set类型是一种无序集合，类似于C++中的std::unordered_set，可以看作是一个value为null的Hash类型。因为也是一个hash表，所以具备与Hash类型相似的特征：</p>
+<ul>
+<li>Set类型的元素是无序的，不能通过索引访问</li>
+<li>Set类型的元素是唯一的，不能重复</li>
+<li>Set类型的元素可以在集合中添加或删除</li>
+<li>查询速度快，适合于需要频繁查询的场景，例如标签系统、好友关系等。</li>
+</ul>
+<p>Set类型的常用命令有：</p>
+<ul>
+<li>
+<p>SADD key member1 member2 &hellip;：将一个或多个成员添加到集合key中，如果key不存在，则创建一个新的集合；如果key存在但不是集合类型，则返回错误</p>
+</li>
+<li>
+<p>SREM key member1 member2 &hellip;：从集合key中移除一个或多个成员，如果key不存在或成员不存在，则不做任何操作</p>
+</li>
+<li>
+<p>SCARD key：获取集合key中成员的数量，如果key不存在，则返回0
+<div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="SADD_SREM_SCARD.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="SADD_SREM_SCARD.png" 
+             alt="SADD、SREM、SCARD命令用法" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">SADD、SREM、SCARD命令用法</span>
+    
+</div></p>
+</li>
+<li>
+<p>SISMEMBER key member：检查集合key中是否存在成员，如果key不存在或成员不存在，则返回0；如果存在，则返回1</p>
+</li>
+<li>
+<p>SMEMBERS key：获取集合key中所有成员的值，如果key不存在，则返回nil
+<div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="SISMEMBER_SMEMBERS.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="SISMEMBER_SMEMBERS.png" 
+             alt="SISMEMBER、SMEMBERS命令用法" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">SISMEMBER、SMEMBERS命令用法</span>
+    
+</div></p>
+</li>
+<li>
+<p>SINTER key1 key2 &hellip;：获取一个或多个集合key的交集，如果key不存在，则返回nil；如果key存在但不是集合类型，则返回错误</p>
+</li>
+<li>
+<p>SUNION key1 key2 &hellip;：获取一个或多个集合key的并集，如果key不存在，则返回nil；如果key存在但不是集合类型，则返回错误</p>
+</li>
+<li>
+<p>SDIFF key1 key2 &hellip;：获取一个或多个集合key的差集，如果key不存在，则返回nil；如果key存在但不是集合类型，则返回错误
+<div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="SINTER_SUNION_SDIFF.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="SINTER_SUNION_SDIFF.png" 
+             alt="SINTER、SUNION、SDIFF命令用法" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">SINTER、SUNION、SDIFF命令用法</span>
+    
+</div></p>
+</li>
+</ul>
+<h3 id="sorted-set类型">Sorted Set类型
+</h3><p>Redis的SortedSet类型是一个可排序的set几何，与C++中的std::set类似，但底层数据结构却差别很大。SortedSet中的每一个元素都带有一个分数（score），Redis会根据分数来对元素进行排序。底层实现是一个跳表（skip list），<strong>跳表是一种基于链表的数据结构，通过增加多级索引来提高查询效率</strong>。SortedSet具备以下特性：</p>
+<ul>
+<li>SortedSet类型的元素是有序的，可以通过索引访问</li>
+<li>SortedSet类型的元素是唯一的，不能重复</li>
+<li>SortedSet类型的元素可以在集合中添加或删除</li>
+<li>查询速度快，适合于需要频繁查询的场景，例如排行榜、社交网络等。
+因为SortedSet的可排序特性，经常被用来实现排行榜这样的功能。</li>
+</ul>
+<p>SortedSet类型的常用命令有：</p>
+<ul>
+<li>
+<p>ZADD key score1 member1 [score2 member2 &hellip;]：将一个或多个成员添加到有序集合key中，并为每个成员设置分数，如果key不存在，则创建一个新的有序集合；如果key存在但不是有序集合类型，则返回错误；如果成员已经存在，则更新其分数</p>
+</li>
+<li>
+<p>ZREM key member1 member2 &hellip;：从有序集合key中移除一个或多个成员，如果key不存在或成员不存在，则不做任何操作</p>
+</li>
+<li>
+<p>ZSCORE key member：获取有序集合key中成员的分数，如果key不存在或成员不存在，则返回nil
+<div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="ZADD_ZREM_ZSCORE.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="ZADD_ZREM_ZSCORE.png" 
+             alt="ZADD、ZREM、ZSCORE命令用法" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">ZADD、ZREM、ZSCORE命令用法</span>
+    
+</div></p>
+</li>
+<li>
+<p>ZRANK key member：获取有序集合key中成员的排名，排名从0开始，如果key不存在或成员不存在，则返回nil</p>
+</li>
+<li>
+<p>ZREVRANK key member：获取有序集合key中成员的反向排名，排名从0开始，如果key不存在或成员不存在，则返回nil</p>
+</li>
+<li>
+<p>ZCARD key：获取有序集合key中成员的数量，如果key不存在，则返回0
+<div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="ZRANK_ZREVRANK_ZCARD.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="ZRANK_ZREVRANK_ZCARD.png" 
+             alt="ZRANK、ZREVRANK、ZCARD命令用法" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">ZRANK、ZREVRANK、ZCARD命令用法</span>
+    
+</div></p>
+</li>
+<li>
+<p>ZCOUNT key min max：获取有序集合key中分数在min和max之间的成员数量，如果key不存在，则返回0；如果key存在但不是有序集合类型，则返回错误</p>
+</li>
+<li>
+<p>ZINCRBY key increment member：将有序集合key中成员的分数增加increment，如果key不存在，则先创建一个新的有序集合；如果成员不存在，则先将其设置为0；如果成员的分数不是一个数字，则返回错误
+<div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="ZCOUNT_ZINCRBY.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="ZCOUNT_ZINCRBY.png" 
+             alt="ZCOUNT、ZINCRBY命令用法" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">ZCOUNT、ZINCRBY命令用法</span>
+    
+</div></p>
+</li>
+<li>
+<p>ZRANGE key start stop [WITHSCORES]：获取有序集合key中指定范围内的成员，start和stop都是索引，索引从0开始，负数表示从集合尾部开始计算，例如-1表示最后一个成员，-2表示倒数第二个成员，以此类推。如果key不存在，则返回nil；如果start或stop超出范围，则返回空列表；如果指定了WITHSCORES选项，则返回成员和分数的列表</p>
+</li>
+<li>
+<p>ZREVRANGE key start stop [WITHSCORES]：获取有序集合key中指定范围内的成员，start和stop都是索引，索引从0开始，负数表示从集合尾部开始计算，例如-1表示最后一个成员，-2表示倒数第二个成员，以此类推。如果key不存在，则返回nil；如果start或stop超出范围，则返回空列表；如果指定了WITHSCORES选项，则返回成员和分数的列表</p>
+</li>
+<li>
+<p>ZRANGEBYSCORE key min max [WITHSCORES]：获取有序集合key中分数在min和max之间的成员，如果key不存在，则返回nil；如果key存在但不是有序集合类型，则返回错误；如果指定了WITHSCORES选项，则返回成员和分数的列表
+<div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="ZRANGE_ZREVRANGE_ZRANGEBYSCORE.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="ZRANGE_ZREVRANGE_ZRANGEBYSCORE.png" 
+             alt="ZRANGE、ZREVRANGE、ZRANGEBYSCORE命令用法" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">ZRANGE、ZREVRANGE、ZRANGEBYSCORE命令用法</span>
+    
+</div></p>
+</li>
+<li>
+<p>ZINTER key numkeys key1 key2 &hellip;：获取一个或多个有序集合key的交集，如果key不存在，则返回nil；如果key存在但不是有序集合类型，则返回错误；如果指定了WITHSCORES选项，则返回成员和分数的列表</p>
+</li>
+<li>
+<p>ZUNION key numkeys key1 key2 &hellip;：获取一个或多个有序集合key的并集，如果key不存在，则返回nil；如果key存在但不是有序集合类型，则返回错误；如果指定了WITHSCORES选项，则返回成员和分数的列表</p>
+</li>
+<li>
+<p>ZDIFF key numkeys key1 key2 &hellip;：获取一个或多个有序集合key的差集，如果key不存在，则返回nil；如果key存在但不是有序集合类型，则返回错误；如果指定了WITHSCORES选项，则返回成员和分数的列表
+<div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="ZINTER_ZUNION_ZDIFF.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="ZINTER_ZUNION_ZDIFF.png" 
+             alt="ZINTER、ZUNION、ZDIFF命令用法" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">ZINTER、ZUNION、ZDIFF命令用法</span>
+    
+</div></p>
+</li>
+<li>
+<p>ZINTERSTORE destination numkeys key1 key2 &hellip;：计算一个或多个有序集合key的交集，并将结果存储在destination中，如果destination已经存在，则覆盖原来的值；如果key不存在，则返回nil；如果key存在但不是有序集合类型，则返回错误</p>
+</li>
+<li>
+<p>ZUNIONSTORE destination numkeys key1 key2 &hellip;：计算一个或多个有序集合key的并集，并将结果存储在destination中，如果destination已经存在，则覆盖原来的值；如果key不存在，则返回nil；如果key存在但不是有序集合类型，则返回错误</p>
+</li>
+<li>
+<p>ZDIFFSTORE destination numkeys key1 key2 &hellip;：计算一个或多个有序集合key的差集，并将结果存储在destination中，如果destination已经存在，则覆盖原来的值；如果key不存在，则返回nil；如果key存在但不是有序集合类型，则返回错误
+<div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="ZINTERSTORE_ZUNIONSTORE_ZDIFFSTORE.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="ZINTERSTORE_ZUNIONSTORE_ZDIFFSTORE.png" 
+             alt="ZINTERSTORE、ZUNIONSTORE、ZDIFFSTORE命令用法" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">ZINTERSTORE、ZUNIONSTORE、ZDIFFSTORE命令用法</span>
+    
+</div></p>
+</li>
+</ul>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/zh-cn/tags/redis/">Redis</a>
+        
+    </section>
+
+
+    </footer>
+
+
+    
+</article>
+
+    
+
+    
+
+     
+    
+        
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+        2026 SymphonyW
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.26.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+    </body>
+</html>
