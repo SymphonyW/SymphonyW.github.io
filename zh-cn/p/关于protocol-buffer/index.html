@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="zh-cn" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Protobuf：更高效的结构化数据序列化格式 在这份文档中，我们将从最基本的概念开始，一步步深入了解 Google 开发的 Protocol Buffers（简称 Protobuf），掌握它的语法、编译流程以及在实际项目中的最佳实践。 1. 什么是 Protobuf？ Protocol Buffers 是一种轻便高效的结构化数据存储格式，可以用于结构化数据的序列化（Serialization）。 它非常适合做数据存储或作为网络通信的数据交换格式。 你可以把它理解为 “增强版、二进制化、带严格约束的 JSON”。 序列化与反序列化 序列化 (Serialization)： 将程序中的对象或数据结构转换成一种特定的格式（如二进制流、JSON 字符串），以便在网络上传输或保存到文件中。 反序列化 (Deserialization)： 将网络上接收到的或文件中读取的格式化数据，重新还原成程序中的对象或数据结构. 2. 为什么要用 Protobuf？(对比 JSON/XML) 在 Web 开发中，JSON 是绝对的霸主，那为什么还要学 Protobuf？ 优势： 体积小、省带宽： Protobuf 采用二进制编码（如 Varint 技术），去掉了 JSON 中的 {}、:、双引号以及字段名本身（仅保留字段编号）。相比 JSON，体积通常能缩小 3 到 10 倍。 解析速度快： 计算机处理二进制数据远比解析字符串（JSON/XML）快得多。Protobuf 的解析速度通常是 JSON 的 20 到 100 倍。 跨语言、跨平台： 只需维护一份 .proto 接口文件，就能自动生成 C++、Java、Python、Go 等几乎所有主流语言的代码。 极强的向前/向后兼容性： 只要遵守一定的规则（不修改现有字段的编号），你可以随意增加新字段，老版本的代码依然能完美解析新数据（自动忽略未知字段）。 劣势： 可读性差： 序列化后是纯二进制数据，人类无法直接阅读（需要工具转码）。 缺乏自描述性： 只有二进制数据是没用的，必须配合对应的 .">
+<title>关于Protocol Buffer</title>
+
+<link rel='canonical' href='https://SymphonyW.github.io/zh-cn/p/%E5%85%B3%E4%BA%8Eprotocol-buffer/'>
+
+<link rel="stylesheet" href="/scss/style.min.fcb8ae9ec4ce6e601e4b352c4eb06a952a123e46064b9bae06de6961bd51fd81.css"><meta property='og:title' content="关于Protocol Buffer">
+<meta property='og:description' content="Protobuf：更高效的结构化数据序列化格式 在这份文档中，我们将从最基本的概念开始，一步步深入了解 Google 开发的 Protocol Buffers（简称 Protobuf），掌握它的语法、编译流程以及在实际项目中的最佳实践。 1. 什么是 Protobuf？ Protocol Buffers 是一种轻便高效的结构化数据存储格式，可以用于结构化数据的序列化（Serialization）。 它非常适合做数据存储或作为网络通信的数据交换格式。 你可以把它理解为 “增强版、二进制化、带严格约束的 JSON”。 序列化与反序列化 序列化 (Serialization)： 将程序中的对象或数据结构转换成一种特定的格式（如二进制流、JSON 字符串），以便在网络上传输或保存到文件中。 反序列化 (Deserialization)： 将网络上接收到的或文件中读取的格式化数据，重新还原成程序中的对象或数据结构. 2. 为什么要用 Protobuf？(对比 JSON/XML) 在 Web 开发中，JSON 是绝对的霸主，那为什么还要学 Protobuf？ 优势： 体积小、省带宽： Protobuf 采用二进制编码（如 Varint 技术），去掉了 JSON 中的 {}、:、双引号以及字段名本身（仅保留字段编号）。相比 JSON，体积通常能缩小 3 到 10 倍。 解析速度快： 计算机处理二进制数据远比解析字符串（JSON/XML）快得多。Protobuf 的解析速度通常是 JSON 的 20 到 100 倍。 跨语言、跨平台： 只需维护一份 .proto 接口文件，就能自动生成 C++、Java、Python、Go 等几乎所有主流语言的代码。 极强的向前/向后兼容性： 只要遵守一定的规则（不修改现有字段的编号），你可以随意增加新字段，老版本的代码依然能完美解析新数据（自动忽略未知字段）。 劣势： 可读性差： 序列化后是纯二进制数据，人类无法直接阅读（需要工具转码）。 缺乏自描述性： 只有二进制数据是没用的，必须配合对应的 .">
+<meta property='og:url' content='https://SymphonyW.github.io/zh-cn/p/%E5%85%B3%E4%BA%8Eprotocol-buffer/'>
+<meta property='og:site_name' content='SymphonyW'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='Protocol Buffer' /><meta property='article:published_time' content='2026-03-26T20:57:56&#43;08:00'/><meta property='article:modified_time' content='2026-03-26T20:57:56&#43;08:00'/>
+<meta name="twitter:title" content="关于Protocol Buffer">
+<meta name="twitter:description" content="Protobuf：更高效的结构化数据序列化格式 在这份文档中，我们将从最基本的概念开始，一步步深入了解 Google 开发的 Protocol Buffers（简称 Protobuf），掌握它的语法、编译流程以及在实际项目中的最佳实践。 1. 什么是 Protobuf？ Protocol Buffers 是一种轻便高效的结构化数据存储格式，可以用于结构化数据的序列化（Serialization）。 它非常适合做数据存储或作为网络通信的数据交换格式。 你可以把它理解为 “增强版、二进制化、带严格约束的 JSON”。 序列化与反序列化 序列化 (Serialization)： 将程序中的对象或数据结构转换成一种特定的格式（如二进制流、JSON 字符串），以便在网络上传输或保存到文件中。 反序列化 (Deserialization)： 将网络上接收到的或文件中读取的格式化数据，重新还原成程序中的对象或数据结构. 2. 为什么要用 Protobuf？(对比 JSON/XML) 在 Web 开发中，JSON 是绝对的霸主，那为什么还要学 Protobuf？ 优势： 体积小、省带宽： Protobuf 采用二进制编码（如 Varint 技术），去掉了 JSON 中的 {}、:、双引号以及字段名本身（仅保留字段编号）。相比 JSON，体积通常能缩小 3 到 10 倍。 解析速度快： 计算机处理二进制数据远比解析字符串（JSON/XML）快得多。Protobuf 的解析速度通常是 JSON 的 20 到 100 倍。 跨语言、跨平台： 只需维护一份 .proto 接口文件，就能自动生成 C++、Java、Python、Go 等几乎所有主流语言的代码。 极强的向前/向后兼容性： 只要遵守一定的规则（不修改现有字段的编号），你可以随意增加新字段，老版本的代码依然能完美解析新数据（自动忽略未知字段）。 劣势： 可读性差： 序列化后是纯二进制数据，人类无法直接阅读（需要工具转码）。 缺乏自描述性： 只有二进制数据是没用的，必须配合对应的 .">
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/zh-cn/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hua20e9d08cce84e79524a418ee5d4524c_7426_300x0_resize_box_3.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">😁</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/zh-cn">SymphonyW</a></h1>
+            <h2 class="site-description">Welcome to my Blog.</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0'
+                        target="_blank"
+                        title="Bilibili"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.0.0-beta2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M488.6 104.1C505.3 122.2 513 143.8 511.9 169.8V372.2C511.5 398.6 502.7 420.3 485.4 437.3C468.2 454.3 446.3 463.2 419.9 464H92.02C65.57 463.2 43.81 454.2 26.74 436.8C9.682 419.4 .7667 396.5 0 368.2V169.8C.7667 143.8 9.682 122.2 26.74 104.1C43.81 87.75 65.57 78.77 92.02 78H121.4L96.05 52.19C90.3 46.46 87.42 39.19 87.42 30.4C87.42 21.6 90.3 14.34 96.05 8.603C101.8 2.868 109.1 0 117.9 0C126.7 0 134 2.868 139.8 8.603L213.1 78H301.1L375.6 8.603C381.7 2.868 389.2 0 398 0C406.8 0 414.1 2.868 419.9 8.603C425.6 14.34 428.5 21.6 428.5 30.4C428.5 39.19 425.6 46.46 419.9 52.19L394.6 78L423.9 78C450.3 78.77 471.9 87.75 488.6 104.1H488.6zM449.8 173.8C449.4 164.2 446.1 156.4 439.1 150.3C433.9 144.2 425.1 140.9 416.4 140.5H96.05C86.46 140.9 78.6 144.2 72.47 150.3C66.33 156.4 63.07 164.2 62.69 173.8V368.2C62.69 377.4 65.95 385.2 72.47 391.7C78.99 398.2 86.85 401.5 96.05 401.5H416.4C425.6 401.5 433.4 398.2 439.7 391.7C446 385.2 449.4 377.4 449.8 368.2L449.8 173.8zM185.5 216.5C191.8 222.8 195.2 230.6 195.6 239.7V273C195.2 282.2 191.9 289.9 185.8 296.2C179.6 302.5 171.8 305.7 162.2 305.7C152.6 305.7 144.7 302.5 138.6 296.2C132.5 289.9 129.2 282.2 128.8 273V239.7C129.2 230.6 132.6 222.8 138.9 216.5C145.2 210.2 152.1 206.9 162.2 206.5C171.4 206.9 179.2 210.2 185.5 216.5H185.5zM377 216.5C383.3 222.8 386.7 230.6 387.1 239.7V273C386.7 282.2 383.4 289.9 377.3 296.2C371.2 302.5 363.3 305.7 353.7 305.7C344.1 305.7 336.3 302.5 330.1 296.2C323.1 289.9 320.7 282.2 320.4 273V239.7C320.7 230.6 324.1 222.8 330.4 216.5C336.7 210.2 344.5 206.9 353.7 206.5C362.9 206.9 370.7 210.2 377 216.5H377z"/></svg>
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://github.com/SymphonyW'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/zh-cn/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>归档</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>搜索</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/%E9%93%BE%E6%8E%A5/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>链接</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://SymphonyW.github.io/" >English</option>
+                                
+                                    <option value="https://SymphonyW.github.io/zh-cn/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#1-什么是-protobuf"><strong>1. 什么是 Protobuf？</strong></a>
+      <ol>
+        <li><a href="#序列化与反序列化"><strong>序列化与反序列化</strong></a></li>
+      </ol>
+    </li>
+    <li><a href="#2-为什么要用-protobuf对比-jsonxml"><strong>2. 为什么要用 Protobuf？(对比 JSON/XML)</strong></a>
+      <ol>
+        <li><a href="#优势"><strong>优势：</strong></a></li>
+        <li><a href="#劣势"><strong>劣势：</strong></a></li>
+      </ol>
+    </li>
+    <li><a href="#3-protobuf-的工作流"><strong>3. Protobuf 的工作流</strong></a></li>
+    <li><a href="#4-动手实战编写你的第一个-proto-文件"><strong>4. 动手实战：编写你的第一个 .proto 文件</strong></a>
+      <ol>
+        <li><a href="#核心概念解析"><strong>核心概念解析：</strong></a></li>
+      </ol>
+    </li>
+    <li><a href="#5-进阶语法复合数据类型"><strong>5. 进阶语法：复合数据类型</strong></a></li>
+    <li><a href="#6-编译-proto-文件-生成-go-代码"><strong>6. 编译 .proto 文件 (生成 Go 代码)</strong></a></li>
+    <li><a href="#7-在代码中使用-以-go-为例"><strong>7. 在代码中使用 (以 Go 为例)</strong></a></li>
+    <li><a href="#8-protobuf-核心最佳实践-避坑指南"><strong>8. Protobuf 核心最佳实践 (避坑指南)</strong></a>
+      <ol>
+        <li><a href="#规则-1绝对不要修改已有字段的编号"><strong>规则 1：绝对不要修改已有字段的编号！</strong></a></li>
+        <li><a href="#规则-2不要直接删除字段使用-reserved"><strong>规则 2：不要直接删除字段，使用 reserved</strong></a></li>
+        <li><a href="#规则-3所有字段都是可选的-proto3"><strong>规则 3：所有字段都是可选的 (proto3)</strong></a></li>
+      </ol>
+    </li>
+    <li><a href="#结语"><strong>结语</strong></a></li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/zh-cn/p/%E5%85%B3%E4%BA%8Eprotocol-buffer/">关于Protocol Buffer</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published">2026-03-26 20:57</time>
+            </div>
+        
+
+        
+    </footer>
+    
+
+    
+        <footer class="article-translations">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+            <div>
+                
+                    <a href="https://SymphonyW.github.io/p/about-protocol-buffer/" class="link">English</a>
+                
+            </div>
+        </footer>
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="protobuf更高效的结构化数据序列化格式"><strong>Protobuf：更高效的结构化数据序列化格式</strong>
+</h1><p>在这份文档中，我们将从最基本的概念开始，一步步深入了解 Google 开发的 <code>Protocol Buffers</code>（简称 <code>Protobuf</code>），掌握它的语法、编译流程以及在实际项目中的最佳实践。</p>
+<h2 id="1-什么是-protobuf"><strong>1. 什么是 Protobuf？</strong>
+</h2><p><strong><code>Protocol Buffers</code></strong> 是一种轻便高效的<strong>结构化数据存储格式</strong>，可以用于结构化数据的序列化（Serialization）。</p>
+<p>它非常适合做数据存储或作为网络通信的数据交换格式。</p>
+<p>你可以把它理解为 <strong>“增强版、二进制化、带严格约束的 <code>JSON</code>”</strong>。</p>
+<h3 id="序列化与反序列化"><strong>序列化与反序列化</strong>
+</h3><ul>
+<li><strong>序列化 (Serialization)：</strong> 将程序中的对象或数据结构转换成一种特定的格式（如二进制流、<code>JSON</code> 字符串），以便在网络上传输或保存到文件中。</li>
+<li><strong>反序列化 (Deserialization)：</strong> 将网络上接收到的或文件中读取的格式化数据，重新还原成程序中的对象或数据结构.</li>
+</ul>
+<h2 id="2-为什么要用-protobuf对比-jsonxml"><strong>2. 为什么要用 Protobuf？(对比 JSON/XML)</strong>
+</h2><p>在 <code>Web</code> 开发中，<code>JSON</code> 是绝对的霸主，那为什么还要学 <code>Protobuf</code>？</p>
+<h3 id="优势"><strong>优势：</strong>
+</h3><ol>
+<li><strong>体积小、省带宽：</strong> <code>Protobuf</code> 采用二进制编码（如 Varint 技术），去掉了 <code>JSON</code> 中的 {}、:、双引号以及字段名本身（仅保留字段编号）。相比 <code>JSON</code>，体积通常能缩小 3 到 10 倍。</li>
+<li><strong>解析速度快：</strong> 计算机处理二进制数据远比解析字符串（<code>JSON</code>/<code>XML</code>）快得多。<code>Protobuf</code> 的解析速度通常是 <code>JSON</code> 的 20 到 100 倍。</li>
+<li><strong>跨语言、跨平台：</strong> 只需维护一份 .proto 接口文件，就能自动生成 C++、Java、Python、Go 等几乎所有主流语言的代码。</li>
+<li><strong>极强的向前/向后兼容性：</strong> 只要遵守一定的规则（不修改现有字段的编号），你可以随意增加新字段，老版本的代码依然能完美解析新数据（自动忽略未知字段）。</li>
+</ol>
+<h3 id="劣势"><strong>劣势：</strong>
+</h3><ol>
+<li><strong>可读性差：</strong> 序列化后是纯二进制数据，人类无法直接阅读（需要工具转码）。</li>
+<li><strong>缺乏自描述性：</strong> 只有二进制数据是没用的，必须配合对应的 .proto 结构文件才能反序列化。而 <code>JSON</code> 本身就包含了字段名（自描述）。</li>
+</ol>
+<p><strong>总结：</strong> 如果是对性能、带宽要求极高的场景（如微服务内部的 gRPC 调用、大型多人在线游戏同步、海量数据存储），<code>Protobuf</code> 是首选；如果是对外的 Web API 接口，<code>JSON</code> 依然是最好的选择。</p>
+<h2 id="3-protobuf-的工作流"><strong>3. Protobuf 的工作流</strong>
+</h2><p>使用 Protobuf 通常遵循以下三大步：</p>
+<ol>
+<li><strong>编写 .proto 文件：</strong> 定义数据结构（Message）。</li>
+<li><strong>编译 .proto 文件：</strong> 使用 <code>protoc</code> 编译器，将协议文件编译成目标语言（如 Go/Python/Java）的源码文件。</li>
+<li><strong>在业务代码中使用：</strong> 引入生成的源码文件，调用现成的 API 进行数据的赋值和序列化。</li>
+</ol>
+<h2 id="4-动手实战编写你的第一个-proto-文件"><strong>4. 动手实战：编写你的第一个 .proto 文件</strong>
+</h2><p>目前主流使用的是 <strong><code>proto3</code></strong> 语法（相比旧版的 <code>proto2</code> 更简洁）。我们来定义一个“用户资料”的数据结构。</p>
+<p>创建一个名为 user.proto 的文件，写入以下内容：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-protobuf" data-lang="protobuf"><span class="line"><span class="cl"><span class="c1">// 1. 指定使用 proto3 语法，必须写在第一行  
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="n">syntax</span> <span class="o">=</span> <span class="s">&#34;proto3&#34;</span><span class="p">;</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="c1">// 2. 定义包名，防止不同项目间的命名冲突  
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kn">package</span> <span class="nn">tutorial</span><span class="p">;</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="c1">// 3. (Go语言专属配置) 为生成的 Go 代码指定特定路径或包名。这里表示生成在当前目录下的 pb 文件夹中。  
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="k">option</span> <span class="n">go_package</span> <span class="o">=</span> <span class="s">&#34;./pb&#34;</span><span class="p">;</span> <span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="c1">// 4. 定义数据结构，使用 message 关键字，类似于编程语言中的 struct 或 class  
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">message</span> <span class="nc">User</span> <span class="p">{</span>  <span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span>  <span class="c1">// 格式：[字段规则] 数据类型 字段名 = 字段编号;
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span>  <span class="kt">int32</span> <span class="n">id</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>               <span class="c1">// 用户的唯一 ID  
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="kt">string</span> <span class="n">username</span> <span class="o">=</span> <span class="mi">2</span><span class="p">;</span>        <span class="c1">// 用户名  
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="kt">string</span> <span class="n">email</span> <span class="o">=</span> <span class="mi">3</span><span class="p">;</span>           <span class="c1">// 邮箱  
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="kt">bool</span> <span class="n">is_active</span> <span class="o">=</span> <span class="mi">4</span><span class="p">;</span>         <span class="c1">// 账号是否激活  
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="p">}</span><span class="err">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><h3 id="核心概念解析"><strong>核心概念解析：</strong>
+</h3><ul>
+<li><strong>message</strong>：定义数据的关键字，里面包含多个字段。</li>
+<li><strong>数据类型</strong>：<code>int32</code>, <code>string</code>, <code>bool</code> 等。</li>
+<li><strong>字段编号 (= 1, = 2)</strong>：<strong>这是 <code>Protobuf</code> 最核心的设计！</strong> * 在二进制数据中，<code>Protobuf</code> 不保存字段名（不保存 &ldquo;username&rdquo; 这个字符串），只保存编号（2）。
+<ul>
+<li>编号 1 到 15 在编码时只占用 1 个字节，16 到 2047 占用 2 个字节。因此，<strong>应该把最常使用的字段编号设为 1 到 15</strong>。</li>
+<li><strong>一旦投入使用，千万不要更改现有字段的编号！</strong></li>
+</ul>
+</li>
+</ul>
+<h2 id="5-进阶语法复合数据类型"><strong>5. 进阶语法：复合数据类型</strong>
+</h2><p>真实的业务数据往往很复杂，<code>Protobuf</code> 提供了丰富的类型来应对：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span><span class="lnt">25
+</span><span class="lnt">26
+</span><span class="lnt">27
+</span><span class="lnt">28
+</span><span class="lnt">29
+</span><span class="lnt">30
+</span><span class="lnt">31
+</span><span class="lnt">32
+</span><span class="lnt">33
+</span><span class="lnt">34
+</span><span class="lnt">35
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-protobuf" data-lang="protobuf"><span class="line"><span class="cl"><span class="n">syntax</span> <span class="o">=</span> <span class="s">&#34;proto3&#34;</span><span class="p">;</span>  <span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="kn">package</span> <span class="nn">tutorial</span><span class="p">;</span>  <span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">option</span> <span class="n">go_package</span> <span class="o">=</span> <span class="s">&#34;./pb&#34;</span><span class="p">;</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="c1">// 定义一个枚举类型  
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">enum</span> <span class="n">PhoneType</span> <span class="p">{</span>  <span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span>  <span class="n">MOBILE</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>  <span class="c1">// proto3 中，枚举的第一个值必须是 0（作为默认值）  
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="n">HOME</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>  <span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span>  <span class="n">WORK</span> <span class="o">=</span> <span class="mi">2</span><span class="p">;</span>  <span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="p">}</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="kd">message</span> <span class="nc">PhoneNumber</span> <span class="p">{</span>  <span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span>  <span class="kt">string</span> <span class="n">number</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>  <span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span>  <span class="n">PhoneType</span> <span class="n">type</span> <span class="o">=</span> <span class="mi">2</span><span class="p">;</span>  <span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="p">}</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="kd">message</span> <span class="nc">UserProfile</span> <span class="p">{</span>  <span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span>  <span class="kt">int32</span> <span class="n">id</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>  <span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span>  <span class="kt">string</span> <span class="n">name</span> <span class="o">=</span> <span class="mi">2</span><span class="p">;</span>  <span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span>    <span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span>  <span class="c1">// 1. 数组 / 列表：使用 repeated 关键字 (Go中会生成切片 slice)  
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="k">repeated</span> <span class="kt">string</span> <span class="n">hobbies</span> <span class="o">=</span> <span class="mi">3</span><span class="p">;</span>   <span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span>    <span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span>  <span class="c1">// 2. 嵌套 Message：引用其他的 message 作为类型  
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="k">repeated</span> <span class="n">PhoneNumber</span> <span class="n">phones</span> <span class="o">=</span> <span class="mi">4</span><span class="p">;</span>  <span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span>    <span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span>  <span class="c1">// 3. 字典 / 键值对：使用 map 关键字 (Go中会生成 map)  
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="n">map</span><span class="p">&lt;</span><span class="kt">string</span><span class="p">,</span> <span class="kt">string</span><span class="p">&gt;</span> <span class="n">attributes</span> <span class="o">=</span> <span class="mi">5</span><span class="p">;</span> <span class="c1">// 例如: {&#34;level&#34;: &#34;vip&#34;, &#34;region&#34;: &#34;cn&#34;}  
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span>  <span class="c1">// 4. 互斥字段：oneof 里面的字段同时只能有一个被设置（节省空间）  
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="k">oneof</span> <span class="n">avatar</span> <span class="p">{</span>  <span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span>    <span class="kt">string</span> <span class="n">image_url</span> <span class="o">=</span> <span class="mi">6</span><span class="p">;</span>  <span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span>    <span class="kt">bytes</span> <span class="n">image_data</span> <span class="o">=</span> <span class="mi">7</span><span class="p">;</span> <span class="c1">// 直接存图片的二进制数据  
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="p">}</span>  <span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="p">}</span><span class="err">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><h2 id="6-编译-proto-文件-生成-go-代码"><strong>6. 编译 .proto 文件 (生成 Go 代码)</strong>
+</h2><p>为了将 <code>.proto</code> 文件转化为 <code>Go</code> 语言的 <code>struct</code> 结构体，你需要安装编译器和 <code>Go</code> 的专属插件。</p>
+<ol>
+<li>
+<p><strong>安装 <code>protoc</code> 编译器：</strong> 可以从 <code>Github</code> 的 <a class="link" href="https://github.com/protocolbuffers/protobuf/releases"  target="_blank" rel="noopener"
+    >Protocol Buffers Releases</a> 页面下载对应系统的压缩包并配置环境变量。</p>
+</li>
+<li>
+<p><strong>安装 <code>Go</code> 语言代码生成插件：</strong> 打开终端，运行以下命令（确保你的 <code>GOPATH/bin</code> 已经加入了系统的环境变量中）：<br>
+<code>go install google.golang.org/protobuf/cmd/protoc-gen-go@latest</code></p>
+</li>
+<li>
+<p><strong>执行编译命令：</strong> 在 <code>user.proto</code> 文件所在的目录下运行：</p>
+</li>
+</ol>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl">   <span class="err">#</span> <span class="o">--</span><span class="nx">go_out</span><span class="p">=.</span> <span class="nx">指定生成的</span> <span class="nx">Go</span> <span class="nx">代码存放到当前目录</span>  
+</span></span><span class="line"><span class="cl">   <span class="err">#</span> <span class="nx">结合代码中的</span> <span class="nx">option</span> <span class="nx">go_package</span> <span class="p">=</span> <span class="s">&#34;./pb&#34;</span><span class="p">;</span>  
+</span></span><span class="line"><span class="cl">   <span class="err">#</span> <span class="nx">最终会在当前目录下自动创建一个</span> <span class="nx">pb</span> <span class="nx">文件夹</span><span class="err">，</span><span class="nx">里面有生成的</span> <span class="nx">user</span><span class="p">.</span><span class="nx">pb</span><span class="p">.</span><span class="k">go</span> <span class="nx">文件</span>  
+</span></span><span class="line"><span class="cl">   <span class="nx">protoc</span> <span class="o">--</span><span class="nx">go_out</span><span class="p">=.</span> <span class="nx">user</span><span class="p">.</span><span class="nx">proto</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>编译完成后，你的项目里会多出一个 <code>pb/user.pb.go</code> 文件。<strong>不要手动去修改这个文件</strong>，它是编译器自动生成的。</p>
+<h2 id="7-在代码中使用-以-go-为例"><strong>7. 在代码中使用 (以 Go 为例)</strong>
+</h2><p>为了在项目中使用，我们需要先下载 <code>Go</code> 的 <code>protobuf</code> 核心库:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">go get google.golang.org/protobuf/proto
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>接下来，我们编写 main.go 来演示极致的序列化体验:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span><span class="lnt">25
+</span><span class="lnt">26
+</span><span class="lnt">27
+</span><span class="lnt">28
+</span><span class="lnt">29
+</span><span class="lnt">30
+</span><span class="lnt">31
+</span><span class="lnt">32
+</span><span class="lnt">33
+</span><span class="lnt">34
+</span><span class="lnt">35
+</span><span class="lnt">36
+</span><span class="lnt">37
+</span><span class="lnt">38
+</span><span class="lnt">39
+</span><span class="lnt">40
+</span><span class="lnt">41
+</span><span class="lnt">42
+</span><span class="lnt">43
+</span><span class="lnt">44
+</span><span class="lnt">45
+</span><span class="lnt">46
+</span><span class="lnt">47
+</span><span class="lnt">48
+</span><span class="lnt">49
+</span><span class="lnt">50
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kn">package</span> <span class="nx">main</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kn">import</span> <span class="p">(</span>  
+</span></span><span class="line"><span class="cl">	<span class="s">&#34;fmt&#34;</span>  
+</span></span><span class="line"><span class="cl">	<span class="s">&#34;log&#34;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="s">&#34;google.golang.org/protobuf/proto&#34;</span>  
+</span></span><span class="line"><span class="cl">	<span class="c1">// 引入刚刚生成的 pb 包 (将 &#34;your_project&#34; 替换为你的实际 module 名称)  
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="c1">// 例如： &#34;\[github.com/myname/myproject/pb\](https://github.com/myname/myproject/pb)&#34;  
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="s">&#34;your_project/pb&#34;</span>   
+</span></span><span class="line"><span class="cl"><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>  
+</span></span><span class="line"><span class="cl">	<span class="c1">// 1. 实例化 Message 对象 (对应 Go 中的 Struct)  
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">user</span> <span class="o">:=</span> <span class="o">&amp;</span><span class="nx">pb</span><span class="p">.</span><span class="nx">User</span><span class="p">{</span>  
+</span></span><span class="line"><span class="cl">		<span class="nx">Id</span><span class="p">:</span>       <span class="mi">1001</span><span class="p">,</span>  
+</span></span><span class="line"><span class="cl">		<span class="nx">Username</span><span class="p">:</span> <span class="s">&#34;Alice&#34;</span><span class="p">,</span>  
+</span></span><span class="line"><span class="cl">		<span class="nx">Email</span><span class="p">:</span>    <span class="s">&#34;alice@example.com&#34;</span><span class="p">,</span>  
+</span></span><span class="line"><span class="cl">		<span class="nx">IsActive</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>  
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="c1">// 2. 序列化为二进制流 (发送给网络或保存到文件)  
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">data</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">proto</span><span class="p">.</span><span class="nf">Marshal</span><span class="p">(</span><span class="nx">user</span><span class="p">)</span>  
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>  
+</span></span><span class="line"><span class="cl">		<span class="nx">log</span><span class="p">.</span><span class="nf">Fatalf</span><span class="p">(</span><span class="s">&#34;序列化失败: %v&#34;</span><span class="p">,</span> <span class="nx">err</span><span class="p">)</span>  
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>  
+</span></span><span class="line"><span class="cl">	  
+</span></span><span class="line"><span class="cl">	<span class="nx">fmt</span><span class="p">.</span><span class="nf">Printf</span><span class="p">(</span><span class="s">&#34;序列化成功！数据长度: %d 字节\n&#34;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="nx">data</span><span class="p">))</span>  
+</span></span><span class="line"><span class="cl">	<span class="c1">// 打印原始二进制数据（通常是乱码或十六进制）  
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">fmt</span><span class="p">.</span><span class="nf">Printf</span><span class="p">(</span><span class="s">&#34;二进制数据: %x\n\n&#34;</span><span class="p">,</span> <span class="nx">data</span><span class="p">)</span> 
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="c1">// 3. 反序列化 (从网络接收到二进制数据后还原)  
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="c1">// 先创建一个空的 User 结构体指针  
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">newUser</span> <span class="o">:=</span> <span class="o">&amp;</span><span class="nx">pb</span><span class="p">.</span><span class="nx">User</span><span class="p">{}</span>   
+</span></span><span class="line"><span class="cl">	  
+</span></span><span class="line"><span class="cl">	<span class="c1">// 解析二进制数据 data，将结果反推入 newUser 中  
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">err</span> <span class="p">=</span> <span class="nx">proto</span><span class="p">.</span><span class="nf">Unmarshal</span><span class="p">(</span><span class="nx">data</span><span class="p">,</span> <span class="nx">newUser</span><span class="p">)</span>  
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>  
+</span></span><span class="line"><span class="cl">		<span class="nx">log</span><span class="p">.</span><span class="nf">Fatalf</span><span class="p">(</span><span class="s">&#34;反序列化失败: %v&#34;</span><span class="p">,</span> <span class="nx">err</span><span class="p">)</span>  
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="c1">// 4. 优雅地访问数据  
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="c1">// 生成的代码为每个字段提供了 Getter 方法 (如 GetId(), GetUsername())  
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="c1">// 推荐使用 Getter 方法，因为它们能在指针为空时安全地返回默认值  
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="nx">fmt</span><span class="p">.</span><span class="nf">Println</span><span class="p">(</span><span class="s">&#34;反序列化还原的数据:&#34;</span><span class="p">)</span>  
+</span></span><span class="line"><span class="cl">	<span class="nx">fmt</span><span class="p">.</span><span class="nf">Printf</span><span class="p">(</span><span class="s">&#34;ID: %d\n&#34;</span><span class="p">,</span> <span class="nx">newUser</span><span class="p">.</span><span class="nf">GetId</span><span class="p">())</span>  
+</span></span><span class="line"><span class="cl">	<span class="nx">fmt</span><span class="p">.</span><span class="nf">Printf</span><span class="p">(</span><span class="s">&#34;姓名: %s\n&#34;</span><span class="p">,</span> <span class="nx">newUser</span><span class="p">.</span><span class="nf">GetUsername</span><span class="p">())</span>  
+</span></span><span class="line"><span class="cl">	<span class="nx">fmt</span><span class="p">.</span><span class="nf">Printf</span><span class="p">(</span><span class="s">&#34;邮箱: %s\n&#34;</span><span class="p">,</span> <span class="nx">newUser</span><span class="p">.</span><span class="nf">GetEmail</span><span class="p">())</span>  
+</span></span><span class="line"><span class="cl">	<span class="nx">fmt</span><span class="p">.</span><span class="nf">Printf</span><span class="p">(</span><span class="s">&#34;账号状态: %v\n&#34;</span><span class="p">,</span> <span class="nx">newUser</span><span class="p">.</span><span class="nf">GetIsActive</span><span class="p">())</span>  
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h2 id="8-protobuf-核心最佳实践-避坑指南"><strong>8. Protobuf 核心最佳实践 (避坑指南)</strong>
+</h2><p>在团队协作和系统迭代中，如果不遵守规范，很容易导致严重的线上事故（如数据解析错乱）。请牢记以下几点：</p>
+<h3 id="规则-1绝对不要修改已有字段的编号"><strong>规则 1：绝对不要修改已有字段的编号！</strong>
+</h3><p>如果 <code>username = 2</code>;，你把它改成了 <code>username = 3</code>;。那么老版本的客户端发来的数据（带着编号2），新版服务端就再也认不出来了。</p>
+<h3 id="规则-2不要直接删除字段使用-reserved"><strong>规则 2：不要直接删除字段，使用 reserved</strong>
+</h3><p>如果业务变更，<code>email</code> 字段不再使用了。<strong>不要直接把那行代码删掉！</strong></p>
+<p>因为如果直接删掉，以后的新同事可能会不知道，把编号 3 分配给了新字段，导致老版本的数据被错误解析。</p>
+<p><strong>正确做法：将废弃的编号和名称“保留”起来。</strong></p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-protobuf" data-lang="protobuf"><span class="line"><span class="cl"><span class="kd">message</span> <span class="nc">User</span> <span class="p">{</span>  <span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span>  <span class="c1">// 告诉编译器，编号 3 和字段名 email 已被预留，任何人不得再次使用  
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="n">reserved</span> <span class="mi">3</span><span class="p">;</span>  <span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span>  <span class="n">reserved</span> <span class="s">&#34;email&#34;</span><span class="p">;</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span>  <span class="kt">int32</span> <span class="n">id</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>  <span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span>  <span class="kt">string</span> <span class="n">username</span> <span class="o">=</span> <span class="mi">2</span><span class="p">;</span>  <span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span>  <span class="c1">// string email = 3;  // 注释掉或删掉  
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>  <span class="kt">bool</span> <span class="n">is_active</span> <span class="o">=</span> <span class="mi">4</span><span class="p">;</span>  <span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="p">}</span><span class="err">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><h3 id="规则-3所有字段都是可选的-proto3"><strong>规则 3：所有字段都是可选的 (proto3)</strong>
+</h3><p>在 proto3 中，取消了 <code>required</code>（必填）关键字。如果一个字段没有被赋值，序列化时就不会包含它；反序列化时，会赋予它一个<strong>默认值</strong>（如数字默认是 0，布尔默认是 <code>false</code>，字符串默认是空字符串）。</p>
+<p>业务逻辑的“必填校验”应该放在代码层做，而不是协议层。</p>
+<h2 id="结语"><strong>结语</strong>
+</h2><p><code>Protobuf</code> 通过放弃部分人类可读性，换取了机器处理的极致效率。当你掌握了它，就等于掌握了现代微服务架构（特别是 <code>gRPC</code> 体系）中最核心的数据通信基石。希望这份文档能帮助你顺利将 <code>Protobuf</code> 应用到 <code>Go</code> 项目中！</p>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/zh-cn/tags/protocol-buffer/">Protocol Buffer</a>
+        
+    </section>
+
+
+    </footer>
+
+
+    
+</article>
+
+    
+
+    
+
+     
+    
+        
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+        2026 SymphonyW
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.26.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+<script>
+window.MathJax = {
+  tex: {
+    
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  svg: {
+    fontCache: 'global'
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    </body>
+</html>
