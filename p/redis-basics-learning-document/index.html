@@ -1,18 +1,18 @@
 <!DOCTYPE html>
 <html lang="en" dir="ltr">
     <head><meta charset='utf-8'>
-<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Redis Learning Note 基础篇 Redis数据结构介绍 Redis是一个key-value的数据库，key一般是String类型，value的类型多种多样： Redis的数据类型 我们可以在官网（https://redis.io/commands）查看不同的命令用法。同时我们也可以在命令行通过help指令来查找命令。 Redis的通用命令 通用命令是部分数据类型的，都可以使用的命令，常见的有： KEYS：查看符合模板的所有key。模糊查询的效率不高，又因为Redis是单线程的，所以不建议在生产环境设备上使用 KEYS命令用法 DEL：删除一个或多个指定的key DEL命令用法 EXISTS：检查一个或多个key是否存在 EXISTS命令用法 EXPIRE：为一个key设置有效期（过期时间），单位为秒，有效期到期时，key会被自动删除 TTL：查看一个key的剩余有效期，单位为秒 EXPIRE和TTL命令用法 注意：当一个key设置了过期时间后，如果在过期时间到期之前再次设置了过期时间，那么原来的过期时间会被覆盖掉，新的过期时间会重新计算。并且过期后TTL命令会返回-2，表示key不存在了；如果一个key没有设置过期时间，那么TTL命令会返回-1，表示这个key是永久有效的。 String类型 String类型是Redis中最基本的数据类型，key和value都是字符串类型。不过根据字符串的格式不同，String类型又可以分为以下几种： 普通字符串：普通的字符串类型，可以存储任何文本数据，最大长度为512MB。 数字字符串：可以存储整数或浮点数，可以进行数学运算和自增操作。 二进制字符串：可以存储二进制数据，如图片、音频等非文本数据。 JSON字符串：可以存储JSON格式的数据，可以方便地进行数据交换和存储复杂的数据结构。 不管是哪种格式，底层都是字节数组形式存储，只不过是编码方式不同。字符串类型的最大空间不能超过512MB，如果超过了这个限制，Redis会返回错误。 String类型的不同格式 String类型的常用命令有： SET：设置一个key的值，如果key已经存在，则覆盖原来的值 GET：获取一个key的值，如果key不存在，则返回nil MSET：同时设置多个key的值 MGET：同时获取多个key的值 SET、GET、MSET、MGET命令用法 INCR：将一个key的值加1，如果key不存在，则先将其设置 INCRBY：将一个key的值加上指定的整数，如果key不存在，则先将其设置。也可以实现自减的效果。 INCRBYFLOAT：将一个key的值加上指定的浮点数，如果key不存在，则先将其设置 INCR、INCRBY、INCRBYFLOAT命令用法 DECR：将一个key的值减1，如果key不存在，则先将其设置 DECRBY：将一个key的值减去指定的整数，如果key不存在，则先将其设置 DECR、DECRBY命令用法 SETNX：只有当key不存在时才设置key的值，如果key已经存在，则不做任何操作 SETNX命令用法 SETEX：设置一个key的值，并为key设置过期时间，单位为秒 SETEX命令用法 PSETEX：设置一个key的值，并为key设置过期时间，单位为毫秒 KEY的层级结构 Redis的key是一个字符串，可以包含任何字符，包括空格和特殊字符。为了方便管理和组织key，Redis没有提供真正的层级结构，但我们可以通过在key中使用分隔符（如冒号:）来模拟层级结构。 例如，我们有一个项目叫heima，有user和product两种不同类型的数据，我们可以这样定义key： user相关的key：heima:user:1、heima:user:2、heima:user:3等 product相关的key：heima:product:1、heima:product:2、heima:product:3等 如果value是一个对象，例如一个user对象，我们可以将其序列化成JSON字符串存储在Redis中，这样就可以方便地进行数据交换和存储复杂的数据结构。 KEY的层级结构 Hash类型 Hash类型，也叫散列，其value是一个无序字典，类似于C++中的unordered_map。Hash类型的key是一个字符串，而value是一个包含多个field和value的字典。每个field都是一个字符串，每个value也是一个字符串。主要特征有： Hash类型的元素是无序的，不能通过索引访问 Hash类型的元素是唯一的，不能重复 Hash类型的元素可以在字典中添加或删除 查询速度快，适合于需要频繁查询的场景，例如用户信息、商品信息等。 Hash类型的结构 Hash类型的常用命令有： HSET key field value：设置hash表key中field的值为value，如果key不存在，则创建一个新的hash表；如果field已经存在，则覆盖原来的值 HGET key field：获取hash表key中field的值，如果key不存在或field不存在，则返回nil HMSET key field1 value1 field2 value2 &hellip;：同时设置hash表key中多个field的值，如果key不存在，则创建一个新的hash表；如果field已经存在，则覆盖原来的值">
-<title>RedisLearningNote</title>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Redis Basics Learning Document Redis数据结构介绍 Redis是一个key-value的数据库，key一般是String类型，value的类型多种多样： Redis的数据类型 我们可以在官网（https://redis.io/commands）查看不同的命令用法。同时我们也可以在命令行通过help指令来查找命令。 Redis的通用命令 通用命令是部分数据类型的，都可以使用的命令，常见的有： KEYS：查看符合模板的所有key。模糊查询的效率不高，又因为Redis是单线程的，所以不建议在生产环境设备上使用 KEYS命令用法 DEL：删除一个或多个指定的key DEL命令用法 EXISTS：检查一个或多个key是否存在 EXISTS命令用法 EXPIRE：为一个key设置有效期（过期时间），单位为秒，有效期到期时，key会被自动删除 TTL：查看一个key的剩余有效期，单位为秒 EXPIRE和TTL命令用法 注意：当一个key设置了过期时间后，如果在过期时间到期之前再次设置了过期时间，那么原来的过期时间会被覆盖掉，新的过期时间会重新计算。并且过期后TTL命令会返回-2，表示key不存在了；如果一个key没有设置过期时间，那么TTL命令会返回-1，表示这个key是永久有效的。 String类型 String类型是Redis中最基本的数据类型，key和value都是字符串类型。不过根据字符串的格式不同，String类型又可以分为以下几种： 普通字符串：普通的字符串类型，可以存储任何文本数据，最大长度为512MB。 数字字符串：可以存储整数或浮点数，可以进行数学运算和自增操作。 二进制字符串：可以存储二进制数据，如图片、音频等非文本数据。 JSON字符串：可以存储JSON格式的数据，可以方便地进行数据交换和存储复杂的数据结构。 不管是哪种格式，底层都是字节数组形式存储，只不过是编码方式不同。字符串类型的最大空间不能超过512MB，如果超过了这个限制，Redis会返回错误。 String类型的不同格式 String类型的常用命令有： SET：设置一个key的值，如果key已经存在，则覆盖原来的值 GET：获取一个key的值，如果key不存在，则返回nil MSET：同时设置多个key的值 MGET：同时获取多个key的值 SET、GET、MSET、MGET命令用法 INCR：将一个key的值加1，如果key不存在，则先将其设置 INCRBY：将一个key的值加上指定的整数，如果key不存在，则先将其设置。也可以实现自减的效果。 INCRBYFLOAT：将一个key的值加上指定的浮点数，如果key不存在，则先将其设置 INCR、INCRBY、INCRBYFLOAT命令用法 DECR：将一个key的值减1，如果key不存在，则先将其设置 DECRBY：将一个key的值减去指定的整数，如果key不存在，则先将其设置 DECR、DECRBY命令用法 SETNX：只有当key不存在时才设置key的值，如果key已经存在，则不做任何操作 SETNX命令用法 SETEX：设置一个key的值，并为key设置过期时间，单位为秒 SETEX命令用法 PSETEX：设置一个key的值，并为key设置过期时间，单位为毫秒 KEY的层级结构 Redis的key是一个字符串，可以包含任何字符，包括空格和特殊字符。为了方便管理和组织key，Redis没有提供真正的层级结构，但我们可以通过在key中使用分隔符（如冒号:）来模拟层级结构。 例如，我们有一个项目叫heima，有user和product两种不同类型的数据，我们可以这样定义key： user相关的key：heima:user:1、heima:user:2、heima:user:3等 product相关的key：heima:product:1、heima:product:2、heima:product:3等 如果value是一个对象，例如一个user对象，我们可以将其序列化成JSON字符串存储在Redis中，这样就可以方便地进行数据交换和存储复杂的数据结构。 KEY的层级结构 Hash类型 Hash类型，也叫散列，其value是一个无序字典，类似于C++中的unordered_map。Hash类型的key是一个字符串，而value是一个包含多个field和value的字典。每个field都是一个字符串，每个value也是一个字符串。主要特征有： Hash类型的元素是无序的，不能通过索引访问 Hash类型的元素是唯一的，不能重复 Hash类型的元素可以在字典中添加或删除 查询速度快，适合于需要频繁查询的场景，例如用户信息、商品信息等。 Hash类型的结构 Hash类型的常用命令有： HSET key field value：设置hash表key中field的值为value，如果key不存在，则创建一个新的hash表；如果field已经存在，则覆盖原来的值 HGET key field：获取hash表key中field的值，如果key不存在或field不存在，则返回nil HMSET key field1 value1 field2 value2 .">
+<title>Redis Basics Learning Document</title>
 
-<link rel='canonical' href='https://SymphonyW.github.io/p/redislearningnote/'>
+<link rel='canonical' href='https://SymphonyW.github.io/p/redis-basics-learning-document/'>
 
-<link rel="stylesheet" href="/scss/style.min.fcb8ae9ec4ce6e601e4b352c4eb06a952a123e46064b9bae06de6961bd51fd81.css"><meta property='og:title' content="RedisLearningNote">
-<meta property='og:description' content="Redis Learning Note 基础篇 Redis数据结构介绍 Redis是一个key-value的数据库，key一般是String类型，value的类型多种多样： Redis的数据类型 我们可以在官网（https://redis.io/commands）查看不同的命令用法。同时我们也可以在命令行通过help指令来查找命令。 Redis的通用命令 通用命令是部分数据类型的，都可以使用的命令，常见的有： KEYS：查看符合模板的所有key。模糊查询的效率不高，又因为Redis是单线程的，所以不建议在生产环境设备上使用 KEYS命令用法 DEL：删除一个或多个指定的key DEL命令用法 EXISTS：检查一个或多个key是否存在 EXISTS命令用法 EXPIRE：为一个key设置有效期（过期时间），单位为秒，有效期到期时，key会被自动删除 TTL：查看一个key的剩余有效期，单位为秒 EXPIRE和TTL命令用法 注意：当一个key设置了过期时间后，如果在过期时间到期之前再次设置了过期时间，那么原来的过期时间会被覆盖掉，新的过期时间会重新计算。并且过期后TTL命令会返回-2，表示key不存在了；如果一个key没有设置过期时间，那么TTL命令会返回-1，表示这个key是永久有效的。 String类型 String类型是Redis中最基本的数据类型，key和value都是字符串类型。不过根据字符串的格式不同，String类型又可以分为以下几种： 普通字符串：普通的字符串类型，可以存储任何文本数据，最大长度为512MB。 数字字符串：可以存储整数或浮点数，可以进行数学运算和自增操作。 二进制字符串：可以存储二进制数据，如图片、音频等非文本数据。 JSON字符串：可以存储JSON格式的数据，可以方便地进行数据交换和存储复杂的数据结构。 不管是哪种格式，底层都是字节数组形式存储，只不过是编码方式不同。字符串类型的最大空间不能超过512MB，如果超过了这个限制，Redis会返回错误。 String类型的不同格式 String类型的常用命令有： SET：设置一个key的值，如果key已经存在，则覆盖原来的值 GET：获取一个key的值，如果key不存在，则返回nil MSET：同时设置多个key的值 MGET：同时获取多个key的值 SET、GET、MSET、MGET命令用法 INCR：将一个key的值加1，如果key不存在，则先将其设置 INCRBY：将一个key的值加上指定的整数，如果key不存在，则先将其设置。也可以实现自减的效果。 INCRBYFLOAT：将一个key的值加上指定的浮点数，如果key不存在，则先将其设置 INCR、INCRBY、INCRBYFLOAT命令用法 DECR：将一个key的值减1，如果key不存在，则先将其设置 DECRBY：将一个key的值减去指定的整数，如果key不存在，则先将其设置 DECR、DECRBY命令用法 SETNX：只有当key不存在时才设置key的值，如果key已经存在，则不做任何操作 SETNX命令用法 SETEX：设置一个key的值，并为key设置过期时间，单位为秒 SETEX命令用法 PSETEX：设置一个key的值，并为key设置过期时间，单位为毫秒 KEY的层级结构 Redis的key是一个字符串，可以包含任何字符，包括空格和特殊字符。为了方便管理和组织key，Redis没有提供真正的层级结构，但我们可以通过在key中使用分隔符（如冒号:）来模拟层级结构。 例如，我们有一个项目叫heima，有user和product两种不同类型的数据，我们可以这样定义key： user相关的key：heima:user:1、heima:user:2、heima:user:3等 product相关的key：heima:product:1、heima:product:2、heima:product:3等 如果value是一个对象，例如一个user对象，我们可以将其序列化成JSON字符串存储在Redis中，这样就可以方便地进行数据交换和存储复杂的数据结构。 KEY的层级结构 Hash类型 Hash类型，也叫散列，其value是一个无序字典，类似于C++中的unordered_map。Hash类型的key是一个字符串，而value是一个包含多个field和value的字典。每个field都是一个字符串，每个value也是一个字符串。主要特征有： Hash类型的元素是无序的，不能通过索引访问 Hash类型的元素是唯一的，不能重复 Hash类型的元素可以在字典中添加或删除 查询速度快，适合于需要频繁查询的场景，例如用户信息、商品信息等。 Hash类型的结构 Hash类型的常用命令有： HSET key field value：设置hash表key中field的值为value，如果key不存在，则创建一个新的hash表；如果field已经存在，则覆盖原来的值 HGET key field：获取hash表key中field的值，如果key不存在或field不存在，则返回nil HMSET key field1 value1 field2 value2 &hellip;：同时设置hash表key中多个field的值，如果key不存在，则创建一个新的hash表；如果field已经存在，则覆盖原来的值">
-<meta property='og:url' content='https://SymphonyW.github.io/p/redislearningnote/'>
+<link rel="stylesheet" href="/scss/style.min.fcb8ae9ec4ce6e601e4b352c4eb06a952a123e46064b9bae06de6961bd51fd81.css"><meta property='og:title' content="Redis Basics Learning Document">
+<meta property='og:description' content="Redis Basics Learning Document Redis数据结构介绍 Redis是一个key-value的数据库，key一般是String类型，value的类型多种多样： Redis的数据类型 我们可以在官网（https://redis.io/commands）查看不同的命令用法。同时我们也可以在命令行通过help指令来查找命令。 Redis的通用命令 通用命令是部分数据类型的，都可以使用的命令，常见的有： KEYS：查看符合模板的所有key。模糊查询的效率不高，又因为Redis是单线程的，所以不建议在生产环境设备上使用 KEYS命令用法 DEL：删除一个或多个指定的key DEL命令用法 EXISTS：检查一个或多个key是否存在 EXISTS命令用法 EXPIRE：为一个key设置有效期（过期时间），单位为秒，有效期到期时，key会被自动删除 TTL：查看一个key的剩余有效期，单位为秒 EXPIRE和TTL命令用法 注意：当一个key设置了过期时间后，如果在过期时间到期之前再次设置了过期时间，那么原来的过期时间会被覆盖掉，新的过期时间会重新计算。并且过期后TTL命令会返回-2，表示key不存在了；如果一个key没有设置过期时间，那么TTL命令会返回-1，表示这个key是永久有效的。 String类型 String类型是Redis中最基本的数据类型，key和value都是字符串类型。不过根据字符串的格式不同，String类型又可以分为以下几种： 普通字符串：普通的字符串类型，可以存储任何文本数据，最大长度为512MB。 数字字符串：可以存储整数或浮点数，可以进行数学运算和自增操作。 二进制字符串：可以存储二进制数据，如图片、音频等非文本数据。 JSON字符串：可以存储JSON格式的数据，可以方便地进行数据交换和存储复杂的数据结构。 不管是哪种格式，底层都是字节数组形式存储，只不过是编码方式不同。字符串类型的最大空间不能超过512MB，如果超过了这个限制，Redis会返回错误。 String类型的不同格式 String类型的常用命令有： SET：设置一个key的值，如果key已经存在，则覆盖原来的值 GET：获取一个key的值，如果key不存在，则返回nil MSET：同时设置多个key的值 MGET：同时获取多个key的值 SET、GET、MSET、MGET命令用法 INCR：将一个key的值加1，如果key不存在，则先将其设置 INCRBY：将一个key的值加上指定的整数，如果key不存在，则先将其设置。也可以实现自减的效果。 INCRBYFLOAT：将一个key的值加上指定的浮点数，如果key不存在，则先将其设置 INCR、INCRBY、INCRBYFLOAT命令用法 DECR：将一个key的值减1，如果key不存在，则先将其设置 DECRBY：将一个key的值减去指定的整数，如果key不存在，则先将其设置 DECR、DECRBY命令用法 SETNX：只有当key不存在时才设置key的值，如果key已经存在，则不做任何操作 SETNX命令用法 SETEX：设置一个key的值，并为key设置过期时间，单位为秒 SETEX命令用法 PSETEX：设置一个key的值，并为key设置过期时间，单位为毫秒 KEY的层级结构 Redis的key是一个字符串，可以包含任何字符，包括空格和特殊字符。为了方便管理和组织key，Redis没有提供真正的层级结构，但我们可以通过在key中使用分隔符（如冒号:）来模拟层级结构。 例如，我们有一个项目叫heima，有user和product两种不同类型的数据，我们可以这样定义key： user相关的key：heima:user:1、heima:user:2、heima:user:3等 product相关的key：heima:product:1、heima:product:2、heima:product:3等 如果value是一个对象，例如一个user对象，我们可以将其序列化成JSON字符串存储在Redis中，这样就可以方便地进行数据交换和存储复杂的数据结构。 KEY的层级结构 Hash类型 Hash类型，也叫散列，其value是一个无序字典，类似于C++中的unordered_map。Hash类型的key是一个字符串，而value是一个包含多个field和value的字典。每个field都是一个字符串，每个value也是一个字符串。主要特征有： Hash类型的元素是无序的，不能通过索引访问 Hash类型的元素是唯一的，不能重复 Hash类型的元素可以在字典中添加或删除 查询速度快，适合于需要频繁查询的场景，例如用户信息、商品信息等。 Hash类型的结构 Hash类型的常用命令有： HSET key field value：设置hash表key中field的值为value，如果key不存在，则创建一个新的hash表；如果field已经存在，则覆盖原来的值 HGET key field：获取hash表key中field的值，如果key不存在或field不存在，则返回nil HMSET key field1 value1 field2 value2 .">
+<meta property='og:url' content='https://SymphonyW.github.io/p/redis-basics-learning-document/'>
 <meta property='og:site_name' content='SymphonyW'>
 <meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='Redis' /><meta property='article:tag' content='Backend' /><meta property='article:published_time' content='2026-03-24T17:05:27&#43;08:00'/><meta property='article:modified_time' content='2026-03-24T17:05:27&#43;08:00'/>
-<meta name="twitter:title" content="RedisLearningNote">
-<meta name="twitter:description" content="Redis Learning Note 基础篇 Redis数据结构介绍 Redis是一个key-value的数据库，key一般是String类型，value的类型多种多样： Redis的数据类型 我们可以在官网（https://redis.io/commands）查看不同的命令用法。同时我们也可以在命令行通过help指令来查找命令。 Redis的通用命令 通用命令是部分数据类型的，都可以使用的命令，常见的有： KEYS：查看符合模板的所有key。模糊查询的效率不高，又因为Redis是单线程的，所以不建议在生产环境设备上使用 KEYS命令用法 DEL：删除一个或多个指定的key DEL命令用法 EXISTS：检查一个或多个key是否存在 EXISTS命令用法 EXPIRE：为一个key设置有效期（过期时间），单位为秒，有效期到期时，key会被自动删除 TTL：查看一个key的剩余有效期，单位为秒 EXPIRE和TTL命令用法 注意：当一个key设置了过期时间后，如果在过期时间到期之前再次设置了过期时间，那么原来的过期时间会被覆盖掉，新的过期时间会重新计算。并且过期后TTL命令会返回-2，表示key不存在了；如果一个key没有设置过期时间，那么TTL命令会返回-1，表示这个key是永久有效的。 String类型 String类型是Redis中最基本的数据类型，key和value都是字符串类型。不过根据字符串的格式不同，String类型又可以分为以下几种： 普通字符串：普通的字符串类型，可以存储任何文本数据，最大长度为512MB。 数字字符串：可以存储整数或浮点数，可以进行数学运算和自增操作。 二进制字符串：可以存储二进制数据，如图片、音频等非文本数据。 JSON字符串：可以存储JSON格式的数据，可以方便地进行数据交换和存储复杂的数据结构。 不管是哪种格式，底层都是字节数组形式存储，只不过是编码方式不同。字符串类型的最大空间不能超过512MB，如果超过了这个限制，Redis会返回错误。 String类型的不同格式 String类型的常用命令有： SET：设置一个key的值，如果key已经存在，则覆盖原来的值 GET：获取一个key的值，如果key不存在，则返回nil MSET：同时设置多个key的值 MGET：同时获取多个key的值 SET、GET、MSET、MGET命令用法 INCR：将一个key的值加1，如果key不存在，则先将其设置 INCRBY：将一个key的值加上指定的整数，如果key不存在，则先将其设置。也可以实现自减的效果。 INCRBYFLOAT：将一个key的值加上指定的浮点数，如果key不存在，则先将其设置 INCR、INCRBY、INCRBYFLOAT命令用法 DECR：将一个key的值减1，如果key不存在，则先将其设置 DECRBY：将一个key的值减去指定的整数，如果key不存在，则先将其设置 DECR、DECRBY命令用法 SETNX：只有当key不存在时才设置key的值，如果key已经存在，则不做任何操作 SETNX命令用法 SETEX：设置一个key的值，并为key设置过期时间，单位为秒 SETEX命令用法 PSETEX：设置一个key的值，并为key设置过期时间，单位为毫秒 KEY的层级结构 Redis的key是一个字符串，可以包含任何字符，包括空格和特殊字符。为了方便管理和组织key，Redis没有提供真正的层级结构，但我们可以通过在key中使用分隔符（如冒号:）来模拟层级结构。 例如，我们有一个项目叫heima，有user和product两种不同类型的数据，我们可以这样定义key： user相关的key：heima:user:1、heima:user:2、heima:user:3等 product相关的key：heima:product:1、heima:product:2、heima:product:3等 如果value是一个对象，例如一个user对象，我们可以将其序列化成JSON字符串存储在Redis中，这样就可以方便地进行数据交换和存储复杂的数据结构。 KEY的层级结构 Hash类型 Hash类型，也叫散列，其value是一个无序字典，类似于C++中的unordered_map。Hash类型的key是一个字符串，而value是一个包含多个field和value的字典。每个field都是一个字符串，每个value也是一个字符串。主要特征有： Hash类型的元素是无序的，不能通过索引访问 Hash类型的元素是唯一的，不能重复 Hash类型的元素可以在字典中添加或删除 查询速度快，适合于需要频繁查询的场景，例如用户信息、商品信息等。 Hash类型的结构 Hash类型的常用命令有： HSET key field value：设置hash表key中field的值为value，如果key不存在，则创建一个新的hash表；如果field已经存在，则覆盖原来的值 HGET key field：获取hash表key中field的值，如果key不存在或field不存在，则返回nil HMSET key field1 value1 field2 value2 &hellip;：同时设置hash表key中多个field的值，如果key不存在，则创建一个新的hash表；如果field已经存在，则覆盖原来的值">
+<meta name="twitter:title" content="Redis Basics Learning Document">
+<meta name="twitter:description" content="Redis Basics Learning Document Redis数据结构介绍 Redis是一个key-value的数据库，key一般是String类型，value的类型多种多样： Redis的数据类型 我们可以在官网（https://redis.io/commands）查看不同的命令用法。同时我们也可以在命令行通过help指令来查找命令。 Redis的通用命令 通用命令是部分数据类型的，都可以使用的命令，常见的有： KEYS：查看符合模板的所有key。模糊查询的效率不高，又因为Redis是单线程的，所以不建议在生产环境设备上使用 KEYS命令用法 DEL：删除一个或多个指定的key DEL命令用法 EXISTS：检查一个或多个key是否存在 EXISTS命令用法 EXPIRE：为一个key设置有效期（过期时间），单位为秒，有效期到期时，key会被自动删除 TTL：查看一个key的剩余有效期，单位为秒 EXPIRE和TTL命令用法 注意：当一个key设置了过期时间后，如果在过期时间到期之前再次设置了过期时间，那么原来的过期时间会被覆盖掉，新的过期时间会重新计算。并且过期后TTL命令会返回-2，表示key不存在了；如果一个key没有设置过期时间，那么TTL命令会返回-1，表示这个key是永久有效的。 String类型 String类型是Redis中最基本的数据类型，key和value都是字符串类型。不过根据字符串的格式不同，String类型又可以分为以下几种： 普通字符串：普通的字符串类型，可以存储任何文本数据，最大长度为512MB。 数字字符串：可以存储整数或浮点数，可以进行数学运算和自增操作。 二进制字符串：可以存储二进制数据，如图片、音频等非文本数据。 JSON字符串：可以存储JSON格式的数据，可以方便地进行数据交换和存储复杂的数据结构。 不管是哪种格式，底层都是字节数组形式存储，只不过是编码方式不同。字符串类型的最大空间不能超过512MB，如果超过了这个限制，Redis会返回错误。 String类型的不同格式 String类型的常用命令有： SET：设置一个key的值，如果key已经存在，则覆盖原来的值 GET：获取一个key的值，如果key不存在，则返回nil MSET：同时设置多个key的值 MGET：同时获取多个key的值 SET、GET、MSET、MGET命令用法 INCR：将一个key的值加1，如果key不存在，则先将其设置 INCRBY：将一个key的值加上指定的整数，如果key不存在，则先将其设置。也可以实现自减的效果。 INCRBYFLOAT：将一个key的值加上指定的浮点数，如果key不存在，则先将其设置 INCR、INCRBY、INCRBYFLOAT命令用法 DECR：将一个key的值减1，如果key不存在，则先将其设置 DECRBY：将一个key的值减去指定的整数，如果key不存在，则先将其设置 DECR、DECRBY命令用法 SETNX：只有当key不存在时才设置key的值，如果key已经存在，则不做任何操作 SETNX命令用法 SETEX：设置一个key的值，并为key设置过期时间，单位为秒 SETEX命令用法 PSETEX：设置一个key的值，并为key设置过期时间，单位为毫秒 KEY的层级结构 Redis的key是一个字符串，可以包含任何字符，包括空格和特殊字符。为了方便管理和组织key，Redis没有提供真正的层级结构，但我们可以通过在key中使用分隔符（如冒号:）来模拟层级结构。 例如，我们有一个项目叫heima，有user和product两种不同类型的数据，我们可以这样定义key： user相关的key：heima:user:1、heima:user:2、heima:user:3等 product相关的key：heima:product:1、heima:product:2、heima:product:3等 如果value是一个对象，例如一个user对象，我们可以将其序列化成JSON字符串存储在Redis中，这样就可以方便地进行数据交换和存储复杂的数据结构。 KEY的层级结构 Hash类型 Hash类型，也叫散列，其value是一个无序字典，类似于C++中的unordered_map。Hash类型的key是一个字符串，而value是一个包含多个field和value的字典。每个field都是一个字符串，每个value也是一个字符串。主要特征有： Hash类型的元素是无序的，不能通过索引访问 Hash类型的元素是唯一的，不能重复 Hash类型的元素可以在字典中添加或删除 查询速度快，适合于需要频繁查询的场景，例如用户信息、商品信息等。 Hash类型的结构 Hash类型的常用命令有： HSET key field value：设置hash表key中field的值为value，如果key不存在，则创建一个新的hash表；如果field已经存在，则覆盖原来的值 HGET key field：获取hash表key中field的值，如果key不存在或field不存在，则返回nil HMSET key field1 value1 field2 value2 .">
     <link rel="shortcut icon" href="/favicon.ico" />
 
     </head>
@@ -285,18 +285,14 @@
         <div class="widget--toc">
             <nav id="TableOfContents">
   <ol>
-    <li><a href="#基础篇">基础篇</a>
-      <ol>
-        <li><a href="#redis数据结构介绍">Redis数据结构介绍</a></li>
-        <li><a href="#redis的通用命令">Redis的通用命令</a></li>
-        <li><a href="#string类型">String类型</a></li>
-        <li><a href="#key的层级结构">KEY的层级结构</a></li>
-        <li><a href="#hash类型">Hash类型</a></li>
-        <li><a href="#list类型">List类型</a></li>
-        <li><a href="#set类型">Set类型</a></li>
-        <li><a href="#sorted-set类型">Sorted Set类型</a></li>
-      </ol>
-    </li>
+    <li><a href="#redis数据结构介绍">Redis数据结构介绍</a></li>
+    <li><a href="#redis的通用命令">Redis的通用命令</a></li>
+    <li><a href="#string类型">String类型</a></li>
+    <li><a href="#key的层级结构">KEY的层级结构</a></li>
+    <li><a href="#hash类型">Hash类型</a></li>
+    <li><a href="#list类型">List类型</a></li>
+    <li><a href="#set类型">Set类型</a></li>
+    <li><a href="#sorted-set类型">Sorted Set类型</a></li>
   </ol>
 </nav>
         </div>
@@ -316,7 +312,7 @@
 
     <div class="article-title-wrapper">
         <h2 class="article-title">
-            <a href="/p/redislearningnote/">RedisLearningNote</a>
+            <a href="/p/redis-basics-learning-document/">Redis Basics Learning Document</a>
         </h2>
     
         
@@ -361,7 +357,7 @@
 
             <div>
                 
-                    <a href="https://SymphonyW.github.io/zh-cn/p/redis%E5%AD%A6%E4%B9%A0%E6%96%87%E6%A1%A3/" class="link">中文</a>
+                    <a href="https://SymphonyW.github.io/zh-cn/p/redis%E5%9F%BA%E7%A1%80%E5%AD%A6%E4%B9%A0%E6%96%87%E6%A1%A3/" class="link">中文</a>
                 
             </div>
         </footer>
@@ -373,10 +369,9 @@
     <section class="article-content">
     
     
-    <h1 id="redis-learning-note">Redis Learning Note
-</h1><h2 id="基础篇">基础篇
-</h2><h3 id="redis数据结构介绍">Redis数据结构介绍
-</h3><p>Redis是一个key-value的数据库，key一般是String类型，value的类型多种多样：
+    <h1 id="redis-basics-learning-document">Redis Basics Learning Document
+</h1><h2 id="redis数据结构介绍">Redis数据结构介绍
+</h2><p>Redis是一个key-value的数据库，key一般是String类型，value的类型多种多样：
 <div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
     
     <a href="dataType.png" 
@@ -392,11 +387,11 @@
     
 </div>
 我们可以在官网（https://redis.io/commands）查看不同的命令用法。同时我们也可以在命令行通过help指令来查找命令。</p>
-<h3 id="redis的通用命令">Redis的通用命令
-</h3><p>通用命令是部分数据类型的，都可以使用的命令，常见的有：</p>
+<h2 id="redis的通用命令">Redis的通用命令
+</h2><p>通用命令是部分数据类型的，都可以使用的命令，常见的有：</p>
 <ul>
 <li>
-<p>KEYS：查看符合模板的所有key。模糊查询的效率不高，又因为Redis是单线程的，所以<strong>不建议在生产环境设备上使用</strong>
+<p><code>KEYS</code>：查看符合模板的所有key。模糊查询的效率不高，又因为Redis是单线程的，所以<strong>不建议在生产环境设备上使用</strong>
 <div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
     
     <a href="KEYS.png" 
@@ -413,7 +408,7 @@
 </div></p>
 </li>
 <li>
-<p>DEL：删除一个或多个指定的key
+<p><code>DEL</code>：删除一个或多个指定的key
 <div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
     
     <a href="DEL.png" 
@@ -430,7 +425,7 @@
 </div></p>
 </li>
 <li>
-<p>EXISTS：检查一个或多个key是否存在
+<p><code>EXISTS</code>：检查一个或多个key是否存在
 <div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
     
     <a href="EXISTS.png" 
@@ -447,10 +442,10 @@
 </div></p>
 </li>
 <li>
-<p>EXPIRE：为一个key设置有效期（过期时间），单位为秒，有效期到期时，key会被自动删除</p>
+<p><code>EXPIRE</code>：为一个key设置有效期（过期时间），单位为秒，有效期到期时，key会被自动删除</p>
 </li>
 <li>
-<p>TTL：查看一个key的剩余有效期，单位为秒
+<p><code>TTL</code>：查看一个key的剩余有效期，单位为秒
 <div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
     
     <a href="EXPIRE_TTL.png" 
@@ -468,8 +463,8 @@
 注意：当一个key设置了过期时间后，如果在过期时间到期之前再次设置了过期时间，那么原来的过期时间会被覆盖掉，新的过期时间会重新计算。并且过期后TTL命令会返回-2，表示key不存在了；如果一个key没有设置过期时间，那么TTL命令会返回-1，表示这个key是永久有效的。</p>
 </li>
 </ul>
-<h3 id="string类型">String类型
-</h3><p>String类型是Redis中最基本的数据类型，key和value都是字符串类型。不过根据字符串的格式不同，String类型又可以分为以下几种：</p>
+<h2 id="string类型">String类型
+</h2><p>String类型是Redis中最基本的数据类型，key和value都是字符串类型。不过根据字符串的格式不同，String类型又可以分为以下几种：</p>
 <ul>
 <li>普通字符串：普通的字符串类型，可以存储任何文本数据，最大长度为512MB。</li>
 <li>数字字符串：可以存储整数或浮点数，可以进行数学运算和自增操作。</li>
@@ -493,10 +488,10 @@
 </div></p>
 <p>String类型的常用命令有：</p>
 <ul>
-<li>SET：设置一个key的值，如果key已经存在，则覆盖原来的值</li>
-<li>GET：获取一个key的值，如果key不存在，则返回nil</li>
-<li>MSET：同时设置多个key的值</li>
-<li>MGET：同时获取多个key的值
+<li><code>SET</code>：设置一个key的值，如果key已经存在，则覆盖原来的值</li>
+<li><code>GET</code>：获取一个key的值，如果key不存在，则返回nil</li>
+<li><code>MSET</code>：同时设置多个key的值</li>
+<li><code>MGET</code>：同时获取多个key的值
 <div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
     
     <a href="SET_GET.png" 
@@ -511,9 +506,9 @@
         <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">SET、GET、MSET、MGET命令用法</span>
     
 </div></li>
-<li>INCR：将一个key的值加1，如果key不存在，则先将其设置</li>
-<li>INCRBY：将一个key的值加上指定的整数，如果key不存在，则先将其设置。也可以实现自减的效果。</li>
-<li>INCRBYFLOAT：将一个key的值加上指定的浮点数，如果key不存在，则先将其设置
+<li><code>INCR</code>：将一个key的值加1，如果key不存在，则先将其设置</li>
+<li><code>INCRBY</code>：将一个key的值加上指定的整数，如果key不存在，则先将其设置。也可以实现自减的效果。</li>
+<li><code>INCRBYFLOAT</code>：将一个key的值加上指定的浮点数，如果key不存在，则先将其设置
 <div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
     
     <a href="INCR.png" 
@@ -528,8 +523,8 @@
         <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">INCR、INCRBY、INCRBYFLOAT命令用法</span>
     
 </div></li>
-<li>DECR：将一个key的值减1，如果key不存在，则先将其设置</li>
-<li>DECRBY：将一个key的值减去指定的整数，如果key不存在，则先将其设置
+<li><code>DECR</code>：将一个key的值减1，如果key不存在，则先将其设置</li>
+<li><code>DECRBY</code>：将一个key的值减去指定的整数，如果key不存在，则先将其设置
 <div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
     
     <a href="DECR.png" 
@@ -544,7 +539,7 @@
         <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">DECR、DECRBY命令用法</span>
     
 </div></li>
-<li>SETNX：只有当key不存在时才设置key的值，如果key已经存在，则不做任何操作
+<li><code>SETNX</code>：只有当key不存在时才设置key的值，如果key已经存在，则不做任何操作
 <div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
     
     <a href="SETNX.png" 
@@ -559,7 +554,7 @@
         <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">SETNX命令用法</span>
     
 </div></li>
-<li>SETEX：设置一个key的值，并为key设置过期时间，单位为秒
+<li><code>SETEX</code>：设置一个key的值，并为key设置过期时间，单位为秒
 <div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
     
     <a href="SETEX.png" 
@@ -574,10 +569,10 @@
         <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">SETEX命令用法</span>
     
 </div></li>
-<li>PSETEX：设置一个key的值，并为key设置过期时间，单位为毫秒</li>
+<li><code>PSETEX</code>：设置一个key的值，并为key设置过期时间，单位为毫秒</li>
 </ul>
-<h3 id="key的层级结构">KEY的层级结构
-</h3><p>Redis的key是一个字符串，可以包含任何字符，包括空格和特殊字符。为了方便管理和组织key，Redis没有提供真正的层级结构，但我们可以通过在key中使用分隔符（如冒号:）来模拟层级结构。
+<h2 id="key的层级结构">KEY的层级结构
+</h2><p>Redis的key是一个字符串，可以包含任何字符，包括空格和特殊字符。为了方便管理和组织key，Redis没有提供真正的层级结构，但我们可以通过在key中使用分隔符（如冒号:）来模拟层级结构。
 例如，我们有一个项目叫heima，有user和product两种不同类型的数据，我们可以这样定义key：</p>
 <ul>
 <li>user相关的key：heima:user:1、heima:user:2、heima:user:3等</li>
@@ -622,8 +617,8 @@
         <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">KEY的层级结构</span>
     
 </div></p>
-<h3 id="hash类型">Hash类型
-</h3><p>Hash类型，也叫散列，其value是一个无序字典，类似于C++中的unordered_map。Hash类型的key是一个字符串，而value是一个包含多个field和value的字典。每个field都是一个字符串，每个value也是一个字符串。主要特征有：</p>
+<h2 id="hash类型">Hash类型
+</h2><p>Hash类型，也叫散列，其value是一个无序字典，类似于C++中的unordered_map。Hash类型的key是一个字符串，而value是一个包含多个field和value的字典。每个field都是一个字符串，每个value也是一个字符串。主要特征有：</p>
 <ul>
 <li>Hash类型的元素是无序的，不能通过索引访问</li>
 <li>Hash类型的元素是唯一的，不能重复</li>
@@ -647,16 +642,16 @@
 <p>Hash类型的常用命令有：</p>
 <ul>
 <li>
-<p>HSET key field value：设置hash表key中field的值为value，如果key不存在，则创建一个新的hash表；如果field已经存在，则覆盖原来的值</p>
+<p><code>HSET key field value</code>：设置hash表key中field的值为value，如果key不存在，则创建一个新的hash表；如果field已经存在，则覆盖原来的值</p>
 </li>
 <li>
-<p>HGET key field：获取hash表key中field的值，如果key不存在或field不存在，则返回nil</p>
+<p><code>HGET key field</code>：获取hash表key中field的值，如果key不存在或field不存在，则返回nil</p>
 </li>
 <li>
-<p>HMSET key field1 value1 field2 value2 &hellip;：同时设置hash表key中多个field的值，如果key不存在，则创建一个新的hash表；如果field已经存在，则覆盖原来的值</p>
+<p><code>HMSET key field1 value1 field2 value2 ...</code>：同时设置hash表key中多个field的值，如果key不存在，则创建一个新的hash表；如果field已经存在，则覆盖原来的值</p>
 </li>
 <li>
-<p>HMGET key field1 field2 &hellip;：同时获取hash表key中多个field的值，如果key不存在或field不存在，则返回nil
+<p><code>HMGET key field1 field2 ...</code>：同时获取hash表key中多个field的值，如果key不存在或field不存在，则返回nil
 <div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
     
     <a href="eg3.png" 
@@ -685,13 +680,13 @@
 </div></p>
 </li>
 <li>
-<p>HGETALL key：获取hash表key中所有field和value的值，如果key不存在，则返回nil</p>
+<p><code>HGETALL key</code>：获取hash表key中所有field和value的值，如果key不存在，则返回nil</p>
 </li>
 <li>
-<p>HKEYS key：获取hash表key中所有field的值，如果key不存在，则返回nil</p>
+<p><code>HKEYS key</code>：获取hash表key中所有field的值，如果key不存在，则返回nil</p>
 </li>
 <li>
-<p>HVALS key：获取hash表key中所有value的值，如果key不存在，则返回nil
+<p><code>HVALS key</code>：获取hash表key中所有value的值，如果key不存在，则返回nil
 <div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
     
     <a href="HGETALL.png" 
@@ -708,10 +703,10 @@
 </div></p>
 </li>
 <li>
-<p>HDEL key field1 field2 &hellip;：删除hash表key中指定的field，如果key不存在或field不存在，则不做任何操作</p>
+<p><code>HDEL key field1 field2 ...</code>：删除hash表key中指定的field，如果key不存在或field不存在，则不做任何操作</p>
 </li>
 <li>
-<p>HLEN key：获取hash表key中field的数量，如果key不存在，则返回0
+<p><code>HLEN key</code>：获取hash表key中field的数量，如果key不存在，则返回0
 <div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
     
     <a href="HDEL_HLEN.png" 
@@ -728,7 +723,7 @@
 </div></p>
 </li>
 <li>
-<p>HEXISTS key field：检查hash表key中是否存在field，如果key不存在或field不存在，则返回0；如果存在，则返回1
+<p><code>HEXISTS key field</code>：检查hash表key中是否存在field，如果key不存在或field不存在，则返回0；如果存在，则返回1
 <div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
     
     <a href="HEXISTS.png" 
@@ -745,10 +740,10 @@
 </div></p>
 </li>
 <li>
-<p>HINCRBY key field increment：将hash表key中field的值加上指定的整数increment，如果key不存在，则先创建一个新的hash表；如果field不存在，则先将其设置为0；如果field的值不是一个整数，则返回错误</p>
+<p><code>HINCRBY key field increment</code>：将hash表key中field的值加上指定的整数increment，如果key不存在，则先创建一个新的hash表；如果field不存在，则先将其设置为0；如果field的值不是一个整数，则返回错误</p>
 </li>
 <li>
-<p>HSETNX key field value：只有当hash表key中field不存在时才设置field的值为value，如果key不存在，则先创建一个新的hash表；如果field已经存在，则不做任何操作
+<p><code>HSETNX key field value</code>：只有当hash表key中field不存在时才设置field的值为value，如果key不存在，则先创建一个新的hash表；如果field已经存在，则不做任何操作
 <div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
     
     <a href="HINCRBY_HSETNX.png" 
@@ -765,8 +760,8 @@
 </div></p>
 </li>
 </ul>
-<h3 id="list类型">List类型
-</h3><p>Redis的List类型与C++中的std::list类似，是一个<strong>双向链表</strong>。List类型的key是一个字符串，而value是一个包含多个元素的列表，每个元素都是一个字符串。特征也与std::list类似：</p>
+<h2 id="list类型">List类型
+</h2><p>Redis的List类型与C++中的std::list类似，是一个<strong>双向链表</strong>。List类型的key是一个字符串，而value是一个包含多个元素的列表，每个元素都是一个字符串。特征也与std::list类似：</p>
 <ul>
 <li>List类型的元素是有序的，可以通过索引访问</li>
 <li>List类型的元素可以重复</li>
@@ -777,7 +772,7 @@
 <p>List类型的常用命令有：</p>
 <ul>
 <li>
-<p>LRANGE key start stop：获取列表key中指定范围内的元素，start和stop都是索引，索引从0开始，负数表示从列表尾部开始计算，例如-1表示最后一个元素，-2表示倒数第二个元素，以此类推。如果key不存在，则返回nil；如果start或stop超出范围，则返回空列表
+<p><code>LRANGE key start stop</code>：获取列表key中指定范围内的元素，start和stop都是索引，索引从0开始，负数表示从列表尾部开始计算，例如-1表示最后一个元素，-2表示倒数第二个元素，以此类推。如果key不存在，则返回nil；如果start或stop超出范围，则返回空列表
 <div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
     
     <a href="LRANGE.png" 
@@ -794,16 +789,16 @@
 </div></p>
 </li>
 <li>
-<p>LPUSH key value1 value2 &hellip;：将一个或多个值插入到列表key的头部，如果key不存在，则创建一个新的列表；如果key存在但不是列表类型，则返回错误</p>
+<p><code>LPUSH key value1 value2 ...</code>：将一个或多个值插入到列表key的头部，如果key不存在，则创建一个新的列表；如果key存在但不是列表类型，则返回错误</p>
 </li>
 <li>
-<p>LPOP key：移除并返回列表key的头部元素，如果key不存在或列表为空，则返回nil</p>
+<p><code>LPOP key</code>：移除并返回列表key的头部元素，如果key不存在或列表为空，则返回nil</p>
 </li>
 <li>
-<p>RPUSH key value1 value2 &hellip;：将一个或多个值插入到列表key的尾部，如果key不存在，则创建一个新的列表；如果key存在但不是列表类型，则返回错误</p>
+<p><code>RPUSH key value1 value2 ...</code>：将一个或多个值插入到列表key的尾部，如果key不存在，则创建一个新的列表；如果key存在但不是列表类型，则返回错误</p>
 </li>
 <li>
-<p>RPOP key：移除并返回列表key的尾部元素，如果key不存在或列表为空，则返回nil
+<p><code>RPOP key</code>：移除并返回列表key的尾部元素，如果key不存在或列表为空，则返回nil
 <div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
     
     <a href="LPUSH_RPUSH.png" 
@@ -820,13 +815,13 @@
 </div></p>
 </li>
 <li>
-<p>LLEN key：获取列表key中元素的数量，如果key不存在，则返回0</p>
+<p><code>LLEN key</code>：获取列表key中元素的数量，如果key不存在，则返回0</p>
 </li>
 <li>
-<p>LINDEX key index：获取列表key中指定索引位置的元素，如果key不存在或索引超出范围，则返回nil</p>
+<p><code>LINDEX key index</code>：获取列表key中指定索引位置的元素，如果key不存在或索引超出范围，则返回nil</p>
 </li>
 <li>
-<p>LSET key index value：设置列表key中指定索引位置的元素为value，如果key不存在或索引超出范围，则返回错误
+<p><code>LSET key index value</code>：设置列表key中指定索引位置的元素为value，如果key不存在或索引超出范围，则返回错误
 <div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
     
     <a href="LLEN_LINDEX_LSET.png" 
@@ -843,10 +838,10 @@
 </div></p>
 </li>
 <li>
-<p>BLPOP key [key &hellip;] timeout：移除并返回一个或多个列表key的头部元素，如果key不存在或列表为空，则返回nil；如果timeout为0，表示永远等待；如果timeout为正整数，表示等待指定的秒数，如果在等待期间有元素被添加到列表中，则立即返回；如果在等待期间没有元素被添加到列表中，则返回nil</p>
+<p><code>BLPOP key [key ...] timeout</code>：移除并返回一个或多个列表key的头部元素，如果key不存在或列表为空，则返回nil；如果timeout为0，表示永远等待；如果timeout为正整数，表示等待指定的秒数，如果在等待期间有元素被添加到列表中，则立即返回；如果在等待期间没有元素被添加到列表中，则返回nil</p>
 </li>
 <li>
-<p>BRPOP key [key &hellip;] timeout：移除并返回一个或多个列表key的尾部元素，如果key不存在或列表为空，则返回nil；如果timeout为0，表示永远等待；如果timeout为正整数，表示等待指定的秒数，如果在等待期间有元素被添加到列表中，则立即返回；如果在等待期间没有元素被添加到列表中，则返回nil
+<p><code>BRPOP key [key ...] timeout</code>：移除并返回一个或多个列表key的尾部元素，如果key不存在或列表为空，则返回nil；如果timeout为0，表示永远等待；如果timeout为正整数，表示等待指定的秒数，如果在等待期间有元素被添加到列表中，则立即返回；如果在等待期间没有元素被添加到列表中，则返回nil
 <div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
     
     <a href="BLPOP_BRPOP.png" 
@@ -864,8 +859,8 @@
 <strong>BLPOP和BRPOP命令常用于实现消息队列的功能，例如生产者将消息推送到列表中，消费者从列表中弹出消息进行处理。如果消费者在等待期间没有收到消息，可以设置一个超时时间来避免无限等待。</strong></p>
 </li>
 </ul>
-<h3 id="set类型">Set类型
-</h3><p>Redis的Set类型是一种无序集合，类似于C++中的std::unordered_set，可以看作是一个value为null的Hash类型。因为也是一个hash表，所以具备与Hash类型相似的特征：</p>
+<h2 id="set类型">Set类型
+</h2><p>Redis的Set类型是一种无序集合，类似于C++中的std::unordered_set，可以看作是一个value为null的Hash类型。因为也是一个hash表，所以具备与Hash类型相似的特征：</p>
 <ul>
 <li>Set类型的元素是无序的，不能通过索引访问</li>
 <li>Set类型的元素是唯一的，不能重复</li>
@@ -875,13 +870,13 @@
 <p>Set类型的常用命令有：</p>
 <ul>
 <li>
-<p>SADD key member1 member2 &hellip;：将一个或多个成员添加到集合key中，如果key不存在，则创建一个新的集合；如果key存在但不是集合类型，则返回错误</p>
+<p><code>SADD key member1 member2 ...</code>：将一个或多个成员添加到集合key中，如果key不存在，则创建一个新的集合；如果key存在但不是集合类型，则返回错误</p>
 </li>
 <li>
-<p>SREM key member1 member2 &hellip;：从集合key中移除一个或多个成员，如果key不存在或成员不存在，则不做任何操作</p>
+<p><code>SREM key member1 member2 ...</code>：从集合key中移除一个或多个成员，如果key不存在或成员不存在，则不做任何操作</p>
 </li>
 <li>
-<p>SCARD key：获取集合key中成员的数量，如果key不存在，则返回0
+<p><code>SCARD key</code>：获取集合key中成员的数量，如果key不存在，则返回0
 <div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
     
     <a href="SADD_SREM_SCARD.png" 
@@ -898,10 +893,10 @@
 </div></p>
 </li>
 <li>
-<p>SISMEMBER key member：检查集合key中是否存在成员，如果key不存在或成员不存在，则返回0；如果存在，则返回1</p>
+<p><code>SISMEMBER key member</code>：检查集合key中是否存在成员，如果key不存在或成员不存在，则返回0；如果存在，则返回1</p>
 </li>
 <li>
-<p>SMEMBERS key：获取集合key中所有成员的值，如果key不存在，则返回nil
+<p><code>SMEMBERS key</code>：获取集合key中所有成员的值，如果key不存在，则返回nil
 <div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
     
     <a href="SISMEMBER_SMEMBERS.png" 
@@ -918,13 +913,13 @@
 </div></p>
 </li>
 <li>
-<p>SINTER key1 key2 &hellip;：获取一个或多个集合key的交集，如果key不存在，则返回nil；如果key存在但不是集合类型，则返回错误</p>
+<p><code>SINTER key1 key2 ...</code>：获取一个或多个集合key的交集，如果key不存在，则返回nil；如果key存在但不是集合类型，则返回错误</p>
 </li>
 <li>
-<p>SUNION key1 key2 &hellip;：获取一个或多个集合key的并集，如果key不存在，则返回nil；如果key存在但不是集合类型，则返回错误</p>
+<p><code>SUNION key1 key2 ...</code>：获取一个或多个集合key的并集，如果key不存在，则返回nil；如果key存在但不是集合类型，则返回错误</p>
 </li>
 <li>
-<p>SDIFF key1 key2 &hellip;：获取一个或多个集合key的差集，如果key不存在，则返回nil；如果key存在但不是集合类型，则返回错误
+<p><code>SDIFF key1 key2 ...</code>：获取一个或多个集合key的差集，如果key不存在，则返回nil；如果key存在但不是集合类型，则返回错误
 <div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
     
     <a href="SINTER_SUNION_SDIFF.png" 
@@ -941,8 +936,8 @@
 </div></p>
 </li>
 </ul>
-<h3 id="sorted-set类型">Sorted Set类型
-</h3><p>Redis的SortedSet类型是一个可排序的set几何，与C++中的std::set类似，但底层数据结构却差别很大。SortedSet中的每一个元素都带有一个分数（score），Redis会根据分数来对元素进行排序。底层实现是一个跳表（skip list），<strong>跳表是一种基于链表的数据结构，通过增加多级索引来提高查询效率</strong>。SortedSet具备以下特性：</p>
+<h2 id="sorted-set类型">Sorted Set类型
+</h2><p>Redis的SortedSet类型是一个可排序的set几何，与C++中的std::set类似，但底层数据结构却差别很大。SortedSet中的每一个元素都带有一个分数（score），Redis会根据分数来对元素进行排序。底层实现是一个跳表（skip list），<strong>跳表是一种基于链表的数据结构，通过增加多级索引来提高查询效率</strong>。SortedSet具备以下特性：</p>
 <ul>
 <li>SortedSet类型的元素是有序的，可以通过索引访问</li>
 <li>SortedSet类型的元素是唯一的，不能重复</li>
@@ -953,13 +948,13 @@
 <p>SortedSet类型的常用命令有：</p>
 <ul>
 <li>
-<p>ZADD key score1 member1 [score2 member2 &hellip;]：将一个或多个成员添加到有序集合key中，并为每个成员设置分数，如果key不存在，则创建一个新的有序集合；如果key存在但不是有序集合类型，则返回错误；如果成员已经存在，则更新其分数</p>
+<p><code>ZADD key score1 member1 [score2 member2 ...]</code>：将一个或多个成员添加到有序集合key中，并为每个成员设置分数，如果key不存在，则创建一个新的有序集合；如果key存在但不是有序集合类型，则返回错误；如果成员已经存在，则更新其分数</p>
 </li>
 <li>
-<p>ZREM key member1 member2 &hellip;：从有序集合key中移除一个或多个成员，如果key不存在或成员不存在，则不做任何操作</p>
+<p><code>ZREM key member1 member2 ...</code>：从有序集合key中移除一个或多个成员，如果key不存在或成员不存在，则不做任何操作</p>
 </li>
 <li>
-<p>ZSCORE key member：获取有序集合key中成员的分数，如果key不存在或成员不存在，则返回nil
+<p><code>ZSCORE key member</code>：获取有序集合key中成员的分数，如果key不存在或成员不存在，则返回nil
 <div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
     
     <a href="ZADD_ZREM_ZSCORE.png" 
@@ -976,13 +971,13 @@
 </div></p>
 </li>
 <li>
-<p>ZRANK key member：获取有序集合key中成员的排名，排名从0开始，如果key不存在或成员不存在，则返回nil</p>
+<p><code>ZRANK key member</code>：获取有序集合key中成员的排名，排名从0开始，如果key不存在或成员不存在，则返回nil</p>
 </li>
 <li>
-<p>ZREVRANK key member：获取有序集合key中成员的反向排名，排名从0开始，如果key不存在或成员不存在，则返回nil</p>
+<p><code>ZREVRANK key member</code>：获取有序集合key中成员的反向排名，排名从0开始，如果key不存在或成员不存在，则返回nil</p>
 </li>
 <li>
-<p>ZCARD key：获取有序集合key中成员的数量，如果key不存在，则返回0
+<p><code>ZCARD key</code>：获取有序集合key中成员的数量，如果key不存在，则返回0
 <div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
     
     <a href="ZRANK_ZREVRANK_ZCARD.png" 
@@ -999,10 +994,10 @@
 </div></p>
 </li>
 <li>
-<p>ZCOUNT key min max：获取有序集合key中分数在min和max之间的成员数量，如果key不存在，则返回0；如果key存在但不是有序集合类型，则返回错误</p>
+<p><code>ZCOUNT key min max</code>：获取有序集合key中分数在min和max之间的成员数量，如果key不存在，则返回0；如果key存在但不是有序集合类型，则返回错误</p>
 </li>
 <li>
-<p>ZINCRBY key increment member：将有序集合key中成员的分数增加increment，如果key不存在，则先创建一个新的有序集合；如果成员不存在，则先将其设置为0；如果成员的分数不是一个数字，则返回错误
+<p><code>ZINCRBY key increment member</code>：将有序集合key中成员的分数增加increment，如果key不存在，则先创建一个新的有序集合；如果成员不存在，则先将其设置为0；如果成员的分数不是一个数字，则返回错误
 <div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
     
     <a href="ZCOUNT_ZINCRBY.png" 
@@ -1019,13 +1014,13 @@
 </div></p>
 </li>
 <li>
-<p>ZRANGE key start stop [WITHSCORES]：获取有序集合key中指定范围内的成员，start和stop都是索引，索引从0开始，负数表示从集合尾部开始计算，例如-1表示最后一个成员，-2表示倒数第二个成员，以此类推。如果key不存在，则返回nil；如果start或stop超出范围，则返回空列表；如果指定了WITHSCORES选项，则返回成员和分数的列表</p>
+<p><code>ZRANGE key start stop [WITHSCORES]</code>：获取有序集合key中指定范围内的成员，start和stop都是索引，索引从0开始，负数表示从集合尾部开始计算，例如-1表示最后一个成员，-2表示倒数第二个成员，以此类推。如果key不存在，则返回nil；如果start或stop超出范围，则返回空列表；如果指定了WITHSCORES选项，则返回成员和分数的列表</p>
 </li>
 <li>
-<p>ZREVRANGE key start stop [WITHSCORES]：获取有序集合key中指定范围内的成员，start和stop都是索引，索引从0开始，负数表示从集合尾部开始计算，例如-1表示最后一个成员，-2表示倒数第二个成员，以此类推。如果key不存在，则返回nil；如果start或stop超出范围，则返回空列表；如果指定了WITHSCORES选项，则返回成员和分数的列表</p>
+<p><code>ZREVRANGE key start stop [WITHSCORES]</code>：获取有序集合key中指定范围内的成员，start和stop都是索引，索引从0开始，负数表示从集合尾部开始计算，例如-1表示最后一个成员，-2表示倒数第二个成员，以此类推。如果key不存在，则返回nil；如果start或stop超出范围，则返回空列表；如果指定了WITHSCORES选项，则返回成员和分数的列表</p>
 </li>
 <li>
-<p>ZRANGEBYSCORE key min max [WITHSCORES]：获取有序集合key中分数在min和max之间的成员，如果key不存在，则返回nil；如果key存在但不是有序集合类型，则返回错误；如果指定了WITHSCORES选项，则返回成员和分数的列表
+<p><code>ZRANGEBYSCORE key min max [WITHSCORES]</code>：获取有序集合key中分数在min和max之间的成员，如果key不存在，则返回nil；如果key存在但不是有序集合类型，则返回错误；如果指定了WITHSCORES选项，则返回成员和分数的列表
 <div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
     
     <a href="ZRANGE_ZREVRANGE_ZRANGEBYSCORE.png" 
@@ -1042,13 +1037,13 @@
 </div></p>
 </li>
 <li>
-<p>ZINTER key numkeys key1 key2 &hellip;：获取一个或多个有序集合key的交集，如果key不存在，则返回nil；如果key存在但不是有序集合类型，则返回错误；如果指定了WITHSCORES选项，则返回成员和分数的列表</p>
+<p><code>ZINTER key numkeys key1 key2 ...</code>：获取一个或多个有序集合key的交集，如果key不存在，则返回nil；如果key存在但不是有序集合类型，则返回错误；如果指定了WITHSCORES选项，则返回成员和分数的列表</p>
 </li>
 <li>
-<p>ZUNION key numkeys key1 key2 &hellip;：获取一个或多个有序集合key的并集，如果key不存在，则返回nil；如果key存在但不是有序集合类型，则返回错误；如果指定了WITHSCORES选项，则返回成员和分数的列表</p>
+<p><code>ZUNION key numkeys key1 key2 ...</code>：获取一个或多个有序集合key的并集，如果key不存在，则返回nil；如果key存在但不是有序集合类型，则返回错误；如果指定了WITHSCORES选项，则返回成员和分数的列表</p>
 </li>
 <li>
-<p>ZDIFF key numkeys key1 key2 &hellip;：获取一个或多个有序集合key的差集，如果key不存在，则返回nil；如果key存在但不是有序集合类型，则返回错误；如果指定了WITHSCORES选项，则返回成员和分数的列表
+<p><code>ZDIFF key numkeys key1 key2 ...</code>：获取一个或多个有序集合key的差集，如果key不存在，则返回nil；如果key存在但不是有序集合类型，则返回错误；如果指定了WITHSCORES选项，则返回成员和分数的列表
 <div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
     
     <a href="ZINTER_ZUNION_ZDIFF.png" 
@@ -1065,13 +1060,13 @@
 </div></p>
 </li>
 <li>
-<p>ZINTERSTORE destination numkeys key1 key2 &hellip;：计算一个或多个有序集合key的交集，并将结果存储在destination中，如果destination已经存在，则覆盖原来的值；如果key不存在，则返回nil；如果key存在但不是有序集合类型，则返回错误</p>
+<p><code>ZINTERSTORE destination numkeys key1 key2 ...</code>：计算一个或多个有序集合key的交集，并将结果存储在destination中，如果destination已经存在，则覆盖原来的值；如果key不存在，则返回nil；如果key存在但不是有序集合类型，则返回错误</p>
 </li>
 <li>
-<p>ZUNIONSTORE destination numkeys key1 key2 &hellip;：计算一个或多个有序集合key的并集，并将结果存储在destination中，如果destination已经存在，则覆盖原来的值；如果key不存在，则返回nil；如果key存在但不是有序集合类型，则返回错误</p>
+<p><code>ZUNIONSTORE destination numkeys key1 key2 ...</code>：计算一个或多个有序集合key的并集，并将结果存储在destination中，如果destination已经存在，则覆盖原来的值；如果key不存在，则返回nil；如果key存在但不是有序集合类型，则返回错误</p>
 </li>
 <li>
-<p>ZDIFFSTORE destination numkeys key1 key2 &hellip;：计算一个或多个有序集合key的差集，并将结果存储在destination中，如果destination已经存在，则覆盖原来的值；如果key不存在，则返回nil；如果key存在但不是有序集合类型，则返回错误
+<p><code>ZDIFFSTORE destination numkeys key1 key2 ...</code>：计算一个或多个有序集合key的差集，并将结果存储在destination中，如果destination已经存在，则覆盖原来的值；如果key不存在，则返回nil；如果key存在但不是有序集合类型，则返回错误
 <div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
     
     <a href="ZINTERSTORE_ZUNIONSTORE_ZDIFFSTORE.png" 
