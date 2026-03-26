@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="zh-cn" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Deformable Beta Splatting 论文解读与分享 本文根据本人对 Deformable Beta Splatting 论文的理解，结合论文中的实验结果和作者的分析，对该方法的核心创新、实验验证以及潜在的局限性进行了详细的解读与总结。同时也用于记录和分享该方法的核心思想和技术细节，方便后续的学习和参考。 成果展示：https://rongliu-leo.github.io/beta-splatting/ 论文链接：https://dl.acm.org/doi/epdf/10.1145/3721238.3730716 代码链接：https://github.com/RongLiu-Leo/beta-splatting.git 一、先搞懂：这篇论文到底在解决什么问题？ 1.1 前置知识：从NeRF到3DGS，实时3D渲染的演进 在讲DBS之前，我们先快速搞懂两个核心技术背景，不然所有原理都听不懂： NeRF（神经辐射场） NeRF用神经网络把整个3D场景“编码”进去，能生成照片级逼真的新视角画面，但有两个致命缺陷： 渲染速度极慢，生成一张图要大量神经网络计算，完全做不到实时； 隐式的场景表示，没法和游戏引擎、工业建模软件（偏好显式几何）兼容。 3DGS（3D高斯溅射） 3DGS彻底抛弃了神经网络，把3D场景拆成无数个3D高斯椭球（可以理解成3D空间里的一个个小光斑/小颜料点）。每个椭球自带位置、大小、旋转、不透明度、颜色等参数，直接把这些椭球“喷”（splatting/溅射）到2D屏幕上，就能完成渲染。 它的核心突破是：实现了3D场景的实时渲染，同时画质接近NeRF，瞬间成了3D渲染领域的顶流。 1.2 3DGS的致命短板：为什么实时了，效果还是不够好？ 3DGS虽然火，但它的渲染质量始终比不过顶级的NeRF方法，核心问题出在它的两个基础组件，还有配套的优化策略上，这也是DBS要解决的核心痛点： 3DGS的核心组件 致命缺陷 直观后果 高斯核（几何表示） 1. 无界+长尾：高斯函数理论上取值范围是无限的，离中心再远也有值，实时渲染必须硬编码截断，引入截断伪影； 2. 天生平滑：高斯函数是钟形曲线，本质就会让画面模糊 锐利边缘闪烁/破碎、平坦表面画糊、精细纹理丢失 低阶球谐函数SH（视点相关颜色编码） 1. 参数量爆炸：SH阶数越高，参数量按平方增长，实时渲染只能用低阶SH； 2. 只能表达平滑颜色变化，完全没法建模锐利的镜面高光 金属、玻璃、光滑塑料的反光糊成一片，没有真实质感 致密化/优化策略 3DGS和后续的3DGS-MCMC的增减点策略，完全和高斯核的数学特性绑定，换个核函数就用不了 想给3DGS换更好的核，却没有配套的优化方法，效果上不去 简单说：这篇论文的核心目标，就是给3DGS做一次“换心手术”——换掉有缺陷的高斯核和球谐函数，再配套一个通用的优化策略，实现画质更好、参数更少、渲染更快的全面突破。 二、DBS的核心解决方案：三大创新一次性讲透 DBS（可变形Beta溅射）的所有能力，都来自三个环环相扣的核心创新，我们逐个拆解得明明白白。 2.1 创新一：可变形Beta核——换掉高斯核，从根源解决几何模糊和伪影 DBS的第一个核心动作，就是用Beta核彻底替换了3DGS里的高斯核，从数学根源上解决了高斯核的所有缺陷。 2.1.1 Beta核是怎么来的？从Beta分布到Beta核函数 Beta核的灵感来自统计学里经典的Beta分布，它的核心特点是：天然定义在[0,1]的闭区间里，超过区间的地方值直接为0，完美解决高斯核的无界长尾问题。 原始Beta分布的公式是： $$f(x;\\alpha,\\beta) = \\frac{1}{B(\\alpha,\\beta)} x^{\\alpha-1} (1-x)^{\\beta-1}, \\quad x \\in [0,1]$$ $x$：到核中心的归一化距离，x=0是中心，x=1是核的边缘； $\\alpha、\\beta$：两个形状参数，控制分布的曲线形态； $B(\\alpha,\\beta)$：Beta归一化函数，用来让分布的积分和为1。 为了让Beta核有类似高斯的钟形，同时保证3D视图之间的平滑一致性，论文做了极简的优化： 把$\\alpha$固定为1，只保留$\\beta$作为形状控制参数； 去掉了归一化项，避免额外的计算开销。 最终得到了Beta核函数： $$B(x;\\beta) = (1-x)^\\beta, \\quad x \\in [0,1]$$">
+<title>Deformable Beta Splatting 论文解读与分享</title>
+
+<link rel='canonical' href='https://SymphonyW.github.io/zh-cn/p/deformable-beta-splatting-%E8%AE%BA%E6%96%87%E8%A7%A3%E8%AF%BB%E4%B8%8E%E5%88%86%E4%BA%AB/'>
+
+<link rel="stylesheet" href="/scss/style.min.fcb8ae9ec4ce6e601e4b352c4eb06a952a123e46064b9bae06de6961bd51fd81.css"><meta property='og:title' content="Deformable Beta Splatting 论文解读与分享">
+<meta property='og:description' content="Deformable Beta Splatting 论文解读与分享 本文根据本人对 Deformable Beta Splatting 论文的理解，结合论文中的实验结果和作者的分析，对该方法的核心创新、实验验证以及潜在的局限性进行了详细的解读与总结。同时也用于记录和分享该方法的核心思想和技术细节，方便后续的学习和参考。 成果展示：https://rongliu-leo.github.io/beta-splatting/ 论文链接：https://dl.acm.org/doi/epdf/10.1145/3721238.3730716 代码链接：https://github.com/RongLiu-Leo/beta-splatting.git 一、先搞懂：这篇论文到底在解决什么问题？ 1.1 前置知识：从NeRF到3DGS，实时3D渲染的演进 在讲DBS之前，我们先快速搞懂两个核心技术背景，不然所有原理都听不懂： NeRF（神经辐射场） NeRF用神经网络把整个3D场景“编码”进去，能生成照片级逼真的新视角画面，但有两个致命缺陷： 渲染速度极慢，生成一张图要大量神经网络计算，完全做不到实时； 隐式的场景表示，没法和游戏引擎、工业建模软件（偏好显式几何）兼容。 3DGS（3D高斯溅射） 3DGS彻底抛弃了神经网络，把3D场景拆成无数个3D高斯椭球（可以理解成3D空间里的一个个小光斑/小颜料点）。每个椭球自带位置、大小、旋转、不透明度、颜色等参数，直接把这些椭球“喷”（splatting/溅射）到2D屏幕上，就能完成渲染。 它的核心突破是：实现了3D场景的实时渲染，同时画质接近NeRF，瞬间成了3D渲染领域的顶流。 1.2 3DGS的致命短板：为什么实时了，效果还是不够好？ 3DGS虽然火，但它的渲染质量始终比不过顶级的NeRF方法，核心问题出在它的两个基础组件，还有配套的优化策略上，这也是DBS要解决的核心痛点： 3DGS的核心组件 致命缺陷 直观后果 高斯核（几何表示） 1. 无界+长尾：高斯函数理论上取值范围是无限的，离中心再远也有值，实时渲染必须硬编码截断，引入截断伪影； 2. 天生平滑：高斯函数是钟形曲线，本质就会让画面模糊 锐利边缘闪烁/破碎、平坦表面画糊、精细纹理丢失 低阶球谐函数SH（视点相关颜色编码） 1. 参数量爆炸：SH阶数越高，参数量按平方增长，实时渲染只能用低阶SH； 2. 只能表达平滑颜色变化，完全没法建模锐利的镜面高光 金属、玻璃、光滑塑料的反光糊成一片，没有真实质感 致密化/优化策略 3DGS和后续的3DGS-MCMC的增减点策略，完全和高斯核的数学特性绑定，换个核函数就用不了 想给3DGS换更好的核，却没有配套的优化方法，效果上不去 简单说：这篇论文的核心目标，就是给3DGS做一次“换心手术”——换掉有缺陷的高斯核和球谐函数，再配套一个通用的优化策略，实现画质更好、参数更少、渲染更快的全面突破。 二、DBS的核心解决方案：三大创新一次性讲透 DBS（可变形Beta溅射）的所有能力，都来自三个环环相扣的核心创新，我们逐个拆解得明明白白。 2.1 创新一：可变形Beta核——换掉高斯核，从根源解决几何模糊和伪影 DBS的第一个核心动作，就是用Beta核彻底替换了3DGS里的高斯核，从数学根源上解决了高斯核的所有缺陷。 2.1.1 Beta核是怎么来的？从Beta分布到Beta核函数 Beta核的灵感来自统计学里经典的Beta分布，它的核心特点是：天然定义在[0,1]的闭区间里，超过区间的地方值直接为0，完美解决高斯核的无界长尾问题。 原始Beta分布的公式是： $$f(x;\\alpha,\\beta) = \\frac{1}{B(\\alpha,\\beta)} x^{\\alpha-1} (1-x)^{\\beta-1}, \\quad x \\in [0,1]$$ $x$：到核中心的归一化距离，x=0是中心，x=1是核的边缘； $\\alpha、\\beta$：两个形状参数，控制分布的曲线形态； $B(\\alpha,\\beta)$：Beta归一化函数，用来让分布的积分和为1。 为了让Beta核有类似高斯的钟形，同时保证3D视图之间的平滑一致性，论文做了极简的优化： 把$\\alpha$固定为1，只保留$\\beta$作为形状控制参数； 去掉了归一化项，避免额外的计算开销。 最终得到了Beta核函数： $$B(x;\\beta) = (1-x)^\\beta, \\quad x \\in [0,1]$$">
+<meta property='og:url' content='https://SymphonyW.github.io/zh-cn/p/deformable-beta-splatting-%E8%AE%BA%E6%96%87%E8%A7%A3%E8%AF%BB%E4%B8%8E%E5%88%86%E4%BA%AB/'>
+<meta property='og:site_name' content='SymphonyW'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='Paper' /><meta property='article:published_time' content='2026-03-26T12:56:18&#43;08:00'/><meta property='article:modified_time' content='2026-03-26T12:56:18&#43;08:00'/>
+<meta name="twitter:title" content="Deformable Beta Splatting 论文解读与分享">
+<meta name="twitter:description" content="Deformable Beta Splatting 论文解读与分享 本文根据本人对 Deformable Beta Splatting 论文的理解，结合论文中的实验结果和作者的分析，对该方法的核心创新、实验验证以及潜在的局限性进行了详细的解读与总结。同时也用于记录和分享该方法的核心思想和技术细节，方便后续的学习和参考。 成果展示：https://rongliu-leo.github.io/beta-splatting/ 论文链接：https://dl.acm.org/doi/epdf/10.1145/3721238.3730716 代码链接：https://github.com/RongLiu-Leo/beta-splatting.git 一、先搞懂：这篇论文到底在解决什么问题？ 1.1 前置知识：从NeRF到3DGS，实时3D渲染的演进 在讲DBS之前，我们先快速搞懂两个核心技术背景，不然所有原理都听不懂： NeRF（神经辐射场） NeRF用神经网络把整个3D场景“编码”进去，能生成照片级逼真的新视角画面，但有两个致命缺陷： 渲染速度极慢，生成一张图要大量神经网络计算，完全做不到实时； 隐式的场景表示，没法和游戏引擎、工业建模软件（偏好显式几何）兼容。 3DGS（3D高斯溅射） 3DGS彻底抛弃了神经网络，把3D场景拆成无数个3D高斯椭球（可以理解成3D空间里的一个个小光斑/小颜料点）。每个椭球自带位置、大小、旋转、不透明度、颜色等参数，直接把这些椭球“喷”（splatting/溅射）到2D屏幕上，就能完成渲染。 它的核心突破是：实现了3D场景的实时渲染，同时画质接近NeRF，瞬间成了3D渲染领域的顶流。 1.2 3DGS的致命短板：为什么实时了，效果还是不够好？ 3DGS虽然火，但它的渲染质量始终比不过顶级的NeRF方法，核心问题出在它的两个基础组件，还有配套的优化策略上，这也是DBS要解决的核心痛点： 3DGS的核心组件 致命缺陷 直观后果 高斯核（几何表示） 1. 无界+长尾：高斯函数理论上取值范围是无限的，离中心再远也有值，实时渲染必须硬编码截断，引入截断伪影； 2. 天生平滑：高斯函数是钟形曲线，本质就会让画面模糊 锐利边缘闪烁/破碎、平坦表面画糊、精细纹理丢失 低阶球谐函数SH（视点相关颜色编码） 1. 参数量爆炸：SH阶数越高，参数量按平方增长，实时渲染只能用低阶SH； 2. 只能表达平滑颜色变化，完全没法建模锐利的镜面高光 金属、玻璃、光滑塑料的反光糊成一片，没有真实质感 致密化/优化策略 3DGS和后续的3DGS-MCMC的增减点策略，完全和高斯核的数学特性绑定，换个核函数就用不了 想给3DGS换更好的核，却没有配套的优化方法，效果上不去 简单说：这篇论文的核心目标，就是给3DGS做一次“换心手术”——换掉有缺陷的高斯核和球谐函数，再配套一个通用的优化策略，实现画质更好、参数更少、渲染更快的全面突破。 二、DBS的核心解决方案：三大创新一次性讲透 DBS（可变形Beta溅射）的所有能力，都来自三个环环相扣的核心创新，我们逐个拆解得明明白白。 2.1 创新一：可变形Beta核——换掉高斯核，从根源解决几何模糊和伪影 DBS的第一个核心动作，就是用Beta核彻底替换了3DGS里的高斯核，从数学根源上解决了高斯核的所有缺陷。 2.1.1 Beta核是怎么来的？从Beta分布到Beta核函数 Beta核的灵感来自统计学里经典的Beta分布，它的核心特点是：天然定义在[0,1]的闭区间里，超过区间的地方值直接为0，完美解决高斯核的无界长尾问题。 原始Beta分布的公式是： $$f(x;\\alpha,\\beta) = \\frac{1}{B(\\alpha,\\beta)} x^{\\alpha-1} (1-x)^{\\beta-1}, \\quad x \\in [0,1]$$ $x$：到核中心的归一化距离，x=0是中心，x=1是核的边缘； $\\alpha、\\beta$：两个形状参数，控制分布的曲线形态； $B(\\alpha,\\beta)$：Beta归一化函数，用来让分布的积分和为1。 为了让Beta核有类似高斯的钟形，同时保证3D视图之间的平滑一致性，论文做了极简的优化： 把$\\alpha$固定为1，只保留$\\beta$作为形状控制参数； 去掉了归一化项，避免额外的计算开销。 最终得到了Beta核函数： $$B(x;\\beta) = (1-x)^\\beta, \\quad x \\in [0,1]$$">
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/zh-cn/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hua20e9d08cce84e79524a418ee5d4524c_7426_300x0_resize_box_3.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">😁</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/zh-cn">SymphonyW</a></h1>
+            <h2 class="site-description">Welcome to my Blog.</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0'
+                        target="_blank"
+                        title="Bilibili"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.0.0-beta2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M488.6 104.1C505.3 122.2 513 143.8 511.9 169.8V372.2C511.5 398.6 502.7 420.3 485.4 437.3C468.2 454.3 446.3 463.2 419.9 464H92.02C65.57 463.2 43.81 454.2 26.74 436.8C9.682 419.4 .7667 396.5 0 368.2V169.8C.7667 143.8 9.682 122.2 26.74 104.1C43.81 87.75 65.57 78.77 92.02 78H121.4L96.05 52.19C90.3 46.46 87.42 39.19 87.42 30.4C87.42 21.6 90.3 14.34 96.05 8.603C101.8 2.868 109.1 0 117.9 0C126.7 0 134 2.868 139.8 8.603L213.1 78H301.1L375.6 8.603C381.7 2.868 389.2 0 398 0C406.8 0 414.1 2.868 419.9 8.603C425.6 14.34 428.5 21.6 428.5 30.4C428.5 39.19 425.6 46.46 419.9 52.19L394.6 78L423.9 78C450.3 78.77 471.9 87.75 488.6 104.1H488.6zM449.8 173.8C449.4 164.2 446.1 156.4 439.1 150.3C433.9 144.2 425.1 140.9 416.4 140.5H96.05C86.46 140.9 78.6 144.2 72.47 150.3C66.33 156.4 63.07 164.2 62.69 173.8V368.2C62.69 377.4 65.95 385.2 72.47 391.7C78.99 398.2 86.85 401.5 96.05 401.5H416.4C425.6 401.5 433.4 398.2 439.7 391.7C446 385.2 449.4 377.4 449.8 368.2L449.8 173.8zM185.5 216.5C191.8 222.8 195.2 230.6 195.6 239.7V273C195.2 282.2 191.9 289.9 185.8 296.2C179.6 302.5 171.8 305.7 162.2 305.7C152.6 305.7 144.7 302.5 138.6 296.2C132.5 289.9 129.2 282.2 128.8 273V239.7C129.2 230.6 132.6 222.8 138.9 216.5C145.2 210.2 152.1 206.9 162.2 206.5C171.4 206.9 179.2 210.2 185.5 216.5H185.5zM377 216.5C383.3 222.8 386.7 230.6 387.1 239.7V273C386.7 282.2 383.4 289.9 377.3 296.2C371.2 302.5 363.3 305.7 353.7 305.7C344.1 305.7 336.3 302.5 330.1 296.2C323.1 289.9 320.7 282.2 320.4 273V239.7C320.7 230.6 324.1 222.8 330.4 216.5C336.7 210.2 344.5 206.9 353.7 206.5C362.9 206.9 370.7 210.2 377 216.5H377z"/></svg>
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://github.com/SymphonyW'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/zh-cn/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>归档</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>搜索</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/%E9%93%BE%E6%8E%A5/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>链接</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://SymphonyW.github.io/" >English</option>
+                                
+                                    <option value="https://SymphonyW.github.io/zh-cn/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#一先搞懂这篇论文到底在解决什么问题">一、先搞懂：这篇论文到底在解决什么问题？</a>
+      <ol>
+        <li><a href="#11-前置知识从nerf到3dgs实时3d渲染的演进">1.1 前置知识：从NeRF到3DGS，实时3D渲染的演进</a></li>
+        <li><a href="#12-3dgs的致命短板为什么实时了效果还是不够好">1.2 3DGS的致命短板：为什么实时了，效果还是不够好？</a></li>
+      </ol>
+    </li>
+    <li><a href="#二dbs的核心解决方案三大创新一次性讲透">二、DBS的核心解决方案：三大创新一次性讲透</a>
+      <ol>
+        <li><a href="#21-创新一可变形beta核换掉高斯核从根源解决几何模糊和伪影">2.1 创新一：可变形Beta核——换掉高斯核，从根源解决几何模糊和伪影</a>
+          <ol>
+            <li><a href="#211-beta核是怎么来的从beta分布到beta核函数">2.1.1 Beta核是怎么来的？从Beta分布到Beta核函数</a></li>
+            <li><a href="#212-关键优化beta核的重参数化让训练更稳定">2.1.2 关键优化：Beta核的重参数化，让训练更稳定</a></li>
+            <li><a href="#213-形状参数b的神奇作用一个参数搞定平坦表面和精细细节">2.1.3 形状参数$b$的神奇作用：一个参数搞定平坦表面和精细细节</a></li>
+            <li><a href="#214-3d椭球beta基元把beta核用到3d场景里">2.1.4 3D椭球Beta基元：把Beta核用到3D场景里</a></li>
+          </ol>
+        </li>
+        <li><a href="#22-创新二球面betasb换掉球谐函数精准拿捏镜面高光">2.2 创新二：球面Beta（SB）——换掉球谐函数，精准拿捏镜面高光</a>
+          <ol>
+            <li><a href="#221-先搞懂为什么球谐函数sh搞不定镜面高光">2.2.1 先搞懂：为什么球谐函数SH搞不定镜面高光？</a></li>
+            <li><a href="#222-球面beta的设计思路抄作业经典phong反射模型">2.2.2 球面Beta的设计思路：抄作业经典Phong反射模型</a></li>
+            <li><a href="#223-球面beta的公式和通俗解读">2.2.3 球面Beta的公式和通俗解读</a></li>
+          </ol>
+        </li>
+        <li><a href="#23-创新三核无关的mcmc通用的致密化策略不再绑定高斯核">2.3 创新三：核无关的MCMC——通用的致密化策略，不再绑定高斯核</a>
+          <ol>
+            <li><a href="#231-先搞懂致密化到底是干嘛的">2.3.1 先搞懂：致密化到底是干嘛的？</a></li>
+            <li><a href="#232-dbs的核心突破数学证明只调不透明度就能适配所有核">2.3.2 DBS的核心突破：数学证明“只调不透明度，就能适配所有核”</a></li>
+            <li><a href="#233-怎么保证小不透明度配套的损失函数设计">2.3.3 怎么保证“小不透明度”？配套的损失函数设计</a></li>
+            <li><a href="#234-这个创新的行业级意义">2.3.4 这个创新的行业级意义</a></li>
+          </ol>
+        </li>
+      </ol>
+    </li>
+    <li><a href="#三实验结果dbs到底有多强">三、实验结果：DBS到底有多强？</a>
+      <ol>
+        <li><a href="#31-核心性能画质速度内存全面超越">3.1 核心性能：画质、速度、内存全面超越</a></li>
+        <li><a href="#32-消融实验每个创新点都实打实起作用">3.2 消融实验：每个创新点都实打实起作用</a></li>
+        <li><a href="#33-彩蛋能力训练后的几何光照分解">3.3 彩蛋能力：训练后的几何+光照分解</a></li>
+      </ol>
+    </li>
+    <li><a href="#四论文结论与行业意义">四、论文结论与行业意义</a>
+      <ol>
+        <li><a href="#41-论文核心结论">4.1 论文核心结论</a></li>
+        <li><a href="#42-行业意义">4.2 行业意义</a></li>
+      </ol>
+    </li>
+    <li><a href="#附录论文关键补充细节详见论文附录">附录：论文关键补充细节（详见论文附录）</a>
+      <ol>
+        <li><a href="#附录a2d核函数的通用有效条件">附录A：2D核函数的通用有效条件</a></li>
+        <li><a href="#附录b论文核心超参数">附录B：论文核心超参数</a></li>
+        <li><a href="#附录c压缩性能">附录C：压缩性能</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="main-article">
+    <header class="article-header">
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/zh-cn/p/deformable-beta-splatting-%E8%AE%BA%E6%96%87%E8%A7%A3%E8%AF%BB%E4%B8%8E%E5%88%86%E4%BA%AB/">Deformable Beta Splatting 论文解读与分享</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published">2026-03-26 12:56</time>
+            </div>
+        
+
+        
+    </footer>
+    
+
+    
+        <footer class="article-translations">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+            <div>
+                
+                    <a href="https://SymphonyW.github.io/p/deformable-beta-splatting-interpretation-and-sharing/" class="link">English</a>
+                
+            </div>
+        </footer>
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="deformable-beta-splatting-论文解读与分享">Deformable Beta Splatting 论文解读与分享
+</h1><p>本文根据本人对 Deformable Beta Splatting 论文的理解，结合论文中的实验结果和作者的分析，对该方法的核心创新、实验验证以及潜在的局限性进行了详细的解读与总结。同时也用于记录和分享该方法的核心思想和技术细节，方便后续的学习和参考。</p>
+<ul>
+<li>成果展示：<a class="link" href="https://rongliu-leo.github.io/beta-splatting/"  target="_blank" rel="noopener"
+    >https://rongliu-leo.github.io/beta-splatting/</a></li>
+<li>论文链接：<a class="link" href="https://dl.acm.org/doi/epdf/10.1145/3721238.3730716"  target="_blank" rel="noopener"
+    >https://dl.acm.org/doi/epdf/10.1145/3721238.3730716</a></li>
+<li>代码链接：<a class="link" href="https://github.com/RongLiu-Leo/beta-splatting.git"  target="_blank" rel="noopener"
+    >https://github.com/RongLiu-Leo/beta-splatting.git</a></li>
+</ul>
+<hr>
+<h2 id="一先搞懂这篇论文到底在解决什么问题">一、先搞懂：这篇论文到底在解决什么问题？
+</h2><h3 id="11-前置知识从nerf到3dgs实时3d渲染的演进">1.1 前置知识：从NeRF到3DGS，实时3D渲染的演进
+</h3><p>在讲DBS之前，我们先快速搞懂两个核心技术背景，不然所有原理都听不懂：</p>
+<ol>
+<li><strong>NeRF（神经辐射场）</strong>
+NeRF用神经网络把整个3D场景“编码”进去，能生成照片级逼真的新视角画面，但有两个致命缺陷：
+<ul>
+<li>渲染速度极慢，生成一张图要大量神经网络计算，完全做不到实时；</li>
+<li>隐式的场景表示，没法和游戏引擎、工业建模软件（偏好显式几何）兼容。</li>
+</ul>
+</li>
+<li><strong>3DGS（3D高斯溅射）</strong>
+3DGS彻底抛弃了神经网络，把3D场景拆成无数个<strong>3D高斯椭球</strong>（可以理解成3D空间里的一个个小光斑/小颜料点）。每个椭球自带位置、大小、旋转、不透明度、颜色等参数，直接把这些椭球“喷”（splatting/溅射）到2D屏幕上，就能完成渲染。
+它的核心突破是：<strong>实现了3D场景的实时渲染</strong>，同时画质接近NeRF，瞬间成了3D渲染领域的顶流。</li>
+</ol>
+<h3 id="12-3dgs的致命短板为什么实时了效果还是不够好">1.2 3DGS的致命短板：为什么实时了，效果还是不够好？
+</h3><p>3DGS虽然火，但它的渲染质量始终比不过顶级的NeRF方法，核心问题出在它的两个基础组件，还有配套的优化策略上，这也是DBS要解决的核心痛点：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>3DGS的核心组件</th>
+<th>致命缺陷</th>
+<th>直观后果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>高斯核（几何表示）</td>
+<td>1. 无界+长尾：高斯函数理论上取值范围是无限的，离中心再远也有值，实时渲染必须硬编码截断，引入截断伪影；<br>2. 天生平滑：高斯函数是钟形曲线，本质就会让画面模糊</td>
+<td>锐利边缘闪烁/破碎、平坦表面画糊、精细纹理丢失</td>
+</tr>
+<tr>
+<td>低阶球谐函数SH（视点相关颜色编码）</td>
+<td>1. 参数量爆炸：SH阶数越高，参数量按平方增长，实时渲染只能用低阶SH；<br>2. 只能表达平滑颜色变化，完全没法建模锐利的镜面高光</td>
+<td>金属、玻璃、光滑塑料的反光糊成一片，没有真实质感</td>
+</tr>
+<tr>
+<td>致密化/优化策略</td>
+<td>3DGS和后续的3DGS-MCMC的增减点策略，完全和高斯核的数学特性绑定，换个核函数就用不了</td>
+<td>想给3DGS换更好的核，却没有配套的优化方法，效果上不去</td>
+</tr>
+</tbody>
+</table></div>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="2026-03-26-13-05-31.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="2026-03-26-13-05-31.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<p>简单说：这篇论文的核心目标，就是给3DGS做一次“换心手术”——换掉有缺陷的高斯核和球谐函数，再配套一个通用的优化策略，实现<strong>画质更好、参数更少、渲染更快</strong>的全面突破。</p>
+<h2 id="二dbs的核心解决方案三大创新一次性讲透">二、DBS的核心解决方案：三大创新一次性讲透
+</h2><p>DBS（可变形Beta溅射）的所有能力，都来自三个环环相扣的核心创新，我们逐个拆解得明明白白。</p>
+<h3 id="21-创新一可变形beta核换掉高斯核从根源解决几何模糊和伪影">2.1 创新一：可变形Beta核——换掉高斯核，从根源解决几何模糊和伪影
+</h3><p>DBS的第一个核心动作，就是用<strong>Beta核</strong>彻底替换了3DGS里的高斯核，从数学根源上解决了高斯核的所有缺陷。</p>
+<h4 id="211-beta核是怎么来的从beta分布到beta核函数">2.1.1 Beta核是怎么来的？从Beta分布到Beta核函数
+</h4><p>Beta核的灵感来自统计学里经典的<strong>Beta分布</strong>，它的核心特点是：<strong>天然定义在[0,1]的闭区间里，超过区间的地方值直接为0</strong>，完美解决高斯核的无界长尾问题。</p>
+<p>原始Beta分布的公式是：
+$$f(x;\alpha,\beta) = \frac{1}{B(\alpha,\beta)} x^{\alpha-1} (1-x)^{\beta-1}, \quad x \in [0,1]$$</p>
+<ul>
+<li>$x$：到核中心的归一化距离，x=0是中心，x=1是核的边缘；</li>
+<li>$\alpha、\beta$：两个形状参数，控制分布的曲线形态；</li>
+<li>$B(\alpha,\beta)$：Beta归一化函数，用来让分布的积分和为1。</li>
+</ul>
+<p>为了让Beta核有类似高斯的钟形，同时保证3D视图之间的平滑一致性，论文做了极简的优化：</p>
+<ol>
+<li>把$\alpha$固定为1，只保留$\beta$作为形状控制参数；</li>
+<li>去掉了归一化项，避免额外的计算开销。</li>
+</ol>
+<p>最终得到了<strong>Beta核函数</strong>：
+$$B(x;\beta) = (1-x)^\beta, \quad x \in [0,1]$$</p>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="2026-03-26-13-06-12.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="2026-03-26-13-06-12.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<p>这个公式的通俗解读：</p>
+<ul>
+<li>完美的<strong>有界支撑</strong>：x只在[0,1]里有值，x&gt;1时函数值直接为0，再也不需要硬编码截断，彻底消除了截断伪影；</li>
+<li>极致的形状可控性：$\beta$的大小直接决定核的“尖/平”，$\beta$越大，核越尖；$\beta$越小，核越平。</li>
+</ul>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="2026-03-26-13-06-47.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="2026-03-26-13-06-47.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<h4 id="212-关键优化beta核的重参数化让训练更稳定">2.1.2 关键优化：Beta核的重参数化，让训练更稳定
+</h4><p>直接优化$\beta$会有两个问题：</p>
+<ol>
+<li>$\beta$必须大于0，模型优化时很容易跑出无效值；</li>
+<li>初始值不好设，训练很容易不稳定。</li>
+</ol>
+<p>论文用<strong>指数激活</strong>给$\beta$做了重参数化，让模型优化一个无范围限制的参数$b$，再通过公式映射出$\beta$：
+$$\beta(b) = 4 \cdot e^b$$</p>
+<ul>
+<li>$b$：模型真正优化的参数，取值范围是$(-\infty, +\infty)$，没有任何限制；</li>
+<li>常数4：当$b=0$时，$\beta=4$，此时Beta核的形状和高斯核几乎完全一致。</li>
+</ul>
+<p>这个设计的妙处：</p>
+<ul>
+<li>模型初始化时，Beta核和高斯核完全对齐，训练起点和3DGS一致，稳定性拉满；</li>
+<li>Beta核本质成了高斯核的<strong>超集</strong>——既能当高斯核用，还能变出更多高斯核做不到的形状。</li>
+</ul>
+<h4 id="213-形状参数b的神奇作用一个参数搞定平坦表面和精细细节">2.1.3 形状参数$b$的神奇作用：一个参数搞定平坦表面和精细细节
+</h4><p>$b$的取值直接决定了Beta核的形态，适配完全不同的场景，这也是DBS几何表达能力的核心：</p>
+<ol>
+<li><strong>当$b&lt;0$时</strong>：$\beta&lt;4$，核的形态非常平坦，边缘截断极其锐利。
+适配场景：平坦的墙面、桌面，还有锐利的几何边缘（比如桌子的直角、建筑的轮廓），完美解决高斯核画平面对象会糊的问题。</li>
+<li><strong>当$b=0$时</strong>：$\beta=4$，核的形态和高斯核完全一致，完美兼容3DGS的所有效果。</li>
+<li><strong>当$b&gt;0$时</strong>：$\beta&gt;4$，核的形态非常尖锐，下降速度极快。
+适配场景：高频细节纹理，比如布料的纹路、树叶的边缘、细小的物体，能比高斯核捕捉到更精细的细节。</li>
+</ol>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="2026-03-26-13-13-34.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="2026-03-26-13-13-34.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<h4 id="214-3d椭球beta基元把beta核用到3d场景里">2.1.4 3D椭球Beta基元：把Beta核用到3D场景里
+</h4><p>有了Beta核，论文定义了DBS里最基础的场景单元——<strong>3D椭球Beta基元</strong>，它的完整参数是：
+$$\mathcal{B} = {\mu, o, q, s, b, f}$$</p>
+<p>每个参数的通俗解释，和3DGS做了对比：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>参数</th>
+<th>含义</th>
+<th>和3DGS的关系</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>$\mu$</td>
+<td>3D空间中基元的中心坐标</td>
+<td>和3DGS完全一致</td>
+</tr>
+<tr>
+<td>$o$</td>
+<td>基元的不透明度</td>
+<td>和3DGS完全一致</td>
+</tr>
+<tr>
+<td>$q$</td>
+<td>四元数，定义基元的旋转角度</td>
+<td>和3DGS完全一致</td>
+</tr>
+<tr>
+<td>$s$</td>
+<td>三维缩放系数，定义椭球的大小/拉伸程度</td>
+<td>和3DGS完全一致</td>
+</tr>
+<tr>
+<td>$b$</td>
+<td>Beta核的形状控制参数</td>
+<td>DBS独有，仅1个参数，开销可忽略</td>
+</tr>
+<tr>
+<td>$f$</td>
+<td>球面Beta函数的系数（控制视点相关颜色）</td>
+<td>DBS独有，替代3DGS的SH系数</td>
+</tr>
+</tbody>
+</table></div>
+<p>划重点：相比3DGS的高斯椭球，DBS只多了1个$b$参数，几乎没有增加计算开销，却实现了几何表达能力的质的飞跃。</p>
+<h3 id="22-创新二球面betasb换掉球谐函数精准拿捏镜面高光">2.2 创新二：球面Beta（SB）——换掉球谐函数，精准拿捏镜面高光
+</h3><p>解决了几何表示的问题，DBS的第二个核心创新，就是用<strong>球面Beta（SB）</strong> 替换了3DGS里的球谐函数SH，彻底解决了镜面高光画不出来的痛点。</p>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="2026-03-26-13-13-54.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="2026-03-26-13-13-54.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<h4 id="221-先搞懂为什么球谐函数sh搞不定镜面高光">2.2.1 先搞懂：为什么球谐函数SH搞不定镜面高光？
+</h4><p>3DGS里的“视点相关颜色”，通俗说就是：你站在不同角度看同一个物体，看到的颜色、反光是不一样的（比如镜子换个角度，高光就变了）。3DGS用低阶SH编码这个效果，但有两个无解的问题：</p>
+<ol>
+<li>高阶SH参数量爆炸：SH的参数量随阶数呈平方增长，3阶SH就有16个参数，再高的话实时渲染就扛不住了，所以3DGS只能用低阶SH；</li>
+<li>低阶SH只能表达平滑的颜色变化，比如漫反射的木头、墙面还行，但遇到金属、玻璃的锐利高光，直接就糊成一片，完全没有质感。</li>
+</ol>
+<h4 id="222-球面beta的设计思路抄作业经典phong反射模型">2.2.2 球面Beta的设计思路：抄作业经典Phong反射模型
+</h4><p>论文的灵感来自计算机图形学里用了几十年的<strong>Phong反射模型</strong>——这个模型把物体的颜色拆成了三个物理上完全独立的部分：</p>
+<ul>
+<li>环境光：场景里的基础光线，固定不变；</li>
+<li>漫反射：物体本身的颜色，不管从哪个角度看，都基本一致；</li>
+<li>镜面反射：物体表面的高光，只有特定角度能看到，角度越准，高光越亮。</li>
+</ul>
+<p>球面Beta直接把这个物理规律搬了过来，把视点相关的颜色彻底解耦：</p>
+<ol>
+<li>把环境光和漫反射合并成一个<strong>固定的基础颜色$c_0$</strong>，不管视角怎么变，这个颜色都不变；</li>
+<li>用多个可学习的Beta核，直接建模<strong>镜面反射瓣</strong>，每个瓣对应一个方向的镜面反光，想让高光多锐利，就调对应的Beta核参数。</li>
+</ol>
+<h4 id="223-球面beta的公式和通俗解读">2.2.3 球面Beta的公式和通俗解读
+</h4><p>球面Beta的最终公式是：
+$$c(V) = c_0 + \sum_{m \in M} \beta(1 - R_m \cdot V; b_m) c_m$$</p>
+<p>我们把每个参数拆解得明明白白：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>参数</th>
+<th>通俗含义</th>
+<th>核心作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>$c(V)$</td>
+<td>最终输出的RGB颜色</td>
+<td>V是当前相机的视线方向，不同角度对应不同的颜色</td>
+</tr>
+<tr>
+<td>$c_0$</td>
+<td>基础漫反射颜色（RGB）</td>
+<td>固定不变，对应物体本身的颜色，仅3个参数</td>
+</tr>
+<tr>
+<td>$M$</td>
+<td>高光瓣的数量</td>
+<td>比如M=2，就是每个基元带2个高光瓣，数量可自定义，平衡效果和效率</td>
+</tr>
+<tr>
+<td>$R_m$</td>
+<td>第m个高光瓣的反射方向（单位向量）</td>
+<td>模型自己学习，决定这个高光从哪个角度能看到</td>
+</tr>
+<tr>
+<td>$V$</td>
+<td>相机的视线方向（单位向量）</td>
+<td>$R_m \cdot V$是两个向量的点积，点积越大，视线和反射方向越重合，高光越亮</td>
+</tr>
+<tr>
+<td>$b_m$</td>
+<td>第m个高光瓣的Beta核形状参数</td>
+<td>$b_m$越大，Beta核下降越快，高光越锐利；越小，高光越柔和</td>
+</tr>
+<tr>
+<td>$c_m$</td>
+<td>第m个高光瓣的颜色（RGB）</td>
+<td>模型自己学习，决定高光的颜色/亮度</td>
+</tr>
+</tbody>
+</table></div>
+<p>这个设计的碾压级优势：</p>
+<ol>
+<li><strong>物理上更合理</strong>：完全贴合现实世界的反光规律，比黑盒的SH函数可控性强太多，效果也更真实；</li>
+<li><strong>参数量极低，效率拉满</strong>：用2个高光瓣（sb=2）时，每个基元的颜色参数仅17个，和3阶SH的16个参数几乎一致，但表达能力天差地别，能画出超锐利的镜面高光，还不影响实时渲染；</li>
+<li><strong>完美解耦漫反射和镜面反射</strong>：漫反射和高光完全分开，训练后可以单独调整高光，不用改几何，也不用重新训练。</li>
+</ol>
+<h3 id="23-创新三核无关的mcmc通用的致密化策略不再绑定高斯核">2.3 创新三：核无关的MCMC——通用的致密化策略，不再绑定高斯核
+</h3><p>换掉了核函数和颜色编码，还剩最后一个问题：3DGS的致密化策略完全和高斯核绑定，Beta核用不了。DBS的第三个核心创新，就是提出了<strong>核无关的MCMC致密化策略</strong>，不管用什么溅射核，都能稳定生效。</p>
+<h4 id="231-先搞懂致密化到底是干嘛的">2.3.1 先搞懂：致密化到底是干嘛的？
+</h4><p>3DGS训练的时候，一开始场景里的基元数量是固定的。训练过程中会出现两个问题：</p>
+<ul>
+<li>细节多的地方，基元数量不够，画面会糊；</li>
+<li>没用的地方，基元太多，浪费算力，甚至出现重影。</li>
+</ul>
+<p><strong>致密化</strong>就是训练过程中，自动给细节多的地方“克隆/分裂”更多基元，给没用的基元“修剪”掉，让画面更清晰，同时不浪费算力。</p>
+<p>3DGS-MCMC把这个过程改成了马尔可夫链蒙特卡洛（MCMC）过程：把基元的不透明度当成概率，不透明度极低的“死亡”基元会被删掉，然后在不透明度高的基元附近“重生”新的基元，同时调整新基元的参数，保证克隆/重生后，画面效果和原来完全一致。</p>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="2026-03-26-13-14-07.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="2026-03-26-13-14-07.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<p>但它的致命问题是：<strong>参数调整的公式，完全是根据高斯核的数学特性推导出来的，换个核函数就不成立了</strong>。</p>
+<h4 id="232-dbs的核心突破数学证明只调不透明度就能适配所有核">2.3.2 DBS的核心突破：数学证明“只调不透明度，就能适配所有核”
+</h4><p>论文用严谨的数学推导，证明了一个颠覆性的结论：<strong>只要基元的不透明度足够小，仅调整不透明度，就能保证克隆后的画面效果完全不变，和溅射核的类型没有任何关系</strong>。</p>
+<p>我们用最通俗的方式，把这个证明过程讲明白：</p>
+<ul>
+<li><strong>步骤1：明确核心目标</strong></li>
+</ul>
+<p>一个基元，核函数是$f(x)$，不透明度是$o$，它在某个像素上的贡献（alpha值）是：
+$$\alpha = o \cdot f(x)$$
+现在要把这个基元克隆N个，每个新基元的不透明度是$o&rsquo;$，我们的目标是：<strong>N个新基元叠加后的总贡献，和原来的完全一致</strong>，也就是$\alpha_{total}&rsquo; = \alpha$。</p>
+<ul>
+<li><strong>步骤2：透明度叠加的物理规则</strong></li>
+</ul>
+<p>根据计算机图形学里的alpha混合规则，N个不透明度为$\alpha&rsquo;=o&rsquo; \cdot f(x)$的基元，叠加后的总不透明度是：
+$$\alpha_{total}&rsquo; = 1 - (1 - o&rsquo; \cdot f(x))^N$$</p>
+<ul>
+<li><strong>步骤3：求解新基元的不透明度$o&rsquo;$</strong></li>
+</ul>
+<p>我们要求$\alpha_{total}&rsquo; = \alpha$，也就是：
+$$o \cdot f(x) = 1 - (1 - o&rsquo; \cdot f(x))^N$$
+暂时忽略核函数$f(x)$，方程简化为：
+$$o = 1 - (1 - o&rsquo;)^N$$
+解这个方程，得到克隆后每个新基元的不透明度：
+$$o&rsquo; = 1 - \sqrt[N]{1 - o}$$</p>
+<ul>
+<li><strong>步骤4：泰勒展开证明：小不透明度下，和核函数完全无关</strong></li>
+</ul>
+<p>当基元的不透明度$o$很小的时候，我们可以用一阶泰勒展开对$\sqrt[N]{1-o}$做近似：
+$$(1-o)^{1/N} ≈ 1 - \frac{o}{N} + O(o^2)$$
+这里的$O(o^2)$是高阶无穷小，当$o$足够小时，这个项可以完全忽略不计。</p>
+<p>把这个近似代入$o&rsquo;$的公式，得到：
+$$o&rsquo; ≈ \frac{o}{N}$$</p>
+<p>再把这个$o&rsquo;$代回总不透明度的公式，做二次近似：
+$$\alpha_{total}&rsquo; = 1 - (1 - \frac{o}{N} \cdot f(x))^N ≈ 1 - (1 - o \cdot f(x)) = o \cdot f(x) = \alpha$$</p>
+<p><strong>最关键的结论来了</strong>：整个推导过程中，我们没有对核函数$f(x)$做任何限制！不管你是高斯核、Beta核，还是随便什么核函数，只要基元的不透明度$o$足够小，这个结论100%成立。</p>
+<h4 id="233-怎么保证小不透明度配套的损失函数设计">2.3.3 怎么保证“小不透明度”？配套的损失函数设计
+</h4><p>为了让上面的结论完美生效，论文在损失函数里加了<strong>不透明度正则化项</strong>，强制让所有基元的不透明度都保持在很小的范围。</p>
+<p>DBS的完整复合损失函数是：
+$$\mathcal{L} = \mathcal{L}<em>{RGB} + \lambda</em>{SSIM} \mathcal{L}_{DSSIM} + \lambda_o \mathcal{L}_o + \lambda_s \mathcal{L}_s$$</p>
+<p>每个部分的作用：</p>
+<ol>
+<li>$\mathcal{L}_{RGB}$：L1像素损失，保证渲染图和真实图的像素一致，画得像；</li>
+<li>$\lambda_{SSIM} \mathcal{L}<em>{DSSIM}$：结构损失，权重$\lambda</em>{SSIM}=0.2$，保证画面的边缘、结构不糊；</li>
+<li>$\lambda_o \mathcal{L}_o$：不透明度正则化项，权重$\lambda_o=0.01$，惩罚高不透明度的基元，让基元的平均不透明度保持在0.1左右，完美满足“小不透明度”假设；</li>
+<li>$\lambda_s \mathcal{L}_s$：尺寸正则化项，惩罚过大的基元，避免巨型基元覆盖画面，保证细节。</li>
+</ol>
+<h4 id="234-这个创新的行业级意义">2.3.4 这个创新的行业级意义
+</h4><p>这个核无关的MCMC策略，不仅解决了DBS自身的优化问题，更给整个3DGS领域打开了新的大门：
+以后大家研究新的溅射核函数，再也不用头疼配套的致密化/优化策略了，直接用这个通用方法就行，极大降低了3DGS核函数创新的门槛。</p>
+<h2 id="三实验结果dbs到底有多强">三、实验结果：DBS到底有多强？
+</h2><p>论文在Mip-NeRF 360、Tanks&amp;Temples、Deep Blending等行业通用数据集上做了全面测试，结果可以用“全面碾压”来形容。</p>
+<h3 id="31-核心性能画质速度内存全面超越">3.1 核心性能：画质、速度、内存全面超越
+</h3><div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>指标</th>
+<th>DBS的表现</th>
+<th>对比基准</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>渲染画质</td>
+<td>所有主流数据集上，PSNR/SSIM/LPIPS均达到SOTA；强镜面反射场景，PSNR比3DGS-MCMC、Zip-NeRF高1dB以上</td>
+<td>超过3DGS、3DGS-MCMC，甚至超越了顶级NeRF方法Zip-NeRF</td>
+</tr>
+<tr>
+<td>参数量</td>
+<td>仅用3DGS-MCMC 45%的参数，就能达到更好的画质；剪枝后的DBS-490K仅49万个基元，压缩后仅10MB，就达到原版3DGS的画质</td>
+<td>原版3DGS需要335万个基元，占用几百MB空间</td>
+</tr>
+<tr>
+<td>渲染速度</td>
+<td>比3DGS-MCMC快1.5倍，达到123FPS的实时渲染</td>
+<td>原版3DGS 116FPS，Zip-NeRF仅0.184FPS</td>
+</tr>
+<tr>
+<td>训练速度</td>
+<td>完整训练仅需22分钟</td>
+<td>3DGS-MCMC需31分钟，Zip-NeRF需5小时29分钟</td>
+</tr>
+</tbody>
+</table></div>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="2026-03-26-13-37-10.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="2026-03-26-13-37-10.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="2026-03-26-13-37-55.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="2026-03-26-13-37-55.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="2026-03-26-13-38-09.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="2026-03-26-13-38-09.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<h3 id="32-消融实验每个创新点都实打实起作用">3.2 消融实验：每个创新点都实打实起作用
+</h3><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="2026-03-26-13-38-23.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="2026-03-26-13-38-23.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div>
+论文把三个创新点拆开测试，验证了每个部分的贡献：</p>
+<ol>
+<li>仅用Beta核替换高斯核，其他不变：PSNR就有明显提升，证明Beta核的几何表达能力远超高斯核；</li>
+<li>加上核无关的MCMC：PSNR进一步提升，证明这个优化策略能让Beta核更好地收敛；</li>
+<li>把SH换成球面Beta（SB）：PSNR再次大幅提升，尤其是高光场景，证明球面Beta完美解决了视点相关颜色的问题；</li>
+<li>高光瓣数量sb=2时，效果和效率达到最佳平衡，sb超过4后，效果提升微乎其微。</li>
+</ol>
+<h3 id="33-彩蛋能力训练后的几何光照分解">3.3 彩蛋能力：训练后的几何+光照分解
+</h3><p>详见：<a class="link" href="https://rongliu-leo.github.io/beta-splatting/"  target="_blank" rel="noopener"
+    >https://rongliu-leo.github.io/beta-splatting/</a>。</p>
+<p>因为DBS天生解耦了漫反射和镜面反射，再加上可变形的Beta核，它实现了3DGS完全做不到的能力：<strong>训练后对场景的几何和光照进行分解</strong>。</p>
+<p>比如在经典的自行车场景里，DBS能把黑色长椅的几何，和上面的白色高光完美分离开。这个能力在3D场景编辑、后期渲染里价值巨大：你可以单独调整场景里的高光、反光，不用修改几何，也不用重新训练模型。</p>
+<h2 id="四论文结论与行业意义">四、论文结论与行业意义
+</h2><h3 id="41-论文核心结论">4.1 论文核心结论
+</h3><p>DBS通过三个环环相扣的核心创新，彻底解决了3DGS的原生短板：</p>
+<ol>
+<li><strong>可变形Beta核</strong>：解决了高斯核无界长尾、天生平滑的问题，几何细节更精准，彻底消除截断伪影；</li>
+<li><strong>球面Beta</strong>：解决了低阶SH无法建模锐利镜面高光的问题，视点相关颜色表达能力拉满，同时保持极低的参数量；</li>
+<li><strong>核无关的MCMC</strong>：解决了致密化策略和高斯核绑定的问题，为任意溅射核提供了通用、稳定的优化方案。</li>
+</ol>
+<p>最终，DBS实现了<strong>画质更好、参数更少、渲染更快、训练更快</strong>的全面突破，把实时辐射场渲染的水平推到了新的高度。</p>
+<h3 id="42-行业意义">4.2 行业意义
+</h3><ol>
+<li><strong>工业级落地价值</strong>：DBS几乎可以直接替换原版3DGS，用在游戏、数字孪生、虚拟人、AR/VR等所有需要实时3D渲染的场景，效果和效率都有显著提升；</li>
+<li><strong>领域级创新价值</strong>：核无关的MCMC策略，为整个3DGS领域的核函数创新铺平了道路，大幅降低了后续研究的门槛；</li>
+<li><strong>内容创作价值</strong>：训练后的几何+光照分解能力，给3D内容创作、后期编辑提供了极大的便利，彻底改变了3DGS场景“一次训练、无法修改”的痛点。</li>
+</ol>
+<h2 id="附录论文关键补充细节详见论文附录">附录：论文关键补充细节（详见论文附录）
+</h2><h3 id="附录a2d核函数的通用有效条件">附录A：2D核函数的通用有效条件
+</h3><p>论文通过逆阿贝尔变换证明，只要一个2D溅射核满足以下5个条件，就一定能找到对应的、多视图一致的3D核函数：</p>
+<ol>
+<li>定义在$r \in [0,1]$，值域在$[0,1]$；</li>
+<li>边界条件：中心不透明度为1（$\lim_{r \to 0} K(r)=1$），边界透明度为0（$\lim_{r \to 1} K(r)=0$）；</li>
+<li>在$(0,1)$上连续可微；</li>
+<li>核及其导数在$(0,1)$上绝对可积；</li>
+<li>逆阿贝尔变换能生成有效的3D核。</li>
+</ol>
+<h3 id="附录b论文核心超参数">附录B：论文核心超参数
+</h3><div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>超参数</th>
+<th>取值</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>位置初始学习率</td>
+<td>0.00016</td>
+<td>基元中心坐标的优化学习率，训练中衰减到0.0000016</td>
+</tr>
+<tr>
+<td>基础颜色/球面Beta学习率</td>
+<td>0.0025</td>
+<td>颜色相关参数的优化学习率</td>
+</tr>
+<tr>
+<td>不透明度学习率</td>
+<td>0.05</td>
+<td>不透明度参数的优化学习率</td>
+</tr>
+<tr>
+<td>Beta核形状参数$b$学习率</td>
+<td>0.001</td>
+<td>核形状参数的优化学习率</td>
+</tr>
+<tr>
+<td>DSSIM损失权重$\lambda_{SSIM}$</td>
+<td>0.2</td>
+<td>结构损失的权重</td>
+</tr>
+<tr>
+<td>不透明度正则化权重$\lambda_o$</td>
+<td>0.01</td>
+<td>小不透明度约束的权重</td>
+</tr>
+<tr>
+<td>致密化间隔</td>
+<td>每100次迭代</td>
+<td>训练中执行致密化的频率</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="附录c压缩性能">附录C：压缩性能
+</h3><p>DBS训练后，通过统一的PNG压缩，能把模型大小再压缩5-6倍，且PSNR仅下降0.15dB，几乎没有画质损失。剪枝后的DBS-490K，经过简单压缩后仅10MB，就能达到原版3DGS的画质，极其适合移动端、AR/VR等轻量化场景。</p>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/zh-cn/tags/paper/">Paper</a>
+        
+    </section>
+
+
+    </footer>
+
+
+    
+</article>
+
+    
+
+    
+
+     
+    
+        
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+        2026 SymphonyW
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.26.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+<script>
+window.MathJax = {
+  tex: {
+    
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  svg: {
+    fontCache: 'global'
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    </body>
+</html>
