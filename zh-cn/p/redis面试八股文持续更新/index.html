@@ -1,18 +1,18 @@
 <!DOCTYPE html>
 <html lang="zh-cn" dir="ltr">
     <head><meta charset='utf-8'>
-<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="数据库 - Redis 面试八股文（硬核整理） 本文档整理了后端开发面试中关于 Redis 最常被问到的高频面试题和深度解析，重点聚焦于底层原理、高并发场景下的缓存设计及高可用架构。 一、 核心基础与数据结构 1. Redis 为什么这么快？ 官方测试 Redis 的 QPS 可以达到 10万+，主要原因有： 完全基于内存：绝大部分请求是纯粹的内存操作，速度极快。 高效的数据结构：Redis 专门设计了如 SDS（简单动态字符串）、跳表（SkipList）、压缩列表（ZipList）等高效的数据结构。 单线程模型：Redis 的网络 IO 和键值对读写是由一个线程来完成的，避免了不必要的上下文切换和竞争条件，不存在加锁释放锁操作造成的性能损耗。（注：Redis 6.0 引入了多线程，但也只是用于网络 I/O 阶段，命令执行依然是单线程）。 I/O 多路复用模型：采用 epoll 作为 I/O 多路复用技术的实现，非阻塞 I/O，可以同时监听多个 Socket。 2. Redis 的五种基本数据类型及其底层数据结构？ 面试不仅会问应用场景，一定会深挖底层结构： | 数据类型 | 应用场景 | 底层数据结构（Redis 3.2+ / 7.0+ 有所演进） | | :&mdash; | :&mdash; | :&mdash; | | String | 缓存、计数器、分布式锁、Session | SDS (简单动态字符串)。比 C 字符串更安全、获取长度 O(1)、防止缓冲区溢出。 |">
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="数据库 - Redis 面试八股文 本文档整理了后端开发面试中关于 Redis 最常被问到的高频面试题和深度解析，重点聚焦于底层原理、高并发场景下的缓存设计及高可用架构。 一、 核心基础与数据结构 1. Redis 为什么这么快？ 官方测试 Redis 的 QPS 可以达到 10万+，主要原因有： 完全基于内存：绝大部分请求是纯粹的内存操作，速度极快。 高效的数据结构：Redis 专门设计了如 SDS（简单动态字符串）、跳表（SkipList）、压缩列表（ZipList）等高效的数据结构。 单线程模型：Redis 的网络 IO 和键值对读写是由一个线程来完成的，避免了不必要的上下文切换和竞争条件，不存在加锁释放锁操作造成的性能损耗。（注：Redis 6.0 引入了多线程，但也只是用于网络 I/O 阶段，命令执行依然是单线程）。 I/O 多路复用模型：采用 epoll 作为 I/O 多路复用技术的实现，非阻塞 I/O，可以同时监听多个 Socket。 2. Redis 的五种基本数据类型及其底层数据结构？ 面试不仅会问应用场景，一定会深挖底层结构： | 数据类型 | 应用场景 | 底层数据结构（Redis 3.2+ / 7.0+ 有所演进） | | :&mdash; | :&mdash; | :&mdash; | | String | 缓存、计数器、分布式锁、Session | SDS (简单动态字符串)。比 C 字符串更安全、获取长度 O(1)、防止缓冲区溢出。 |">
 <title>Redis面试八股文（持续更新）</title>
 
 <link rel='canonical' href='https://SymphonyW.github.io/zh-cn/p/redis%E9%9D%A2%E8%AF%95%E5%85%AB%E8%82%A1%E6%96%87%E6%8C%81%E7%BB%AD%E6%9B%B4%E6%96%B0/'>
 
 <link rel="stylesheet" href="/scss/style.min.fcb8ae9ec4ce6e601e4b352c4eb06a952a123e46064b9bae06de6961bd51fd81.css"><meta property='og:title' content="Redis面试八股文（持续更新）">
-<meta property='og:description' content="数据库 - Redis 面试八股文（硬核整理） 本文档整理了后端开发面试中关于 Redis 最常被问到的高频面试题和深度解析，重点聚焦于底层原理、高并发场景下的缓存设计及高可用架构。 一、 核心基础与数据结构 1. Redis 为什么这么快？ 官方测试 Redis 的 QPS 可以达到 10万+，主要原因有： 完全基于内存：绝大部分请求是纯粹的内存操作，速度极快。 高效的数据结构：Redis 专门设计了如 SDS（简单动态字符串）、跳表（SkipList）、压缩列表（ZipList）等高效的数据结构。 单线程模型：Redis 的网络 IO 和键值对读写是由一个线程来完成的，避免了不必要的上下文切换和竞争条件，不存在加锁释放锁操作造成的性能损耗。（注：Redis 6.0 引入了多线程，但也只是用于网络 I/O 阶段，命令执行依然是单线程）。 I/O 多路复用模型：采用 epoll 作为 I/O 多路复用技术的实现，非阻塞 I/O，可以同时监听多个 Socket。 2. Redis 的五种基本数据类型及其底层数据结构？ 面试不仅会问应用场景，一定会深挖底层结构： | 数据类型 | 应用场景 | 底层数据结构（Redis 3.2+ / 7.0+ 有所演进） | | :&mdash; | :&mdash; | :&mdash; | | String | 缓存、计数器、分布式锁、Session | SDS (简单动态字符串)。比 C 字符串更安全、获取长度 O(1)、防止缓冲区溢出。 |">
+<meta property='og:description' content="数据库 - Redis 面试八股文 本文档整理了后端开发面试中关于 Redis 最常被问到的高频面试题和深度解析，重点聚焦于底层原理、高并发场景下的缓存设计及高可用架构。 一、 核心基础与数据结构 1. Redis 为什么这么快？ 官方测试 Redis 的 QPS 可以达到 10万+，主要原因有： 完全基于内存：绝大部分请求是纯粹的内存操作，速度极快。 高效的数据结构：Redis 专门设计了如 SDS（简单动态字符串）、跳表（SkipList）、压缩列表（ZipList）等高效的数据结构。 单线程模型：Redis 的网络 IO 和键值对读写是由一个线程来完成的，避免了不必要的上下文切换和竞争条件，不存在加锁释放锁操作造成的性能损耗。（注：Redis 6.0 引入了多线程，但也只是用于网络 I/O 阶段，命令执行依然是单线程）。 I/O 多路复用模型：采用 epoll 作为 I/O 多路复用技术的实现，非阻塞 I/O，可以同时监听多个 Socket。 2. Redis 的五种基本数据类型及其底层数据结构？ 面试不仅会问应用场景，一定会深挖底层结构： | 数据类型 | 应用场景 | 底层数据结构（Redis 3.2+ / 7.0+ 有所演进） | | :&mdash; | :&mdash; | :&mdash; | | String | 缓存、计数器、分布式锁、Session | SDS (简单动态字符串)。比 C 字符串更安全、获取长度 O(1)、防止缓冲区溢出。 |">
 <meta property='og:url' content='https://SymphonyW.github.io/zh-cn/p/redis%E9%9D%A2%E8%AF%95%E5%85%AB%E8%82%A1%E6%96%87%E6%8C%81%E7%BB%AD%E6%9B%B4%E6%96%B0/'>
 <meta property='og:site_name' content='SymphonyW'>
 <meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='Redis' /><meta property='article:tag' content='Backend' /><meta property='article:tag' content='Interview' /><meta property='article:published_time' content='2026-03-25T22:08:57&#43;08:00'/><meta property='article:modified_time' content='2026-03-25T22:08:57&#43;08:00'/>
 <meta name="twitter:title" content="Redis面试八股文（持续更新）">
-<meta name="twitter:description" content="数据库 - Redis 面试八股文（硬核整理） 本文档整理了后端开发面试中关于 Redis 最常被问到的高频面试题和深度解析，重点聚焦于底层原理、高并发场景下的缓存设计及高可用架构。 一、 核心基础与数据结构 1. Redis 为什么这么快？ 官方测试 Redis 的 QPS 可以达到 10万+，主要原因有： 完全基于内存：绝大部分请求是纯粹的内存操作，速度极快。 高效的数据结构：Redis 专门设计了如 SDS（简单动态字符串）、跳表（SkipList）、压缩列表（ZipList）等高效的数据结构。 单线程模型：Redis 的网络 IO 和键值对读写是由一个线程来完成的，避免了不必要的上下文切换和竞争条件，不存在加锁释放锁操作造成的性能损耗。（注：Redis 6.0 引入了多线程，但也只是用于网络 I/O 阶段，命令执行依然是单线程）。 I/O 多路复用模型：采用 epoll 作为 I/O 多路复用技术的实现，非阻塞 I/O，可以同时监听多个 Socket。 2. Redis 的五种基本数据类型及其底层数据结构？ 面试不仅会问应用场景，一定会深挖底层结构： | 数据类型 | 应用场景 | 底层数据结构（Redis 3.2+ / 7.0+ 有所演进） | | :&mdash; | :&mdash; | :&mdash; | | String | 缓存、计数器、分布式锁、Session | SDS (简单动态字符串)。比 C 字符串更安全、获取长度 O(1)、防止缓冲区溢出。 |">
+<meta name="twitter:description" content="数据库 - Redis 面试八股文 本文档整理了后端开发面试中关于 Redis 最常被问到的高频面试题和深度解析，重点聚焦于底层原理、高并发场景下的缓存设计及高可用架构。 一、 核心基础与数据结构 1. Redis 为什么这么快？ 官方测试 Redis 的 QPS 可以达到 10万+，主要原因有： 完全基于内存：绝大部分请求是纯粹的内存操作，速度极快。 高效的数据结构：Redis 专门设计了如 SDS（简单动态字符串）、跳表（SkipList）、压缩列表（ZipList）等高效的数据结构。 单线程模型：Redis 的网络 IO 和键值对读写是由一个线程来完成的，避免了不必要的上下文切换和竞争条件，不存在加锁释放锁操作造成的性能损耗。（注：Redis 6.0 引入了多线程，但也只是用于网络 I/O 阶段，命令执行依然是单线程）。 I/O 多路复用模型：采用 epoll 作为 I/O 多路复用技术的实现，非阻塞 I/O，可以同时监听多个 Socket。 2. Redis 的五种基本数据类型及其底层数据结构？ 面试不仅会问应用场景，一定会深挖底层结构： | 数据类型 | 应用场景 | 底层数据结构（Redis 3.2+ / 7.0+ 有所演进） | | :&mdash; | :&mdash; | :&mdash; | | String | 缓存、计数器、分布式锁、Session | SDS (简单动态字符串)。比 C 字符串更安全、获取长度 O(1)、防止缓冲区溢出。 |">
     <link rel="shortcut icon" href="/favicon.ico" />
 
     </head>
@@ -400,7 +400,7 @@
     <section class="article-content">
     
     
-    <h1 id="数据库---redis-面试八股文硬核整理"><strong>数据库 - Redis 面试八股文（硬核整理）</strong>
+    <h1 id="数据库---redis-面试八股文"><strong>数据库 - Redis 面试八股文</strong>
 </h1><p>本文档整理了后端开发面试中关于 Redis 最常被问到的高频面试题和深度解析，重点聚焦于底层原理、高并发场景下的缓存设计及高可用架构。</p>
 <h2 id="一-核心基础与数据结构"><strong>一、 核心基础与数据结构</strong>
 </h2><h3 id="1-redis-为什么这么快"><strong>1. Redis 为什么这么快？</strong>
