@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="zh-cn" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Git原理与面试指南 一、Git 核心原理 Git 是目前最流行的分布式版本控制系统，其核心设计思想颠覆了传统的集中式版本控制工具。 1.1 分布式架构 与 SVN 等集中式工具不同，Git 的每个克隆仓库都是完整的独立版本库： 全量历史：git clone 会下载项目的所有历史提交、分支和标签，而非仅下载最新版本 离线操作：绝大多数操作（提交、分支、查看历史）都可在本地完成，无需网络 冗余备份：每个开发者的本地仓库都是一份完整备份，服务器损坏时可通过任意本地仓库恢复 1.2 快照存储而非差异存储 这是 Git 与传统版本控制系统最核心的区别： 传统差异存储：SVN 等工具存储的是文件随时间的增量变更（delta），回溯历史时需要逐层计算差异 Git 快照存储：每次提交时，Git 会对当前整个项目的文件状态拍摄一张完整的快照 高效优化：对于未修改的文件，Git 不会重复存储，而是保留一个指向原有文件对象的引用，既保证了快照的完整性，又节省了存储空间 1.3 内容寻址存储 Git 的本质是一个基于内容的键值对数据库： 所有数据在存储前都会计算 SHA-1 哈希值（40 位十六进制字符串） 哈希值由文件内容计算得出，内容不变则哈希值不变 这保证了数据的完整性：任何文件内容的篡改都会导致哈希值变化，Git 可以立即检测到 1.4 三区域工作模型 Git 将文件的状态划分为三个区域，构成了完整的工作流： 工作区（Working Directory）：用户直接编辑文件的目录，是你能直接看到和修改的文件 暂存区（Staging Area / Index）：临时存储区域，保存了你准备下次提交的修改，位于 \\.git/index 版本库（Repository）：Git 的核心数据库，存储了项目的所有元数据和对象，位于 \\.git 目录 基本工作流程： 1 工作区修改 → git add → 暂存区标记 → git commit → 版本库永久存储 二、Git 存储机制详解 Git 的所有数据都存储在 \\.">
+<title>Git原理与面试指南</title>
+
+<link rel='canonical' href='https://SymphonyW.github.io/zh-cn/p/git%E5%8E%9F%E7%90%86%E4%B8%8E%E9%9D%A2%E8%AF%95%E6%8C%87%E5%8D%97/'>
+
+<link rel="stylesheet" href="/scss/style.min.fcb8ae9ec4ce6e601e4b352c4eb06a952a123e46064b9bae06de6961bd51fd81.css"><meta property='og:title' content="Git原理与面试指南">
+<meta property='og:description' content="Git原理与面试指南 一、Git 核心原理 Git 是目前最流行的分布式版本控制系统，其核心设计思想颠覆了传统的集中式版本控制工具。 1.1 分布式架构 与 SVN 等集中式工具不同，Git 的每个克隆仓库都是完整的独立版本库： 全量历史：git clone 会下载项目的所有历史提交、分支和标签，而非仅下载最新版本 离线操作：绝大多数操作（提交、分支、查看历史）都可在本地完成，无需网络 冗余备份：每个开发者的本地仓库都是一份完整备份，服务器损坏时可通过任意本地仓库恢复 1.2 快照存储而非差异存储 这是 Git 与传统版本控制系统最核心的区别： 传统差异存储：SVN 等工具存储的是文件随时间的增量变更（delta），回溯历史时需要逐层计算差异 Git 快照存储：每次提交时，Git 会对当前整个项目的文件状态拍摄一张完整的快照 高效优化：对于未修改的文件，Git 不会重复存储，而是保留一个指向原有文件对象的引用，既保证了快照的完整性，又节省了存储空间 1.3 内容寻址存储 Git 的本质是一个基于内容的键值对数据库： 所有数据在存储前都会计算 SHA-1 哈希值（40 位十六进制字符串） 哈希值由文件内容计算得出，内容不变则哈希值不变 这保证了数据的完整性：任何文件内容的篡改都会导致哈希值变化，Git 可以立即检测到 1.4 三区域工作模型 Git 将文件的状态划分为三个区域，构成了完整的工作流： 工作区（Working Directory）：用户直接编辑文件的目录，是你能直接看到和修改的文件 暂存区（Staging Area / Index）：临时存储区域，保存了你准备下次提交的修改，位于 \\.git/index 版本库（Repository）：Git 的核心数据库，存储了项目的所有元数据和对象，位于 \\.git 目录 基本工作流程： 1 工作区修改 → git add → 暂存区标记 → git commit → 版本库永久存储 二、Git 存储机制详解 Git 的所有数据都存储在 \\.">
+<meta property='og:url' content='https://SymphonyW.github.io/zh-cn/p/git%E5%8E%9F%E7%90%86%E4%B8%8E%E9%9D%A2%E8%AF%95%E6%8C%87%E5%8D%97/'>
+<meta property='og:site_name' content='SymphonyW'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='Version Control' /><meta property='article:tag' content='Interview' /><meta property='article:tag' content='Git' /><meta property='article:published_time' content='2026-01-22T17:06:02&#43;08:00'/><meta property='article:modified_time' content='2026-01-22T17:06:02&#43;08:00'/><meta property='og:image' content='https://SymphonyW.github.io/zh-cn/p/git%E5%8E%9F%E7%90%86%E4%B8%8E%E9%9D%A2%E8%AF%95%E6%8C%87%E5%8D%97/background.jpg' />
+<meta name="twitter:title" content="Git原理与面试指南">
+<meta name="twitter:description" content="Git原理与面试指南 一、Git 核心原理 Git 是目前最流行的分布式版本控制系统，其核心设计思想颠覆了传统的集中式版本控制工具。 1.1 分布式架构 与 SVN 等集中式工具不同，Git 的每个克隆仓库都是完整的独立版本库： 全量历史：git clone 会下载项目的所有历史提交、分支和标签，而非仅下载最新版本 离线操作：绝大多数操作（提交、分支、查看历史）都可在本地完成，无需网络 冗余备份：每个开发者的本地仓库都是一份完整备份，服务器损坏时可通过任意本地仓库恢复 1.2 快照存储而非差异存储 这是 Git 与传统版本控制系统最核心的区别： 传统差异存储：SVN 等工具存储的是文件随时间的增量变更（delta），回溯历史时需要逐层计算差异 Git 快照存储：每次提交时，Git 会对当前整个项目的文件状态拍摄一张完整的快照 高效优化：对于未修改的文件，Git 不会重复存储，而是保留一个指向原有文件对象的引用，既保证了快照的完整性，又节省了存储空间 1.3 内容寻址存储 Git 的本质是一个基于内容的键值对数据库： 所有数据在存储前都会计算 SHA-1 哈希值（40 位十六进制字符串） 哈希值由文件内容计算得出，内容不变则哈希值不变 这保证了数据的完整性：任何文件内容的篡改都会导致哈希值变化，Git 可以立即检测到 1.4 三区域工作模型 Git 将文件的状态划分为三个区域，构成了完整的工作流： 工作区（Working Directory）：用户直接编辑文件的目录，是你能直接看到和修改的文件 暂存区（Staging Area / Index）：临时存储区域，保存了你准备下次提交的修改，位于 \\.git/index 版本库（Repository）：Git 的核心数据库，存储了项目的所有元数据和对象，位于 \\.git 目录 基本工作流程： 1 工作区修改 → git add → 暂存区标记 → git commit → 版本库永久存储 二、Git 存储机制详解 Git 的所有数据都存储在 \\."><meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content='https://SymphonyW.github.io/zh-cn/p/git%E5%8E%9F%E7%90%86%E4%B8%8E%E9%9D%A2%E8%AF%95%E6%8C%87%E5%8D%97/background.jpg' />
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/zh-cn/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hua20e9d08cce84e79524a418ee5d4524c_7426_300x0_resize_box_3.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">😁</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/zh-cn">SymphonyW</a></h1>
+            <h2 class="site-description">Welcome to my Blog.</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0'
+                        target="_blank"
+                        title="Bilibili"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.0.0-beta2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M488.6 104.1C505.3 122.2 513 143.8 511.9 169.8V372.2C511.5 398.6 502.7 420.3 485.4 437.3C468.2 454.3 446.3 463.2 419.9 464H92.02C65.57 463.2 43.81 454.2 26.74 436.8C9.682 419.4 .7667 396.5 0 368.2V169.8C.7667 143.8 9.682 122.2 26.74 104.1C43.81 87.75 65.57 78.77 92.02 78H121.4L96.05 52.19C90.3 46.46 87.42 39.19 87.42 30.4C87.42 21.6 90.3 14.34 96.05 8.603C101.8 2.868 109.1 0 117.9 0C126.7 0 134 2.868 139.8 8.603L213.1 78H301.1L375.6 8.603C381.7 2.868 389.2 0 398 0C406.8 0 414.1 2.868 419.9 8.603C425.6 14.34 428.5 21.6 428.5 30.4C428.5 39.19 425.6 46.46 419.9 52.19L394.6 78L423.9 78C450.3 78.77 471.9 87.75 488.6 104.1H488.6zM449.8 173.8C449.4 164.2 446.1 156.4 439.1 150.3C433.9 144.2 425.1 140.9 416.4 140.5H96.05C86.46 140.9 78.6 144.2 72.47 150.3C66.33 156.4 63.07 164.2 62.69 173.8V368.2C62.69 377.4 65.95 385.2 72.47 391.7C78.99 398.2 86.85 401.5 96.05 401.5H416.4C425.6 401.5 433.4 398.2 439.7 391.7C446 385.2 449.4 377.4 449.8 368.2L449.8 173.8zM185.5 216.5C191.8 222.8 195.2 230.6 195.6 239.7V273C195.2 282.2 191.9 289.9 185.8 296.2C179.6 302.5 171.8 305.7 162.2 305.7C152.6 305.7 144.7 302.5 138.6 296.2C132.5 289.9 129.2 282.2 128.8 273V239.7C129.2 230.6 132.6 222.8 138.9 216.5C145.2 210.2 152.1 206.9 162.2 206.5C171.4 206.9 179.2 210.2 185.5 216.5H185.5zM377 216.5C383.3 222.8 386.7 230.6 387.1 239.7V273C386.7 282.2 383.4 289.9 377.3 296.2C371.2 302.5 363.3 305.7 353.7 305.7C344.1 305.7 336.3 302.5 330.1 296.2C323.1 289.9 320.7 282.2 320.4 273V239.7C320.7 230.6 324.1 222.8 330.4 216.5C336.7 210.2 344.5 206.9 353.7 206.5C362.9 206.9 370.7 210.2 377 216.5H377z"/></svg>
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://github.com/SymphonyW'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/zh-cn/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>归档</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>搜索</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/%E9%93%BE%E6%8E%A5/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>链接</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://SymphonyW.github.io/" >English</option>
+                                
+                                    <option value="https://SymphonyW.github.io/zh-cn/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#一git-核心原理">一、Git 核心原理</a>
+      <ol>
+        <li><a href="#11-分布式架构">1.1 分布式架构</a></li>
+        <li><a href="#12-快照存储而非差异存储">1.2 快照存储而非差异存储</a></li>
+        <li><a href="#13-内容寻址存储">1.3 内容寻址存储</a></li>
+        <li><a href="#14-三区域工作模型">1.4 三区域工作模型</a></li>
+      </ol>
+    </li>
+    <li><a href="#二git-存储机制详解">二、Git 存储机制详解</a>
+      <ol>
+        <li><a href="#21-四大核心对象">2.1 四大核心对象</a>
+          <ol>
+            <li><a href="#对象关系示例">对象关系示例</a></li>
+          </ol>
+        </li>
+        <li><a href="#22-对象存储方式">2.2 对象存储方式</a></li>
+        <li><a href="#23-引用机制references">2.3 引用机制（References）</a></li>
+      </ol>
+    </li>
+    <li><a href="#三git-高频面试题">三、Git 高频面试题</a>
+      <ol>
+        <li><a href="#31-基础概念类">3.1 基础概念类</a>
+          <ol>
+            <li><a href="#q1-git-和-svn-的核心区别是什么">Q1: Git 和 SVN 的核心区别是什么？</a></li>
+            <li><a href="#q2-工作区暂存区版本库的区别">Q2: 工作区、暂存区、版本库的区别？</a></li>
+            <li><a href="#q3-git-pull-和-git-fetch-的区别">Q3: git pull 和 git fetch 的区别？</a></li>
+          </ol>
+        </li>
+        <li><a href="#32-分支与合并类">3.2 分支与合并类</a>
+          <ol>
+            <li><a href="#q4-merge-和-rebase-的区别">Q4: merge 和 rebase 的区别？</a></li>
+            <li><a href="#q5-分支合并冲突如何处理">Q5: 分支合并冲突如何处理？</a></li>
+            <li><a href="#q6-什么是-fast-forward-合并">Q6: 什么是 Fast-forward 合并？</a></li>
+          </ol>
+        </li>
+        <li><a href="#33-撤销与回滚类">3.3 撤销与回滚类</a>
+          <ol>
+            <li><a href="#q7-git-reset-和-git-revert-的区别">Q7: git reset 和 git revert 的区别？</a></li>
+            <li><a href="#q8-如何撤销工作区的修改">Q8: 如何撤销工作区的修改？</a></li>
+            <li><a href="#q9-如何撤销暂存区的修改">Q9: 如何撤销暂存区的修改？</a></li>
+            <li><a href="#q10-什么是-git-stash如何使用">Q10: 什么是 git stash？如何使用？</a></li>
+          </ol>
+        </li>
+        <li><a href="#34-故障处理类">3.4 故障处理类</a>
+          <ol>
+            <li><a href="#q11-如何恢复误删的分支">Q11: 如何恢复误删的分支？</a></li>
+            <li><a href="#q12-提交后发现写错了提交信息怎么修改">Q12: 提交后发现写错了提交信息，怎么修改？</a></li>
+          </ol>
+        </li>
+        <li><a href="#35-工作流类">3.5 工作流类</a>
+          <ol>
+            <li><a href="#q13-你了解-git-flow-工作流吗">Q13: 你了解 Git Flow 工作流吗？</a></li>
+            <li><a href="#q14-如何将多个提交合并为一个">Q14: 如何将多个提交合并为一个？</a></li>
+          </ol>
+        </li>
+        <li><a href="#36-原理深入类">3.6 原理深入类</a>
+          <ol>
+            <li><a href="#q15-git-是如何存储数据的">Q15: Git 是如何存储数据的？</a></li>
+            <li><a href="#q16-为什么-git-的分支这么轻量">Q16: 为什么 Git 的分支这么轻量？</a></li>
+          </ol>
+        </li>
+      </ol>
+    </li>
+    <li><a href="#参考资料">参考资料</a></li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="has-image main-article">
+    <header class="article-header">
+        <div class="article-image">
+            <a href="/zh-cn/p/git%E5%8E%9F%E7%90%86%E4%B8%8E%E9%9D%A2%E8%AF%95%E6%8C%87%E5%8D%97/">
+                <img src="/zh-cn/p/git%E5%8E%9F%E7%90%86%E4%B8%8E%E9%9D%A2%E8%AF%95%E6%8C%87%E5%8D%97/background_hud7e36f7e20e71be184458283bdae4646_55974_800x0_resize_q75_box.jpg"
+                        srcset="/zh-cn/p/git%E5%8E%9F%E7%90%86%E4%B8%8E%E9%9D%A2%E8%AF%95%E6%8C%87%E5%8D%97/background_hud7e36f7e20e71be184458283bdae4646_55974_800x0_resize_q75_box.jpg 800w, /zh-cn/p/git%E5%8E%9F%E7%90%86%E4%B8%8E%E9%9D%A2%E8%AF%95%E6%8C%87%E5%8D%97/background_hud7e36f7e20e71be184458283bdae4646_55974_1600x0_resize_q75_box.jpg 1600w"
+                        width="800" 
+                        height="534" 
+                        loading="lazy"
+                        alt="Featured image of post Git原理与面试指南" />
+                
+            </a>
+        </div>
+    
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/zh-cn/p/git%E5%8E%9F%E7%90%86%E4%B8%8E%E9%9D%A2%E8%AF%95%E6%8C%87%E5%8D%97/">Git原理与面试指南</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published">2026-01-22 17:06</time>
+            </div>
+        
+
+        
+    </footer>
+    
+
+    
+        <footer class="article-translations">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+            <div>
+                
+                    <a href="https://SymphonyW.github.io/p/git-principles-and-interview-guide/" class="link">English</a>
+                
+            </div>
+        </footer>
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="git原理与面试指南">Git原理与面试指南
+</h1><h2 id="一git-核心原理">一、Git 核心原理
+</h2><p>Git 是目前最流行的分布式版本控制系统，其核心设计思想颠覆了传统的集中式版本控制工具。</p>
+<h3 id="11-分布式架构">1.1 分布式架构
+</h3><p>与 SVN 等集中式工具不同，Git 的每个克隆仓库都是完整的独立版本库：</p>
+<ul>
+<li>
+<p><strong>全量历史</strong>：<code>git clone</code> 会下载项目的所有历史提交、分支和标签，而非仅下载最新版本</p>
+</li>
+<li>
+<p><strong>离线操作</strong>：绝大多数操作（提交、分支、查看历史）都可在本地完成，无需网络</p>
+</li>
+<li>
+<p><strong>冗余备份</strong>：每个开发者的本地仓库都是一份完整备份，服务器损坏时可通过任意本地仓库恢复</p>
+</li>
+</ul>
+<h3 id="12-快照存储而非差异存储">1.2 快照存储而非差异存储
+</h3><p>这是 Git 与传统版本控制系统最核心的区别：</p>
+<ul>
+<li>
+<p><strong>传统差异存储</strong>：SVN 等工具存储的是文件随时间的增量变更（delta），回溯历史时需要逐层计算差异</p>
+</li>
+<li>
+<p><strong>Git 快照存储</strong>：每次提交时，Git 会对当前整个项目的文件状态拍摄一张完整的快照</p>
+</li>
+<li>
+<p><strong>高效优化</strong>：对于未修改的文件，Git 不会重复存储，而是保留一个指向原有文件对象的引用，既保证了快照的完整性，又节省了存储空间</p>
+</li>
+</ul>
+<h3 id="13-内容寻址存储">1.3 内容寻址存储
+</h3><p>Git 的本质是一个基于内容的键值对数据库：</p>
+<ul>
+<li>
+<p>所有数据在存储前都会计算 SHA-1 哈希值（40 位十六进制字符串）</p>
+</li>
+<li>
+<p>哈希值由文件内容计算得出，内容不变则哈希值不变</p>
+</li>
+<li>
+<p>这保证了数据的完整性：任何文件内容的篡改都会导致哈希值变化，Git 可以立即检测到</p>
+</li>
+</ul>
+<h3 id="14-三区域工作模型">1.4 三区域工作模型
+</h3><p>Git 将文件的状态划分为三个区域，构成了完整的工作流：</p>
+<ol>
+<li>
+<p><strong>工作区（Working Directory）</strong>：用户直接编辑文件的目录，是你能直接看到和修改的文件</p>
+</li>
+<li>
+<p><strong>暂存区（Staging Area / Index）</strong>：临时存储区域，保存了你准备下次提交的修改，位于 <code>\.git/index</code></p>
+</li>
+<li>
+<p><strong>版本库（Repository）</strong>：Git 的核心数据库，存储了项目的所有元数据和对象，位于 <code>\.git</code> 目录</p>
+</li>
+</ol>
+<p>基本工作流程：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-Plain" data-lang="Plain"><span class="line"><span class="cl">工作区修改 → git add → 暂存区标记 → git commit → 版本库永久存储
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h2 id="二git-存储机制详解">二、Git 存储机制详解
+</h2><p>Git 的所有数据都存储在 <code>\.git/objects</code> 目录下，通过四大核心对象构建了整个版本历史。</p>
+<h3 id="21-四大核心对象">2.1 四大核心对象
+</h3><p>Git 内部有四种基本对象类型，所有版本控制功能都基于这四种对象构建：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>对象类型</th>
+<th>作用</th>
+<th>存储内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Blob</strong></td>
+<td>存储文件内容</td>
+<td>文件的二进制数据，不包含文件名、权限等元数据</td>
+</tr>
+<tr>
+<td><strong>Tree</strong></td>
+<td>存储目录结构</td>
+<td>文件名列表 + 对应 Blob / 子 Tree 的哈希引用，以及文件权限</td>
+</tr>
+<tr>
+<td><strong>Commit</strong></td>
+<td>记录提交快照</td>
+<td>根 Tree 哈希 + 父提交哈希 + 作者 / 提交者信息 + 提交说明</td>
+</tr>
+<tr>
+<td><strong>Tag</strong></td>
+<td>版本标记</td>
+<td>指向特定 Commit 的引用，附带标签信息，常用于版本发布</td>
+</tr>
+</tbody>
+</table></div>
+<h4 id="对象关系示例">对象关系示例
+</h4><p>一次提交的构建过程：</p>
+<ol>
+<li>
+<p>修改文件后，<code>git add</code> 会生成新的 Blob 对象存储文件内容</p>
+</li>
+<li>
+<p><code>git commit</code> 时，会生成 Tree 对象，记录当前目录下所有文件的引用</p>
+</li>
+<li>
+<p>最后生成 Commit 对象，指向根 Tree，并记录父提交、作者等信息</p>
+</li>
+</ol>
+<h3 id="22-对象存储方式">2.2 对象存储方式
+</h3><p>Git 对象有两种存储形态：</p>
+<ol>
+<li>
+<p><strong>松散对象（Loose Objects）</strong>：新建的对象首先以单独文件的形式存储</p>
+<ul>
+<li>
+<p>目录结构：<code>\.git/objects/xx/yyyyy\.\.\.</code>，其中 <code>xx</code> 是 SHA-1 前两位，剩余 38 位作为文件名</p>
+</li>
+<li>
+<p>内容使用 zlib 压缩，节省空间</p>
+</li>
+</ul>
+</li>
+<li>
+<p><strong>打包文件（Packfiles）</strong>：当仓库对象增多时，Git 会通过 <code>git gc</code> 进行垃圾回收</p>
+<ul>
+<li>
+<p>将多个松散对象打包成一个 <code>\.pack</code> 文件</p>
+</li>
+<li>
+<p>对相似对象使用增量压缩（Delta Compression），大幅节省存储空间</p>
+</li>
+<li>
+<p>配套的 <code>\.idx</code> 文件用于快速查找对象</p>
+</li>
+</ul>
+</li>
+</ol>
+<h3 id="23-引用机制references">2.3 引用机制（References）
+</h3><p>为了方便用户定位提交，Git 引入了引用机制：</p>
+<ul>
+<li>
+<p><strong>分支引用</strong>：存储在 <code>\.git/refs/heads/</code>，本质是一个 40 字节的文件，保存了分支最新 Commit 的哈希</p>
+<ul>
+<li>创建分支仅需新建一个指针文件，成本极低</li>
+</ul>
+</li>
+<li>
+<p><strong>标签引用</strong>：存储在 <code>\.git/refs/tags/</code>，指向特定的 Commit，用于标记版本</p>
+</li>
+<li>
+<p><strong>HEAD 引用</strong>：特殊的符号引用，指向当前所在的分支，例如 <code>ref: refs/heads/main</code></p>
+</li>
+<li>
+<p><strong>远程引用</strong>：存储在 <code>\.git/refs/remotes/</code>，跟踪远程仓库的分支状态</p>
+</li>
+</ul>
+<h2 id="三git-高频面试题">三、Git 高频面试题
+</h2><h3 id="31-基础概念类">3.1 基础概念类
+</h3><h4 id="q1-git-和-svn-的核心区别是什么">Q1: Git 和 SVN 的核心区别是什么？
+</h4><p><strong>A</strong>：</p>
+<ul>
+<li>
+<p>Git 是分布式版本控制系统，每个开发者都有完整的仓库历史；SVN 是集中式，只有中央服务器有完整历史</p>
+</li>
+<li>
+<p>Git 采用快照存储，每次提交保存完整项目状态；SVN 采用差异存储，仅保存文件变更</p>
+</li>
+<li>
+<p>Git 支持离线提交、分支操作等绝大多数本地操作；SVN 大部分操作需要联网</p>
+</li>
+<li>
+<p>Git 分支是轻量级指针，创建切换极快；SVN 分支是目录拷贝，成本较高</p>
+</li>
+</ul>
+<h4 id="q2-工作区暂存区版本库的区别">Q2: 工作区、暂存区、版本库的区别？
+</h4><p><strong>A</strong>：</p>
+<ul>
+<li>
+<p>工作区：本地编辑的文件目录，用户直接修改的地方</p>
+</li>
+<li>
+<p>暂存区：临时存储区域，保存了准备提交的修改，是工作区到版本库的缓冲</p>
+</li>
+<li>
+<p>版本库：Git 的核心数据库，存储了项目的所有版本历史，提交后数据永久保存</p>
+</li>
+</ul>
+<h4 id="q3-git-pull-和-git-fetch-的区别">Q3: git pull 和 git fetch 的区别？
+</h4><p><strong>A</strong>：</p>
+<ul>
+<li>
+<p><code>git fetch</code>：仅拉取远程仓库的更新到本地远程分支，不修改当前工作区，是安全的只读操作</p>
+</li>
+<li>
+<p><code>git pull</code>：等价于 <code>git fetch \+ git merge</code>，拉取更新后自动合并到当前分支，可能产生冲突</p>
+</li>
+</ul>
+<h3 id="32-分支与合并类">3.2 分支与合并类
+</h3><h4 id="q4-merge-和-rebase-的区别">Q4: merge 和 rebase 的区别？
+</h4><p><strong>A</strong>：</p>
+<ul>
+<li>
+<p><strong>merge</strong>：将两个分支的历史合并，会生成一个新的合并提交，保留完整的分支合并历史，适合公共分支</p>
+</li>
+<li>
+<p><strong>rebase</strong>：将当前分支的提交 “移植” 到目标分支的顶端，重写提交历史，得到线性的提交记录，适合个人特性分支整理</p>
+</li>
+<li>
+<p>注意：不要对已经推送到远程的公共分支使用 rebase，会导致团队成员的历史混乱</p>
+</li>
+</ul>
+<h4 id="q5-分支合并冲突如何处理">Q5: 分支合并冲突如何处理？
+</h4><p><strong>A</strong>：</p>
+<ol>
+<li>
+<p>通过 <code>git status</code> 查看冲突文件</p>
+</li>
+<li>
+<p>手动编辑冲突文件，删除 Git 插入的冲突标记（<code>\&amp;lt;\&amp;lt;\&amp;lt;\&amp;lt;\&amp;lt;\&amp;lt;\&amp;lt;</code>、<code>=======</code>、<code>\&amp;gt;\&amp;gt;\&amp;gt;\&amp;gt;\&amp;gt;\&amp;gt;\&amp;gt;</code>），保留正确的代码</p>
+</li>
+<li>
+<p>执行 <code>git add \&amp;lt;冲突文件\&amp;gt;</code> 标记冲突已解决</p>
+</li>
+<li>
+<p>执行 <code>git commit</code> 完成合并提交</p>
+</li>
+</ol>
+<h4 id="q6-什么是-fast-forward-合并">Q6: 什么是 Fast-forward 合并？
+</h4><p><strong>A</strong>：当目标分支是当前分支的直接祖先时，Git 不需要创建新的合并提交，只是简单地将目标分支的指针移动到当前分支的最新位置，这个过程就是快进合并。</p>
+<h3 id="33-撤销与回滚类">3.3 撤销与回滚类
+</h3><h4 id="q7-git-reset-和-git-revert-的区别">Q7: git reset 和 git revert 的区别？
+</h4><p><strong>A</strong>：</p>
+<ul>
+<li>
+<p><code>git reset</code>：移动分支指针，会重写历史，会删除后续的提交，适合本地未推送的提交回滚</p>
+<ul>
+<li>
+<p><code>\-\-soft</code>：仅撤销提交，修改保留在暂存区</p>
+</li>
+<li>
+<p><code>\-\-mixed</code>：撤销提交，修改保留在工作区（默认）</p>
+</li>
+<li>
+<p><code>\-\-hard</code>：彻底撤销提交和所有修改，数据可能丢失</p>
+</li>
+</ul>
+</li>
+<li>
+<p><code>git revert</code>：创建一个新的提交，来抵消目标提交的修改，不会修改历史，适合已经推送到远程的公共提交，是安全的回滚方式</p>
+</li>
+</ul>
+<h4 id="q8-如何撤销工作区的修改">Q8: 如何撤销工作区的修改？
+</h4><p><strong>A</strong>：</p>
+<ul>
+<li>
+<p>旧版命令：<code>git checkout \-\- \&amp;lt;file\&amp;gt;</code></p>
+</li>
+<li>
+<p>新版命令：<code>git restore \&amp;lt;file\&amp;gt;</code></p>
+</li>
+<li>
+<p>撤销所有工作区修改：<code>git checkout \-\- \.</code> 或 <code>git restore \.</code></p>
+</li>
+</ul>
+<h4 id="q9-如何撤销暂存区的修改">Q9: 如何撤销暂存区的修改？
+</h4><p><strong>A</strong>：</p>
+<ul>
+<li>
+<p>旧版命令：<code>git reset HEAD \&amp;lt;file\&amp;gt;</code></p>
+</li>
+<li>
+<p>新版命令：<code>git restore \-\-staged \&amp;lt;file\&amp;gt;</code></p>
+</li>
+</ul>
+<h4 id="q10-什么是-git-stash如何使用">Q10: 什么是 git stash？如何使用？
+</h4><p><strong>A</strong>：</p>
+<ul>
+<li>
+<p><code>git stash</code> 用于临时保存工作区未提交的修改，让工作区回到干净状态，方便切换分支处理其他任务</p>
+</li>
+<li>
+<p>常用操作：</p>
+<ul>
+<li>
+<p><code>git stash</code>：保存当前修改</p>
+</li>
+<li>
+<p><code>git stash list</code>：查看保存的 stash 列表</p>
+</li>
+<li>
+<p><code>git stash pop</code>：恢复最近的 stash 并删除它</p>
+</li>
+<li>
+<p><code>git stash apply</code>：恢复 stash 但保留记录</p>
+</li>
+</ul>
+</li>
+</ul>
+<h3 id="34-故障处理类">3.4 故障处理类
+</h3><h4 id="q11-如何恢复误删的分支">Q11: 如何恢复误删的分支？
+</h4><p><strong>A</strong>：
+通过 reflog 找回删除的提交：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">git reflog  <span class="c1"># 查看所有操作历史，找到分支删除前的提交哈希</span>
+</span></span><span class="line"><span class="cl">git checkout -b recover-branch &lt;commit-hash&gt;  <span class="c1"># 基于该提交重建分支</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h4 id="q12-提交后发现写错了提交信息怎么修改">Q12: 提交后发现写错了提交信息，怎么修改？
+</h4><p><strong>A</strong>：</p>
+<ul>
+<li>
+<p>如果是最后一次提交，未推送：<code>git commit \-\-amend</code>，可以修改最后一次的提交信息</p>
+</li>
+<li>
+<p>如果是多个历史提交，需要用交互式变基：<code>git rebase \-i HEAD\~n</code>，将需要修改的提交标记为 edit，然后修改后继续</p>
+</li>
+</ul>
+<h3 id="35-工作流类">3.5 工作流类
+</h3><h4 id="q13-你了解-git-flow-工作流吗">Q13: 你了解 Git Flow 工作流吗？
+</h4><p><strong>A</strong>：
+Git Flow 是一种经典的分支管理策略，定义了不同分支的用途：</p>
+<ul>
+<li>
+<p><code>main/master</code>：主分支，存储生产环境的稳定代码</p>
+</li>
+<li>
+<p><code>develop</code>：开发分支，集成了所有功能的开发代码</p>
+</li>
+<li>
+<p><code>feature/\*</code>：特性分支，从 develop 分出，用于开发新功能</p>
+</li>
+<li>
+<p><code>release/\*</code>：发布分支，从 develop 分出，用于准备版本发布</p>
+</li>
+<li>
+<p><code>hotfix/\*</code>：热修复分支，从 main 分出，用于修复线上紧急 bug</p>
+</li>
+</ul>
+<h4 id="q14-如何将多个提交合并为一个">Q14: 如何将多个提交合并为一个？
+</h4><p><strong>A</strong>：
+使用交互式变基：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">git rebase -i HEAD~3  <span class="c1"># 合并最近3个提交</span>
+</span></span><span class="line"><span class="cl"><span class="c1"># 在编辑器中，将后面的提交标记为 squash，保存退出后编辑最终的提交信息</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h3 id="36-原理深入类">3.6 原理深入类
+</h3><h4 id="q15-git-是如何存储数据的">Q15: Git 是如何存储数据的？
+</h4><p><strong>A</strong>：
+Git 本质是一个内容寻址的键值数据库，核心是四大对象：Blob、Tree、Commit、Tag。所有对象通过 SHA-1 哈希唯一标识，存储在 <code>\.git/objects</code> 目录。每次提交保存完整的项目快照，未修改的文件复用原有对象，通过 zlib 压缩和 pack 文件优化存储。</p>
+<h4 id="q16-为什么-git-的分支这么轻量">Q16: 为什么 Git 的分支这么轻量？
+</h4><p><strong>A</strong>：
+因为 Git 的分支本质上只是一个指向 Commit 的 40 字节的指针文件。创建分支仅需新建一个小文件，不需要拷贝整个目录，所以创建和切换都极其高效。</p>
+<h2 id="参考资料">参考资料
+</h2><ul>
+<li>
+<p><a class="link" href="https://git-scm.com/book/zh/v2"  target="_blank" rel="noopener"
+    >Git 官方文档</a></p>
+</li>
+<li>
+<p>深入 Git 内部原理与对象模型</p>
+</li>
+<li>
+<p>Git 高频面试题汇总</p>
+</li>
+</ul>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/zh-cn/tags/version-control/">Version Control</a>
+        
+            <a href="/zh-cn/tags/interview/">Interview</a>
+        
+            <a href="/zh-cn/tags/git/">Git</a>
+        
+    </section>
+
+
+    </footer>
+
+
+    
+</article>
+
+    
+
+    
+
+     
+    
+        
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+        2026 SymphonyW
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.26.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+<script>
+window.MathJax = {
+  tex: {
+    
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  svg: {
+    fontCache: 'global'
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    </body>
+</html>
