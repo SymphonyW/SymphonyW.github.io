@@ -1,18 +1,18 @@
 <!DOCTYPE html>
 <html lang="zh-cn" dir="ltr">
     <head><meta charset='utf-8'>
-<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="数据库 - Redis 面试八股文 本文档整理了后端开发面试中关于 Redis 最常被问到的高频面试题和深度解析，重点聚焦于底层原理、高并发场景下的缓存设计及高可用架构。 一、 核心基础与数据结构 1. Redis 为什么这么快？ 官方测试 Redis 的 QPS 可以达到 10万+，主要原因有： 完全基于内存：绝大部分请求是纯粹的内存操作，速度极快。 高效的数据结构：Redis 专门设计了如 SDS（简单动态字符串）、跳表（SkipList）、压缩列表（ZipList）等高效的数据结构。 单线程模型：Redis 的网络 IO 和键值对读写是由一个线程来完成的，避免了不必要的上下文切换和竞争条件，不存在加锁释放锁操作造成的性能损耗。（注：Redis 6.0 引入了多线程，但也只是用于网络 I/O 阶段，命令执行依然是单线程）。 I/O 多路复用模型：采用 epoll 作为 I/O 多路复用技术的实现，非阻塞 I/O，可以同时监听多个 Socket。 2. Redis 的五种基本数据类型及其底层数据结构？ 面试不仅会问应用场景，一定会深挖底层结构： | 数据类型 | 应用场景 | 底层数据结构（Redis 3.2+ / 7.0+ 有所演进） | | :&mdash; | :&mdash; | :&mdash; | | String | 缓存、计数器、分布式锁、Session | SDS (简单动态字符串)。比 C 字符串更安全、获取长度 O(1)、防止缓冲区溢出。 |">
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="数据库 - Redis 面试八股文 本文档整理了后端开发面试中关于 Redis 最常被问到的高频面试题和深度解析，重点聚焦于底层原理、高并发场景下的缓存设计及高可用架构。 一、 核心基础与数据结构 1. Redis 为什么这么快？ 官方测试 Redis 的 QPS 可以达到 10万+，主要原因有： 完全基于内存：绝大部分请求是纯粹的内存操作，速度极快。 高效的数据结构：Redis 专门设计了如 SDS（简单动态字符串）、跳表（SkipList）、压缩列表（ZipList）等高效的数据结构。 单线程模型：Redis 的网络 IO 和键值对读写是由一个线程来完成的，避免了不必要的上下文切换和竞争条件，不存在加锁释放锁操作造成的性能损耗。（注：Redis 6.0 引入了多线程，但也只是用于网络 I/O 阶段，命令执行依然是单线程）。 I/O 多路复用模型：采用 epoll 作为 I/O 多路复用技术的实现，非阻塞 I/O，可以同时监听多个 Socket。 2. Redis 的五种基本数据类型及其底层数据结构？ 面试不仅会问应用场景，一定会深挖底层结构： 数据类型 应用场景 底层数据结构（Redis 3.2+ / 7.0+ 有所演进） String 缓存、计数器、分布式锁、Session SDS (简单动态字符串)。比 C 字符串更安全、获取长度 O(1)、防止缓冲区溢出。 List 消息队列、文章列表、粉丝列表 QuickList (快速列表，双向链表 + 压缩列表的组合)。 Hash 存储对象、购物车 ZipList (压缩列表，数据少时) / HashTable (哈希表/字典，数据多时)。注：Redis 7.0 后 ZipList 替换为 ListPack。 Set 共同好友、点赞、抽奖 IntSet (整数集合，元素全为整数且较少时) / HashTable (字典)。 ZSet (Sorted Set) 排行榜、延时队列 ZipList (数据少时) / SkipList + HashTable (跳跃表+字典)。跳表保证范围查询效率 O(logN)，字典保证单点查询 O(1)。 3.">
 <title>Redis面试八股文（持续更新）</title>
 
 <link rel='canonical' href='https://SymphonyW.github.io/zh-cn/p/redis%E9%9D%A2%E8%AF%95%E5%85%AB%E8%82%A1%E6%96%87%E6%8C%81%E7%BB%AD%E6%9B%B4%E6%96%B0/'>
 
 <link rel="stylesheet" href="/scss/style.min.fcb8ae9ec4ce6e601e4b352c4eb06a952a123e46064b9bae06de6961bd51fd81.css"><meta property='og:title' content="Redis面试八股文（持续更新）">
-<meta property='og:description' content="数据库 - Redis 面试八股文 本文档整理了后端开发面试中关于 Redis 最常被问到的高频面试题和深度解析，重点聚焦于底层原理、高并发场景下的缓存设计及高可用架构。 一、 核心基础与数据结构 1. Redis 为什么这么快？ 官方测试 Redis 的 QPS 可以达到 10万+，主要原因有： 完全基于内存：绝大部分请求是纯粹的内存操作，速度极快。 高效的数据结构：Redis 专门设计了如 SDS（简单动态字符串）、跳表（SkipList）、压缩列表（ZipList）等高效的数据结构。 单线程模型：Redis 的网络 IO 和键值对读写是由一个线程来完成的，避免了不必要的上下文切换和竞争条件，不存在加锁释放锁操作造成的性能损耗。（注：Redis 6.0 引入了多线程，但也只是用于网络 I/O 阶段，命令执行依然是单线程）。 I/O 多路复用模型：采用 epoll 作为 I/O 多路复用技术的实现，非阻塞 I/O，可以同时监听多个 Socket。 2. Redis 的五种基本数据类型及其底层数据结构？ 面试不仅会问应用场景，一定会深挖底层结构： | 数据类型 | 应用场景 | 底层数据结构（Redis 3.2+ / 7.0+ 有所演进） | | :&mdash; | :&mdash; | :&mdash; | | String | 缓存、计数器、分布式锁、Session | SDS (简单动态字符串)。比 C 字符串更安全、获取长度 O(1)、防止缓冲区溢出。 |">
+<meta property='og:description' content="数据库 - Redis 面试八股文 本文档整理了后端开发面试中关于 Redis 最常被问到的高频面试题和深度解析，重点聚焦于底层原理、高并发场景下的缓存设计及高可用架构。 一、 核心基础与数据结构 1. Redis 为什么这么快？ 官方测试 Redis 的 QPS 可以达到 10万+，主要原因有： 完全基于内存：绝大部分请求是纯粹的内存操作，速度极快。 高效的数据结构：Redis 专门设计了如 SDS（简单动态字符串）、跳表（SkipList）、压缩列表（ZipList）等高效的数据结构。 单线程模型：Redis 的网络 IO 和键值对读写是由一个线程来完成的，避免了不必要的上下文切换和竞争条件，不存在加锁释放锁操作造成的性能损耗。（注：Redis 6.0 引入了多线程，但也只是用于网络 I/O 阶段，命令执行依然是单线程）。 I/O 多路复用模型：采用 epoll 作为 I/O 多路复用技术的实现，非阻塞 I/O，可以同时监听多个 Socket。 2. Redis 的五种基本数据类型及其底层数据结构？ 面试不仅会问应用场景，一定会深挖底层结构： 数据类型 应用场景 底层数据结构（Redis 3.2+ / 7.0+ 有所演进） String 缓存、计数器、分布式锁、Session SDS (简单动态字符串)。比 C 字符串更安全、获取长度 O(1)、防止缓冲区溢出。 List 消息队列、文章列表、粉丝列表 QuickList (快速列表，双向链表 + 压缩列表的组合)。 Hash 存储对象、购物车 ZipList (压缩列表，数据少时) / HashTable (哈希表/字典，数据多时)。注：Redis 7.0 后 ZipList 替换为 ListPack。 Set 共同好友、点赞、抽奖 IntSet (整数集合，元素全为整数且较少时) / HashTable (字典)。 ZSet (Sorted Set) 排行榜、延时队列 ZipList (数据少时) / SkipList + HashTable (跳跃表+字典)。跳表保证范围查询效率 O(logN)，字典保证单点查询 O(1)。 3.">
 <meta property='og:url' content='https://SymphonyW.github.io/zh-cn/p/redis%E9%9D%A2%E8%AF%95%E5%85%AB%E8%82%A1%E6%96%87%E6%8C%81%E7%BB%AD%E6%9B%B4%E6%96%B0/'>
 <meta property='og:site_name' content='SymphonyW'>
 <meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='Redis' /><meta property='article:tag' content='Backend' /><meta property='article:tag' content='Interview' /><meta property='article:published_time' content='2026-03-25T22:08:57&#43;08:00'/><meta property='article:modified_time' content='2026-03-25T22:08:57&#43;08:00'/>
 <meta name="twitter:title" content="Redis面试八股文（持续更新）">
-<meta name="twitter:description" content="数据库 - Redis 面试八股文 本文档整理了后端开发面试中关于 Redis 最常被问到的高频面试题和深度解析，重点聚焦于底层原理、高并发场景下的缓存设计及高可用架构。 一、 核心基础与数据结构 1. Redis 为什么这么快？ 官方测试 Redis 的 QPS 可以达到 10万+，主要原因有： 完全基于内存：绝大部分请求是纯粹的内存操作，速度极快。 高效的数据结构：Redis 专门设计了如 SDS（简单动态字符串）、跳表（SkipList）、压缩列表（ZipList）等高效的数据结构。 单线程模型：Redis 的网络 IO 和键值对读写是由一个线程来完成的，避免了不必要的上下文切换和竞争条件，不存在加锁释放锁操作造成的性能损耗。（注：Redis 6.0 引入了多线程，但也只是用于网络 I/O 阶段，命令执行依然是单线程）。 I/O 多路复用模型：采用 epoll 作为 I/O 多路复用技术的实现，非阻塞 I/O，可以同时监听多个 Socket。 2. Redis 的五种基本数据类型及其底层数据结构？ 面试不仅会问应用场景，一定会深挖底层结构： | 数据类型 | 应用场景 | 底层数据结构（Redis 3.2+ / 7.0+ 有所演进） | | :&mdash; | :&mdash; | :&mdash; | | String | 缓存、计数器、分布式锁、Session | SDS (简单动态字符串)。比 C 字符串更安全、获取长度 O(1)、防止缓冲区溢出。 |">
+<meta name="twitter:description" content="数据库 - Redis 面试八股文 本文档整理了后端开发面试中关于 Redis 最常被问到的高频面试题和深度解析，重点聚焦于底层原理、高并发场景下的缓存设计及高可用架构。 一、 核心基础与数据结构 1. Redis 为什么这么快？ 官方测试 Redis 的 QPS 可以达到 10万+，主要原因有： 完全基于内存：绝大部分请求是纯粹的内存操作，速度极快。 高效的数据结构：Redis 专门设计了如 SDS（简单动态字符串）、跳表（SkipList）、压缩列表（ZipList）等高效的数据结构。 单线程模型：Redis 的网络 IO 和键值对读写是由一个线程来完成的，避免了不必要的上下文切换和竞争条件，不存在加锁释放锁操作造成的性能损耗。（注：Redis 6.0 引入了多线程，但也只是用于网络 I/O 阶段，命令执行依然是单线程）。 I/O 多路复用模型：采用 epoll 作为 I/O 多路复用技术的实现，非阻塞 I/O，可以同时监听多个 Socket。 2. Redis 的五种基本数据类型及其底层数据结构？ 面试不仅会问应用场景，一定会深挖底层结构： 数据类型 应用场景 底层数据结构（Redis 3.2+ / 7.0+ 有所演进） String 缓存、计数器、分布式锁、Session SDS (简单动态字符串)。比 C 字符串更安全、获取长度 O(1)、防止缓冲区溢出。 List 消息队列、文章列表、粉丝列表 QuickList (快速列表，双向链表 + 压缩列表的组合)。 Hash 存储对象、购物车 ZipList (压缩列表，数据少时) / HashTable (哈希表/字典，数据多时)。注：Redis 7.0 后 ZipList 替换为 ListPack。 Set 共同好友、点赞、抽奖 IntSet (整数集合，元素全为整数且较少时) / HashTable (字典)。 ZSet (Sorted Set) 排行榜、延时队列 ZipList (数据少时) / SkipList + HashTable (跳跃表+字典)。跳表保证范围查询效率 O(logN)，字典保证单点查询 O(1)。 3.">
     <link rel="shortcut icon" href="/favicon.ico" />
 
     </head>
@@ -413,13 +413,42 @@
 </ol>
 <h3 id="2-redis-的五种基本数据类型及其底层数据结构"><strong>2. Redis 的五种基本数据类型及其底层数据结构？</strong>
 </h3><p>面试不仅会问应用场景，一定会深挖底层结构：</p>
-<p>| 数据类型 | 应用场景 | 底层数据结构（Redis 3.2+ / 7.0+ 有所演进） |</p>
-<p>| :&mdash; | :&mdash; | :&mdash; |</p>
-<p>| <strong>String</strong> | 缓存、计数器、分布式锁、Session | <strong>SDS</strong> (简单动态字符串)。比 C 字符串更安全、获取长度 O(1)、防止缓冲区溢出。 |</p>
-<p>| <strong>List</strong> | 消息队列、文章列表、粉丝列表 | <strong>QuickList</strong> (快速列表，双向链表 + 压缩列表的组合)。 |</p>
-<p>| <strong>Hash</strong> | 存储对象、购物车 | <strong>ZipList</strong> (压缩列表，数据少时) / <strong>HashTable</strong> (哈希表/字典，数据多时)。<em>注：Redis 7.0 后 ZipList 替换为 ListPack。</em> |</p>
-<p>| <strong>Set</strong> | 共同好友、点赞、抽奖 | <strong>IntSet</strong> (整数集合，元素全为整数且较少时) / <strong>HashTable</strong> (字典)。 |</p>
-<p>| <strong>ZSet (Sorted Set)</strong>| 排行榜、延时队列 | <strong>ZipList</strong> (数据少时) / <strong>SkipList + HashTable</strong> (跳跃表+字典)。跳表保证范围查询效率 O(logN)，字典保证单点查询 O(1)。 |</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th style="text-align:left">数据类型</th>
+<th style="text-align:left">应用场景</th>
+<th style="text-align:left">底层数据结构（Redis 3.2+ / 7.0+ 有所演进）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>String</strong></td>
+<td style="text-align:left">缓存、计数器、分布式锁、Session</td>
+<td style="text-align:left"><strong>SDS</strong> (简单动态字符串)。比 C 字符串更安全、获取长度 O(1)、防止缓冲区溢出。</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>List</strong></td>
+<td style="text-align:left">消息队列、文章列表、粉丝列表</td>
+<td style="text-align:left"><strong>QuickList</strong> (快速列表，双向链表 + 压缩列表的组合)。</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Hash</strong></td>
+<td style="text-align:left">存储对象、购物车</td>
+<td style="text-align:left"><strong>ZipList</strong> (压缩列表，数据少时) / <strong>HashTable</strong> (哈希表/字典，数据多时)。<em>注：Redis 7.0 后 ZipList 替换为 ListPack。</em></td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Set</strong></td>
+<td style="text-align:left">共同好友、点赞、抽奖</td>
+<td style="text-align:left"><strong>IntSet</strong> (整数集合，元素全为整数且较少时) / <strong>HashTable</strong> (字典)。</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>ZSet (Sorted Set)</strong></td>
+<td style="text-align:left">排行榜、延时队列</td>
+<td style="text-align:left"><strong>ZipList</strong> (数据少时) / <strong>SkipList + HashTable</strong> (跳跃表+字典)。跳表保证范围查询效率 O(logN)，字典保证单点查询 O(1)。</td>
+</tr>
+</tbody>
+</table></div>
 <h3 id="3-zset-为什么使用跳表skiplist而不是红黑树或-b-树"><strong>3. ZSet 为什么使用跳表（SkipList）而不是红黑树或 B+ 树？</strong>
 </h3><ul>
 <li><strong>对比红黑树</strong>：跳表实现更简单；在进行范围查找（如排行榜获取前 10 名）时，跳表只需要找到起点然后顺着底层链表遍历即可，而红黑树需要中序遍历，跳表效率更高；跳表的插入/删除只需修改相邻节点的指针，不需要像红黑树那样做复杂的旋转。</li>
