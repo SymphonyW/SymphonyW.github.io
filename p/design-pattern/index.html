@@ -1,0 +1,2240 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="写给新手的详细设计模式入门手册，从原理到代码，手把手带你吃透几种常用设计模式。 前言：为什么要学设计模式？ 如果你是一个刚入门的 C++ 开发者，你可能会问：&quot; 我会写for循环，会用类和对象，能把功能跑通不就行了吗？为什么要学什么设计模式？&quot; 别急，我们来看一个真实的场景： 假设你写了一个计算器程序，一开始只支持加法。代码很简单： 1 2 3 4 5 int calculate(int a, int b, string op) { if (op == &#34;add&#34;) { return a + b; } } 后来你加了减法： 1 2 3 4 5 6 7 int calculate(int a, int b, string op) { if (op == &#34;add&#34;) { return a + b; } else if (op == &#34;sub&#34;) { return a - b; } } 再加乘法、除法&hellip; 最后这个calculate函数变得几百行，每次加新功能都要改这个函数，改着改着就改错了，而且测试起来也特别麻烦。">
+<title>Design Pattern</title>
+
+<link rel='canonical' href='https://SymphonyW.github.io/p/design-pattern/'>
+
+<link rel="stylesheet" href="/scss/style.min.fcb8ae9ec4ce6e601e4b352c4eb06a952a123e46064b9bae06de6961bd51fd81.css"><meta property='og:title' content="Design Pattern">
+<meta property='og:description' content="写给新手的详细设计模式入门手册，从原理到代码，手把手带你吃透几种常用设计模式。 前言：为什么要学设计模式？ 如果你是一个刚入门的 C++ 开发者，你可能会问：&quot; 我会写for循环，会用类和对象，能把功能跑通不就行了吗？为什么要学什么设计模式？&quot; 别急，我们来看一个真实的场景： 假设你写了一个计算器程序，一开始只支持加法。代码很简单： 1 2 3 4 5 int calculate(int a, int b, string op) { if (op == &#34;add&#34;) { return a + b; } } 后来你加了减法： 1 2 3 4 5 6 7 int calculate(int a, int b, string op) { if (op == &#34;add&#34;) { return a + b; } else if (op == &#34;sub&#34;) { return a - b; } } 再加乘法、除法&hellip; 最后这个calculate函数变得几百行，每次加新功能都要改这个函数，改着改着就改错了，而且测试起来也特别麻烦。">
+<meta property='og:url' content='https://SymphonyW.github.io/p/design-pattern/'>
+<meta property='og:site_name' content='SymphonyW'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='Design Pattern' /><meta property='article:published_time' content='2026-04-01T16:36:24&#43;08:00'/><meta property='article:modified_time' content='2026-04-01T16:36:24&#43;08:00'/><meta property='og:image' content='https://SymphonyW.github.io/p/design-pattern/bg.png' />
+<meta name="twitter:title" content="Design Pattern">
+<meta name="twitter:description" content="写给新手的详细设计模式入门手册，从原理到代码，手把手带你吃透几种常用设计模式。 前言：为什么要学设计模式？ 如果你是一个刚入门的 C++ 开发者，你可能会问：&quot; 我会写for循环，会用类和对象，能把功能跑通不就行了吗？为什么要学什么设计模式？&quot; 别急，我们来看一个真实的场景： 假设你写了一个计算器程序，一开始只支持加法。代码很简单： 1 2 3 4 5 int calculate(int a, int b, string op) { if (op == &#34;add&#34;) { return a + b; } } 后来你加了减法： 1 2 3 4 5 6 7 int calculate(int a, int b, string op) { if (op == &#34;add&#34;) { return a + b; } else if (op == &#34;sub&#34;) { return a - b; } } 再加乘法、除法&hellip; 最后这个calculate函数变得几百行，每次加新功能都要改这个函数，改着改着就改错了，而且测试起来也特别麻烦。"><meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content='https://SymphonyW.github.io/p/design-pattern/bg.png' />
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="Toggle Menu">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hua20e9d08cce84e79524a418ee5d4524c_7426_300x0_resize_box_3.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">😁</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">SymphonyW</a></h1>
+            <h2 class="site-description">Welcome to my Blog.</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0'
+                        target="_blank"
+                        title="Bilibili"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.0.0-beta2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M488.6 104.1C505.3 122.2 513 143.8 511.9 169.8V372.2C511.5 398.6 502.7 420.3 485.4 437.3C468.2 454.3 446.3 463.2 419.9 464H92.02C65.57 463.2 43.81 454.2 26.74 436.8C9.682 419.4 .7667 396.5 0 368.2V169.8C.7667 143.8 9.682 122.2 26.74 104.1C43.81 87.75 65.57 78.77 92.02 78H121.4L96.05 52.19C90.3 46.46 87.42 39.19 87.42 30.4C87.42 21.6 90.3 14.34 96.05 8.603C101.8 2.868 109.1 0 117.9 0C126.7 0 134 2.868 139.8 8.603L213.1 78H301.1L375.6 8.603C381.7 2.868 389.2 0 398 0C406.8 0 414.1 2.868 419.9 8.603C425.6 14.34 428.5 21.6 428.5 30.4C428.5 39.19 425.6 46.46 419.9 52.19L394.6 78L423.9 78C450.3 78.77 471.9 87.75 488.6 104.1H488.6zM449.8 173.8C449.4 164.2 446.1 156.4 439.1 150.3C433.9 144.2 425.1 140.9 416.4 140.5H96.05C86.46 140.9 78.6 144.2 72.47 150.3C66.33 156.4 63.07 164.2 62.69 173.8V368.2C62.69 377.4 65.95 385.2 72.47 391.7C78.99 398.2 86.85 401.5 96.05 401.5H416.4C425.6 401.5 433.4 398.2 439.7 391.7C446 385.2 449.4 377.4 449.8 368.2L449.8 173.8zM185.5 216.5C191.8 222.8 195.2 230.6 195.6 239.7V273C195.2 282.2 191.9 289.9 185.8 296.2C179.6 302.5 171.8 305.7 162.2 305.7C152.6 305.7 144.7 302.5 138.6 296.2C132.5 289.9 129.2 282.2 128.8 273V239.7C129.2 230.6 132.6 222.8 138.9 216.5C145.2 210.2 152.1 206.9 162.2 206.5C171.4 206.9 179.2 210.2 185.5 216.5H185.5zM377 216.5C383.3 222.8 386.7 230.6 387.1 239.7V273C386.7 282.2 383.4 289.9 377.3 296.2C371.2 302.5 363.3 305.7 353.7 305.7C344.1 305.7 336.3 302.5 330.1 296.2C323.1 289.9 320.7 282.2 320.4 273V239.7C320.7 230.6 324.1 222.8 330.4 216.5C336.7 210.2 344.5 206.9 353.7 206.5C362.9 206.9 370.7 210.2 377 216.5H377z"/></svg>
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://github.com/SymphonyW'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>Home</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://SymphonyW.github.io/" selected>English</option>
+                                
+                                    <option value="https://SymphonyW.github.io/zh-cn/" >中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>Dark Mode</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">Table of contents</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#前言为什么要学设计模式">前言：为什么要学设计模式？</a></li>
+    <li><a href="#一设计模式入门先搞懂这几个概念">一、设计模式入门：先搞懂这几个概念</a>
+      <ol>
+        <li><a href="#11-什么是设计模式">1.1 什么是设计模式？</a></li>
+        <li><a href="#12-23-种模式的分类">1.2 23 种模式的分类</a>
+          <ol>
+            <li><a href="#1-创建型模式5-种">1. 创建型模式（5 种）</a></li>
+            <li><a href="#2-结构型模式7-种">2. 结构型模式（7 种）</a></li>
+            <li><a href="#3-行为型模式11-种">3. 行为型模式（11 种）</a></li>
+          </ol>
+        </li>
+        <li><a href="#13-设计模式的基石solid-原则">1.3 设计模式的基石：SOLID 原则</a>
+          <ol>
+            <li><a href="#1-单一职责原则srp">1. 单一职责原则（SRP）</a></li>
+            <li><a href="#2-开闭原则ocp">2. 开闭原则（OCP）</a></li>
+            <li><a href="#3-里氏替换原则lsp">3. 里氏替换原则（LSP）</a></li>
+            <li><a href="#4-接口隔离原则isp">4. 接口隔离原则（ISP）</a></li>
+            <li><a href="#5-依赖倒置原则dip">5. 依赖倒置原则（DIP）</a></li>
+          </ol>
+        </li>
+      </ol>
+    </li>
+    <li><a href="#二创建型模式搞定对象的创建">二、创建型模式：搞定对象的创建</a>
+      <ol>
+        <li><a href="#21-单例模式singleton全局唯一的实例">2.1 单例模式（Singleton）：全局唯一的实例</a>
+          <ol>
+            <li><a href="#它解决了什么问题">它解决了什么问题？</a></li>
+            <li><a href="#核心思路">核心思路</a></li>
+            <li><a href="#uml-类图">UML 类图</a></li>
+            <li><a href="#c-代码实现推荐线程安全版">C++ 代码实现（推荐！线程安全版）</a></li>
+            <li><a href="#运行结果">运行结果</a></li>
+            <li><a href="#注意事项">注意事项</a></li>
+          </ol>
+        </li>
+        <li><a href="#22-工厂模式factory对象创建的-代工厂">2.2 工厂模式（Factory）：对象创建的 &ldquo;代工厂&rdquo;</a>
+          <ol>
+            <li><a href="#它解决了什么问题-1">它解决了什么问题？</a></li>
+            <li><a href="#工厂方法模式最常用的工厂">工厂方法模式：最常用的工厂</a></li>
+            <li><a href="#uml-类图-1">UML 类图</a></li>
+            <li><a href="#c-代码实现">C++ 代码实现</a></li>
+            <li><a href="#运行结果-1">运行结果</a></li>
+            <li><a href="#什么时候用工厂模式">什么时候用工厂模式？</a></li>
+          </ol>
+        </li>
+      </ol>
+    </li>
+    <li><a href="#三结构型模式搞定类的组合">三、结构型模式：搞定类的组合</a>
+      <ol>
+        <li><a href="#31-适配器模式adapter给旧接口做个-转接头">3.1 适配器模式（Adapter）：给旧接口做个 &ldquo;转接头&rdquo;</a>
+          <ol>
+            <li><a href="#它解决了什么问题-2">它解决了什么问题？</a></li>
+            <li><a href="#uml-类图-2">UML 类图</a></li>
+            <li><a href="#c-代码实现-1">C++ 代码实现</a></li>
+            <li><a href="#运行结果-2">运行结果</a></li>
+          </ol>
+        </li>
+        <li><a href="#32-装饰器模式decorator动态给对象-加-buff">3.2 装饰器模式（Decorator）：动态给对象 &ldquo;加 buff&rdquo;</a>
+          <ol>
+            <li><a href="#它解决了什么问题-3">它解决了什么问题？</a></li>
+            <li><a href="#uml-类图-3">UML 类图</a></li>
+            <li><a href="#c-代码实现-2">C++ 代码实现</a></li>
+            <li><a href="#运行结果-3">运行结果</a></li>
+          </ol>
+        </li>
+      </ol>
+    </li>
+    <li><a href="#四行为型模式搞定对象的交互">四、行为型模式：搞定对象的交互</a>
+      <ol>
+        <li><a href="#41-观察者模式observer一对多的-订阅---发布">4.1 观察者模式（Observer）：一对多的 &ldquo;订阅 - 发布&rdquo;</a>
+          <ol>
+            <li><a href="#它解决了什么问题-4">它解决了什么问题？</a></li>
+            <li><a href="#uml-类图-4">UML 类图</a></li>
+            <li><a href="#c-代码实现-3">C++ 代码实现</a></li>
+            <li><a href="#运行结果-4">运行结果</a></li>
+          </ol>
+        </li>
+        <li><a href="#42-策略模式strategy动态切换算法">4.2 策略模式（Strategy）：动态切换算法</a>
+          <ol>
+            <li><a href="#它解决了什么问题-5">它解决了什么问题？</a></li>
+            <li><a href="#uml-类图-5">UML 类图</a></li>
+            <li><a href="#c-代码实现-4">C++ 代码实现</a></li>
+            <li><a href="#运行结果-5">运行结果</a></li>
+          </ol>
+        </li>
+      </ol>
+    </li>
+    <li><a href="#五怎么学好设计模式">五、怎么学好设计模式？</a>
+      <ol>
+        <li><a href="#51-不要死记硬背">5.1 不要死记硬背</a></li>
+        <li><a href="#52-先写坏代码再重构">5.2 先写坏代码，再重构</a></li>
+        <li><a href="#53-不要过度设计">5.3 不要过度设计</a></li>
+        <li><a href="#54-从常用的模式开始学">5.4 从常用的模式开始学</a></li>
+      </ol>
+    </li>
+    <li><a href="#总结">总结</a></li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="has-image main-article">
+    <header class="article-header">
+        <div class="article-image">
+            <a href="/p/design-pattern/">
+                <img src="/p/design-pattern/bg_hu51126b9bc0e986376dbf73765f55cf5f_895832_800x0_resize_box_3.png"
+                        srcset="/p/design-pattern/bg_hu51126b9bc0e986376dbf73765f55cf5f_895832_800x0_resize_box_3.png 800w, /p/design-pattern/bg_hu51126b9bc0e986376dbf73765f55cf5f_895832_1600x0_resize_box_3.png 1600w"
+                        width="800" 
+                        height="437" 
+                        loading="lazy"
+                        alt="Featured image of post Design Pattern" />
+                
+            </a>
+        </div>
+    
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/p/design-pattern/">Design Pattern</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published">2026-04-01 16:36</time>
+            </div>
+        
+
+        
+    </footer>
+    
+
+    
+        <footer class="article-translations">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+            <div>
+                
+                    <a href="https://SymphonyW.github.io/zh-cn/p/%E8%AE%BE%E8%AE%A1%E6%A8%A1%E5%BC%8F/" class="link">中文</a>
+                
+            </div>
+        </footer>
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <blockquote>
+<p>写给新手的详细设计模式入门手册，从原理到代码，手把手带你吃透几种常用设计模式。</p>
+</blockquote>
+<h2 id="前言为什么要学设计模式">前言：为什么要学设计模式？
+</h2><p>如果你是一个刚入门的 C++ 开发者，你可能会问：&quot; 我会写<code>for</code>循环，会用类和对象，能把功能跑通不就行了吗？为什么要学什么设计模式？&quot;</p>
+<p>别急，我们来看一个真实的场景：</p>
+<p>假设你写了一个计算器程序，一开始只支持加法。代码很简单：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-cpp" data-lang="cpp"><span class="line"><span class="cl"><span class="kt">int</span> <span class="nf">calculate</span><span class="p">(</span><span class="kt">int</span> <span class="n">a</span><span class="p">,</span> <span class="kt">int</span> <span class="n">b</span><span class="p">,</span> <span class="n">string</span> <span class="n">op</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">if</span> <span class="p">(</span><span class="n">op</span> <span class="o">==</span> <span class="s">&#34;add&#34;</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="k">return</span> <span class="n">a</span> <span class="o">+</span> <span class="n">b</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>后来你加了减法：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-cpp" data-lang="cpp"><span class="line"><span class="cl"><span class="kt">int</span> <span class="nf">calculate</span><span class="p">(</span><span class="kt">int</span> <span class="n">a</span><span class="p">,</span> <span class="kt">int</span> <span class="n">b</span><span class="p">,</span> <span class="n">string</span> <span class="n">op</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">if</span> <span class="p">(</span><span class="n">op</span> <span class="o">==</span> <span class="s">&#34;add&#34;</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="k">return</span> <span class="n">a</span> <span class="o">+</span> <span class="n">b</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span> <span class="k">else</span> <span class="k">if</span> <span class="p">(</span><span class="n">op</span> <span class="o">==</span> <span class="s">&#34;sub&#34;</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="k">return</span> <span class="n">a</span> <span class="o">-</span> <span class="n">b</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>再加乘法、除法&hellip; 最后这个<code>calculate</code>函数变得几百行，每次加新功能都要改这个函数，改着改着就改错了，而且测试起来也特别麻烦。</p>
+<p>这就是<strong>坏代码</strong>的典型特征：</p>
+<ul>
+<li>
+<p><strong>耦合度高</strong>：所有逻辑都堆在一起，改一处影响全身</p>
+</li>
+<li>
+<p><strong>可维护性差</strong>：加新功能要改老代码，容易出 Bug</p>
+</li>
+<li>
+<p><strong>可读性差</strong>：几百行的函数，谁看谁头疼</p>
+</li>
+</ul>
+<p>而<strong>设计模式</strong>，就是前辈们总结出来的，解决这类常见问题的 &ldquo;最佳实践&rdquo;。它不是什么黑魔法，只是一套让代码变得<strong>优雅、可维护、可扩展</strong>的通用套路。</p>
+<h2 id="一设计模式入门先搞懂这几个概念">一、设计模式入门：先搞懂这几个概念
+</h2><h3 id="11-什么是设计模式">1.1 什么是设计模式？
+</h3><p>设计模式（Design Pattern）是对软件设计中普遍存在的各种问题，所提出的解决方案。</p>
+<p>简单来说：</p>
+<ul>
+<li>
+<p>它不是代码，而是<strong>解决问题的思路</strong></p>
+</li>
+<li>
+<p>它不是标准，而是<strong>最佳实践</strong></p>
+</li>
+<li>
+<p>它不是必须的，但学会了能让你少走很多弯路</p>
+</li>
+</ul>
+<p>1994 年，四位大牛（GoF, Gang of Four）出版了《设计模式：可复用面向对象软件的基础》，总结了 23 种经典的设计模式，这也是我们今天要学习的核心内容。</p>
+<h3 id="12-23-种模式的分类">1.2 23 种模式的分类
+</h3><p>这 23 种模式并不是杂乱无章的，它们可以分为三大类：</p>
+<h4 id="1-创建型模式5-种">1. 创建型模式（5 种）
+</h4><ul>
+<li>
+<p><strong>解决的问题</strong>：对象怎么创建？</p>
+</li>
+<li>
+<p><strong>核心思想</strong>：把对象的创建和使用分开，不让你到处<code>new</code>对象</p>
+</li>
+<li>
+<p>包括：单例、工厂方法、抽象工厂、建造者、原型</p>
+</li>
+</ul>
+<h4 id="2-结构型模式7-种">2. 结构型模式（7 种）
+</h4><ul>
+<li>
+<p><strong>解决的问题</strong>：类和对象怎么组合起来，形成更大的结构？</p>
+</li>
+<li>
+<p><strong>核心思想</strong>：如何让类的组合更灵活，功能复用更方便</p>
+</li>
+<li>
+<p>包括：适配器、桥接、组合、装饰、外观、享元、代理</p>
+</li>
+</ul>
+<h4 id="3-行为型模式11-种">3. 行为型模式（11 种）
+</h4><ul>
+<li>
+<p><strong>解决的问题</strong>：对象之间怎么通信？怎么分配职责？</p>
+</li>
+<li>
+<p><strong>核心思想</strong>：让对象之间的交互更解耦，行为更灵活</p>
+</li>
+<li>
+<p>包括：观察者、策略、模板方法、迭代器、命令、状态等</p>
+</li>
+</ul>
+<h3 id="13-设计模式的基石solid-原则">1.3 设计模式的基石：SOLID 原则
+</h3><p>在学习具体的模式之前，你必须先理解这 5 个基本原则，因为<strong>所有的设计模式，本质上都是为了更好地遵守这几个原则</strong>。</p>
+<h4 id="1-单一职责原则srp">1. 单一职责原则（SRP）
+</h4><blockquote>
+<p>一个类，只负责一件事。</p>
+</blockquote>
+<p>比如，一个<code>User</code>类，就只负责用户的数据；不要让它同时负责 &ldquo;把用户数据存到数据库&rdquo;，那是<code>UserRepository</code>的事。</p>
+<p>好处：改需求的时候，你只需要改对应的类，不会影响其他地方。</p>
+<h4 id="2-开闭原则ocp">2. 开闭原则（OCP）
+</h4><blockquote>
+<p>对扩展开放，对修改关闭。</p>
+</blockquote>
+<p>意思是：加新功能的时候，你应该加新的类 / 新的代码，而不是去改已经写好的、测试过的老代码。</p>
+<p>这是最重要的一个原则！比如你要加新的支付方式，加个新类就行了，不用去改原来的支付逻辑。</p>
+<h4 id="3-里氏替换原则lsp">3. 里氏替换原则（LSP）
+</h4><blockquote>
+<p>子类必须能替换掉它的父类，程序运行结果不变。</p>
+</blockquote>
+<p>比如，父类是<code>Bird</code>，有个<code>fly()</code>方法；子类<code>Penguin</code>（企鹅）也是鸟，但它不会飞。如果你强行让<code>Penguin</code>继承<code>Bird</code>，那调用<code>fly()</code>就会报错，这就违反了 LSP。</p>
+<p>你可以把<code>Bird</code>拆成两个接口：<code>Flyable</code>（会飞的鸟）和<code>NonFlyable</code>（不会飞的鸟），这样就不会有问题了。</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span><span class="lnt">9
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-C++" data-lang="C++"><span class="line"><span class="cl"><span class="k">class</span> <span class="nc">Flyable</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl"><span class="k">public</span><span class="o">:</span>
+</span></span><span class="line"><span class="cl">    <span class="k">virtual</span> <span class="kt">void</span> <span class="n">fly</span><span class="p">()</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl"><span class="p">};</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="k">class</span> <span class="nc">NonFlyable</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl"><span class="k">public</span><span class="o">:</span>
+</span></span><span class="line"><span class="cl">    <span class="k">virtual</span> <span class="kt">void</span> <span class="n">walk</span><span class="p">()</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl"><span class="p">};</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h4 id="4-接口隔离原则isp">4. 接口隔离原则（ISP）
+</h4><blockquote>
+<p>不要强迫客户端依赖它不需要的接口。</p>
+</blockquote>
+<p>简单说：接口要小而精，不要搞一个大而全的胖接口。比如，你不要搞一个<code>Animal</code>接口，里面既有<code>eat()</code>、<code>sleep()</code>，又有<code>fly()</code>、<code>swim()</code>，因为不是所有动物都会飞会游泳。</p>
+<p>你可以把接口拆成<code>Eater</code>、<code>Sleeper</code>、<code>Flyer</code>、<code>Swimmer</code>，每个类只实现它需要的接口，这样就更清晰了。</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-C++" data-lang="C++"><span class="line"><span class="cl"><span class="k">class</span> <span class="nc">Eater</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl"><span class="k">public</span><span class="o">:</span>
+</span></span><span class="line"><span class="cl">    <span class="k">virtual</span> <span class="kt">void</span> <span class="n">eat</span><span class="p">()</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl"><span class="p">};</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="k">class</span> <span class="nc">Sleeper</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl"><span class="k">public</span><span class="o">:</span>
+</span></span><span class="line"><span class="cl">    <span class="k">virtual</span> <span class="kt">void</span> <span class="n">sleep</span><span class="p">()</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl"><span class="p">};</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="k">class</span> <span class="nc">Flyer</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl"><span class="k">public</span><span class="o">:</span>
+</span></span><span class="line"><span class="cl">    <span class="k">virtual</span> <span class="kt">void</span> <span class="n">fly</span><span class="p">()</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl"><span class="p">};</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="k">class</span> <span class="nc">Swimmer</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl"><span class="k">public</span><span class="o">:</span>
+</span></span><span class="line"><span class="cl">    <span class="k">virtual</span> <span class="kt">void</span> <span class="n">swim</span><span class="p">()</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl"><span class="p">};</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h4 id="5-依赖倒置原则dip">5. 依赖倒置原则（DIP）
+</h4><blockquote>
+<p>依赖抽象，不要依赖具体实现。</p>
+</blockquote>
+<p>高层模块不要依赖低层模块，两者都要依赖抽象。</p>
+<p>比如，你开车，你只需要依赖 &ldquo;车&rdquo; 这个抽象（它能跑），而不要依赖具体是 &ldquo;宝马&rdquo; 还是 &ldquo;特斯拉&rdquo;。这样你换车的时候，完全不用改你开车的代码。</p>
+<hr>
+<h2 id="二创建型模式搞定对象的创建">二、创建型模式：搞定对象的创建
+</h2><h3 id="21-单例模式singleton全局唯一的实例">2.1 单例模式（Singleton）：全局唯一的实例
+</h3><h4 id="它解决了什么问题">它解决了什么问题？
+</h4><p>有时候，我们需要一个类，在整个程序里，<strong>只有一个实例</strong>。</p>
+<p>比如：</p>
+<ul>
+<li>
+<p>全局的配置管理器</p>
+</li>
+<li>
+<p>日志记录器</p>
+</li>
+<li>
+<p>数据库连接池</p>
+</li>
+</ul>
+<p>你肯定不想让别人随便<code>new</code>一个配置管理器，不然就会有好几个配置，数据就乱了。</p>
+<h4 id="核心思路">核心思路
+</h4><ol>
+<li>
+<p>把构造函数私有化，不让别人随便<code>new</code></p>
+</li>
+<li>
+<p>自己在类里面维护唯一的实例</p>
+</li>
+<li>
+<p>提供一个静态方法，让别人通过这个方法获取唯一的实例</p>
+</li>
+</ol>
+<h4 id="uml-类图">UML 类图
+</h4><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="2026-04-02-10-03-00.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="2026-04-02-10-03-00.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<h4 id="c-代码实现推荐线程安全版">C++ 代码实现（推荐！线程安全版）
+</h4><p>C++11 之后，局部静态变量的初始化是线程安全的，这是最简单最推荐的实现方式！</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span><span class="lnt">25
+</span><span class="lnt">26
+</span><span class="lnt">27
+</span><span class="lnt">28
+</span><span class="lnt">29
+</span><span class="lnt">30
+</span><span class="lnt">31
+</span><span class="lnt">32
+</span><span class="lnt">33
+</span><span class="lnt">34
+</span><span class="lnt">35
+</span><span class="lnt">36
+</span><span class="lnt">37
+</span><span class="lnt">38
+</span><span class="lnt">39
+</span><span class="lnt">40
+</span><span class="lnt">41
+</span><span class="lnt">42
+</span><span class="lnt">43
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-cpp" data-lang="cpp"><span class="line"><span class="cl"><span class="cp">#include</span> <span class="cpf">&lt;iostream&gt;</span><span class="cp">
+</span></span></span><span class="line"><span class="cl"><span class="cp">#include</span> <span class="cpf">&lt;string&gt;</span><span class="cp">
+</span></span></span><span class="line"><span class="cl"><span class="cp"></span>
+</span></span><span class="line"><span class="cl"><span class="k">class</span> <span class="nc">Logger</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl"><span class="k">private</span><span class="o">:</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">// 1. 私有构造函数！禁止外部创建实例
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="n">Logger</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&#34;Logger 实例创建了，只会执行一次！&#34;</span> <span class="o">&lt;&lt;</span> <span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="c1">// 2. 禁止拷贝构造和赋值操作，防止别人复制出一个新实例
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="n">Logger</span><span class="p">(</span><span class="k">const</span> <span class="n">Logger</span><span class="o">&amp;</span><span class="p">)</span> <span class="o">=</span> <span class="k">delete</span><span class="p">;</span> <span class="c1">// 禁止拷贝构造
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="n">Logger</span><span class="o">&amp;</span> <span class="k">operator</span><span class="o">=</span><span class="p">(</span><span class="k">const</span> <span class="n">Logger</span><span class="o">&amp;</span><span class="p">)</span> <span class="o">=</span> <span class="k">delete</span><span class="p">;</span> <span class="c1">// 禁止赋值操作
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>
+</span></span><span class="line"><span class="cl"><span class="k">public</span><span class="o">:</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">// 3.全局访问点，获取唯一的实例
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="k">static</span> <span class="n">Logger</span><span class="o">&amp;</span> <span class="n">getInstance</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="c1">// C++11 之后，局部静态变量的初始化是线程安全的，保证了单例模式在多线程环境下的正确性
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>        <span class="k">static</span> <span class="n">Logger</span> <span class="n">instance</span><span class="p">;</span> <span class="c1">// 局部静态变量，第一次调用时创建实例，之后直接返回
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>        <span class="k">return</span> <span class="n">instance</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="c1">// 业务方法：打印日志
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="kt">void</span> <span class="nf">log</span><span class="p">(</span><span class="k">const</span> <span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span> <span class="n">message</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&#34;日志: &#34;</span> <span class="o">&lt;&lt;</span> <span class="n">message</span> <span class="o">&lt;&lt;</span> <span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">};</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// 测试单例模式
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kt">int</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">// 不管你调用多少次getInstance()，都只会创建一个Logger实例
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="n">Logger</span><span class="o">::</span><span class="n">getInstance</span><span class="p">().</span><span class="n">log</span><span class="p">(</span><span class="s">&#34;程序启动了！&#34;</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl">    <span class="n">Logger</span><span class="o">::</span><span class="n">getInstance</span><span class="p">().</span><span class="n">log</span><span class="p">(</span><span class="s">&#34;用户登录了！&#34;</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="n">Logger</span><span class="o">&amp;</span> <span class="n">l1</span> <span class="o">=</span> <span class="n">Logger</span><span class="o">::</span><span class="n">getInstance</span><span class="p">();</span>
+</span></span><span class="line"><span class="cl">    <span class="n">Logger</span><span class="o">&amp;</span> <span class="n">l2</span> <span class="o">=</span> <span class="n">Logger</span><span class="o">::</span><span class="n">getInstance</span><span class="p">();</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="c1">// 如果输出的地址相同，说明l1和l2是同一个实例
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&#34;l1的地址: &#34;</span> <span class="o">&lt;&lt;</span> <span class="o">&amp;</span><span class="n">l1</span> <span class="o">&lt;&lt;</span> <span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&#34;l2的地址: &#34;</span> <span class="o">&lt;&lt;</span> <span class="o">&amp;</span><span class="n">l2</span> <span class="o">&lt;&lt;</span> <span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    
+</span></span><span class="line"><span class="cl">    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h4 id="运行结果">运行结果
+</h4><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-Plain" data-lang="Plain"><span class="line"><span class="cl">Logger 实例创建了，只会执行一次！
+</span></span><span class="line"><span class="cl">日志: 程序启动了！
+</span></span><span class="line"><span class="cl">日志: 用户登录了！
+</span></span><span class="line"><span class="cl">l1的地址: 0x7ff7c68530b0
+</span></span><span class="line"><span class="cl">l2的地址: 0x7ff7c68530b0
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="2026-04-01-16-47-23.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="2026-04-01-16-47-23.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<h4 id="注意事项">注意事项
+</h4><ul>
+<li>
+<p>不要用饿汉式（程序启动就创建），浪费内存</p>
+</li>
+<li>
+<p>不要用旧的双重检查锁（DCL），C++11 之前有内存重排序的问题</p>
+</li>
+<li>
+<p>直接用 Meyers&rsquo; Singleton（就是上面的代码），简单又安全！</p>
+</li>
+</ul>
+<hr>
+<h3 id="22-工厂模式factory对象创建的-代工厂">2.2 工厂模式（Factory）：对象创建的 &ldquo;代工厂&rdquo;
+</h3><h4 id="它解决了什么问题-1">它解决了什么问题？
+</h4><p>如果你的代码里到处都是<code>new</code>具体的类，比如：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-cpp" data-lang="cpp"><span class="line"><span class="cl"><span class="k">if</span> <span class="p">(</span><span class="n">type</span> <span class="o">==</span> <span class="s">&#34;word&#34;</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="n">doc</span> <span class="o">=</span> <span class="k">new</span> <span class="n">WordDocument</span><span class="p">();</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span> <span class="k">else</span> <span class="nf">if</span> <span class="p">(</span><span class="n">type</span> <span class="o">==</span> <span class="s">&#34;pdf&#34;</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="n">doc</span> <span class="o">=</span> <span class="k">new</span> <span class="n">PdfDocument</span><span class="p">();</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span> <span class="k">else</span> <span class="nf">if</span> <span class="p">(</span><span class="n">type</span> <span class="o">==</span> <span class="s">&#34;txt&#34;</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="n">doc</span> <span class="o">=</span> <span class="k">new</span> <span class="n">TxtDocument</span><span class="p">();</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>每次加新的文档类型，你都要改这段代码，而且这段代码会散落在你的项目里，维护起来巨麻烦。</p>
+<p>工厂模式就是把这些<code>new</code>的逻辑，统一放到一个 &ldquo;工厂&rdquo; 里，你要什么对象，找工厂要就行了，不用自己<code>new</code>。</p>
+<h4 id="工厂方法模式最常用的工厂">工厂方法模式：最常用的工厂
+</h4><p>工厂方法模式，就是给每个产品，配一个对应的工厂，完美符合开闭原则！</p>
+<h4 id="uml-类图-1">UML 类图
+</h4><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="2026-04-02-10-04-26.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="2026-04-02-10-04-26.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<h4 id="c-代码实现">C++ 代码实现
+</h4><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span><span class="lnt">25
+</span><span class="lnt">26
+</span><span class="lnt">27
+</span><span class="lnt">28
+</span><span class="lnt">29
+</span><span class="lnt">30
+</span><span class="lnt">31
+</span><span class="lnt">32
+</span><span class="lnt">33
+</span><span class="lnt">34
+</span><span class="lnt">35
+</span><span class="lnt">36
+</span><span class="lnt">37
+</span><span class="lnt">38
+</span><span class="lnt">39
+</span><span class="lnt">40
+</span><span class="lnt">41
+</span><span class="lnt">42
+</span><span class="lnt">43
+</span><span class="lnt">44
+</span><span class="lnt">45
+</span><span class="lnt">46
+</span><span class="lnt">47
+</span><span class="lnt">48
+</span><span class="lnt">49
+</span><span class="lnt">50
+</span><span class="lnt">51
+</span><span class="lnt">52
+</span><span class="lnt">53
+</span><span class="lnt">54
+</span><span class="lnt">55
+</span><span class="lnt">56
+</span><span class="lnt">57
+</span><span class="lnt">58
+</span><span class="lnt">59
+</span><span class="lnt">60
+</span><span class="lnt">61
+</span><span class="lnt">62
+</span><span class="lnt">63
+</span><span class="lnt">64
+</span><span class="lnt">65
+</span><span class="lnt">66
+</span><span class="lnt">67
+</span><span class="lnt">68
+</span><span class="lnt">69
+</span><span class="lnt">70
+</span><span class="lnt">71
+</span><span class="lnt">72
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-cpp" data-lang="cpp"><span class="line"><span class="cl"><span class="cp">#include</span> <span class="cpf">&lt;iostream&gt;</span><span class="cp">
+</span></span></span><span class="line"><span class="cl"><span class="cp">#include</span> <span class="cpf">&lt;memory&gt;</span><span class="cp"> </span><span class="c1">// 引入智能指针头文件，使用std::unique_ptr来管理资源，避免内存泄漏。
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>
+</span></span><span class="line"><span class="cl"><span class="c1">// ====================== 第一步：定义产品接口 ======================
+</span></span></span><span class="line"><span class="cl"><span class="c1">// 所有文档都要实现这个接口
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="k">class</span> <span class="nc">Document</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl"><span class="k">public</span><span class="o">:</span>
+</span></span><span class="line"><span class="cl">    <span class="k">virtual</span> <span class="o">~</span><span class="n">Document</span><span class="p">()</span> <span class="o">=</span> <span class="k">default</span><span class="p">;</span>   <span class="c1">// 虚析构函数，确保子类能正确析构
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="k">virtual</span> <span class="kt">void</span> <span class="nf">open</span><span class="p">()</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>            <span class="c1">// 打开文档，子类必须实现
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="p">};</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// 具体产品1：Word文档
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="k">class</span> <span class="nc">WordDoc</span> <span class="o">:</span> <span class="k">public</span> <span class="n">Document</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl"><span class="k">public</span><span class="o">:</span>
+</span></span><span class="line"><span class="cl">    <span class="kt">void</span> <span class="n">open</span><span class="p">()</span> <span class="k">override</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&#34;正在打开Word文档: xxx.docx&#34;</span> <span class="o">&lt;&lt;</span> <span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">};</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// 具体产品2：PDF文档
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="k">class</span> <span class="nc">PDFDoc</span> <span class="o">:</span> <span class="k">public</span> <span class="n">Document</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl"><span class="k">public</span><span class="o">:</span>
+</span></span><span class="line"><span class="cl">    <span class="kt">void</span> <span class="n">open</span><span class="p">()</span> <span class="k">override</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&#34;正在打开PDF文档: xxx.pdf&#34;</span> <span class="o">&lt;&lt;</span> <span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">};</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// ====================== 第二步：定义工厂接口 ======================
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="k">class</span> <span class="nc">DocumentFactory</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl"><span class="k">public</span><span class="o">:</span>
+</span></span><span class="line"><span class="cl">    <span class="k">virtual</span> <span class="o">~</span><span class="n">DocumentFactory</span><span class="p">()</span> <span class="o">=</span> <span class="k">default</span><span class="p">;</span>   <span class="c1">// 虚析构函数，确保子类能正确析构
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="k">virtual</span> <span class="n">std</span><span class="o">::</span><span class="n">unique_ptr</span><span class="o">&lt;</span><span class="n">Document</span><span class="o">&gt;</span> <span class="n">createDocument</span><span class="p">()</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>  <span class="c1">// 创建文档，子类必须实现
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="p">};</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// 具体工厂1：Word文档工厂
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="k">class</span> <span class="nc">WordDocFactory</span> <span class="o">:</span> <span class="k">public</span> <span class="n">DocumentFactory</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl"><span class="k">public</span><span class="o">:</span>
+</span></span><span class="line"><span class="cl">    <span class="n">std</span><span class="o">::</span><span class="n">unique_ptr</span><span class="o">&lt;</span><span class="n">Document</span><span class="o">&gt;</span> <span class="n">createDocument</span><span class="p">()</span> <span class="k">override</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="k">return</span> <span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">WordDoc</span><span class="o">&gt;</span><span class="p">();</span>  <span class="c1">// 创建并返回一个Word文档实例
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">};</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// 具体工厂2：PDF文档工厂
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="k">class</span> <span class="nc">PDFDocFactory</span> <span class="o">:</span> <span class="k">public</span> <span class="n">DocumentFactory</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl"><span class="k">public</span><span class="o">:</span>
+</span></span><span class="line"><span class="cl">    <span class="n">std</span><span class="o">::</span><span class="n">unique_ptr</span><span class="o">&lt;</span><span class="n">Document</span><span class="o">&gt;</span> <span class="n">createDocument</span><span class="p">()</span> <span class="k">override</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="k">return</span> <span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">PDFDoc</span><span class="o">&gt;</span><span class="p">();</span>  <span class="c1">// 创建并返回一个PDF文档实例
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">};</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// ====================== 第三步：使用工厂创建产品 ======================
+</span></span></span><span class="line"><span class="cl"><span class="c1">// 客户端只依赖工厂接口，不直接依赖具体产品
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kt">void</span> <span class="nf">clientCode</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">unique_ptr</span><span class="o">&lt;</span><span class="n">DocumentFactory</span><span class="o">&gt;</span> <span class="n">factory</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">auto</span> <span class="n">doc</span> <span class="o">=</span> <span class="n">factory</span><span class="o">-&gt;</span><span class="n">createDocument</span><span class="p">();</span>  <span class="c1">// 通过工厂创建文档
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="n">doc</span><span class="o">-&gt;</span><span class="n">open</span><span class="p">();</span>  <span class="c1">// 打开文档
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kt">int</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">// 我要打开Word文档，就传Word工厂
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="n">clientCode</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">WordDocFactory</span><span class="o">&gt;</span><span class="p">());</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="c1">// 我要打开PDF文档，就传PDF工厂
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="n">clientCode</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">PDFDocFactory</span><span class="o">&gt;</span><span class="p">());</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="c1">// 以后我要加TXT文档？
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="c1">// 只需要加一个TxtDoc类，再加一个TxtDocFactory类！
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="c1">// 完全不用改clientCode里的代码！完美符合开闭原则！
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    
+</span></span><span class="line"><span class="cl">    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// 这样的设计使得我们可以轻松地添加新的文档类型，而不需要修改现有的代码，符合开闭原则（Open/Closed Principle）。每个工厂负责创建一个特定类型的文档，客户端代码只依赖于工厂接口，不需要知道具体的文档实现细节。
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><h4 id="运行结果-1">运行结果
+</h4><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-Plain" data-lang="Plain"><span class="line"><span class="cl">正在打开Word文档：xxx.docx
+</span></span><span class="line"><span class="cl">正在打开PDF文档：xxx.pdf
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="2026-04-01-17-13-52.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="2026-04-01-17-13-52.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<h4 id="什么时候用工厂模式">什么时候用工厂模式？
+</h4><ul>
+<li>
+<p>你不知道运行时到底要创建哪个类的实例</p>
+</li>
+<li>
+<p>你想把对象的创建逻辑封装起来，统一管理</p>
+</li>
+<li>
+<p>你希望扩展新产品的时候，不用改老代码</p>
+</li>
+</ul>
+<hr>
+<h2 id="三结构型模式搞定类的组合">三、结构型模式：搞定类的组合
+</h2><h3 id="31-适配器模式adapter给旧接口做个-转接头">3.1 适配器模式（Adapter）：给旧接口做个 &ldquo;转接头&rdquo;
+</h3><h4 id="它解决了什么问题-2">它解决了什么问题？
+</h4><p>你有没有过这种情况：你有一个旧的类，它的接口和你现在系统需要的接口不兼容，但是你又不能改旧的代码（比如它是第三方库）。</p>
+<p>这时候你就需要一个<strong>转接头</strong>，把旧接口转换成新接口，这就是适配器模式。</p>
+<p>举个例子：</p>
+<ul>
+<li>
+<p>旧的打印机有个方法叫<code>printOld(string s)</code></p>
+</li>
+<li>
+<p>新系统需要的打印机接口是<code>print(string s)</code></p>
+</li>
+<li>
+<p>你搞个适配器，把<code>print</code>的调用，转成调用旧的<code>printOld</code></p>
+</li>
+</ul>
+<h4 id="uml-类图-2">UML 类图
+</h4><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="2026-04-02-14-21-40.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="2026-04-02-14-21-40.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<h4 id="c-代码实现-1">C++ 代码实现
+</h4><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span><span class="lnt">25
+</span><span class="lnt">26
+</span><span class="lnt">27
+</span><span class="lnt">28
+</span><span class="lnt">29
+</span><span class="lnt">30
+</span><span class="lnt">31
+</span><span class="lnt">32
+</span><span class="lnt">33
+</span><span class="lnt">34
+</span><span class="lnt">35
+</span><span class="lnt">36
+</span><span class="lnt">37
+</span><span class="lnt">38
+</span><span class="lnt">39
+</span><span class="lnt">40
+</span><span class="lnt">41
+</span><span class="lnt">42
+</span><span class="lnt">43
+</span><span class="lnt">44
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-cpp" data-lang="cpp"><span class="line"><span class="cl"><span class="cp">#include</span> <span class="cpf">&lt;iostream&gt;</span><span class="cp">
+</span></span></span><span class="line"><span class="cl"><span class="cp">#include</span> <span class="cpf">&lt;string&gt;</span><span class="cp">
+</span></span></span><span class="line"><span class="cl"><span class="cp"></span>
+</span></span><span class="line"><span class="cl"><span class="c1">// 新系统期望的接口
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="k">class</span> <span class="nc">Printer</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl"><span class="k">public</span><span class="o">:</span>
+</span></span><span class="line"><span class="cl">    <span class="k">virtual</span> <span class="o">~</span><span class="n">Printer</span><span class="p">()</span> <span class="o">=</span> <span class="k">default</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="k">virtual</span> <span class="kt">void</span> <span class="nf">print</span><span class="p">(</span><span class="k">const</span> <span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span> <span class="n">content</span><span class="p">)</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl"><span class="p">};</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// 旧系统的类，接口不兼容
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="k">class</span> <span class="nc">LegacyPrinter</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl"><span class="k">public</span><span class="o">:</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">// 旧的接口，与新的接口不兼容
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="kt">void</span> <span class="n">printOld</span><span class="p">(</span><span class="k">const</span> <span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span> <span class="n">content</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&#34;[旧系统打印]&#34;</span> <span class="o">&lt;&lt;</span> <span class="n">content</span> <span class="o">&lt;&lt;</span> <span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">};</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// 适配器，实现新的接口，同时持有旧系统的实例
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="k">class</span> <span class="nc">PrinterAdapter</span> <span class="o">:</span> <span class="k">public</span> <span class="n">Printer</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl"><span class="k">private</span><span class="o">:</span>
+</span></span><span class="line"><span class="cl">    <span class="n">LegacyPrinter</span> <span class="n">legacyPrinter</span><span class="p">;</span>        <span class="c1">// 持有旧的打印机
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>
+</span></span><span class="line"><span class="cl"><span class="k">public</span><span class="o">:</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">// 实现新的接口
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="kt">void</span> <span class="n">print</span><span class="p">(</span><span class="k">const</span> <span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span> <span class="n">content</span><span class="p">)</span> <span class="k">override</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="c1">// 把新接口的调用，转发给旧的打印机
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>        <span class="n">legacyPrinter</span><span class="p">.</span><span class="n">printOld</span><span class="p">(</span><span class="n">content</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">};</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// 客户端代码，只认识新的Printer接口
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kt">void</span> <span class="nf">usePrinter</span><span class="p">(</span><span class="n">Printer</span><span class="o">&amp;</span> <span class="n">printer</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="n">printer</span><span class="p">.</span><span class="n">print</span><span class="p">(</span><span class="s">&#34;Hello, Adapter!&#34;</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kt">int</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="n">PrinterAdapter</span> <span class="n">adapter</span><span class="p">;</span>  <span class="c1">// 创建适配器实例
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="n">usePrinter</span><span class="p">(</span><span class="n">adapter</span><span class="p">);</span>     <span class="c1">// 客户端使用适配器，实际上调用的是旧系统的打印机
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// 这样做的好处是，客户端代码只依赖于新的接口（Printer），而不需要修改旧系统的代码（LegacyPrinter）。适配器模式使得两个不兼容的接口能够协同工作，增加了系统的灵活性和可扩展性。
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><h4 id="运行结果-2">运行结果
+</h4><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-Plain" data-lang="Plain"><span class="line"><span class="cl">[旧系统打印] Hello, Adapter!
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="2026-04-01-17-31-19.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="2026-04-01-17-31-19.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<hr>
+<h3 id="32-装饰器模式decorator动态给对象-加-buff">3.2 装饰器模式（Decorator）：动态给对象 &ldquo;加 buff&rdquo;
+</h3><h4 id="它解决了什么问题-3">它解决了什么问题？
+</h4><p>如果你想给一个对象动态地添加功能，用继承的话，会导致 &ldquo;类爆炸&rdquo;。</p>
+<p>比如，咖啡：</p>
+<ul>
+<li>
+<p>基础咖啡</p>
+</li>
+<li>
+<p>咖啡 + 牛奶</p>
+</li>
+<li>
+<p>咖啡 + 糖</p>
+</li>
+<li>
+<p>咖啡 + 牛奶 + 糖</p>
+</li>
+<li>
+<p>咖啡 + 奶泡</p>
+</li>
+<li>
+<p>&hellip;</p>
+</li>
+</ul>
+<p>如果你用继承，你要写 N 多个子类：<code>CoffeeWithMilk</code>、<code>CoffeeWithSugar</code>、<code>CoffeeWithMilkAndSugar</code>&hellip; 这也太蠢了。</p>
+<p>装饰器模式就是解决这个的：你可以动态地给对象叠加功能，想加什么加什么。</p>
+<h4 id="uml-类图-3">UML 类图
+</h4><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="2026-04-02-14-23-43.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="2026-04-02-14-23-43.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<h4 id="c-代码实现-2">C++ 代码实现
+</h4><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span><span class="lnt">25
+</span><span class="lnt">26
+</span><span class="lnt">27
+</span><span class="lnt">28
+</span><span class="lnt">29
+</span><span class="lnt">30
+</span><span class="lnt">31
+</span><span class="lnt">32
+</span><span class="lnt">33
+</span><span class="lnt">34
+</span><span class="lnt">35
+</span><span class="lnt">36
+</span><span class="lnt">37
+</span><span class="lnt">38
+</span><span class="lnt">39
+</span><span class="lnt">40
+</span><span class="lnt">41
+</span><span class="lnt">42
+</span><span class="lnt">43
+</span><span class="lnt">44
+</span><span class="lnt">45
+</span><span class="lnt">46
+</span><span class="lnt">47
+</span><span class="lnt">48
+</span><span class="lnt">49
+</span><span class="lnt">50
+</span><span class="lnt">51
+</span><span class="lnt">52
+</span><span class="lnt">53
+</span><span class="lnt">54
+</span><span class="lnt">55
+</span><span class="lnt">56
+</span><span class="lnt">57
+</span><span class="lnt">58
+</span><span class="lnt">59
+</span><span class="lnt">60
+</span><span class="lnt">61
+</span><span class="lnt">62
+</span><span class="lnt">63
+</span><span class="lnt">64
+</span><span class="lnt">65
+</span><span class="lnt">66
+</span><span class="lnt">67
+</span><span class="lnt">68
+</span><span class="lnt">69
+</span><span class="lnt">70
+</span><span class="lnt">71
+</span><span class="lnt">72
+</span><span class="lnt">73
+</span><span class="lnt">74
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-cpp" data-lang="cpp"><span class="line"><span class="cl"><span class="cp">#include</span> <span class="cpf">&lt;iostream&gt;</span><span class="cp">
+</span></span></span><span class="line"><span class="cl"><span class="cp">#include</span> <span class="cpf">&lt;string&gt;</span><span class="cp">
+</span></span></span><span class="line"><span class="cl"><span class="cp">#include</span> <span class="cpf">&lt;memory&gt;</span><span class="cp">
+</span></span></span><span class="line"><span class="cl"><span class="cp"></span>
+</span></span><span class="line"><span class="cl"><span class="c1">// 咖啡的抽象接口
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="k">class</span> <span class="nc">Coffee</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl"><span class="k">public</span><span class="o">:</span>
+</span></span><span class="line"><span class="cl">    <span class="k">virtual</span> <span class="o">~</span><span class="n">Coffee</span><span class="p">()</span> <span class="o">=</span> <span class="k">default</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="k">virtual</span> <span class="n">std</span><span class="o">::</span><span class="n">string</span> <span class="n">getDescription</span><span class="p">()</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="k">virtual</span> <span class="kt">double</span> <span class="nf">getPrice</span><span class="p">()</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl"><span class="p">};</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// 基础咖啡：浓缩咖啡
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="k">class</span> <span class="nc">Espresso</span> <span class="o">:</span> <span class="k">public</span> <span class="n">Coffee</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl"><span class="k">public</span><span class="o">:</span>
+</span></span><span class="line"><span class="cl">    <span class="n">std</span><span class="o">::</span><span class="n">string</span> <span class="n">getDescription</span><span class="p">()</span> <span class="k">override</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="k">return</span> <span class="s">&#34;浓缩咖啡&#34;</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl">    <span class="kt">double</span> <span class="nf">getPrice</span><span class="p">()</span> <span class="k">override</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="k">return</span> <span class="mf">25.0</span><span class="p">;</span>        <span class="c1">// 基础价25
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">};</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// 装饰器的基类，是一个抽象类，继承自Coffee，并持有一个Coffee对象的指针
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="k">class</span> <span class="nc">CoffeeDecorator</span> <span class="o">:</span> <span class="k">public</span> <span class="n">Coffee</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl"><span class="k">protected</span><span class="o">:</span>      <span class="c1">// 保护成员，允许子类访问
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="n">std</span><span class="o">::</span><span class="n">unique_ptr</span><span class="o">&lt;</span><span class="n">Coffee</span><span class="o">&gt;</span> <span class="n">coffee</span><span class="p">;</span>     <span class="c1">// 持有被装饰的咖啡
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>
+</span></span><span class="line"><span class="cl"><span class="k">public</span><span class="o">:</span>
+</span></span><span class="line"><span class="cl">    <span class="n">CoffeeDecorator</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">unique_ptr</span><span class="o">&lt;</span><span class="n">Coffee</span><span class="o">&gt;</span> <span class="n">c</span><span class="p">)</span> <span class="o">:</span> <span class="n">coffee</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">c</span><span class="p">))</span> <span class="p">{}</span>
+</span></span><span class="line"><span class="cl"><span class="p">};</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// 具体的装饰器：加牛奶
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="k">class</span> <span class="nc">MilkDecorator</span> <span class="o">:</span> <span class="k">public</span> <span class="n">CoffeeDecorator</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl"><span class="k">public</span><span class="o">:</span>
+</span></span><span class="line"><span class="cl">    <span class="n">MilkDecorator</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">unique_ptr</span><span class="o">&lt;</span><span class="n">Coffee</span><span class="o">&gt;</span> <span class="n">c</span><span class="p">)</span> <span class="o">:</span> <span class="n">CoffeeDecorator</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">c</span><span class="p">))</span> <span class="p">{}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="n">std</span><span class="o">::</span><span class="n">string</span> <span class="n">getDescription</span><span class="p">()</span> <span class="k">override</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="k">return</span> <span class="n">coffee</span><span class="o">-&gt;</span><span class="n">getDescription</span><span class="p">()</span> <span class="o">+</span> <span class="s">&#34;, 加牛奶&#34;</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl">    <span class="kt">double</span> <span class="nf">getPrice</span><span class="p">()</span> <span class="k">override</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="k">return</span> <span class="n">coffee</span><span class="o">-&gt;</span><span class="n">getPrice</span><span class="p">()</span> <span class="o">+</span> <span class="mf">5.0</span><span class="p">;</span>  <span class="c1">// 牛奶加5元
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">};</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// 具体的装饰器：加糖
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="k">class</span> <span class="nc">SugarDecorator</span> <span class="o">:</span> <span class="k">public</span> <span class="n">CoffeeDecorator</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl"><span class="k">public</span><span class="o">:</span>
+</span></span><span class="line"><span class="cl">    <span class="n">SugarDecorator</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">unique_ptr</span><span class="o">&lt;</span><span class="n">Coffee</span><span class="o">&gt;</span> <span class="n">c</span><span class="p">)</span> <span class="o">:</span> <span class="n">CoffeeDecorator</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">c</span><span class="p">))</span> <span class="p">{}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="n">std</span><span class="o">::</span><span class="n">string</span> <span class="n">getDescription</span><span class="p">()</span> <span class="k">override</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="k">return</span> <span class="n">coffee</span><span class="o">-&gt;</span><span class="n">getDescription</span><span class="p">()</span> <span class="o">+</span> <span class="s">&#34;, 加糖&#34;</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="kt">double</span> <span class="nf">getPrice</span><span class="p">()</span> <span class="k">override</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="k">return</span> <span class="n">coffee</span><span class="o">-&gt;</span><span class="n">getPrice</span><span class="p">()</span> <span class="o">+</span> <span class="mf">2.0</span><span class="p">;</span>    <span class="c1">// 加糖2元
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">};</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kt">int</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">// 1. 先来一杯基础浓缩
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="n">std</span><span class="o">::</span><span class="n">unique_ptr</span><span class="o">&lt;</span><span class="n">Coffee</span><span class="o">&gt;</span> <span class="n">coffee</span> <span class="o">=</span> <span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">Espresso</span><span class="o">&gt;</span><span class="p">();</span>
+</span></span><span class="line"><span class="cl">    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="n">coffee</span><span class="o">-&gt;</span><span class="n">getDescription</span><span class="p">()</span> <span class="o">&lt;&lt;</span> <span class="s">&#34; | 价格：&#34;</span> <span class="o">&lt;&lt;</span> <span class="n">coffee</span><span class="o">-&gt;</span><span class="n">getPrice</span><span class="p">()</span> <span class="o">&lt;&lt;</span> <span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="c1">// 2. 加牛奶
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="n">coffee</span> <span class="o">=</span> <span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">MilkDecorator</span><span class="o">&gt;</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">coffee</span><span class="p">));</span>  <span class="c1">// 用装饰器包装原来的咖啡，把原来的咖啡转移到装饰器中
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="n">coffee</span><span class="o">-&gt;</span><span class="n">getDescription</span><span class="p">()</span> <span class="o">&lt;&lt;</span> <span class="s">&#34; | 价格：&#34;</span> <span class="o">&lt;&lt;</span> <span class="n">coffee</span><span class="o">-&gt;</span><span class="n">getPrice</span><span class="p">()</span> <span class="o">&lt;&lt;</span> <span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="c1">// 3. 再加糖
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="n">coffee</span> <span class="o">=</span> <span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">SugarDecorator</span><span class="o">&gt;</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">coffee</span><span class="p">));</span>  <span class="c1">// 再用装饰器包装一次
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="n">coffee</span><span class="o">-&gt;</span><span class="n">getDescription</span><span class="p">()</span> <span class="o">&lt;&lt;</span> <span class="s">&#34; | 价格：&#34;</span> <span class="o">&lt;&lt;</span> <span class="n">coffee</span><span class="o">-&gt;</span><span class="n">getPrice</span><span class="p">()</span> <span class="o">&lt;&lt;</span> <span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// 这样，我们通过装饰器模式，动态地为基础咖啡添加了牛奶和糖的功能，同时保持了代码的清晰和可维护性。每个装饰器都只关注自己添加的功能，而不需要修改原有的咖啡类，这符合开闭原则。
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><h4 id="运行结果-3">运行结果
+</h4><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-Plain" data-lang="Plain"><span class="line"><span class="cl">浓缩咖啡 | 价格: 25
+</span></span><span class="line"><span class="cl">浓缩咖啡, 加牛奶 | 价格: 30
+</span></span><span class="line"><span class="cl">浓缩咖啡, 加牛奶, 加糖 | 价格: 32
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="2026-04-01-21-05-39.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="2026-04-01-21-05-39.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<hr>
+<h2 id="四行为型模式搞定对象的交互">四、行为型模式：搞定对象的交互
+</h2><h3 id="41-观察者模式observer一对多的-订阅---发布">4.1 观察者模式（Observer）：一对多的 &ldquo;订阅 - 发布&rdquo;
+</h3><h4 id="它解决了什么问题-4">它解决了什么问题？
+</h4><p>当一个对象的状态发生变化时，你要自动通知所有依赖它的对象，让它们更新。</p>
+<p>这就是我们常说的<strong>发布 - 订阅模式</strong>！</p>
+<p>比如：</p>
+<ul>
+<li>
+<p>公众号发文章，所有订阅的粉丝都能收到通知</p>
+</li>
+<li>
+<p>气象站更新天气，所有的显示器（手机 APP、大屏、报警器）都要同步更新</p>
+</li>
+</ul>
+<h4 id="uml-类图-4">UML 类图
+</h4><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="2026-04-02-14-26-26.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="2026-04-02-14-26-26.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<h4 id="c-代码实现-3">C++ 代码实现
+</h4><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">  1
+</span><span class="lnt">  2
+</span><span class="lnt">  3
+</span><span class="lnt">  4
+</span><span class="lnt">  5
+</span><span class="lnt">  6
+</span><span class="lnt">  7
+</span><span class="lnt">  8
+</span><span class="lnt">  9
+</span><span class="lnt"> 10
+</span><span class="lnt"> 11
+</span><span class="lnt"> 12
+</span><span class="lnt"> 13
+</span><span class="lnt"> 14
+</span><span class="lnt"> 15
+</span><span class="lnt"> 16
+</span><span class="lnt"> 17
+</span><span class="lnt"> 18
+</span><span class="lnt"> 19
+</span><span class="lnt"> 20
+</span><span class="lnt"> 21
+</span><span class="lnt"> 22
+</span><span class="lnt"> 23
+</span><span class="lnt"> 24
+</span><span class="lnt"> 25
+</span><span class="lnt"> 26
+</span><span class="lnt"> 27
+</span><span class="lnt"> 28
+</span><span class="lnt"> 29
+</span><span class="lnt"> 30
+</span><span class="lnt"> 31
+</span><span class="lnt"> 32
+</span><span class="lnt"> 33
+</span><span class="lnt"> 34
+</span><span class="lnt"> 35
+</span><span class="lnt"> 36
+</span><span class="lnt"> 37
+</span><span class="lnt"> 38
+</span><span class="lnt"> 39
+</span><span class="lnt"> 40
+</span><span class="lnt"> 41
+</span><span class="lnt"> 42
+</span><span class="lnt"> 43
+</span><span class="lnt"> 44
+</span><span class="lnt"> 45
+</span><span class="lnt"> 46
+</span><span class="lnt"> 47
+</span><span class="lnt"> 48
+</span><span class="lnt"> 49
+</span><span class="lnt"> 50
+</span><span class="lnt"> 51
+</span><span class="lnt"> 52
+</span><span class="lnt"> 53
+</span><span class="lnt"> 54
+</span><span class="lnt"> 55
+</span><span class="lnt"> 56
+</span><span class="lnt"> 57
+</span><span class="lnt"> 58
+</span><span class="lnt"> 59
+</span><span class="lnt"> 60
+</span><span class="lnt"> 61
+</span><span class="lnt"> 62
+</span><span class="lnt"> 63
+</span><span class="lnt"> 64
+</span><span class="lnt"> 65
+</span><span class="lnt"> 66
+</span><span class="lnt"> 67
+</span><span class="lnt"> 68
+</span><span class="lnt"> 69
+</span><span class="lnt"> 70
+</span><span class="lnt"> 71
+</span><span class="lnt"> 72
+</span><span class="lnt"> 73
+</span><span class="lnt"> 74
+</span><span class="lnt"> 75
+</span><span class="lnt"> 76
+</span><span class="lnt"> 77
+</span><span class="lnt"> 78
+</span><span class="lnt"> 79
+</span><span class="lnt"> 80
+</span><span class="lnt"> 81
+</span><span class="lnt"> 82
+</span><span class="lnt"> 83
+</span><span class="lnt"> 84
+</span><span class="lnt"> 85
+</span><span class="lnt"> 86
+</span><span class="lnt"> 87
+</span><span class="lnt"> 88
+</span><span class="lnt"> 89
+</span><span class="lnt"> 90
+</span><span class="lnt"> 91
+</span><span class="lnt"> 92
+</span><span class="lnt"> 93
+</span><span class="lnt"> 94
+</span><span class="lnt"> 95
+</span><span class="lnt"> 96
+</span><span class="lnt"> 97
+</span><span class="lnt"> 98
+</span><span class="lnt"> 99
+</span><span class="lnt">100
+</span><span class="lnt">101
+</span><span class="lnt">102
+</span><span class="lnt">103
+</span><span class="lnt">104
+</span><span class="lnt">105
+</span><span class="lnt">106
+</span><span class="lnt">107
+</span><span class="lnt">108
+</span><span class="lnt">109
+</span><span class="lnt">110
+</span><span class="lnt">111
+</span><span class="lnt">112
+</span><span class="lnt">113
+</span><span class="lnt">114
+</span><span class="lnt">115
+</span><span class="lnt">116
+</span><span class="lnt">117
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-cpp" data-lang="cpp"><span class="line"><span class="cl"><span class="cp">#include</span> <span class="cpf">&lt;iostream&gt;</span><span class="cp">
+</span></span></span><span class="line"><span class="cl"><span class="cp">#include</span> <span class="cpf">&lt;vector&gt;</span><span class="cp">
+</span></span></span><span class="line"><span class="cl"><span class="cp">#include</span> <span class="cpf">&lt;string&gt;</span><span class="cp">
+</span></span></span><span class="line"><span class="cl"><span class="cp">#include</span> <span class="cpf">&lt;memory&gt;</span><span class="cp">
+</span></span></span><span class="line"><span class="cl"><span class="cp">#include</span> <span class="cpf">&lt;algorithm&gt;</span><span class="cp">  </span><span class="c1">// std::remove_if用于从vector中移除元素
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>
+</span></span><span class="line"><span class="cl"><span class="c1">// 前向声明
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="k">class</span> <span class="nc">Subject</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// 观察者接口
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="k">class</span> <span class="nc">Observer</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl"><span class="k">public</span><span class="o">:</span>
+</span></span><span class="line"><span class="cl">    <span class="k">virtual</span> <span class="o">~</span><span class="n">Observer</span><span class="p">()</span> <span class="o">=</span> <span class="k">default</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="k">virtual</span> <span class="kt">void</span> <span class="nf">update</span><span class="p">(</span><span class="n">Subject</span><span class="o">*</span> <span class="n">subject</span><span class="p">)</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>  <span class="c1">// 收到通知时更新
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="p">};</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// 主题（被观察者）接口
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="k">class</span> <span class="nc">Subject</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl"><span class="k">private</span><span class="o">:</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">// 保存所有的观察者，用weak_ptr避免循环引用，当观察者被销毁时，weak_ptr会自动失效
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">weak_ptr</span><span class="o">&lt;</span><span class="n">Observer</span><span class="o">&gt;&gt;</span> <span class="n">observers</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="k">public</span><span class="o">:</span>
+</span></span><span class="line"><span class="cl">    <span class="k">virtual</span> <span class="o">~</span><span class="n">Subject</span><span class="p">()</span> <span class="o">=</span> <span class="k">default</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="c1">// 订阅
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="kt">void</span> <span class="nf">attach</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">Observer</span><span class="o">&gt;</span> <span class="n">observer</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="n">observers</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="n">observer</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="c1">// 取消订阅
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="kt">void</span> <span class="nf">detach</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">Observer</span><span class="o">&gt;</span> <span class="n">observer</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="c1">// 使用remove_if和erase从observers中移除与observer相同的元素，wp.lock() == observer表示找到了要移除的观察者
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>        <span class="n">observers</span><span class="p">.</span><span class="n">erase</span><span class="p">(</span>
+</span></span><span class="line"><span class="cl">            <span class="n">std</span><span class="o">::</span><span class="n">remove_if</span><span class="p">(</span><span class="n">observers</span><span class="p">.</span><span class="n">begin</span><span class="p">(),</span><span class="n">observers</span><span class="p">.</span><span class="n">end</span><span class="p">(),</span>
+</span></span><span class="line"><span class="cl">            <span class="p">[</span><span class="o">&amp;</span><span class="p">](</span><span class="k">const</span> <span class="n">std</span><span class="o">::</span><span class="n">weak_ptr</span><span class="o">&lt;</span><span class="n">Observer</span><span class="o">&gt;&amp;</span> <span class="n">wp</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">                <span class="k">return</span> <span class="n">wp</span><span class="p">.</span><span class="n">lock</span><span class="p">()</span> <span class="o">==</span> <span class="n">observer</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">            <span class="p">}),</span>
+</span></span><span class="line"><span class="cl">            <span class="n">observers</span><span class="p">.</span><span class="n">end</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">        <span class="p">);</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="c1">// 通知所有观察者
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="kt">void</span> <span class="nf">notify</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="c1">// 遍历所有观察者，调用它们的update方法
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>        <span class="k">for</span> <span class="p">(</span><span class="k">auto</span><span class="o">&amp;</span> <span class="nl">wp</span> <span class="p">:</span> <span class="n">observers</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">            <span class="k">if</span> <span class="p">(</span><span class="k">auto</span> <span class="n">observer</span> <span class="o">=</span> <span class="n">wp</span><span class="p">.</span><span class="n">lock</span><span class="p">())</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">                <span class="n">observer</span><span class="o">-&gt;</span><span class="n">update</span><span class="p">(</span><span class="k">this</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl">            <span class="p">}</span>
+</span></span><span class="line"><span class="cl">        <span class="p">}</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="c1">// 状态接口
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="k">virtual</span> <span class="n">std</span><span class="o">::</span><span class="n">string</span> <span class="n">getState</span><span class="p">()</span> <span class="k">const</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="k">virtual</span> <span class="kt">void</span> <span class="nf">setState</span><span class="p">(</span><span class="k">const</span> <span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span> <span class="n">state</span><span class="p">)</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl"><span class="p">};</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// 具体的主题：气象站
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="k">class</span> <span class="nc">WeatherStation</span> <span class="o">:</span> <span class="k">public</span> <span class="n">Subject</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl"><span class="k">private</span><span class="o">:</span>
+</span></span><span class="line"><span class="cl">    <span class="n">std</span><span class="o">::</span><span class="n">string</span> <span class="n">weatherState</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="k">public</span><span class="o">:</span>
+</span></span><span class="line"><span class="cl">    <span class="n">std</span><span class="o">::</span><span class="n">string</span> <span class="n">getState</span><span class="p">()</span> <span class="k">const</span> <span class="k">override</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="k">return</span> <span class="n">weatherState</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="kt">void</span> <span class="nf">setState</span><span class="p">(</span><span class="k">const</span> <span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span> <span class="n">state</span><span class="p">)</span> <span class="k">override</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="n">weatherState</span> <span class="o">=</span> <span class="n">state</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">        <span class="n">notify</span><span class="p">();</span>       <span class="c1">// 状态一变，立刻通知所有人！
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">};</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// 具体的观察者
+</span></span></span><span class="line"><span class="cl"><span class="c1">// 观察者1：当前天气显示器
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="k">class</span> <span class="nc">CurrentDisplay</span> <span class="o">:</span> <span class="k">public</span> <span class="n">Observer</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl"><span class="k">public</span><span class="o">:</span>
+</span></span><span class="line"><span class="cl">    <span class="kt">void</span> <span class="n">update</span><span class="p">(</span><span class="n">Subject</span><span class="o">*</span> <span class="n">subject</span><span class="p">)</span> <span class="k">override</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&#34;【当前天气】：&#34;</span> <span class="o">&lt;&lt;</span> <span class="n">subject</span><span class="o">-&gt;</span><span class="n">getState</span><span class="p">()</span> <span class="o">&lt;&lt;</span> <span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">};</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// 观察者2：天气预报显示器
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="k">class</span> <span class="nc">ForecastDisplay</span> <span class="o">:</span> <span class="k">public</span> <span class="n">Observer</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl"><span class="k">public</span><span class="o">:</span>
+</span></span><span class="line"><span class="cl">    <span class="kt">void</span> <span class="n">update</span><span class="p">(</span><span class="n">Subject</span><span class="o">*</span> <span class="n">subject</span><span class="p">)</span> <span class="k">override</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="n">std</span><span class="o">::</span><span class="n">string</span> <span class="n">state</span> <span class="o">=</span> <span class="n">subject</span><span class="o">-&gt;</span><span class="n">getState</span><span class="p">();</span>
+</span></span><span class="line"><span class="cl">        <span class="n">std</span><span class="o">::</span><span class="n">string</span> <span class="n">forecast</span> <span class="o">=</span> <span class="p">(</span><span class="n">state</span> <span class="o">==</span> <span class="s">&#34;晴天&#34;</span><span class="p">)</span> <span class="o">?</span> <span class="s">&#34;明天也是晴天！&#34;</span> <span class="o">:</span> <span class="s">&#34;明天可能下雨，记得带伞&#34;</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">        <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&#34;【天气预报】：&#34;</span> <span class="o">&lt;&lt;</span> <span class="n">forecast</span> <span class="o">&lt;&lt;</span> <span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">};</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kt">int</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">// 创建气象站
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">Subject</span><span class="o">&gt;</span> <span class="n">station</span> <span class="o">=</span> <span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">WeatherStation</span><span class="o">&gt;</span><span class="p">();</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="c1">// 创建观察者
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">Observer</span><span class="o">&gt;</span> <span class="n">current</span> <span class="o">=</span> <span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">CurrentDisplay</span><span class="o">&gt;</span><span class="p">();</span>
+</span></span><span class="line"><span class="cl">    <span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">Observer</span><span class="o">&gt;</span> <span class="n">forecast</span> <span class="o">=</span> <span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">ForecastDisplay</span><span class="o">&gt;</span><span class="p">();</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="c1">// 订阅
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="n">station</span><span class="o">-&gt;</span><span class="n">attach</span><span class="p">(</span><span class="n">current</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl">    <span class="n">station</span><span class="o">-&gt;</span><span class="n">attach</span><span class="p">(</span><span class="n">forecast</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&#34;=== 气象站更新：晴天 ===&#34;</span> <span class="o">&lt;&lt;</span> <span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="n">station</span><span class="o">-&gt;</span><span class="n">setState</span><span class="p">(</span><span class="s">&#34;晴天&#34;</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="c1">// 小明取消了天气预报的订阅
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="n">station</span><span class="o">-&gt;</span><span class="n">detach</span><span class="p">(</span><span class="n">forecast</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&#34;=== 气象站更新：雨天 ===&#34;</span> <span class="o">&lt;&lt;</span> <span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="n">station</span><span class="o">-&gt;</span><span class="n">setState</span><span class="p">(</span><span class="s">&#34;雨天&#34;</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// 这样的设计使得观察者和主题之间的耦合度非常低，观察者可以自由地订阅和取消订阅，而主题只需要负责通知观察者即可。观察者模式非常适合实现事件驱动的系统，比如 GUI 应用、消息系统等。当主题的状态发生变化时，所有依赖它的观察者都会自动收到通知并更新自己，这极大地提高了系统的灵活性和可维护性。
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><h4 id="运行结果-4">运行结果
+</h4><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-Plain" data-lang="Plain"><span class="line"><span class="cl">=== 气象站更新：晴天 ===
+</span></span><span class="line"><span class="cl">【当前天气】: 晴天
+</span></span><span class="line"><span class="cl">【天气预报】: 明天也是晴天！
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">=== 气象站更新：雨天 ===
+</span></span><span class="line"><span class="cl">【当前天气】: 雨天
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="2026-04-01-21-49-33.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="2026-04-01-21-49-33.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<hr>
+<h3 id="42-策略模式strategy动态切换算法">4.2 策略模式（Strategy）：动态切换算法
+</h3><h4 id="它解决了什么问题-5">它解决了什么问题？
+</h4><p>如果你有多个算法，你想在运行的时候动态地切换它们，而且让算法的变化独立于使用算法的客户。</p>
+<p>比如：</p>
+<ul>
+<li>
+<p>排序，有时候用快排，有时候用冒泡</p>
+</li>
+<li>
+<p>支付，有时候用微信，有时候用支付宝</p>
+</li>
+<li>
+<p>促销，普通用户没折扣，VIP 打 9 折，超级 VIP 打 8 折</p>
+</li>
+</ul>
+<p>如果不用策略模式，你可能会写一堆<code>if-else</code>：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-cpp" data-lang="cpp"><span class="line"><span class="cl"><span class="k">if</span> <span class="p">(</span><span class="n">userType</span> <span class="o">==</span> <span class="s">&#34;normal&#34;</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="n">price</span> <span class="o">=</span> <span class="n">p</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span> <span class="k">else</span> <span class="nf">if</span> <span class="p">(</span><span class="n">userType</span> <span class="o">==</span> <span class="s">&#34;vip&#34;</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="n">price</span> <span class="o">=</span> <span class="n">p</span> <span class="o">*</span> <span class="mf">0.9</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span> <span class="k">else</span> <span class="nf">if</span> <span class="p">(</span><span class="n">userType</span> <span class="o">==</span> <span class="s">&#34;svip&#34;</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="n">price</span> <span class="o">=</span> <span class="n">p</span> <span class="o">*</span> <span class="mf">0.8</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>加新的折扣类型，又要改这个函数，太麻烦了。</p>
+<p>策略模式就是把每个算法，封装成独立的类，然后你想换哪个就换哪个。</p>
+<h4 id="uml-类图-5">UML 类图
+</h4><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="2026-04-02-14-30-06.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="2026-04-02-14-30-06.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<h4 id="c-代码实现-4">C++ 代码实现
+</h4><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span><span class="lnt">25
+</span><span class="lnt">26
+</span><span class="lnt">27
+</span><span class="lnt">28
+</span><span class="lnt">29
+</span><span class="lnt">30
+</span><span class="lnt">31
+</span><span class="lnt">32
+</span><span class="lnt">33
+</span><span class="lnt">34
+</span><span class="lnt">35
+</span><span class="lnt">36
+</span><span class="lnt">37
+</span><span class="lnt">38
+</span><span class="lnt">39
+</span><span class="lnt">40
+</span><span class="lnt">41
+</span><span class="lnt">42
+</span><span class="lnt">43
+</span><span class="lnt">44
+</span><span class="lnt">45
+</span><span class="lnt">46
+</span><span class="lnt">47
+</span><span class="lnt">48
+</span><span class="lnt">49
+</span><span class="lnt">50
+</span><span class="lnt">51
+</span><span class="lnt">52
+</span><span class="lnt">53
+</span><span class="lnt">54
+</span><span class="lnt">55
+</span><span class="lnt">56
+</span><span class="lnt">57
+</span><span class="lnt">58
+</span><span class="lnt">59
+</span><span class="lnt">60
+</span><span class="lnt">61
+</span><span class="lnt">62
+</span><span class="lnt">63
+</span><span class="lnt">64
+</span><span class="lnt">65
+</span><span class="lnt">66
+</span><span class="lnt">67
+</span><span class="lnt">68
+</span><span class="lnt">69
+</span><span class="lnt">70
+</span><span class="lnt">71
+</span><span class="lnt">72
+</span><span class="lnt">73
+</span><span class="lnt">74
+</span><span class="lnt">75
+</span><span class="lnt">76
+</span><span class="lnt">77
+</span><span class="lnt">78
+</span><span class="lnt">79
+</span><span class="lnt">80
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-cpp" data-lang="cpp"><span class="line"><span class="cl"><span class="cp">#include</span> <span class="cpf">&lt;iostream&gt;</span><span class="cp">
+</span></span></span><span class="line"><span class="cl"><span class="cp">#include</span> <span class="cpf">&lt;memory&gt;</span><span class="cp">
+</span></span></span><span class="line"><span class="cl"><span class="cp"></span>
+</span></span><span class="line"><span class="cl"><span class="c1">// 策略接口
+</span></span></span><span class="line"><span class="cl"><span class="c1">// 所有的折扣策略都要实现这个接口
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="k">class</span> <span class="nc">DiscountStrategy</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl"><span class="k">public</span><span class="o">:</span>
+</span></span><span class="line"><span class="cl">    <span class="k">virtual</span> <span class="o">~</span><span class="n">DiscountStrategy</span><span class="p">()</span> <span class="o">=</span> <span class="k">default</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="k">virtual</span> <span class="kt">double</span> <span class="nf">calculate</span><span class="p">(</span><span class="kt">double</span> <span class="n">originalPrice</span><span class="p">)</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl"><span class="p">};</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// 具体的策略
+</span></span></span><span class="line"><span class="cl"><span class="c1">// 普通用户：无折扣
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="k">class</span> <span class="nc">NormalDiscount</span> <span class="o">:</span> <span class="k">public</span> <span class="n">DiscountStrategy</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl"><span class="k">public</span><span class="o">:</span>
+</span></span><span class="line"><span class="cl">    <span class="kt">double</span> <span class="n">calculate</span><span class="p">(</span><span class="kt">double</span> <span class="n">originalPrice</span><span class="p">)</span> <span class="k">override</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&#34;普通用户，无折扣&#34;</span> <span class="o">&lt;&lt;</span> <span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">        <span class="k">return</span> <span class="n">originalPrice</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">};</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// VIP用户：9折
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="k">class</span> <span class="nc">VipDiscount</span> <span class="o">:</span> <span class="k">public</span> <span class="n">DiscountStrategy</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl"><span class="k">public</span><span class="o">:</span>
+</span></span><span class="line"><span class="cl">    <span class="kt">double</span> <span class="n">calculate</span><span class="p">(</span><span class="kt">double</span> <span class="n">originalPrice</span><span class="p">)</span> <span class="k">override</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&#34;VIP用户，打9折&#34;</span> <span class="o">&lt;&lt;</span> <span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">        <span class="k">return</span> <span class="mf">0.9</span> <span class="o">*</span> <span class="n">originalPrice</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">};</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// 超级VIP：8折
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="k">class</span> <span class="nc">SvipDiscount</span> <span class="o">:</span> <span class="k">public</span> <span class="n">DiscountStrategy</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl"><span class="k">public</span><span class="o">:</span>
+</span></span><span class="line"><span class="cl">    <span class="kt">double</span> <span class="n">calculate</span><span class="p">(</span><span class="kt">double</span> <span class="n">originalPrice</span><span class="p">)</span> <span class="k">override</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&#34;超级VIP用户，打8折&#34;</span> <span class="o">&lt;&lt;</span> <span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">        <span class="k">return</span> <span class="mf">0.8</span> <span class="o">*</span> <span class="n">originalPrice</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">};</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">// 上下文：使用策略的类
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="k">class</span> <span class="nc">PriceCalculator</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl"><span class="k">private</span><span class="o">:</span>
+</span></span><span class="line"><span class="cl">    <span class="n">std</span><span class="o">::</span><span class="n">unique_ptr</span><span class="o">&lt;</span><span class="n">DiscountStrategy</span><span class="o">&gt;</span> <span class="n">strategy</span><span class="p">;</span>     <span class="c1">// 当前用的策略
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>
+</span></span><span class="line"><span class="cl"><span class="k">public</span><span class="o">:</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">// 构造的时候传入策略
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="n">PriceCalculator</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">unique_ptr</span><span class="o">&lt;</span><span class="n">DiscountStrategy</span><span class="o">&gt;</span> <span class="n">s</span><span class="p">)</span> <span class="o">:</span> <span class="n">strategy</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">s</span><span class="p">))</span> <span class="p">{}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="c1">// 动态切换策略
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="kt">void</span> <span class="nf">setStrategy</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">unique_ptr</span><span class="o">&lt;</span><span class="n">DiscountStrategy</span><span class="o">&gt;</span> <span class="n">s</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="n">strategy</span> <span class="o">=</span> <span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">s</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="c1">// 计算最终价格
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="kt">double</span> <span class="nf">getFinalPrice</span><span class="p">(</span><span class="kt">double</span> <span class="n">originalPrice</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="k">return</span> <span class="n">strategy</span><span class="o">-&gt;</span><span class="n">calculate</span><span class="p">(</span><span class="n">originalPrice</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">};</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kt">int</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="c1">// 一开始，默认普通用户
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="n">PriceCalculator</span> <span class="n">calculator</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">NormalDiscount</span><span class="o">&gt;</span><span class="p">());</span>
+</span></span><span class="line"><span class="cl">    <span class="kt">double</span> <span class="n">normalPrice</span> <span class="o">=</span> <span class="n">calculator</span><span class="p">.</span><span class="n">getFinalPrice</span><span class="p">(</span><span class="mi">100</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl">    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&#34;原价100元，最终价格：&#34;</span> <span class="o">&lt;&lt;</span> <span class="n">normalPrice</span> <span class="o">&lt;&lt;</span> <span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="c1">// 用户升级成VIP了，切换策略
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="n">calculator</span><span class="p">.</span><span class="n">setStrategy</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">VipDiscount</span><span class="o">&gt;</span><span class="p">());</span>
+</span></span><span class="line"><span class="cl">    <span class="kt">double</span> <span class="n">vipPrice</span> <span class="o">=</span> <span class="n">calculator</span><span class="p">.</span><span class="n">getFinalPrice</span><span class="p">(</span><span class="mi">100</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl">    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&#34;原价100元，最终价格：&#34;</span> <span class="o">&lt;&lt;</span> <span class="n">vipPrice</span> <span class="o">&lt;&lt;</span> <span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="c1">// 用户升级成超级VIP了，切换策略
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="n">calculator</span><span class="p">.</span><span class="n">setStrategy</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">SvipDiscount</span><span class="o">&gt;</span><span class="p">());</span>
+</span></span><span class="line"><span class="cl">    <span class="kt">double</span> <span class="n">svipPrice</span> <span class="o">=</span> <span class="n">calculator</span><span class="p">.</span><span class="n">getFinalPrice</span><span class="p">(</span><span class="mi">100</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl">    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">&#34;原价100元，最终价格：&#34;</span> <span class="o">&lt;&lt;</span> <span class="n">svipPrice</span> <span class="o">&lt;&lt;</span> <span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="c1">// 以后要加新的折扣？比如节日折扣？
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>    <span class="c1">// 加个HolidayDiscount类就行了！完全不用改Calculator的代码！
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>
+</span></span><span class="line"><span class="cl">    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h4 id="运行结果-5">运行结果
+</h4><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-Plain" data-lang="Plain"><span class="line"><span class="cl">普通用户，无折扣
+</span></span><span class="line"><span class="cl">原价100元，最终价格: 100
+</span></span><span class="line"><span class="cl">VIP用户，打9折
+</span></span><span class="line"><span class="cl">原价100元，最终价格: 90
+</span></span><span class="line"><span class="cl">超级VIP，打8折
+</span></span><span class="line"><span class="cl">原价100元，最终价格: 80
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="2026-04-02-09-46-14.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="2026-04-02-09-46-14.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<hr>
+<h2 id="五怎么学好设计模式">五、怎么学好设计模式？
+</h2><h3 id="51-不要死记硬背">5.1 不要死记硬背
+</h3><p>很多人学设计模式，就是把 23 个模式的定义背下来，这完全没用！</p>
+<p>你要记住的是：</p>
+<ul>
+<li>
+<p>这个模式<strong>解决了什么问题</strong>？</p>
+</li>
+<li>
+<p>什么时候<strong>该用</strong>它？</p>
+</li>
+<li>
+<p>什么时候<strong>不该用</strong>它？</p>
+</li>
+</ul>
+<h3 id="52-先写坏代码再重构">5.2 先写坏代码，再重构
+</h3><p>最好的学习方式，不是上来就用设计模式。</p>
+<ol>
+<li>
+<p>先把功能写出来，哪怕代码很烂，一堆<code>if-else</code></p>
+</li>
+<li>
+<p>当你发现代码越来越难维护的时候，再回头看，哪个模式能解决你的问题</p>
+</li>
+<li>
+<p>重构！</p>
+</li>
+</ol>
+<p>这样你才能真正理解，这个模式解决了什么痛点。</p>
+<h3 id="53-不要过度设计">5.3 不要过度设计
+</h3><p>设计模式不是银弹！不要为了用模式而用模式。</p>
+<ul>
+<li>
+<p>如果你的项目很小，就几个类，别搞什么工厂、策略了，直接写最简单的代码就行</p>
+</li>
+<li>
+<p>KISS 原则：Keep It Simple, Stupid! 简单比复杂更重要</p>
+</li>
+</ul>
+<h3 id="54-从常用的模式开始学">5.4 从常用的模式开始学
+</h3><p>不用一上来就把 23 个都学完，先把这几个最常用的吃透：</p>
+<ol>
+<li>
+<p>单例（最简单，必学）</p>
+</li>
+<li>
+<p>工厂（解耦创建，必学）</p>
+</li>
+<li>
+<p>观察者（事件系统，必学）</p>
+</li>
+<li>
+<p>策略（算法切换，必学）</p>
+</li>
+<li>
+<p>适配器（兼容旧代码，常用）</p>
+</li>
+<li>
+<p>装饰器（动态加功能，常用）</p>
+</li>
+</ol>
+<p>剩下的，用到的时候再学也不迟。</p>
+<hr>
+<h2 id="总结">总结
+</h2><p>设计模式，本质上就是一套 &ldquo;让代码变好&rdquo; 的经验总结。它不是什么高深的黑魔法，而是帮你写出更优雅、更易维护的代码的工具。</p>
+<p>作为小白，你不用急着一口吃成胖子，慢慢来：</p>
+<ol>
+<li>
+<p>先理解 SOLID 原则</p>
+</li>
+<li>
+<p>逐个吃透常用的模式，动手敲代码</p>
+</li>
+<li>
+<p>在实际项目中，遇到问题了，想想哪个模式能帮你</p>
+</li>
+</ol>
+<p>相信我，当你真正理解了设计模式，你会发现，写代码原来是一件这么爽的事！</p>
+<hr>
+<p><em>本文章基于现代 C++（C++11 及以上）编写，所有代码均可直接编译运行。</em></p>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/design-pattern/">Design Pattern</a>
+        
+    </section>
+
+
+    </footer>
+
+
+    
+</article>
+
+    
+
+    
+
+     
+    
+        
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+        2026 SymphonyW
+    </section>
+    
+    <section class="powerby">
+        Built with <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> <br />
+        Theme <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.26.0">Stack</a></b> designed by <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a>
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+<script>
+window.MathJax = {
+  tex: {
+    
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  svg: {
+    fontCache: 'global'
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    </body>
+</html>
