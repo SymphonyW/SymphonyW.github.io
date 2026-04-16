@@ -1899,16 +1899,15 @@ Agent 的 Prompt 更复杂，不仅要包含任务描述，还要包含工具的
         <pubDate>Wed, 25 Mar 2026 22:08:57 +0800</pubDate>
         
         <guid>https://SymphonyW.github.io/zh-cn/p/redis%E9%9D%A2%E8%AF%95%E5%85%AB%E8%82%A1%E6%96%87%E6%8C%81%E7%BB%AD%E6%9B%B4%E6%96%B0/</guid>
-        <description>&lt;img src="https://SymphonyW.github.io/zh-cn/p/redis%E9%9D%A2%E8%AF%95%E5%85%AB%E8%82%A1%E6%96%87%E6%8C%81%E7%BB%AD%E6%9B%B4%E6%96%B0/bg.png" alt="Featured image of post Redis面试八股文（持续更新）" /&gt;&lt;h1 id=&#34;数据库---redis-面试八股文&#34;&gt;&lt;strong&gt;数据库 - Redis 面试八股文&lt;/strong&gt;
-&lt;/h1&gt;&lt;p&gt;本文档整理了后端开发面试中关于 Redis 最常被问到的高频面试题和深度解析，重点聚焦于底层原理、高并发场景下的缓存设计及高可用架构。&lt;/p&gt;
+        <description>&lt;img src="https://SymphonyW.github.io/zh-cn/p/redis%E9%9D%A2%E8%AF%95%E5%85%AB%E8%82%A1%E6%96%87%E6%8C%81%E7%BB%AD%E6%9B%B4%E6%96%B0/bg.png" alt="Featured image of post Redis面试八股文（持续更新）" /&gt;&lt;p&gt;本文档整理了后端开发面试中关于 Redis 最常被问到的高频面试题和深度解析，重点聚焦于底层原理、高并发场景下的缓存设计及高可用架构。&lt;/p&gt;
 &lt;h2 id=&#34;一-核心基础与数据结构&#34;&gt;&lt;strong&gt;一、 核心基础与数据结构&lt;/strong&gt;
 &lt;/h2&gt;&lt;h3 id=&#34;1-redis-为什么这么快&#34;&gt;&lt;strong&gt;1. Redis 为什么这么快？&lt;/strong&gt;
 &lt;/h3&gt;&lt;p&gt;官方测试 Redis 的 QPS 可以达到 10万+，主要原因有：&lt;/p&gt;
 &lt;ol&gt;
-&lt;li&gt;&lt;strong&gt;完全基于内存&lt;/strong&gt;：绝大部分请求是纯粹的内存操作，速度极快。&lt;/li&gt;
-&lt;li&gt;&lt;strong&gt;高效的数据结构&lt;/strong&gt;：Redis 专门设计了如 SDS（简单动态字符串）、跳表（SkipList）、压缩列表（ZipList）等高效的数据结构。&lt;/li&gt;
-&lt;li&gt;&lt;strong&gt;单线程模型&lt;/strong&gt;：Redis 的网络 IO 和键值对读写是由一个线程来完成的，避免了不必要的上下文切换和竞争条件，不存在加锁释放锁操作造成的性能损耗。（注：Redis 6.0 引入了多线程，但也只是用于网络 I/O 阶段，命令执行依然是单线程）。&lt;/li&gt;
-&lt;li&gt;&lt;strong&gt;I/O 多路复用模型&lt;/strong&gt;：采用 epoll 作为 I/O 多路复用技术的实现，非阻塞 I/O，可以同时监听多个 Socket。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;完全基于内存&lt;/strong&gt;：绝大部分请求是&lt;strong&gt;纯内存&lt;/strong&gt;操作，速度极快。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;高效的数据结构&lt;/strong&gt;：Redis 专门设计了如 SDS（简单动态字符串）、&lt;strong&gt;跳表（SkipList）&lt;/strong&gt;、压缩列表（ZipList）等高效的数据结构。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;单线程模型&lt;/strong&gt;：Redis 的网络 IO 和键值对读写是由一个线程来完成的，&lt;strong&gt;避免了不必要的上下文切换和竞争条件&lt;/strong&gt;，不存在加锁解锁操作造成的性能损耗。（注：Redis 6.0 引入了多线程，但也只是用于网络 I/O 阶段，命令执行依然是单线程）。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;I/O 多路复用模型&lt;/strong&gt;：采用 epoll 作为 &lt;strong&gt;I/O 多路复用&lt;/strong&gt;技术的实现，非阻塞 I/O，可以同时监听多个 Socket。&lt;/li&gt;
 &lt;/ol&gt;
 &lt;h3 id=&#34;2-redis-的五种基本数据类型及其底层数据结构&#34;&gt;&lt;strong&gt;2. Redis 的五种基本数据类型及其底层数据结构？&lt;/strong&gt;
 &lt;/h3&gt;&lt;p&gt;面试不仅会问应用场景，一定会深挖底层结构：&lt;/p&gt;
@@ -1923,7 +1922,7 @@ Agent 的 Prompt 更复杂，不仅要包含任务描述，还要包含工具的
 &lt;tbody&gt;
 &lt;tr&gt;
 &lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;String&lt;/strong&gt;&lt;/td&gt;
-&lt;td style=&#34;text-align:left&#34;&gt;缓存、计数器、分布式锁、Session&lt;/td&gt;
+&lt;td style=&#34;text-align:left&#34;&gt;缓存、计数器、分布式锁、Session（会话）&lt;/td&gt;
 &lt;td style=&#34;text-align:left&#34;&gt;&lt;strong&gt;SDS&lt;/strong&gt; (简单动态字符串)。比 C 字符串更安全、获取长度 O(1)、防止缓冲区溢出。&lt;/td&gt;
 &lt;/tr&gt;
 &lt;tr&gt;
@@ -1949,12 +1948,78 @@ Agent 的 Prompt 更复杂，不仅要包含任务描述，还要包含工具的
 &lt;/tbody&gt;
 &lt;/table&gt;
 &lt;h3 id=&#34;3-zset-为什么使用跳表skiplist而不是红黑树或-b-树&#34;&gt;&lt;strong&gt;3. ZSet 为什么使用跳表（SkipList）而不是红黑树或 B+ 树？&lt;/strong&gt;
-&lt;/h3&gt;&lt;ul&gt;
+&lt;/h3&gt;&lt;p&gt;&lt;div class=&#34;post-image-container&#34; style=&#34;margin: 15px auto; text-align: center; width: 85%;&#34;&gt;
+    
+    &lt;a href=&#34;2026-04-15-19-17-00.png&#34; 
+        
+       target=&#34;_blank&#34; 
+       class=&#34;gallery-item&#34;&gt; &lt;img src=&#34;2026-04-15-19-17-00.png&#34; 
+             alt=&#34;跳表的示例，底层是多层有序链表&#34; 
+             style=&#34;max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);&#34;&gt;
+             
+    &lt;/a&gt;
+    
+        &lt;span style=&#34;display: block; margin-top: 10px; color: #666; font-size: 0.9em;&#34;&gt;跳表的示例，底层是多层有序链表&lt;/span&gt;
+    
+&lt;/div&gt;&lt;/p&gt;
+&lt;p&gt;查询时，以查找 30 为例：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;从最高层的最左侧开始。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;如果当前节点的下一个节点比 30 小，就向右跳。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;如果当前节点的下一个节点比 30 大或者已经是末尾，就向下掉一层。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;重复此过程，直到在某一层找到 30，或者在底层确定该元素不存在。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;跳表通过随机层数机制，平均每层节点数是下一层的 1/2 或 1/4，查询效率 O(logN)。插入和删除时只需要修改相邻节点的指针，维护成本较低。&lt;/p&gt;
+&lt;ul&gt;
 &lt;li&gt;&lt;strong&gt;对比红黑树&lt;/strong&gt;：跳表实现更简单；在进行范围查找（如排行榜获取前 10 名）时，跳表只需要找到起点然后顺着底层链表遍历即可，而红黑树需要中序遍历，跳表效率更高；跳表的插入/删除只需修改相邻节点的指针，不需要像红黑树那样做复杂的旋转。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;div class=&#34;post-image-container&#34; style=&#34;margin: 15px auto; text-align: center; width: 85%;&#34;&gt;
+    
+    &lt;a href=&#34;2026-04-15-16-22-28.png&#34; 
+        
+       target=&#34;_blank&#34; 
+       class=&#34;gallery-item&#34;&gt; &lt;img src=&#34;2026-04-15-16-22-28.png&#34; 
+             alt=&#34;红黑树示例&#34; 
+             style=&#34;max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);&#34;&gt;
+             
+    &lt;/a&gt;
+    
+        &lt;span style=&#34;display: block; margin-top: 10px; color: #666; font-size: 0.9em;&#34;&gt;红黑树示例&lt;/span&gt;
+    
+&lt;/div&gt;&lt;/p&gt;
+&lt;ul&gt;
 &lt;li&gt;&lt;strong&gt;对比 B+ 树&lt;/strong&gt;：B+ 树是为了最大限度减少磁盘 I/O 而设计的，树的高度较矮。但 Redis 是内存数据库，不需要考虑磁盘 I/O，跳表作为内存数据结构，其随机层数机制和简单的节点维护成本更低。&lt;/li&gt;
 &lt;/ul&gt;
+&lt;p&gt;&lt;div class=&#34;post-image-container&#34; style=&#34;margin: 15px auto; text-align: center; width: 85%;&#34;&gt;
+    
+    &lt;a href=&#34;2026-04-15-16-25-12.png&#34; 
+        
+       target=&#34;_blank&#34; 
+       class=&#34;gallery-item&#34;&gt; &lt;img src=&#34;2026-04-15-16-25-12.png&#34; 
+             alt=&#34;B&amp;#43; 树示例&#34; 
+             style=&#34;max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);&#34;&gt;
+             
+    &lt;/a&gt;
+    
+        &lt;span style=&#34;display: block; margin-top: 10px; color: #666; font-size: 0.9em;&#34;&gt;B&amp;#43; 树示例&lt;/span&gt;
+    
+&lt;/div&gt;&lt;/p&gt;
 &lt;h2 id=&#34;二-持久化机制&#34;&gt;&lt;strong&gt;二、 持久化机制&lt;/strong&gt;
-&lt;/h2&gt;&lt;h3 id=&#34;4-rdb-和-aof-持久化的区别&#34;&gt;&lt;strong&gt;4. RDB 和 AOF 持久化的区别？&lt;/strong&gt;
+&lt;/h2&gt;&lt;h3 id=&#34;4-redis-的持久化是怎么实现的&#34;&gt;&lt;strong&gt;4. Redis 的持久化是怎么实现的？&lt;/strong&gt;
+&lt;/h3&gt;&lt;p&gt;Redis 提供了两种持久化机制：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;RDB (Redis DataBase)&lt;/strong&gt;：&lt;strong&gt;快照&lt;/strong&gt;机制，定期将内存中的数据以二进制文件（dump.rdb）保存到磁盘。可以通过 save（阻塞）或 bgsave（异步，fork 子进程）命令触发，也可以配置自动触发条件。恢复时直接加载 RDB 文件到内存，速度快，但可能丢失两次快照之间的数据。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;AOF (Append Only File)&lt;/strong&gt;：&lt;strong&gt;日志&lt;/strong&gt;机制，记录服务器执行的所有写操作命令（appendonly.aof）。可以配置不同的同步策略（always、everysec、no）。恢复时需要重新执行 AOF 文件中的命令，速度较慢，但数据安全性高（最多丢一秒的数据）。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h3 id=&#34;5-rdb-和-aof-持久化的区别&#34;&gt;&lt;strong&gt;5. RDB 和 AOF 持久化的区别？&lt;/strong&gt;
 &lt;/h3&gt;&lt;table&gt;
 &lt;thead&gt;
 &lt;tr&gt;
@@ -1991,21 +2056,21 @@ Agent 的 Prompt 更复杂，不仅要包含任务描述，还要包含工具的
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;h3 id=&#34;5-什么是-aof-重写aof-rewrite&#34;&gt;&lt;strong&gt;5. 什么是 AOF 重写（AOF Rewrite）？&lt;/strong&gt;
-&lt;/h3&gt;&lt;p&gt;随着命令不断写入，AOF 文件会越来越大。AOF 重写机制就是用来压缩 AOF 文件的。&lt;/p&gt;
+&lt;h3 id=&#34;6-什么是-aof-重写aof-rewrite&#34;&gt;&lt;strong&gt;6. 什么是 AOF 重写（AOF Rewrite）？&lt;/strong&gt;
+&lt;/h3&gt;&lt;p&gt;随着命令不断写入，AOF 文件会越来越大。AOF 重写机制就是&lt;strong&gt;用来压缩 AOF 文件&lt;/strong&gt;的。&lt;/p&gt;
 &lt;ul&gt;
-&lt;li&gt;&lt;strong&gt;原理&lt;/strong&gt;：Redis 会 fork 出一个 bgrewriteaof 子进程，它会扫描当前内存中的数据，为每一个键值对生成一条对应的插入命令，写入到新的 AOF 文件中。比如以前对一个 key 进行了 100 次自增，重写后只会变成一条 SET key 100 的命令，大大减小了体积。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;原理&lt;/strong&gt;：Redis 会 &lt;strong&gt;fork 出一个 bgrewriteaof 子进程&lt;/strong&gt;，它会扫描当前内存中的数据，为每一个键值对生成一条对应的插入命令，写入到新的 AOF 文件中。比如以前对一个 key 进行了 100 次自增，重写后只会变成一条 SET key 100 的命令，大大减小了体积。&lt;/li&gt;
 &lt;li&gt;&lt;strong&gt;混合持久化&lt;/strong&gt;：Redis 4.0 引入，AOF 重写时，将当前内存数据以 &lt;strong&gt;RDB 格式&lt;/strong&gt;写入新 AOF 文件的开头，之后的新写入命令继续以 &lt;strong&gt;AOF 格式&lt;/strong&gt;追加。结合了 RDB 恢复快和 AOF 数据不丢失的优点。&lt;/li&gt;
 &lt;/ul&gt;
 &lt;h2 id=&#34;三-内存淘汰与过期策略&#34;&gt;&lt;strong&gt;三、 内存淘汰与过期策略&lt;/strong&gt;
-&lt;/h2&gt;&lt;h3 id=&#34;6-redis-的过期键删除策略是什么&#34;&gt;&lt;strong&gt;6. Redis 的过期键删除策略是什么？&lt;/strong&gt;
+&lt;/h2&gt;&lt;h3 id=&#34;7-redis-的过期键删除策略是什么&#34;&gt;&lt;strong&gt;7. Redis 的过期键删除策略是什么？&lt;/strong&gt;
 &lt;/h3&gt;&lt;p&gt;Redis 使用了 &lt;strong&gt;惰性删除 + 定期删除&lt;/strong&gt; 的配合策略：&lt;/p&gt;
 &lt;ol&gt;
-&lt;li&gt;&lt;strong&gt;惰性删除&lt;/strong&gt;：平时不主动管，只有当客户端试图访问某个 key 时，Redis 才去检查它是否过期，如果过期了就删除并返回空。优点是省 CPU，缺点是如果过期 key 一直不被访问，会造成内存泄漏。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;惰性删除&lt;/strong&gt;：平时不主动管，只有当客户端试图访问某个 key 时，Redis 才去检查它是否过期，如果过期了就删除并返回空。优点是省 CPU，缺点是如果过期 key 一直不被访问，会造成&lt;strong&gt;内存泄漏&lt;/strong&gt;。&lt;/li&gt;
 &lt;li&gt;&lt;strong&gt;定期删除&lt;/strong&gt;：Redis 默认每秒执行 10 次清理操作，随机抽取一部分设置了过期时间的 key，检查并删除已过期的。这种机制可以防止内存被大量无人访问的过期 key 占满。&lt;/li&gt;
 &lt;/ol&gt;
-&lt;h3 id=&#34;7-redis-的内存淘汰策略有哪些当内存满了怎么办&#34;&gt;&lt;strong&gt;7. Redis 的内存淘汰策略有哪些？（当内存满了怎么办）&lt;/strong&gt;
-&lt;/h3&gt;&lt;p&gt;当 Redis 内存使用达到 maxmemory 限制时，会触发淘汰策略：&lt;/p&gt;
+&lt;h3 id=&#34;8-redis-的内存淘汰策略有哪些当内存满了怎么办&#34;&gt;&lt;strong&gt;8. Redis 的内存淘汰策略有哪些？（当内存满了怎么办）&lt;/strong&gt;
+&lt;/h3&gt;&lt;p&gt;当 Redis 内存使用达到 max memory 限制时，会触发淘汰策略：&lt;/p&gt;
 &lt;ol&gt;
 &lt;li&gt;noeviction（默认）：不淘汰数据，如果有写请求直接报错 (OOM)。&lt;/li&gt;
 &lt;li&gt;allkeys-lru：在所有 key 中，淘汰最近最少使用的 key（最常用）。&lt;/li&gt;
@@ -2015,27 +2080,39 @@ Agent 的 Prompt 更复杂，不仅要包含任务描述，还要包含工具的
 &lt;li&gt;&lt;strong&gt;allkeys-lfu / volatile-lfu&lt;/strong&gt;（Redis 4.0+ 引入）：淘汰使用频率最少的 key（Least Frequently Used）。解决了 LRU 无法应对偶发性冷数据全表扫描的问题。&lt;/li&gt;
 &lt;/ol&gt;
 &lt;h2 id=&#34;四-缓存高并发经典问题穿透击穿雪崩&#34;&gt;&lt;strong&gt;四、 缓存高并发经典问题（穿透、击穿、雪崩）&lt;/strong&gt;
-&lt;/h2&gt;&lt;h3 id=&#34;8-什么是缓存穿透如何解决&#34;&gt;&lt;strong&gt;8. 什么是缓存穿透？如何解决？&lt;/strong&gt;
+&lt;/h2&gt;&lt;h3 id=&#34;9-什么是缓存穿透如何解决&#34;&gt;&lt;strong&gt;9. 什么是缓存穿透？如何解决？&lt;/strong&gt;
 &lt;/h3&gt;&lt;ul&gt;
-&lt;li&gt;&lt;strong&gt;定义&lt;/strong&gt;：查询一个&lt;strong&gt;根本不存在的数据&lt;/strong&gt;，缓存中肯定查不到（不命中），导致请求每次都要去数据库查，如果有人恶意疯狂请求这个不存在的 key，数据库可能会被瞬间压垮。&lt;/li&gt;
-&lt;li&gt;&lt;strong&gt;解决方案&lt;/strong&gt;：
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;定义&lt;/strong&gt;：查询一个&lt;strong&gt;根本不存在的数据&lt;/strong&gt;，缓存中肯定查不到（不命中），导致请求每次都要去数据库查，如果有人恶意疯狂请求这个不存在的 key，数据库可能会瞬间崩掉。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;解决方案&lt;/strong&gt;：&lt;/p&gt;
 &lt;ol&gt;
 &lt;li&gt;&lt;strong&gt;缓存空对象/默认值&lt;/strong&gt;：当数据库查不到时，依然把这个空结果（如 null）存入缓存，设置一个较短的过期时间。&lt;/li&gt;
 &lt;li&gt;&lt;strong&gt;布隆过滤器 (Bloom Filter)&lt;/strong&gt;：在请求到达缓存之前，先经过布隆过滤器判断该 key 是否存在。如果布隆过滤器说不存在，那一定不存在，直接返回；如果说存在（有极小误判率），再去查缓存和 DB。&lt;/li&gt;
 &lt;/ol&gt;
 &lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;补充：布隆过滤器是一个空间效率极高的概率型数据结构，可以判断一个元素是否在一个集合中。它使用多个哈希函数将元素映射到一个位数组上，查询时同样通过哈希函数检查对应位是否为 1。虽然存在误判（可能会误判某个不存在的元素为存在），但绝不会漏判（真正存在的元素一定会被识别）。因此非常适合用来做缓存穿透的第一道防线。&lt;/p&gt;
+&lt;/li&gt;
 &lt;/ul&gt;
-&lt;h3 id=&#34;9-什么是缓存击穿如何解决&#34;&gt;&lt;strong&gt;9. 什么是缓存击穿？如何解决？&lt;/strong&gt;
+&lt;h3 id=&#34;10-什么是缓存击穿如何解决&#34;&gt;&lt;strong&gt;10. 什么是缓存击穿？如何解决？&lt;/strong&gt;
 &lt;/h3&gt;&lt;ul&gt;
-&lt;li&gt;&lt;strong&gt;定义&lt;/strong&gt;：一个&lt;strong&gt;极度热点的数据&lt;/strong&gt;（比如秒杀商品），在&lt;strong&gt;缓存过期的瞬间&lt;/strong&gt;，有极其庞大的并发请求过来。因为缓存失效了，这几万个请求会同时去穿透到数据库，导致数据库瞬间崩溃。&lt;/li&gt;
-&lt;li&gt;&lt;strong&gt;解决方案&lt;/strong&gt;：
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;定义&lt;/strong&gt;：一个&lt;strong&gt;极度热点的数据&lt;/strong&gt;（比如秒杀商品），在&lt;strong&gt;缓存过期的瞬间&lt;/strong&gt;，有极其庞大的并发请求过来。因为缓存失效了，这几万个请求会同时去穿透到数据库，导致数据库瞬间崩溃。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;解决方案&lt;/strong&gt;：&lt;/p&gt;
 &lt;ol&gt;
 &lt;li&gt;&lt;strong&gt;互斥锁 (Mutex Lock)&lt;/strong&gt;：在缓存失效去数据库查询重建缓存的这个步骤加上分布式锁（如 Redis 的 SETNX）。保证只有一个请求能打到 DB 并更新缓存，其他请求拿不到锁就休眠重试。&lt;/li&gt;
 &lt;li&gt;&lt;strong&gt;逻辑过期 (热点数据永不过期)&lt;/strong&gt;：物理上不设置 TTL，而是在 value 内部维护一个逻辑过期时间字段。发现逻辑过期时，异步开启一个线程去更新缓存，当前请求先返回旧数据。&lt;/li&gt;
 &lt;/ol&gt;
 &lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;补充：分布式锁是分布式系统中用来保证多个进程或线程之间互斥访问共享资源的机制。它的实现细节非常重要，必须保证“谁加的锁只有谁能解”，防止误删别人的锁。通常会在加锁时设置一个唯一的随机值（如 UUID），解锁时通过 Lua 脚本比对这个值，只有匹配成功才删除锁。&lt;/p&gt;
+&lt;/li&gt;
 &lt;/ul&gt;
-&lt;h3 id=&#34;10-什么是缓存雪崩如何解决&#34;&gt;&lt;strong&gt;10. 什么是缓存雪崩？如何解决？&lt;/strong&gt;
+&lt;h3 id=&#34;11-什么是缓存雪崩如何解决&#34;&gt;&lt;strong&gt;11. 什么是缓存雪崩？如何解决？&lt;/strong&gt;
 &lt;/h3&gt;&lt;ul&gt;
 &lt;li&gt;&lt;strong&gt;定义&lt;/strong&gt;：&lt;strong&gt;大量的热点 key 在同一时间集中过期&lt;/strong&gt;，或者 &lt;strong&gt;Redis 服务宕机&lt;/strong&gt;。导致海量请求直接打到数据库，引发数据库宕机乃至整个系统雪崩。&lt;/li&gt;
 &lt;li&gt;&lt;strong&gt;解决方案&lt;/strong&gt;：
@@ -2047,7 +2124,7 @@ Agent 的 Prompt 更复杂，不仅要包含任务描述，还要包含工具的
 &lt;/li&gt;
 &lt;/ul&gt;
 &lt;h2 id=&#34;五-分布式锁与双写一致性&#34;&gt;&lt;strong&gt;五、 分布式锁与双写一致性&lt;/strong&gt;
-&lt;/h2&gt;&lt;h3 id=&#34;11-如何用-redis-实现分布式锁&#34;&gt;&lt;strong&gt;11. 如何用 Redis 实现分布式锁？&lt;/strong&gt;
+&lt;/h2&gt;&lt;h3 id=&#34;12-如何用-redis-实现分布式锁&#34;&gt;&lt;strong&gt;12. 如何用 Redis 实现分布式锁？&lt;/strong&gt;
 &lt;/h3&gt;&lt;ul&gt;
 &lt;li&gt;&lt;strong&gt;基础版本&lt;/strong&gt;：使用 SET resource_name my_random_value NX PX 30000。
 &lt;ul&gt;
@@ -2058,13 +2135,20 @@ Agent 的 Prompt 更复杂，不仅要包含任务描述，还要包含工具的
 &lt;/li&gt;
 &lt;li&gt;&lt;strong&gt;进阶版本 (Redisson)&lt;/strong&gt;：基础版本的锁如果业务执行时间太长，锁提前过期了怎么办？Redisson 框架提供了 &lt;strong&gt;看门狗 (Watch Dog)&lt;/strong&gt; 机制。加锁成功后，会开启一个后台线程，每隔 10 秒（默认超时时间 30s 的 1/3）检查一下业务是否还在执行，如果还在执行就将锁的过期时间续期回 30s。&lt;/li&gt;
 &lt;/ul&gt;
-&lt;h3 id=&#34;12-redis-和-mysql-如何保证双写一致性&#34;&gt;&lt;strong&gt;12. Redis 和 MySQL 如何保证双写一致性？&lt;/strong&gt;
+&lt;h3 id=&#34;13-redis-和-mysql-如何保证双写一致性&#34;&gt;&lt;strong&gt;13. Redis 和 MySQL 如何保证双写一致性？&lt;/strong&gt;
 &lt;/h3&gt;&lt;p&gt;这是面试高频必杀题。标准的处理模式是 &lt;strong&gt;Cache Aside Pattern（旁路缓存模式）&lt;/strong&gt;。&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;strong&gt;标准操作&lt;/strong&gt;：&lt;strong&gt;先更新数据库，再删除缓存&lt;/strong&gt;。&lt;/li&gt;
-&lt;li&gt;&lt;strong&gt;为什么不能先更新缓存再更新 DB？&lt;/strong&gt; 如果 DB 更新失败，缓存就是脏数据。&lt;/li&gt;
-&lt;li&gt;&lt;strong&gt;为什么不能先删缓存再更新 DB？&lt;/strong&gt; 在并发环境下，线程 A 删了缓存还没更新 DB，线程 B 进来查缓存没命中，去 DB 读到了旧数据并写入缓存。然后 A 更新了 DB。导致缓存里永远是旧数据。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;为什么不能先更新缓存再更新 DB？&lt;/strong&gt; 如果 DB 更新失败，缓存就是&lt;strong&gt;脏数据&lt;/strong&gt;。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;为什么不能先删缓存再更新 DB？&lt;/strong&gt; 在并发环境下，线程 A 删了缓存还没更新 DB，线程 B 进来查缓存没命中，去 DB 读到了旧数据并写入缓存。然后 A 更新了 DB。导致缓存里永远是&lt;strong&gt;旧数据&lt;/strong&gt;。&lt;/li&gt;
 &lt;li&gt;&lt;strong&gt;先更新 DB 再删缓存，有没有可能出问题？&lt;/strong&gt; 有。A 查 DB 读到旧数据（还未写缓存），B 更新 DB 并删缓存，A 将刚才的旧数据写入缓存。但这种情况概率极低（要求写操作比读操作还快）。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;为什么是删除缓存而不是更新缓存？&lt;/strong&gt; 因为更新缓存需要保证原子性（更新 DB 和更新缓存必须是一个原子操作），而 Redis 没有提供这样的事务机制。删除缓存后，下一次读请求会去 DB 读到最新数据并写入缓存。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;解决方案&lt;/strong&gt;：
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;加分布式锁&lt;/strong&gt;：在更新 DB 和删除缓存的过程中加锁，保证同一时间只有一个线程能操作这个 key。缺点是性能较差，增加了复杂度。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;逻辑过期&lt;/strong&gt;：不设置物理过期时间，而是在 value 内部维护一个逻辑过期时间字段。更新 DB 后，直接更新缓存并重置逻辑过期时间。读请求发现逻辑过期时，异步开启一个线程去更新缓存，当前请求先返回旧数据。缺点是可能会有短暂的脏数据窗口。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/li&gt;
 &lt;li&gt;&lt;strong&gt;终极保障方案（延迟双删 / 消息队列）&lt;/strong&gt;：
 &lt;ol&gt;
 &lt;li&gt;&lt;strong&gt;延迟双删&lt;/strong&gt;：先删缓存 -&amp;gt; 更新 DB -&amp;gt; 睡眠（如 500ms） -&amp;gt; 再次删缓存。确保把读请求可能产生的脏缓存删掉。&lt;/li&gt;
@@ -2073,19 +2157,19 @@ Agent 的 Prompt 更复杂，不仅要包含任务描述，还要包含工具的
 &lt;/li&gt;
 &lt;/ul&gt;
 &lt;h2 id=&#34;六-高可用与集群架构&#34;&gt;&lt;strong&gt;六、 高可用与集群架构&lt;/strong&gt;
-&lt;/h2&gt;&lt;h3 id=&#34;13-主从复制的原理是什么&#34;&gt;&lt;strong&gt;13. 主从复制的原理是什么？&lt;/strong&gt;
+&lt;/h2&gt;&lt;h3 id=&#34;14-主从复制的原理是什么&#34;&gt;&lt;strong&gt;14. 主从复制的原理是什么？&lt;/strong&gt;
 &lt;/h3&gt;&lt;ul&gt;
 &lt;li&gt;&lt;strong&gt;全量同步&lt;/strong&gt;：当从节点第一次连接主节点时。主节点执行 bgsave 生成 RDB 文件发送给从节点，从节点加载。期间主节点的新写命令会存入 replication buffer，RDB 发送完后再把 buffer 里的命令发给从节点。&lt;/li&gt;
 &lt;li&gt;&lt;strong&gt;增量同步&lt;/strong&gt;：网络断开重连后，主节点根据从节点上报的 offset，从 &lt;strong&gt;repl_backlog_buffer&lt;/strong&gt;（环形缓冲区）中把断开期间的命令发给从节点，无需重新全量同步。&lt;/li&gt;
 &lt;/ul&gt;
-&lt;h3 id=&#34;14-什么是哨兵模式-sentinel&#34;&gt;&lt;strong&gt;14. 什么是哨兵模式 (Sentinel)？&lt;/strong&gt;
-&lt;/h3&gt;&lt;p&gt;主从复制无法自动故障转移。哨兵就是用来监控主从节点的：&lt;/p&gt;
+&lt;h3 id=&#34;15-什么是哨兵模式-sentinel&#34;&gt;&lt;strong&gt;15. 什么是哨兵模式 (Sentinel)？&lt;/strong&gt;
+&lt;/h3&gt;&lt;p&gt;主从复制无法自动故障转移。哨兵就是用来&lt;strong&gt;监控主从节点&lt;/strong&gt;的：&lt;/p&gt;
 &lt;ol&gt;
 &lt;li&gt;&lt;strong&gt;监控&lt;/strong&gt;：不断向主从节点发送 PING 检查是否在线（主观下线、客观下线）。&lt;/li&gt;
 &lt;li&gt;&lt;strong&gt;故障转移 (Failover)&lt;/strong&gt;：主节点挂了，哨兵集群会通过 Raft 算法选举出一个 Leader 哨兵，由它在从节点中选出一个新的主节点（根据优先级、复制偏移量 offset、RunID 选举）。&lt;/li&gt;
 &lt;li&gt;&lt;strong&gt;通知&lt;/strong&gt;：将新的主节点信息通知给客户端和其他从节点。&lt;/li&gt;
 &lt;/ol&gt;
-&lt;h3 id=&#34;15-redis-cluster-集群的原理什么是哈希槽-hash-slot&#34;&gt;&lt;strong&gt;15. Redis Cluster 集群的原理？什么是哈希槽 (Hash Slot)？&lt;/strong&gt;
+&lt;h3 id=&#34;16-redis-cluster-集群的原理什么是哈希槽-hash-slot&#34;&gt;&lt;strong&gt;16. Redis Cluster 集群的原理？什么是哈希槽 (Hash Slot)？&lt;/strong&gt;
 &lt;/h3&gt;&lt;p&gt;哨兵模式解决了高可用，但无法解决单机内存上限和写并发能力瓶颈。Redis Cluster 提供了**分布式（分片）**方案。&lt;/p&gt;
 &lt;ul&gt;
 &lt;li&gt;&lt;strong&gt;哈希槽&lt;/strong&gt;：Redis 集群没有使用一致性 Hash，而是引入了 16384 个哈希槽。集群的每个主节点负责一部分槽。&lt;/li&gt;
