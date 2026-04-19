@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="zh-cn" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="LightGaussian: Unbounded 3D Gaussian Compression with 15x Reduction and 200+ FPS 本文根据本人对 LightGaussian 论文的理解，结合论文中的实验结果和作者的分析，对该方法的核心创新、实验验证以及潜在的局限性进行了详细的解读与总结。同时也用于记录和分享该方法的核心思想和技术细节，方便后续的学习和参考。 效果展示：https://lightgaussian.github.io/ 论文链接：https://arxiv.org/pdf/2311.17245 代码链接：https://github.com/VITA-Group/LightGaussian LightGaussian 的流程 原文中的流程图展示了 LightGaussian 的整体流程，主要分为以下几个步骤： 输入数据：首先，LightGaussian 接收一个由原版3DGS生成的高斯点云作为输入。这些高斯点云包含了场景的几何和颜色信息，是后续处理的基础。 剪枝与恢复：接下来，LightGaussian 通过一种创新的剪枝方法，将输入数据中对画面质量贡献较小的高斯点剪掉。这一步是 LightGaussian 的核心创新之一，通过引入一种新的全局显著性算法，实现了对场景的中高斯点的精准剪枝。并且在剪枝后，还使用剪枝剩下的高斯点的渲染结果和真实图像对比，并微调它们（剩余高斯点）的参数，以进一步减少剪枝对画面质量的影响。 蒸馏SH：在剪枝之后，LightGaussian 还引入了一个蒸馏SH（Spherical Harmonics）的方法，用于对剪枝后的高斯点进行进一步的优化和压缩。这一步通过知识蒸馏和伪视图增强，进一步减少了数据量，同时保持了较好的视觉质量。 高斯VQ：最后，LightGaussian 还使用了一种高斯VQ（Vector Quantization）的方法，对剪枝后的高斯点进行量化和编码，以实现更高效的存储和传输。 具体压缩方法 高斯剪枝与恢复 以前的压缩方法主要依赖于高斯点的不透明度来进行剪枝。从上面的图中可以看出，不透明度小于0.2的高斯点几乎占了全部高斯点的一半，也就是说大部分高斯点的不透明度都不高。所以如果直接根据不透明度进行剪枝，可能会导致画面质量的显著下降。 而 LightGaussian 的剪枝方法则引入了一种新的全局显著性算法： 这个算法综合考虑了高斯点的光线命中次数、不透明度以及高斯体积多个因素，来判断哪些高斯点应该被剪掉。 其中，高斯体积由高斯点的真实体积归一化得到，这样才不会导致体积非常小的用于表现细节的高斯点被剪掉。具体计算公式如下： 这种方法能够更精准地识别出那些对画面质量贡献较小的高斯点，从而实现更有效的剪枝。 最后，LightGaussian 还通过比较剪枝后的渲染结果和真实图像之间的差异来对剩余高斯点的参数进行微调。通过优化剩余高斯点的参数，使得最终的渲染结果尽可能接近真实图像，从而最大程度地减少剪枝对画面质量的影响。 下图是剪枝前后高斯点的数量和画面的结构相似度的对比，中间这一列是光栅化残差，也就是画面中被剪掉的高斯点。可以看出剪枝后的高斯点数量大幅减少，并且画面仍然能够保持较好的视觉效果： 作者还做了相关的消融实验来验证这种剪枝方法的有效性。第一行是剪枝前的结果，第二行是只根据命中次数进行剪枝的结果，第三行是进一步考虑了不透明度进行剪枝的结果，第四行是再进一步考虑了高斯体积（也就是文中的方法）进行剪枝的结果。可以看出，LightGaussian 的方法在保持较好视觉质量的同时，实现了更高效的剪枝： 球谐（SH）系数蒸馏 原始的3DGS方法中，每个高斯点有位置、缩放、旋转、不透明度等参数。除此之外，每个高斯点还包含了一个3阶的球谐（SH）函数，用于表示该高斯点的光照信息。这个3阶的球谐函数需要48个参数来表示，参数占据了大量的存储空间。 因此作者就想通过对球谐函数进行降阶来进一步减少参数量。具体来说，作者是通过知识蒸馏和伪视图增强的方法来实现的。 首先，作者将原始的3阶球谐函数作为教师模型，然后用砍掉一阶的球谐函数作为学生模型，让这个学生模型来学习教师模型的输出。通过这种方式，学生模型能够在保持较好视觉质量的同时，使用更少的参数来表示球谐函数。 并且为了让学生模型学习连续视角下的光影变化，避免过拟合到特定视角，作者还引入了伪视图增强的方法。具体来说，就是在真实相机视角附近随机生成一些虚拟相机视角（也就是从不同的视角渲染场景），然后让学生模型在这些伪视图上进行训练。通过这种方式，学生模型能够更好地学习到球谐函数在不同视角下的变化，从而进一步提升了压缩后的视觉质量。 这一步实现了用低阶球谐函数来模拟高阶的效果，从而在保证视觉效果的同时，进一步减少了参数量。 高斯矢量量化（VQ） 在剪枝和蒸馏之后，LightGaussian 还引入了一种高斯矢量量化（VQ）的方法来进一步压缩数据。 举个例子，比如有1000个相似的白色色块，原始的3DGS方法每个色块都需要存完整的RGB值，这样就需要3000个参数。而矢量量化就是把这些相似的色块归为一类，只存储一个代表性的RGB值并将其记录到一个公用的码本中，然后每个色块就只需要存储其对应的索引，这样总共就只需要1003个参数。 按照前面的例子，直觉上肯定会想对所有高斯点的所有参数都进行矢量量化，这样才能最大化的减少参数量。但是作者发现如果对高斯点的位置、缩放、旋转这些参数也做量化的话，误差会特别大。因为这些参数稍微有一点点变化，最终渲染出来的效果就会差很多。而高斯点的SH系数则相对稳定，对误差比较不敏感，相似点的SH系数也更接近，因此最适合进行矢量量化。 但是也不是所有高斯点的SH系数都适合进行矢量量化。作者根据前面提到的全局显著性分数来筛选，只对全局显著性得分最低的那些高斯点的SH系数进行矢量量化。而对于那些全局显著性得分高的高斯点的SH系数，则不进行矢量量化，而是直接存储完整的参数。 也就是说，最终只对部分高斯点的SH系数进行矢量量化，这样既能够最大程度地减少参数量，又能够保持较好的视觉质量。 最后再对码本进行一定次数的微调，减少量化带来的画面质量损失。而未被量化的参数则直接用16位的浮点数存储（原始3DGS中是32位）。 作者也对不同的量化策略进行了消融实验。第一行是没有进行矢量量化的结果，第二行是只把32位浮点数换成16位浮点数存储的结果， 第三行是对所有高斯点的所有系数都进行矢量量化的结果，第四行是只对全局显著性较低的高斯点的全部系数进行矢量量化的结果。可以看出画面质量相比不考虑全局显著性有明显提升。 第五行是对所有高斯点的SH系数进行矢量量化的结果，可以看出画面质量明显下降。第六行是只对全局显著性较低的高斯点的SH系数进行矢量量化的结果，画面质量相比前面有明显提升： 实验结果 对比实验 作者在多个数据集上对 LightGaussian 进行了实验验证，并与之前的压缩方法进行了对比。结果表明，LightGaussian 在实现了更高效压缩和更快渲染速度的同时，也保证了较好的视觉质量。">
+<title>LightGaussian论文分享</title>
+
+<link rel='canonical' href='https://SymphonyW.github.io/zh-cn/p/lightgaussian%E8%AE%BA%E6%96%87%E5%88%86%E4%BA%AB/'>
+
+<link rel="stylesheet" href="/scss/style.min.76cec463d0246ee3e7c62047bd9f8be21bcee248644c1508553423514d02ae57.css"><meta property='og:title' content="LightGaussian论文分享">
+<meta property='og:description' content="LightGaussian: Unbounded 3D Gaussian Compression with 15x Reduction and 200+ FPS 本文根据本人对 LightGaussian 论文的理解，结合论文中的实验结果和作者的分析，对该方法的核心创新、实验验证以及潜在的局限性进行了详细的解读与总结。同时也用于记录和分享该方法的核心思想和技术细节，方便后续的学习和参考。 效果展示：https://lightgaussian.github.io/ 论文链接：https://arxiv.org/pdf/2311.17245 代码链接：https://github.com/VITA-Group/LightGaussian LightGaussian 的流程 原文中的流程图展示了 LightGaussian 的整体流程，主要分为以下几个步骤： 输入数据：首先，LightGaussian 接收一个由原版3DGS生成的高斯点云作为输入。这些高斯点云包含了场景的几何和颜色信息，是后续处理的基础。 剪枝与恢复：接下来，LightGaussian 通过一种创新的剪枝方法，将输入数据中对画面质量贡献较小的高斯点剪掉。这一步是 LightGaussian 的核心创新之一，通过引入一种新的全局显著性算法，实现了对场景的中高斯点的精准剪枝。并且在剪枝后，还使用剪枝剩下的高斯点的渲染结果和真实图像对比，并微调它们（剩余高斯点）的参数，以进一步减少剪枝对画面质量的影响。 蒸馏SH：在剪枝之后，LightGaussian 还引入了一个蒸馏SH（Spherical Harmonics）的方法，用于对剪枝后的高斯点进行进一步的优化和压缩。这一步通过知识蒸馏和伪视图增强，进一步减少了数据量，同时保持了较好的视觉质量。 高斯VQ：最后，LightGaussian 还使用了一种高斯VQ（Vector Quantization）的方法，对剪枝后的高斯点进行量化和编码，以实现更高效的存储和传输。 具体压缩方法 高斯剪枝与恢复 以前的压缩方法主要依赖于高斯点的不透明度来进行剪枝。从上面的图中可以看出，不透明度小于0.2的高斯点几乎占了全部高斯点的一半，也就是说大部分高斯点的不透明度都不高。所以如果直接根据不透明度进行剪枝，可能会导致画面质量的显著下降。 而 LightGaussian 的剪枝方法则引入了一种新的全局显著性算法： 这个算法综合考虑了高斯点的光线命中次数、不透明度以及高斯体积多个因素，来判断哪些高斯点应该被剪掉。 其中，高斯体积由高斯点的真实体积归一化得到，这样才不会导致体积非常小的用于表现细节的高斯点被剪掉。具体计算公式如下： 这种方法能够更精准地识别出那些对画面质量贡献较小的高斯点，从而实现更有效的剪枝。 最后，LightGaussian 还通过比较剪枝后的渲染结果和真实图像之间的差异来对剩余高斯点的参数进行微调。通过优化剩余高斯点的参数，使得最终的渲染结果尽可能接近真实图像，从而最大程度地减少剪枝对画面质量的影响。 下图是剪枝前后高斯点的数量和画面的结构相似度的对比，中间这一列是光栅化残差，也就是画面中被剪掉的高斯点。可以看出剪枝后的高斯点数量大幅减少，并且画面仍然能够保持较好的视觉效果： 作者还做了相关的消融实验来验证这种剪枝方法的有效性。第一行是剪枝前的结果，第二行是只根据命中次数进行剪枝的结果，第三行是进一步考虑了不透明度进行剪枝的结果，第四行是再进一步考虑了高斯体积（也就是文中的方法）进行剪枝的结果。可以看出，LightGaussian 的方法在保持较好视觉质量的同时，实现了更高效的剪枝： 球谐（SH）系数蒸馏 原始的3DGS方法中，每个高斯点有位置、缩放、旋转、不透明度等参数。除此之外，每个高斯点还包含了一个3阶的球谐（SH）函数，用于表示该高斯点的光照信息。这个3阶的球谐函数需要48个参数来表示，参数占据了大量的存储空间。 因此作者就想通过对球谐函数进行降阶来进一步减少参数量。具体来说，作者是通过知识蒸馏和伪视图增强的方法来实现的。 首先，作者将原始的3阶球谐函数作为教师模型，然后用砍掉一阶的球谐函数作为学生模型，让这个学生模型来学习教师模型的输出。通过这种方式，学生模型能够在保持较好视觉质量的同时，使用更少的参数来表示球谐函数。 并且为了让学生模型学习连续视角下的光影变化，避免过拟合到特定视角，作者还引入了伪视图增强的方法。具体来说，就是在真实相机视角附近随机生成一些虚拟相机视角（也就是从不同的视角渲染场景），然后让学生模型在这些伪视图上进行训练。通过这种方式，学生模型能够更好地学习到球谐函数在不同视角下的变化，从而进一步提升了压缩后的视觉质量。 这一步实现了用低阶球谐函数来模拟高阶的效果，从而在保证视觉效果的同时，进一步减少了参数量。 高斯矢量量化（VQ） 在剪枝和蒸馏之后，LightGaussian 还引入了一种高斯矢量量化（VQ）的方法来进一步压缩数据。 举个例子，比如有1000个相似的白色色块，原始的3DGS方法每个色块都需要存完整的RGB值，这样就需要3000个参数。而矢量量化就是把这些相似的色块归为一类，只存储一个代表性的RGB值并将其记录到一个公用的码本中，然后每个色块就只需要存储其对应的索引，这样总共就只需要1003个参数。 按照前面的例子，直觉上肯定会想对所有高斯点的所有参数都进行矢量量化，这样才能最大化的减少参数量。但是作者发现如果对高斯点的位置、缩放、旋转这些参数也做量化的话，误差会特别大。因为这些参数稍微有一点点变化，最终渲染出来的效果就会差很多。而高斯点的SH系数则相对稳定，对误差比较不敏感，相似点的SH系数也更接近，因此最适合进行矢量量化。 但是也不是所有高斯点的SH系数都适合进行矢量量化。作者根据前面提到的全局显著性分数来筛选，只对全局显著性得分最低的那些高斯点的SH系数进行矢量量化。而对于那些全局显著性得分高的高斯点的SH系数，则不进行矢量量化，而是直接存储完整的参数。 也就是说，最终只对部分高斯点的SH系数进行矢量量化，这样既能够最大程度地减少参数量，又能够保持较好的视觉质量。 最后再对码本进行一定次数的微调，减少量化带来的画面质量损失。而未被量化的参数则直接用16位的浮点数存储（原始3DGS中是32位）。 作者也对不同的量化策略进行了消融实验。第一行是没有进行矢量量化的结果，第二行是只把32位浮点数换成16位浮点数存储的结果， 第三行是对所有高斯点的所有系数都进行矢量量化的结果，第四行是只对全局显著性较低的高斯点的全部系数进行矢量量化的结果。可以看出画面质量相比不考虑全局显著性有明显提升。 第五行是对所有高斯点的SH系数进行矢量量化的结果，可以看出画面质量明显下降。第六行是只对全局显著性较低的高斯点的SH系数进行矢量量化的结果，画面质量相比前面有明显提升： 实验结果 对比实验 作者在多个数据集上对 LightGaussian 进行了实验验证，并与之前的压缩方法进行了对比。结果表明，LightGaussian 在实现了更高效压缩和更快渲染速度的同时，也保证了较好的视觉质量。">
+<meta property='og:url' content='https://SymphonyW.github.io/zh-cn/p/lightgaussian%E8%AE%BA%E6%96%87%E5%88%86%E4%BA%AB/'>
+<meta property='og:site_name' content='SymphonyW'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='Paper Sharing' /><meta property='article:published_time' content='2026-04-19T21:03:21&#43;08:00'/><meta property='article:modified_time' content='2026-04-19T21:03:21&#43;08:00'/><meta property='og:image' content='https://SymphonyW.github.io/zh-cn/p/lightgaussian%E8%AE%BA%E6%96%87%E5%88%86%E4%BA%AB/bg.png' />
+<meta name="twitter:title" content="LightGaussian论文分享">
+<meta name="twitter:description" content="LightGaussian: Unbounded 3D Gaussian Compression with 15x Reduction and 200+ FPS 本文根据本人对 LightGaussian 论文的理解，结合论文中的实验结果和作者的分析，对该方法的核心创新、实验验证以及潜在的局限性进行了详细的解读与总结。同时也用于记录和分享该方法的核心思想和技术细节，方便后续的学习和参考。 效果展示：https://lightgaussian.github.io/ 论文链接：https://arxiv.org/pdf/2311.17245 代码链接：https://github.com/VITA-Group/LightGaussian LightGaussian 的流程 原文中的流程图展示了 LightGaussian 的整体流程，主要分为以下几个步骤： 输入数据：首先，LightGaussian 接收一个由原版3DGS生成的高斯点云作为输入。这些高斯点云包含了场景的几何和颜色信息，是后续处理的基础。 剪枝与恢复：接下来，LightGaussian 通过一种创新的剪枝方法，将输入数据中对画面质量贡献较小的高斯点剪掉。这一步是 LightGaussian 的核心创新之一，通过引入一种新的全局显著性算法，实现了对场景的中高斯点的精准剪枝。并且在剪枝后，还使用剪枝剩下的高斯点的渲染结果和真实图像对比，并微调它们（剩余高斯点）的参数，以进一步减少剪枝对画面质量的影响。 蒸馏SH：在剪枝之后，LightGaussian 还引入了一个蒸馏SH（Spherical Harmonics）的方法，用于对剪枝后的高斯点进行进一步的优化和压缩。这一步通过知识蒸馏和伪视图增强，进一步减少了数据量，同时保持了较好的视觉质量。 高斯VQ：最后，LightGaussian 还使用了一种高斯VQ（Vector Quantization）的方法，对剪枝后的高斯点进行量化和编码，以实现更高效的存储和传输。 具体压缩方法 高斯剪枝与恢复 以前的压缩方法主要依赖于高斯点的不透明度来进行剪枝。从上面的图中可以看出，不透明度小于0.2的高斯点几乎占了全部高斯点的一半，也就是说大部分高斯点的不透明度都不高。所以如果直接根据不透明度进行剪枝，可能会导致画面质量的显著下降。 而 LightGaussian 的剪枝方法则引入了一种新的全局显著性算法： 这个算法综合考虑了高斯点的光线命中次数、不透明度以及高斯体积多个因素，来判断哪些高斯点应该被剪掉。 其中，高斯体积由高斯点的真实体积归一化得到，这样才不会导致体积非常小的用于表现细节的高斯点被剪掉。具体计算公式如下： 这种方法能够更精准地识别出那些对画面质量贡献较小的高斯点，从而实现更有效的剪枝。 最后，LightGaussian 还通过比较剪枝后的渲染结果和真实图像之间的差异来对剩余高斯点的参数进行微调。通过优化剩余高斯点的参数，使得最终的渲染结果尽可能接近真实图像，从而最大程度地减少剪枝对画面质量的影响。 下图是剪枝前后高斯点的数量和画面的结构相似度的对比，中间这一列是光栅化残差，也就是画面中被剪掉的高斯点。可以看出剪枝后的高斯点数量大幅减少，并且画面仍然能够保持较好的视觉效果： 作者还做了相关的消融实验来验证这种剪枝方法的有效性。第一行是剪枝前的结果，第二行是只根据命中次数进行剪枝的结果，第三行是进一步考虑了不透明度进行剪枝的结果，第四行是再进一步考虑了高斯体积（也就是文中的方法）进行剪枝的结果。可以看出，LightGaussian 的方法在保持较好视觉质量的同时，实现了更高效的剪枝： 球谐（SH）系数蒸馏 原始的3DGS方法中，每个高斯点有位置、缩放、旋转、不透明度等参数。除此之外，每个高斯点还包含了一个3阶的球谐（SH）函数，用于表示该高斯点的光照信息。这个3阶的球谐函数需要48个参数来表示，参数占据了大量的存储空间。 因此作者就想通过对球谐函数进行降阶来进一步减少参数量。具体来说，作者是通过知识蒸馏和伪视图增强的方法来实现的。 首先，作者将原始的3阶球谐函数作为教师模型，然后用砍掉一阶的球谐函数作为学生模型，让这个学生模型来学习教师模型的输出。通过这种方式，学生模型能够在保持较好视觉质量的同时，使用更少的参数来表示球谐函数。 并且为了让学生模型学习连续视角下的光影变化，避免过拟合到特定视角，作者还引入了伪视图增强的方法。具体来说，就是在真实相机视角附近随机生成一些虚拟相机视角（也就是从不同的视角渲染场景），然后让学生模型在这些伪视图上进行训练。通过这种方式，学生模型能够更好地学习到球谐函数在不同视角下的变化，从而进一步提升了压缩后的视觉质量。 这一步实现了用低阶球谐函数来模拟高阶的效果，从而在保证视觉效果的同时，进一步减少了参数量。 高斯矢量量化（VQ） 在剪枝和蒸馏之后，LightGaussian 还引入了一种高斯矢量量化（VQ）的方法来进一步压缩数据。 举个例子，比如有1000个相似的白色色块，原始的3DGS方法每个色块都需要存完整的RGB值，这样就需要3000个参数。而矢量量化就是把这些相似的色块归为一类，只存储一个代表性的RGB值并将其记录到一个公用的码本中，然后每个色块就只需要存储其对应的索引，这样总共就只需要1003个参数。 按照前面的例子，直觉上肯定会想对所有高斯点的所有参数都进行矢量量化，这样才能最大化的减少参数量。但是作者发现如果对高斯点的位置、缩放、旋转这些参数也做量化的话，误差会特别大。因为这些参数稍微有一点点变化，最终渲染出来的效果就会差很多。而高斯点的SH系数则相对稳定，对误差比较不敏感，相似点的SH系数也更接近，因此最适合进行矢量量化。 但是也不是所有高斯点的SH系数都适合进行矢量量化。作者根据前面提到的全局显著性分数来筛选，只对全局显著性得分最低的那些高斯点的SH系数进行矢量量化。而对于那些全局显著性得分高的高斯点的SH系数，则不进行矢量量化，而是直接存储完整的参数。 也就是说，最终只对部分高斯点的SH系数进行矢量量化，这样既能够最大程度地减少参数量，又能够保持较好的视觉质量。 最后再对码本进行一定次数的微调，减少量化带来的画面质量损失。而未被量化的参数则直接用16位的浮点数存储（原始3DGS中是32位）。 作者也对不同的量化策略进行了消融实验。第一行是没有进行矢量量化的结果，第二行是只把32位浮点数换成16位浮点数存储的结果， 第三行是对所有高斯点的所有系数都进行矢量量化的结果，第四行是只对全局显著性较低的高斯点的全部系数进行矢量量化的结果。可以看出画面质量相比不考虑全局显著性有明显提升。 第五行是对所有高斯点的SH系数进行矢量量化的结果，可以看出画面质量明显下降。第六行是只对全局显著性较低的高斯点的SH系数进行矢量量化的结果，画面质量相比前面有明显提升： 实验结果 对比实验 作者在多个数据集上对 LightGaussian 进行了实验验证，并与之前的压缩方法进行了对比。结果表明，LightGaussian 在实现了更高效压缩和更快渲染速度的同时，也保证了较好的视觉质量。"><meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content='https://SymphonyW.github.io/zh-cn/p/lightgaussian%E8%AE%BA%E6%96%87%E5%88%86%E4%BA%AB/bg.png' />
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/zh-cn/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hua20e9d08cce84e79524a418ee5d4524c_7426_300x0_resize_box_3.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">😁</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/zh-cn">SymphonyW</a></h1>
+            <h2 class="site-description">Welcome to my Blog.</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0'
+                        target="_blank"
+                        title="Bilibili"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.0.0-beta2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M488.6 104.1C505.3 122.2 513 143.8 511.9 169.8V372.2C511.5 398.6 502.7 420.3 485.4 437.3C468.2 454.3 446.3 463.2 419.9 464H92.02C65.57 463.2 43.81 454.2 26.74 436.8C9.682 419.4 .7667 396.5 0 368.2V169.8C.7667 143.8 9.682 122.2 26.74 104.1C43.81 87.75 65.57 78.77 92.02 78H121.4L96.05 52.19C90.3 46.46 87.42 39.19 87.42 30.4C87.42 21.6 90.3 14.34 96.05 8.603C101.8 2.868 109.1 0 117.9 0C126.7 0 134 2.868 139.8 8.603L213.1 78H301.1L375.6 8.603C381.7 2.868 389.2 0 398 0C406.8 0 414.1 2.868 419.9 8.603C425.6 14.34 428.5 21.6 428.5 30.4C428.5 39.19 425.6 46.46 419.9 52.19L394.6 78L423.9 78C450.3 78.77 471.9 87.75 488.6 104.1H488.6zM449.8 173.8C449.4 164.2 446.1 156.4 439.1 150.3C433.9 144.2 425.1 140.9 416.4 140.5H96.05C86.46 140.9 78.6 144.2 72.47 150.3C66.33 156.4 63.07 164.2 62.69 173.8V368.2C62.69 377.4 65.95 385.2 72.47 391.7C78.99 398.2 86.85 401.5 96.05 401.5H416.4C425.6 401.5 433.4 398.2 439.7 391.7C446 385.2 449.4 377.4 449.8 368.2L449.8 173.8zM185.5 216.5C191.8 222.8 195.2 230.6 195.6 239.7V273C195.2 282.2 191.9 289.9 185.8 296.2C179.6 302.5 171.8 305.7 162.2 305.7C152.6 305.7 144.7 302.5 138.6 296.2C132.5 289.9 129.2 282.2 128.8 273V239.7C129.2 230.6 132.6 222.8 138.9 216.5C145.2 210.2 152.1 206.9 162.2 206.5C171.4 206.9 179.2 210.2 185.5 216.5H185.5zM377 216.5C383.3 222.8 386.7 230.6 387.1 239.7V273C386.7 282.2 383.4 289.9 377.3 296.2C371.2 302.5 363.3 305.7 353.7 305.7C344.1 305.7 336.3 302.5 330.1 296.2C323.1 289.9 320.7 282.2 320.4 273V239.7C320.7 230.6 324.1 222.8 330.4 216.5C336.7 210.2 344.5 206.9 353.7 206.5C362.9 206.9 370.7 210.2 377 216.5H377z"/></svg>
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://github.com/SymphonyW'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/zh-cn/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>归档</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>搜索</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/%E9%93%BE%E6%8E%A5/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>链接</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch">  
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <select name="language" title="language" onchange="window.location.href = this.selectedOptions[0].value">
+                                
+                                    <option value="https://SymphonyW.github.io/" >English</option>
+                                
+                                    <option value="https://SymphonyW.github.io/zh-cn/" selected>中文</option>
+                                
+                            </select>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#lightgaussian-的流程">LightGaussian 的流程</a></li>
+    <li><a href="#具体压缩方法">具体压缩方法</a>
+      <ol>
+        <li><a href="#高斯剪枝与恢复">高斯剪枝与恢复</a></li>
+        <li><a href="#球谐sh系数蒸馏">球谐（SH）系数蒸馏</a></li>
+        <li><a href="#高斯矢量量化vq">高斯矢量量化（VQ）</a></li>
+      </ol>
+    </li>
+    <li><a href="#实验结果">实验结果</a>
+      <ol>
+        <li><a href="#对比实验">对比实验</a></li>
+        <li><a href="#消融实验">消融实验</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="has-image main-article">
+    <header class="article-header">
+        <div class="article-image">
+            <a href="/zh-cn/p/lightgaussian%E8%AE%BA%E6%96%87%E5%88%86%E4%BA%AB/">
+                <img src="/zh-cn/p/lightgaussian%E8%AE%BA%E6%96%87%E5%88%86%E4%BA%AB/bg_hue90119b960c1afe8134025878bc8795d_492384_800x0_resize_box_3.png"
+                        srcset="/zh-cn/p/lightgaussian%E8%AE%BA%E6%96%87%E5%88%86%E4%BA%AB/bg_hue90119b960c1afe8134025878bc8795d_492384_800x0_resize_box_3.png 800w, /zh-cn/p/lightgaussian%E8%AE%BA%E6%96%87%E5%88%86%E4%BA%AB/bg_hue90119b960c1afe8134025878bc8795d_492384_1600x0_resize_box_3.png 1600w"
+                        width="800" 
+                        height="650" 
+                        loading="lazy"
+                        alt="Featured image of post LightGaussian论文分享" />
+                
+            </a>
+        </div>
+    
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/zh-cn/p/lightgaussian%E8%AE%BA%E6%96%87%E5%88%86%E4%BA%AB/">LightGaussian论文分享</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published">2026-04-19 21:03</time>
+            </div>
+        
+
+        
+    </footer>
+    
+
+    
+        <footer class="article-translations">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+            <div>
+                
+                    <a href="https://SymphonyW.github.io/p/lightgaussian-paper-sharing/" class="link">English</a>
+                
+            </div>
+        </footer>
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="lightgaussian-unbounded-3d-gaussian-compression-with-15x-reduction-and-200-fps">LightGaussian: Unbounded 3D Gaussian Compression with 15x Reduction and 200+ FPS
+</h1><p>本文根据本人对 LightGaussian 论文的理解，结合论文中的实验结果和作者的分析，对该方法的核心创新、实验验证以及潜在的局限性进行了详细的解读与总结。同时也用于记录和分享该方法的核心思想和技术细节，方便后续的学习和参考。</p>
+<ul>
+<li>效果展示：<a class="link" href="https://lightgaussian.github.io/"  target="_blank" rel="noopener"
+    >https://lightgaussian.github.io/</a></li>
+<li>论文链接：<a class="link" href="https://arxiv.org/pdf/2311.17245"  target="_blank" rel="noopener"
+    >https://arxiv.org/pdf/2311.17245</a></li>
+<li>代码链接：<a class="link" href="https://github.com/VITA-Group/LightGaussian"  target="_blank" rel="noopener"
+    >https://github.com/VITA-Group/LightGaussian</a></li>
+</ul>
+<hr>
+<h2 id="lightgaussian-的流程">LightGaussian 的流程
+</h2><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="2026-04-19-21-10-31.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="2026-04-19-21-10-31.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<p>原文中的流程图展示了 LightGaussian 的整体流程，主要分为以下几个步骤：</p>
+<ol>
+<li>
+<p><strong>输入数据</strong>：首先，LightGaussian 接收一个由原版3DGS生成的高斯点云作为输入。这些高斯点云包含了场景的几何和颜色信息，是后续处理的基础。</p>
+</li>
+<li>
+<p><strong>剪枝与恢复</strong>：接下来，LightGaussian 通过一种创新的剪枝方法，将输入数据中对画面质量贡献较小的高斯点剪掉。这一步是 LightGaussian 的核心创新之一，通过引入一种新的全局显著性算法，实现了对场景的中高斯点的精准剪枝。并且在剪枝后，还使用剪枝剩下的高斯点的渲染结果和真实图像对比，并微调它们（剩余高斯点）的参数，以进一步减少剪枝对画面质量的影响。</p>
+</li>
+<li>
+<p><strong>蒸馏SH</strong>：在剪枝之后，LightGaussian 还引入了一个蒸馏SH（Spherical Harmonics）的方法，用于对剪枝后的高斯点进行进一步的优化和压缩。这一步通过知识蒸馏和伪视图增强，进一步减少了数据量，同时保持了较好的视觉质量。</p>
+</li>
+<li>
+<p><strong>高斯VQ</strong>：最后，LightGaussian 还使用了一种高斯VQ（Vector Quantization）的方法，对剪枝后的高斯点进行量化和编码，以实现更高效的存储和传输。</p>
+</li>
+</ol>
+<h2 id="具体压缩方法">具体压缩方法
+</h2><h3 id="高斯剪枝与恢复">高斯剪枝与恢复
+</h3><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="2026-04-19-21-20-01.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="2026-04-19-21-20-01.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<p>以前的压缩方法主要依赖于高斯点的不透明度来进行剪枝。从上面的图中可以看出，不透明度小于0.2的高斯点几乎占了全部高斯点的一半，也就是说大部分高斯点的不透明度都不高。所以如果直接根据不透明度进行剪枝，可能会导致画面质量的显著下降。</p>
+<p>而 LightGaussian 的剪枝方法则引入了一种新的<strong>全局显著性</strong>算法：</p>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="2026-04-19-21-28-01.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="2026-04-19-21-28-01.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<p>这个算法综合考虑了高斯点的<strong>光线命中次数、不透明度</strong>以及<strong>高斯体积</strong>多个因素，来判断哪些高斯点应该被剪掉。</p>
+<p>其中，高斯体积由高斯点的真实体积归一化得到，这样才不会导致体积非常小的用于表现细节的高斯点被剪掉。具体计算公式如下：</p>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="2026-04-19-21-29-35.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="2026-04-19-21-29-35.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<p>这种方法能够更精准地识别出那些对画面质量贡献较小的高斯点，从而实现更有效的剪枝。</p>
+<p>最后，LightGaussian 还通过比较剪枝后的渲染结果和真实图像之间的差异来对剩余高斯点的参数进行微调。通过优化剩余高斯点的参数，使得最终的渲染结果尽可能接近真实图像，从而最大程度地减少剪枝对画面质量的影响。</p>
+<p>下图是剪枝前后高斯点的数量和画面的结构相似度的对比，中间这一列是光栅化残差，也就是画面中被剪掉的高斯点。可以看出剪枝后的高斯点数量大幅减少，并且画面仍然能够保持较好的视觉效果：</p>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="2026-04-19-21-19-40.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="2026-04-19-21-19-40.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<p>作者还做了相关的消融实验来验证这种剪枝方法的有效性。第一行是剪枝前的结果，第二行是只根据命中次数进行剪枝的结果，第三行是进一步考虑了不透明度进行剪枝的结果，第四行是再进一步考虑了高斯体积（也就是文中的方法）进行剪枝的结果。可以看出，LightGaussian 的方法在保持较好视觉质量的同时，实现了更高效的剪枝：</p>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="2026-04-19-21-37-58.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="2026-04-19-21-37-58.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<h3 id="球谐sh系数蒸馏">球谐（SH）系数蒸馏
+</h3><p>原始的3DGS方法中，每个高斯点有位置、缩放、旋转、不透明度等参数。除此之外，每个高斯点还包含了一个3阶的球谐（SH）函数，用于表示该高斯点的光照信息。这个3阶的球谐函数需要48个参数来表示，参数占据了大量的存储空间。</p>
+<p>因此作者就想通过对球谐函数进行降阶来进一步减少参数量。具体来说，作者是通过知识蒸馏和伪视图增强的方法来实现的。</p>
+<p>首先，作者将原始的3阶球谐函数作为教师模型，然后用砍掉一阶的球谐函数作为学生模型，让这个学生模型来学习教师模型的输出。通过这种方式，学生模型能够在保持较好视觉质量的同时，使用更少的参数来表示球谐函数。</p>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="2026-04-19-21-49-42.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="2026-04-19-21-49-42.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<p>并且为了让学生模型学习连续视角下的光影变化，避免过拟合到特定视角，作者还引入了伪视图增强的方法。具体来说，就是在真实相机视角附近随机生成一些虚拟相机视角（也就是从不同的视角渲染场景），然后让学生模型在这些伪视图上进行训练。通过这种方式，学生模型能够更好地学习到球谐函数在不同视角下的变化，从而进一步提升了压缩后的视觉质量。</p>
+<p>这一步实现了用低阶球谐函数来模拟高阶的效果，从而在保证视觉效果的同时，进一步减少了参数量。</p>
+<h3 id="高斯矢量量化vq">高斯矢量量化（VQ）
+</h3><p>在剪枝和蒸馏之后，LightGaussian 还引入了一种高斯矢量量化（VQ）的方法来进一步压缩数据。</p>
+<p>举个例子，比如有1000个相似的白色色块，原始的3DGS方法每个色块都需要存完整的RGB值，这样就需要3000个参数。而矢量量化就是把这些相似的色块归为一类，只存储一个代表性的RGB值并将其记录到一个公用的码本中，然后每个色块就只需要存储其对应的索引，这样总共就只需要1003个参数。</p>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="2026-04-19-22-01-31.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="2026-04-19-22-01-31.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<p>按照前面的例子，直觉上肯定会想对所有高斯点的所有参数都进行矢量量化，这样才能最大化的减少参数量。但是作者发现如果对高斯点的位置、缩放、旋转这些参数也做量化的话，误差会特别大。因为这些参数稍微有一点点变化，最终渲染出来的效果就会差很多。而高斯点的SH系数则相对稳定，对误差比较不敏感，相似点的SH系数也更接近，因此最适合进行矢量量化。</p>
+<p>但是也不是所有高斯点的SH系数都适合进行矢量量化。作者根据前面提到的全局显著性分数来筛选，<strong>只对全局显著性得分最低的那些高斯点的SH系数进行矢量量化</strong>。而对于那些全局显著性得分高的高斯点的SH系数，则不进行矢量量化，而是直接存储完整的参数。</p>
+<p>也就是说，最终只对部分高斯点的SH系数进行矢量量化，这样既能够最大程度地减少参数量，又能够保持较好的视觉质量。</p>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="2026-04-19-22-01-15.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="2026-04-19-22-01-15.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<p>最后再对码本进行一定次数的微调，减少量化带来的画面质量损失。而未被量化的参数则直接用16位的浮点数存储（原始3DGS中是32位）。</p>
+<p>作者也对不同的量化策略进行了消融实验。第一行是没有进行矢量量化的结果，第二行是只把32位浮点数换成16位浮点数存储的结果，</p>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="2026-04-19-22-04-01.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="2026-04-19-22-04-01.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<p>第三行是对所有高斯点的所有系数都进行矢量量化的结果，第四行是只对全局显著性较低的高斯点的全部系数进行矢量量化的结果。可以看出画面质量相比不考虑全局显著性有明显提升。</p>
+<p>第五行是对所有高斯点的SH系数进行矢量量化的结果，可以看出画面质量明显下降。第六行是只对全局显著性较低的高斯点的SH系数进行矢量量化的结果，画面质量相比前面有明显提升：</p>
+<h2 id="实验结果">实验结果
+</h2><h3 id="对比实验">对比实验
+</h3><p>作者在多个数据集上对 LightGaussian 进行了实验验证，并与之前的压缩方法进行了对比。<strong>结果表明，LightGaussian 在实现了更高效压缩和更快渲染速度的同时，也保证了较好的视觉质量。</strong></p>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="2026-04-19-22-11-54.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="2026-04-19-22-11-54.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="2026-04-19-22-12-10.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="2026-04-19-22-12-10.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+<h3 id="消融实验">消融实验
+</h3><p>最后作者还进行了消融实验来验证每个步骤的有效性。通过逐步去掉剪枝、蒸馏SH和高斯VQ等组件，观察画面质量的变化，进一步证明了这些组件在 LightGaussian 中的重要作用。</p>
+<p>第一行是原始的3DGS方法，第二行是剪枝后的结果，第三行是剪枝加上恢复的结果。</p>
+<p>第四行是再加上直接讲解球谐函数的结果，第五行是加上降阶后微调的结果，第六行是加上知识蒸馏和伪视图增强的结果。</p>
+<p>第七行是再加上高斯矢量量化的结果，第八行是加上量化后对码本进行微调的结果。<strong>可以看出每一步的改进都在帧率和场景大小或者画面质量上有明显提升</strong>：</p>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="2026-04-19-22-14-37.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="2026-04-19-22-14-37.png" 
+             alt="" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+</div></p>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/zh-cn/tags/paper-sharing/">Paper Sharing</a>
+        
+    </section>
+
+
+    </footer>
+
+
+    
+</article>
+
+    
+
+    
+
+     
+    
+        
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+        2026 SymphonyW
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.26.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.js" defer></script><script type="text/javascript" src="/ts/custom.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+<script>
+window.MathJax = {
+  tex: {
+    
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  svg: {
+    fontCache: 'global'
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    </body>
+</html>
