@@ -6,7 +6,7 @@
 
 <link rel='canonical' href='https://SymphonyW.github.io/zh-cn/p/rag-%E6%8A%80%E6%9C%AF%E5%85%A8%E6%99%AF%E8%AE%A9%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%BB%8E%E9%97%AD%E5%8D%B7%E8%80%83%E8%AF%95%E5%88%B0%E5%BC%80%E5%8D%B7%E8%80%83%E8%AF%95/'>
 
-<link rel="stylesheet" href="/scss/style.min.cc2767508dce3983bbc22bfea97375903af8251e7a4fff21e2e1be6357cf5356.css"><meta property='og:title' content="RAG 技术全景：让大模型从\"闭卷考试\"到\"开卷考试\"">
+<link rel="stylesheet" href="/scss/style.min.2ef8188814a65e168feb5af792de6c1c9146d7232c9ab6f011973eac268b66f3.css"><meta property='og:title' content="RAG 技术全景：让大模型从\"闭卷考试\"到\"开卷考试\"">
 <meta property='og:description' content="RAG 技术全景：让大模型从&quot;闭卷考试&quot;到&quot;开卷考试&quot; 大模型很强，但它会&quot;一本正经地胡说八道&quot;。RAG（Retrieval-Augmented Generation，检索增强生成）给大模型外挂了一个&quot;知识库&quot;，让它从闭卷考试变成开卷考试，回答既准又能溯源。本文用 6 张图带你完整搞懂 RAG。 一、先聊痛点：大模型的&quot;幻觉&quot;从哪来？ 你大概遇到过这样的场景：问 GPT 一个公司内部的政策问题，或者让它总结一份最新发布的财报，它信誓旦旦地给你一段听起来很专业的回答——但仔细一查，全是编的。 这就是大模型的幻觉（Hallucination）。它不是故意的，而是由其工作方式决定的：LLM 本质上是在做&quot;下一个 token 预测&quot;，它根据训练时记住的概率分布生成文本，分不清&quot;知道&quot;和&quot;不知道&quot;。 原生 LLM 在企业级场景下有四个硬伤： 知识截止：训练数据有截止日期，不知道今天发生的事 幻觉问题：没见过的知识就靠&quot;编&quot;，还很自信 领域知识不足：对企业内部文档、专业细分领域不熟悉 无法溯源：回答不知道来自哪里，没法核验 要解决这些问题，传统思路是微调（Fine-tuning）——用领域数据重新训练模型。但微调又贵又慢，而且知识一更新就得再来一遍。 RAG 给了另一条路：不重新训练模型，而是给它外挂一个可随时更新的知识库，回答时先去知识库里检索，再基于检索到的内容作答。 原生 LLM vs RAG：闭卷考试 vs 开卷考试 就像考试一样：原生 LLM 是闭卷考试，全凭记忆，记不清就编；RAG 是开卷考试，遇到不会的可以翻书，答案有据可循。 二、RAG 是什么：核心思想一句话 RAG = 检索（Retrieval）+ 增强（Augmentation）+ 生成（Generation） 在 LLM 生成回答之前，先从外部知识库中检索相关资料，把这些资料增强到 Prompt 里作为上下文，再让 LLM 基于这些上下文生成回答。 用一句话概括：RAG 让 LLM 从&quot;闭卷考试&quot;变成&quot;开卷考试&quot;。 它和微调的根本区别在于：微调把知识&quot;烧进&quot;模型权重里，RAG 把知识放在模型之外的数据库里，用的时候现查。这也决定了两者的适用边界——后面会详细对比。 三、RAG 工作流程：三阶段详解 RAG 工作流程：检索 → 增强 → 生成 RAG 的完整流程可以拆成离线建库和在线问答两大阶段。在线问答又分为检索、增强、生成三步。 3.1 离线阶段：把文档变成可检索的向量库 这一步是&quot;建图书馆&quot;的过程，通常一次性完成，知识更新时增量重建： 文档加载：读取 PDF、Word、HTML、Markdown 等原始文档 切分（Chunking）：把长文档切成小段。为什么不整篇存？因为检索时要找最相关的片段，整篇文档向量会&quot;稀释&quot;语义；而且 LLM 上下文有限，塞不下整篇 向量化（Embedding）：用嵌入模型把每段文本转成一个高维向量（通常 768~1536 维），语义相近的文本在向量空间里距离也近 存入向量数据库：把向量和原文一起存进去，建好索引，供后续快速检索 3.">
 <meta property='og:url' content='https://SymphonyW.github.io/zh-cn/p/rag-%E6%8A%80%E6%9C%AF%E5%85%A8%E6%99%AF%E8%AE%A9%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%BB%8E%E9%97%AD%E5%8D%B7%E8%80%83%E8%AF%95%E5%88%B0%E5%BC%80%E5%8D%B7%E8%80%83%E8%AF%95/'>
 <meta property='og:site_name' content='SymphonyW'>
@@ -419,6 +419,20 @@
 </div>
 
 </header>
+
+    
+    <section class="article-tags">
+        
+            <a href="/zh-cn/tags/rag/">RAG</a>
+        
+            <a href="/zh-cn/tags/llm/">LLM</a>
+        
+            <a href="/zh-cn/tags/ai/">AI</a>
+        
+            <a href="/zh-cn/tags/%E5%90%91%E9%87%8F%E6%95%B0%E6%8D%AE%E5%BA%93/">向量数据库</a>
+        
+    </section>
+
 
     <section class="article-content">
     
