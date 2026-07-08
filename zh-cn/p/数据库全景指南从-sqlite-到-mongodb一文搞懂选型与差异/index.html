@@ -1,0 +1,1210 @@
+<!DOCTYPE html>
+<html lang="zh-cn" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="数据库全景指南：从 SQLite 到 MongoDB，一文搞懂选型与差异 MySQL、PostgreSQL、MongoDB、Redis、Cassandra、Neo4j、Elasticsearch…… 数据库多到让人眼花。本文从分类、原理、模型、选型、组合五个维度，带你看清它们各自的边界与适用场景。 一、为什么会有这么多数据库？ 先抛一个真实的尴尬场景： 新人入职第一天，被安排设计一个博客系统。他下意识打开 Navicat，建了一张 articles 表，写到第三天发现：文章正文要存富文本，字数可能上万；评论数据要嵌套在文章里；标签数量不固定；还要做全文搜索。继续用 MySQL 越写越别扭，最后只能上 ES 做搜索、MongoDB 存正文、MySQL 存元数据。 这不是个例。没有一种数据库能赢下所有场景，根本原因是存储需求里同时存在四组矛盾： 结构化 vs 灵活：业务模型固定还是多变 一致性 vs 可用性：要数据绝对正确，还是允许短暂数据不一致换可用性 规模 vs 性能：单机极致性能还是分布式海量吞吐 读写均衡 vs 海量写入：典型 Web 应用还是 IoT 流式写入 围绕这些矛盾，业界演化出了关系型、键值、文档、列族、图、搜索、时序、列存分析等 八大分支。每解决一组矛盾，就诞生一类新数据库。 二、数据库分类全景图 数据库分类全景图 上图把主流数据库按&quot;数据模型 + 适用场景&quot;分成了 8 类。下面我们逐类展开，但在分类之前，必须先理解三个底层概念：ACID、CAP、BASE。它们决定了数据库的&quot;性格&quot;。 三、ACID vs BASE：两种一致性哲学 ACID vs BASE：两种一致性哲学 ACID：关系型数据库的承诺 ACID 是事务的四大保证，是关系型数据库压箱底的能力： 字母 含义 通俗解释 A Atomicity 原子性 事务要么全成功，要么全回滚 转账扣款和加款必须同时发生 C Consistency 一致性 事务前后满足所有约束 主键、外键、CHECK 不能被破坏 I Isolation 隔离性 并发事务互不干扰 MVCC + 锁机制保证 D Durability 持久性 提交后即使宕机也不丢 通过 WAL / redo log 实现 为 ACID 付出的代价：锁竞争、跨节点协调延迟、水平扩展难。这也是为什么单机 MySQL 通常撑到几千 QPS 就开始考虑读写分离。">
+<title>数据库全景指南：从 SQLite 到 MongoDB，一文搞懂选型与差异</title>
+
+<link rel='canonical' href='https://SymphonyW.github.io/zh-cn/p/%E6%95%B0%E6%8D%AE%E5%BA%93%E5%85%A8%E6%99%AF%E6%8C%87%E5%8D%97%E4%BB%8E-sqlite-%E5%88%B0-mongodb%E4%B8%80%E6%96%87%E6%90%9E%E6%87%82%E9%80%89%E5%9E%8B%E4%B8%8E%E5%B7%AE%E5%BC%82/'>
+
+<link rel="stylesheet" href="/scss/style.min.cc2767508dce3983bbc22bfea97375903af8251e7a4fff21e2e1be6357cf5356.css"><meta property='og:title' content="数据库全景指南：从 SQLite 到 MongoDB，一文搞懂选型与差异">
+<meta property='og:description' content="数据库全景指南：从 SQLite 到 MongoDB，一文搞懂选型与差异 MySQL、PostgreSQL、MongoDB、Redis、Cassandra、Neo4j、Elasticsearch…… 数据库多到让人眼花。本文从分类、原理、模型、选型、组合五个维度，带你看清它们各自的边界与适用场景。 一、为什么会有这么多数据库？ 先抛一个真实的尴尬场景： 新人入职第一天，被安排设计一个博客系统。他下意识打开 Navicat，建了一张 articles 表，写到第三天发现：文章正文要存富文本，字数可能上万；评论数据要嵌套在文章里；标签数量不固定；还要做全文搜索。继续用 MySQL 越写越别扭，最后只能上 ES 做搜索、MongoDB 存正文、MySQL 存元数据。 这不是个例。没有一种数据库能赢下所有场景，根本原因是存储需求里同时存在四组矛盾： 结构化 vs 灵活：业务模型固定还是多变 一致性 vs 可用性：要数据绝对正确，还是允许短暂数据不一致换可用性 规模 vs 性能：单机极致性能还是分布式海量吞吐 读写均衡 vs 海量写入：典型 Web 应用还是 IoT 流式写入 围绕这些矛盾，业界演化出了关系型、键值、文档、列族、图、搜索、时序、列存分析等 八大分支。每解决一组矛盾，就诞生一类新数据库。 二、数据库分类全景图 数据库分类全景图 上图把主流数据库按&quot;数据模型 + 适用场景&quot;分成了 8 类。下面我们逐类展开，但在分类之前，必须先理解三个底层概念：ACID、CAP、BASE。它们决定了数据库的&quot;性格&quot;。 三、ACID vs BASE：两种一致性哲学 ACID vs BASE：两种一致性哲学 ACID：关系型数据库的承诺 ACID 是事务的四大保证，是关系型数据库压箱底的能力： 字母 含义 通俗解释 A Atomicity 原子性 事务要么全成功，要么全回滚 转账扣款和加款必须同时发生 C Consistency 一致性 事务前后满足所有约束 主键、外键、CHECK 不能被破坏 I Isolation 隔离性 并发事务互不干扰 MVCC + 锁机制保证 D Durability 持久性 提交后即使宕机也不丢 通过 WAL / redo log 实现 为 ACID 付出的代价：锁竞争、跨节点协调延迟、水平扩展难。这也是为什么单机 MySQL 通常撑到几千 QPS 就开始考虑读写分离。">
+<meta property='og:url' content='https://SymphonyW.github.io/zh-cn/p/%E6%95%B0%E6%8D%AE%E5%BA%93%E5%85%A8%E6%99%AF%E6%8C%87%E5%8D%97%E4%BB%8E-sqlite-%E5%88%B0-mongodb%E4%B8%80%E6%96%87%E6%90%9E%E6%87%82%E9%80%89%E5%9E%8B%E4%B8%8E%E5%B7%AE%E5%BC%82/'>
+<meta property='og:site_name' content='SymphonyW'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='数据库' /><meta property='article:tag' content='MySQL' /><meta property='article:tag' content='MongoDB' /><meta property='article:tag' content='Redis' /><meta property='article:tag' content='架构' /><meta property='article:published_time' content='2026-07-07T21:04:00&#43;08:00'/><meta property='article:modified_time' content='2026-07-07T21:04:00&#43;08:00'/><meta property='og:image' content='https://SymphonyW.github.io/zh-cn/p/%E6%95%B0%E6%8D%AE%E5%BA%93%E5%85%A8%E6%99%AF%E6%8C%87%E5%8D%97%E4%BB%8E-sqlite-%E5%88%B0-mongodb%E4%B8%80%E6%96%87%E6%90%9E%E6%87%82%E9%80%89%E5%9E%8B%E4%B8%8E%E5%B7%AE%E5%BC%82/bg.png' />
+<meta name="twitter:title" content="数据库全景指南：从 SQLite 到 MongoDB，一文搞懂选型与差异">
+<meta name="twitter:description" content="数据库全景指南：从 SQLite 到 MongoDB，一文搞懂选型与差异 MySQL、PostgreSQL、MongoDB、Redis、Cassandra、Neo4j、Elasticsearch…… 数据库多到让人眼花。本文从分类、原理、模型、选型、组合五个维度，带你看清它们各自的边界与适用场景。 一、为什么会有这么多数据库？ 先抛一个真实的尴尬场景： 新人入职第一天，被安排设计一个博客系统。他下意识打开 Navicat，建了一张 articles 表，写到第三天发现：文章正文要存富文本，字数可能上万；评论数据要嵌套在文章里；标签数量不固定；还要做全文搜索。继续用 MySQL 越写越别扭，最后只能上 ES 做搜索、MongoDB 存正文、MySQL 存元数据。 这不是个例。没有一种数据库能赢下所有场景，根本原因是存储需求里同时存在四组矛盾： 结构化 vs 灵活：业务模型固定还是多变 一致性 vs 可用性：要数据绝对正确，还是允许短暂数据不一致换可用性 规模 vs 性能：单机极致性能还是分布式海量吞吐 读写均衡 vs 海量写入：典型 Web 应用还是 IoT 流式写入 围绕这些矛盾，业界演化出了关系型、键值、文档、列族、图、搜索、时序、列存分析等 八大分支。每解决一组矛盾，就诞生一类新数据库。 二、数据库分类全景图 数据库分类全景图 上图把主流数据库按&quot;数据模型 + 适用场景&quot;分成了 8 类。下面我们逐类展开，但在分类之前，必须先理解三个底层概念：ACID、CAP、BASE。它们决定了数据库的&quot;性格&quot;。 三、ACID vs BASE：两种一致性哲学 ACID vs BASE：两种一致性哲学 ACID：关系型数据库的承诺 ACID 是事务的四大保证，是关系型数据库压箱底的能力： 字母 含义 通俗解释 A Atomicity 原子性 事务要么全成功，要么全回滚 转账扣款和加款必须同时发生 C Consistency 一致性 事务前后满足所有约束 主键、外键、CHECK 不能被破坏 I Isolation 隔离性 并发事务互不干扰 MVCC + 锁机制保证 D Durability 持久性 提交后即使宕机也不丢 通过 WAL / redo log 实现 为 ACID 付出的代价：锁竞争、跨节点协调延迟、水平扩展难。这也是为什么单机 MySQL 通常撑到几千 QPS 就开始考虑读写分离。"><meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content='https://SymphonyW.github.io/zh-cn/p/%E6%95%B0%E6%8D%AE%E5%BA%93%E5%85%A8%E6%99%AF%E6%8C%87%E5%8D%97%E4%BB%8E-sqlite-%E5%88%B0-mongodb%E4%B8%80%E6%96%87%E6%90%9E%E6%87%82%E9%80%89%E5%9E%8B%E4%B8%8E%E5%B7%AE%E5%BC%82/bg.png' />
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/zh-cn/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hua20e9d08cce84e79524a418ee5d4524c_7426_300x0_resize_box_3.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">😁</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/zh-cn">SymphonyW</a></h1>
+            <h2 class="site-description">Welcome to my Blog.</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0'
+                        target="_blank"
+                        title="Bilibili"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.0.0-beta2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M488.6 104.1C505.3 122.2 513 143.8 511.9 169.8V372.2C511.5 398.6 502.7 420.3 485.4 437.3C468.2 454.3 446.3 463.2 419.9 464H92.02C65.57 463.2 43.81 454.2 26.74 436.8C9.682 419.4 .7667 396.5 0 368.2V169.8C.7667 143.8 9.682 122.2 26.74 104.1C43.81 87.75 65.57 78.77 92.02 78H121.4L96.05 52.19C90.3 46.46 87.42 39.19 87.42 30.4C87.42 21.6 90.3 14.34 96.05 8.603C101.8 2.868 109.1 0 117.9 0C126.7 0 134 2.868 139.8 8.603L213.1 78H301.1L375.6 8.603C381.7 2.868 389.2 0 398 0C406.8 0 414.1 2.868 419.9 8.603C425.6 14.34 428.5 21.6 428.5 30.4C428.5 39.19 425.6 46.46 419.9 52.19L394.6 78L423.9 78C450.3 78.77 471.9 87.75 488.6 104.1H488.6zM449.8 173.8C449.4 164.2 446.1 156.4 439.1 150.3C433.9 144.2 425.1 140.9 416.4 140.5H96.05C86.46 140.9 78.6 144.2 72.47 150.3C66.33 156.4 63.07 164.2 62.69 173.8V368.2C62.69 377.4 65.95 385.2 72.47 391.7C78.99 398.2 86.85 401.5 96.05 401.5H416.4C425.6 401.5 433.4 398.2 439.7 391.7C446 385.2 449.4 377.4 449.8 368.2L449.8 173.8zM185.5 216.5C191.8 222.8 195.2 230.6 195.6 239.7V273C195.2 282.2 191.9 289.9 185.8 296.2C179.6 302.5 171.8 305.7 162.2 305.7C152.6 305.7 144.7 302.5 138.6 296.2C132.5 289.9 129.2 282.2 128.8 273V239.7C129.2 230.6 132.6 222.8 138.9 216.5C145.2 210.2 152.1 206.9 162.2 206.5C171.4 206.9 179.2 210.2 185.5 216.5H185.5zM377 216.5C383.3 222.8 386.7 230.6 387.1 239.7V273C386.7 282.2 383.4 289.9 377.3 296.2C371.2 302.5 363.3 305.7 353.7 305.7C344.1 305.7 336.3 302.5 330.1 296.2C323.1 289.9 320.7 282.2 320.4 273V239.7C320.7 230.6 324.1 222.8 330.4 216.5C336.7 210.2 344.5 206.9 353.7 206.5C362.9 206.9 370.7 210.2 377 216.5H377z"/></svg>
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://github.com/SymphonyW'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/zh-cn/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/zh-cn/post/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>博客</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>归档</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>搜索</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>链接</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch" class="language-switcher">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <div class="language-switcher__tabs" aria-label="Language">
+                                <a class="language-switcher__tab "
+                                        href="/p/databases-panoramafrom-sqlite-to-mongodb-a-complete-guide/"
+                                        >
+                                        English
+                                    </a>
+                                <a class="language-switcher__tab is-current"
+                                        href="/zh-cn/p/%E6%95%B0%E6%8D%AE%E5%BA%93%E5%85%A8%E6%99%AF%E6%8C%87%E5%8D%97%E4%BB%8E-sqlite-%E5%88%B0-mongodb%E4%B8%80%E6%96%87%E6%90%9E%E6%87%82%E9%80%89%E5%9E%8B%E4%B8%8E%E5%B7%AE%E5%BC%82/"
+                                        aria-current="true">
+                                        中文
+                                    </a>
+                                
+                            </div>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#一为什么会有这么多数据库">一、为什么会有这么多数据库？</a></li>
+    <li><a href="#二数据库分类全景图">二、数据库分类全景图</a></li>
+    <li><a href="#三acid-vs-base两种一致性哲学">三、ACID vs BASE：两种一致性哲学</a>
+      <ol>
+        <li><a href="#acid关系型数据库的承诺">ACID：关系型数据库的承诺</a></li>
+        <li><a href="#base分布式系统的妥协">BASE：分布式系统的妥协</a></li>
+      </ol>
+    </li>
+    <li><a href="#四cap-定理分布式系统的三角抉择">四、CAP 定理：分布式系统的三角抉择</a>
+      <ol>
+        <li><a href="#三个关键认知">三个关键认知</a></li>
+      </ol>
+    </li>
+    <li><a href="#五关系型数据库稳如泰山的基石">五、关系型数据库：稳如泰山的基石</a>
+      <ol>
+        <li><a href="#51-五大主流-rdbms-对比">5.1 五大主流 RDBMS 对比</a></li>
+        <li><a href="#52-选型经验">5.2 选型经验</a></li>
+        <li><a href="#53-关系型的硬伤">5.3 关系型的硬伤</a></li>
+      </ol>
+    </li>
+    <li><a href="#六nosql-的崛起四大家族">六、NoSQL 的崛起：四大家族</a>
+      <ol>
+        <li><a href="#61-sql-vs-nosql-数据模型对比">6.1 SQL vs NoSQL 数据模型对比</a></li>
+        <li><a href="#62-键值型redis">6.2 键值型：Redis</a></li>
+        <li><a href="#63-文档型mongodb">6.3 文档型：MongoDB</a></li>
+        <li><a href="#64-列族型cassandra--hbase">6.4 列族型：Cassandra / HBase</a></li>
+        <li><a href="#65-图型neo4j">6.5 图型：Neo4j</a></li>
+      </ol>
+    </li>
+    <li><a href="#七专用场景数据库搜索--时序--列存">七、专用场景数据库：搜索 / 时序 / 列存</a>
+      <ol>
+        <li><a href="#71-搜索引擎elasticsearch">7.1 搜索引擎：Elasticsearch</a></li>
+        <li><a href="#72-时序数据库influxdb--timescaledb">7.2 时序数据库：InfluxDB / TimescaleDB</a></li>
+        <li><a href="#73-列存分析clickhouse">7.3 列存分析：ClickHouse</a></li>
+      </ol>
+    </li>
+    <li><a href="#八数据库选型决策树">八、数据库选型决策树</a>
+      <ol>
+        <li><a href="#三条选型铁律">三条选型铁律</a></li>
+      </ol>
+    </li>
+    <li><a href="#九真实项目中的数据库组合架构">九、真实项目中的数据库组合架构</a>
+      <ol>
+        <li><a href="#数据流拆解">数据流拆解</a></li>
+        <li><a href="#为什么要拆">为什么要拆？</a></li>
+      </ol>
+    </li>
+    <li><a href="#十核心差异对照表">十、核心差异对照表</a></li>
+    <li><a href="#总结">总结</a></li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="has-image main-article">
+    <header class="article-header">
+        <div class="article-image">
+            <a href="/zh-cn/p/%E6%95%B0%E6%8D%AE%E5%BA%93%E5%85%A8%E6%99%AF%E6%8C%87%E5%8D%97%E4%BB%8E-sqlite-%E5%88%B0-mongodb%E4%B8%80%E6%96%87%E6%90%9E%E6%87%82%E9%80%89%E5%9E%8B%E4%B8%8E%E5%B7%AE%E5%BC%82/">
+                <img src="/zh-cn/p/%E6%95%B0%E6%8D%AE%E5%BA%93%E5%85%A8%E6%99%AF%E6%8C%87%E5%8D%97%E4%BB%8E-sqlite-%E5%88%B0-mongodb%E4%B8%80%E6%96%87%E6%90%9E%E6%87%82%E9%80%89%E5%9E%8B%E4%B8%8E%E5%B7%AE%E5%BC%82/bg_hu5edff12dc3b9e5bf875c827049333bc2_142600_800x0_resize_box_3.png"
+                        srcset="/zh-cn/p/%E6%95%B0%E6%8D%AE%E5%BA%93%E5%85%A8%E6%99%AF%E6%8C%87%E5%8D%97%E4%BB%8E-sqlite-%E5%88%B0-mongodb%E4%B8%80%E6%96%87%E6%90%9E%E6%87%82%E9%80%89%E5%9E%8B%E4%B8%8E%E5%B7%AE%E5%BC%82/bg_hu5edff12dc3b9e5bf875c827049333bc2_142600_800x0_resize_box_3.png 800w, /zh-cn/p/%E6%95%B0%E6%8D%AE%E5%BA%93%E5%85%A8%E6%99%AF%E6%8C%87%E5%8D%97%E4%BB%8E-sqlite-%E5%88%B0-mongodb%E4%B8%80%E6%96%87%E6%90%9E%E6%87%82%E9%80%89%E5%9E%8B%E4%B8%8E%E5%B7%AE%E5%BC%82/bg_hu5edff12dc3b9e5bf875c827049333bc2_142600_1600x0_resize_box_3.png 1600w"
+                        width="800" 
+                        height="800" 
+                        loading="lazy"
+                        alt="Featured image of post 数据库全景指南：从 SQLite 到 MongoDB，一文搞懂选型与差异" />
+                
+            </a>
+        </div>
+    
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/zh-cn/p/%E6%95%B0%E6%8D%AE%E5%BA%93%E5%85%A8%E6%99%AF%E6%8C%87%E5%8D%97%E4%BB%8E-sqlite-%E5%88%B0-mongodb%E4%B8%80%E6%96%87%E6%90%9E%E6%87%82%E9%80%89%E5%9E%8B%E4%B8%8E%E5%B7%AE%E5%BC%82/">数据库全景指南：从 SQLite 到 MongoDB，一文搞懂选型与差异</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published">2026-07-07 21:04</time>
+            </div>
+        
+
+        
+    </footer>
+    
+
+    
+        <footer class="article-translations">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+            <div>
+                
+                    <a href="https://SymphonyW.github.io/p/databases-panoramafrom-sqlite-to-mongodb-a-complete-guide/" class="link">English</a>
+                
+            </div>
+        </footer>
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="数据库全景指南从-sqlite-到-mongodb一文搞懂选型与差异">数据库全景指南：从 SQLite 到 MongoDB，一文搞懂选型与差异
+</h1><blockquote>
+<p>MySQL、PostgreSQL、MongoDB、Redis、Cassandra、Neo4j、Elasticsearch…… 数据库多到让人眼花。本文从分类、原理、模型、选型、组合五个维度，带你看清它们各自的边界与适用场景。</p>
+</blockquote>
+<hr>
+<h2 id="一为什么会有这么多数据库">一、为什么会有这么多数据库？
+</h2><p>先抛一个真实的尴尬场景：</p>
+<p>新人入职第一天，被安排设计一个博客系统。他下意识打开 Navicat，建了一张 <code>articles</code> 表，写到第三天发现：文章正文要存富文本，字数可能上万；评论数据要嵌套在文章里；标签数量不固定；还要做全文搜索。继续用 MySQL 越写越别扭，最后只能上 ES 做搜索、MongoDB 存正文、MySQL 存元数据。</p>
+<p>这不是个例。<strong>没有一种数据库能赢下所有场景</strong>，根本原因是存储需求里同时存在四组矛盾：</p>
+<ol>
+<li><strong>结构化 vs 灵活</strong>：业务模型固定还是多变</li>
+<li><strong>一致性 vs 可用性</strong>：要数据绝对正确，还是允许短暂数据不一致换可用性</li>
+<li><strong>规模 vs 性能</strong>：单机极致性能还是分布式海量吞吐</li>
+<li><strong>读写均衡 vs 海量写入</strong>：典型 Web 应用还是 IoT 流式写入</li>
+</ol>
+<p>围绕这些矛盾，业界演化出了关系型、键值、文档、列族、图、搜索、时序、列存分析等 <strong>八大分支</strong>。每解决一组矛盾，就诞生一类新数据库。</p>
+<hr>
+<h2 id="二数据库分类全景图">二、数据库分类全景图
+</h2><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="db-categories.svg" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="db-categories.svg" 
+             alt="数据库分类全景图" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">数据库分类全景图</span>
+    
+</div></p>
+<p>上图把主流数据库按&quot;数据模型 + 适用场景&quot;分成了 8 类。下面我们逐类展开，但在分类之前，必须先理解三个底层概念：<strong>ACID、CAP、BASE</strong>。它们决定了数据库的&quot;性格&quot;。</p>
+<hr>
+<h2 id="三acid-vs-base两种一致性哲学">三、ACID vs BASE：两种一致性哲学
+</h2><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="acid-base.svg" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="acid-base.svg" 
+             alt="ACID vs BASE：两种一致性哲学" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">ACID vs BASE：两种一致性哲学</span>
+    
+</div></p>
+<h3 id="acid关系型数据库的承诺">ACID：关系型数据库的承诺
+</h3><p>ACID 是事务的四大保证，是关系型数据库压箱底的能力：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>字母</th>
+<th>含义</th>
+<th>通俗解释</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>A</strong> Atomicity 原子性</td>
+<td>事务要么全成功，要么全回滚</td>
+<td>转账扣款和加款必须同时发生</td>
+</tr>
+<tr>
+<td><strong>C</strong> Consistency 一致性</td>
+<td>事务前后满足所有约束</td>
+<td>主键、外键、CHECK 不能被破坏</td>
+</tr>
+<tr>
+<td><strong>I</strong> Isolation 隔离性</td>
+<td>并发事务互不干扰</td>
+<td>MVCC + 锁机制保证</td>
+</tr>
+<tr>
+<td><strong>D</strong> Durability 持久性</td>
+<td>提交后即使宕机也不丢</td>
+<td>通过 WAL / redo log 实现</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>为 ACID 付出的代价</strong>：锁竞争、跨节点协调延迟、水平扩展难。这也是为什么单机 MySQL 通常撑到几千 QPS 就开始考虑读写分离。</p>
+<h3 id="base分布式系统的妥协">BASE：分布式系统的妥协
+</h3><p>当系统走向分布式，强一致性的代价过高，业界提出 BASE 作为 AP 系统的设计哲学：</p>
+<ul>
+<li><strong>BA</strong> Basically Available 基本可用：允许响应变慢、允许功能降级</li>
+<li><strong>S</strong> Soft State 软状态：允许存在中间状态</li>
+<li><strong>E</strong> Eventually Consistent 最终一致：不保证任意时刻一致，但保证最终收敛</li>
+</ul>
+<blockquote>
+<p>关键认知：<strong>ACID 中的 C 是事务一致性（约束不被破坏），CAP 中的 C 是副本一致性（多节点数据相同）</strong>，两者不是一回事。</p>
+</blockquote>
+<hr>
+<h2 id="四cap-定理分布式系统的三角抉择">四、CAP 定理：分布式系统的三角抉择
+</h2><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="cap-theorem.svg" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="cap-theorem.svg" 
+             alt="CAP 定理：分布式系统的三角抉择" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">CAP 定理：分布式系统的三角抉择</span>
+    
+</div></p>
+<p>CAP 定理由 Eric Brewer 在 2000 年提出，断言：<strong>一个分布式系统最多只能同时满足 Consistency（一致性）、Availability（可用性）、Partition tolerance（分区容错）三者中的两个</strong>。</p>
+<h3 id="三个关键认知">三个关键认知
+</h3><p><strong>① P 不可避免</strong></p>
+<p>真实分布式系统必然存在网络分区（交换机抖动、机房断连、节点宕机）。所以工程师实际上只能在 <strong>C 和 A 之间做选择</strong>：</p>
+<ul>
+<li>分区时拒绝写入 → CP，保证数据正确，但牺牲可用性</li>
+<li>分区时仍可读写 → AP，保证可用性，但允许数据短暂不一致</li>
+</ul>
+<p><strong>② 三种组合的典型代表</strong></p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>组合</th>
+<th>牺牲项</th>
+<th>典型数据库</th>
+<th>典型场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>CA</strong></td>
+<td>分区容错</td>
+<td>MySQL 单机、PostgreSQL 单机</td>
+<td>传统单机业务</td>
+</tr>
+<tr>
+<td><strong>CP</strong></td>
+<td>可用性</td>
+<td>HBase、MongoDB、Redis 集群</td>
+<td>强一致优先的金融、配置</td>
+</tr>
+<tr>
+<td><strong>AP</strong></td>
+<td>一致性</td>
+<td>Cassandra、DynamoDB、Eureka</td>
+<td>高可用的社交、推荐</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>③ 同一业务可灵活切换</strong></p>
+<p>注册中心是个经典例子：<strong>ZooKeeper 是 CP</strong>，选举期间不可用；<strong>Eureka 是 AP</strong>，节点之间不强制同步。Netflix 选 Eureka，因为它能容忍注册信息短暂不一致，但不能容忍服务发现挂掉。</p>
+<hr>
+<h2 id="五关系型数据库稳如泰山的基石">五、关系型数据库：稳如泰山的基石
+</h2><p>关系型数据库以 <strong>二维表 + SQL + ACID 事务</strong> 为核心，是 90% 业务系统的默认选择。</p>
+<h3 id="51-五大主流-rdbms-对比">5.1 五大主流 RDBMS 对比
+</h3><div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>数据库</th>
+<th>厂商 / 协议</th>
+<th>强项</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>MySQL</strong></td>
+<td>开源（GPL/商业双协议）</td>
+<td>生态成熟、运维资料最多</td>
+<td>Web 应用、电商、CMS</td>
+</tr>
+<tr>
+<td><strong>PostgreSQL</strong></td>
+<td>开源（BSD）</td>
+<td>复杂查询、JSON、PostGIS、扩展性强</td>
+<td>复杂业务、地理数据、数据分析</td>
+</tr>
+<tr>
+<td><strong>SQLite</strong></td>
+<td>开源（公有领域）</td>
+<td>嵌入式、零配置、单文件</td>
+<td>移动端、嵌入式、原型、测试</td>
+</tr>
+<tr>
+<td><strong>Oracle</strong></td>
+<td>商业</td>
+<td>企业级功能、稳定性、技术支持</td>
+<td>银行、电信、政府核心系统</td>
+</tr>
+<tr>
+<td><strong>SQL Server</strong></td>
+<td>商业（微软）</td>
+<td>与 .NET 生态深度集成</td>
+<td>企业内部系统、Windows 环境</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="52-选型经验">5.2 选型经验
+</h3><ul>
+<li><strong>个人项目 / 小工具</strong>：SQLite，单文件零配置</li>
+<li><strong>Web 应用首选</strong>：MySQL（运维生态好）或 PostgreSQL（功能强、复杂查询爽）</li>
+<li><strong>企业核心系统有预算</strong>：Oracle 或 SQL Server，看团队技术栈</li>
+<li><strong>要不要选 PostgreSQL 而不是 MySQL？</strong> 如果业务里有复杂分析、地理数据、强约束、JSON 字段，PG 更合适；如果只是 CRUD + 简单关联，MySQL 更省心</li>
+</ul>
+<h3 id="53-关系型的硬伤">5.3 关系型的硬伤
+</h3><ul>
+<li><strong>水平扩展难</strong>：分库分表后跨库 JOIN、事务都成噩梦，需要引入 ShardingSphere、Vitess 之类的中间件</li>
+<li><strong>Schema 变更贵</strong>：上亿行表加索引可能锁表几小时</li>
+<li><strong>高并发写入瓶颈</strong>：单机通常几千 QPS，靠缓存兜底</li>
+</ul>
+<hr>
+<h2 id="六nosql-的崛起四大家族">六、NoSQL 的崛起：四大家族
+</h2><p>NoSQL（Not Only SQL）的核心动机：<strong>通过放松某个约束（一致性 / Schema / 关系），换取扩展性、性能或灵活性</strong>。</p>
+<h3 id="61-sql-vs-nosql-数据模型对比">6.1 SQL vs NoSQL 数据模型对比
+</h3><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="sql-vs-nosql.svg" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="sql-vs-nosql.svg" 
+             alt="SQL vs NoSQL：数据模型架构对比" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">SQL vs NoSQL：数据模型架构对比</span>
+    
+</div></p>
+<p>左图是关系型的方式：<strong>范式化拆表 + 外键关联</strong>，查 Alice 的订单要 JOIN 两张表。
+右图是文档型的方式：<strong>聚合存储 + 内嵌文档</strong>，Alice 的订单直接嵌在她的文档里，一次读取拿全。</p>
+<p>两种模型各有利弊：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>维度</th>
+<th>关系型（SQL）</th>
+<th>文档型（NoSQL）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Schema</td>
+<td>严格固定</td>
+<td>灵活可变</td>
+</tr>
+<tr>
+<td>关联查询</td>
+<td>JOIN 强</td>
+<td>弱（要靠应用层）</td>
+</tr>
+<tr>
+<td>数据冗余</td>
+<td>低（范式化）</td>
+<td>高（反范式）</td>
+</tr>
+<tr>
+<td>事务</td>
+<td>强 ACID</td>
+<td>弱（多文档 4.0+ 才支持）</td>
+</tr>
+<tr>
+<td>扩展性</td>
+<td>垂直为主</td>
+<td>易水平分片</td>
+</tr>
+<tr>
+<td>适合</td>
+<td>关系复杂、强一致</td>
+<td>模型多变、读多写少</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="62-键值型redis">6.2 键值型：Redis
+</h3><p>Redis 是最被低估的&quot;瑞士军刀&quot;。它表面上是个缓存，实际上能做：</p>
+<ul>
+<li><strong>缓存</strong>：最常见，热点数据加速</li>
+<li><strong>会话存储</strong>：分布式 Session</li>
+<li><strong>排行榜</strong>：ZSet 天生支持</li>
+<li><strong>消息队列</strong>：List / Stream</li>
+<li><strong>限流器</strong>：INCR + EXPIRE</li>
+<li><strong>分布式锁</strong>：SETNX / Redlock</li>
+</ul>
+<p><strong>选型提醒</strong>：Redis 是 <strong>CP 系统</strong>（集群模式下）—— 主节点挂掉会触发故障转移，期间集群不可用。不是所有 Redis 都&quot;高可用&quot;。</p>
+<h3 id="63-文档型mongodb">6.3 文档型：MongoDB
+</h3><p>MongoDB 用 BSON（二进制 JSON）存储，每个文档自包含。它的甜点场景：</p>
+<ul>
+<li><strong>内容管理</strong>：文章、评论、附件，结构天然嵌套</li>
+<li><strong>IoT 设备元数据</strong>：不同设备字段不同，灵活 Schema 太香</li>
+<li><strong>快速迭代业务</strong>：需求变就加字段，不用 ALTER TABLE</li>
+<li><strong>日志聚合</strong>：MongoDB 的聚合管道 + 副本集很合用</li>
+</ul>
+<p><strong>坑点</strong>：MongoDB 4.0 才支持多文档事务，复杂事务场景慎用。索引设计不当会让查询慢到怀疑人生。</p>
+<h3 id="64-列族型cassandra--hbase">6.4 列族型：Cassandra / HBase
+</h3><p>列族型数据库把&quot;行&quot;打散成&quot;列族&quot;，<strong>同一列的数据连续存储</strong>，对&quot;按列聚合 + 海量写入&quot;特别友好。</p>
+<ul>
+<li><strong>Cassandra</strong>：AWS Dynamo 论文的开源实现，无主架构，写入性能极强。Netflix、Instagram、Apple 都在用</li>
+<li><strong>HBase</strong>：基于 HDFS，强一致，适合离线大数据</li>
+<li><strong>ScyllaDB</strong>：用 C++ 重写的 Cassandra，性能高一个数量级</li>
+</ul>
+<p><strong>典型场景</strong>：时序数据、推荐特征存储、消息历史归档。Cassandra 在写入 QPS 上能轻松甩开 MySQL 一个数量级。</p>
+<h3 id="65-图型neo4j">6.5 图型：Neo4j
+</h3><p>如果业务核心是 <strong>关系</strong>（不是表关联，而是多跳关系遍历），用图数据库比 SQL 递归查询快几个数量级。</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">// Neo4j 查询：找到 Alice 三度人脉里喜欢 Go 语言的人
+</span></span><span class="line"><span class="cl">MATCH (a:User {name:&#39;Alice&#39;})-[:KNOWS*1..3]-(friend:User)
+</span></span><span class="line"><span class="cl">WHERE friend.language = &#39;Go&#39;
+</span></span><span class="line"><span class="cl">RETURN friend
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p><strong>典型场景</strong>：社交网络（好友推荐）、反欺诈（团伙识别）、知识图谱、IT 资产拓扑。</p>
+<p>用 MySQL 写&quot;找三度人脉&quot;要用 4 层自连接，性能爆炸；Neo4j 用邻接表存储，时间复杂度近似 O(1)。</p>
+<hr>
+<h2 id="七专用场景数据库搜索--时序--列存">七、专用场景数据库：搜索 / 时序 / 列存
+</h2><p>通用数据库做不到极致，专用数据库在特定领域把性能压榨到极限。</p>
+<h3 id="71-搜索引擎elasticsearch">7.1 搜索引擎：Elasticsearch
+</h3><p>ES 用 <strong>倒排索引</strong> 实现秒级全文检索，是 ELK（Elasticsearch + Logstash + Kibana）的核心。</p>
+<ul>
+<li><strong>商品搜索</strong>：分词、同义词、纠错、相关性排序</li>
+<li><strong>日志分析</strong>：海量日志聚合，按时间维度切片</li>
+<li><strong>可观测性</strong>：APM、链路追踪数据存储</li>
+</ul>
+<p><strong>重要认知</strong>：ES 不是数据库替代品。它写入延迟较高（近实时，1 秒刷新），不适合做强一致主存储。通常 <strong>MySQL 是真相源，ES 是搜索副本</strong>，通过 Canal/Debezium 同步。</p>
+<h3 id="72-时序数据库influxdb--timescaledb">7.2 时序数据库：InfluxDB / TimescaleDB
+</h3><p>时序数据有显著特征：<strong>写多读少、按时间顺序、自动降采样、旧数据可丢弃</strong>。专用 TSDB 的写入性能比 MySQL 高 1-2 个数量级。</p>
+<ul>
+<li><strong>InfluxDB</strong>：Go 写的，单机性能强，TSM 存储引擎</li>
+<li><strong>TimescaleDB</strong>：PostgreSQL 扩展，能用 SQL，事务保证更好</li>
+<li><strong>Prometheus</strong>：监控专用，pull 模型</li>
+<li><strong>TDengine</strong>：国产，物联网场景优化</li>
+</ul>
+<p><strong>典型场景</strong>：服务器监控、IoT 传感器、金融行情、用户行为埋点。</p>
+<h3 id="73-列存分析clickhouse">7.3 列存分析：ClickHouse
+</h3><p>OLAP 场景的核心诉求：<strong>扫描 TB 级数据，做 GROUP BY 聚合，秒级返回</strong>。行存数据库（MySQL）做这种扫描会读大量无关列，列存数据库只读需要的列，性能差几十倍。</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-sql" data-lang="sql"><span class="line"><span class="cl"><span class="c1">-- ClickHouse 典型查询：秒级扫描 10 亿行
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="k">SELECT</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">toDate</span><span class="p">(</span><span class="n">event_time</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="k">day</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">city</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="k">count</span><span class="p">()</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">pv</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">uniq</span><span class="p">(</span><span class="n">user_id</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">uv</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="k">FROM</span><span class="w"> </span><span class="n">events</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="k">WHERE</span><span class="w"> </span><span class="n">event_time</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="n">today</span><span class="p">()</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">30</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="k">GROUP</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="k">day</span><span class="p">,</span><span class="w"> </span><span class="n">city</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="k">day</span><span class="w"> </span><span class="k">DESC</span><span class="p">,</span><span class="w"> </span><span class="n">pv</span><span class="w"> </span><span class="k">DESC</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p><strong>对比</strong>：同样的查询，MySQL 要几十分钟，ClickHouse 通常 1 秒内。</p>
+<hr>
+<h2 id="八数据库选型决策树">八、数据库选型决策树
+</h2><p>讲了这么多，实战怎么选？下图给出一份决策路径：</p>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="db-selection.svg" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="db-selection.svg" 
+             alt="数据库选型决策树" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">数据库选型决策树</span>
+    
+</div></p>
+<h3 id="三条选型铁律">三条选型铁律
+</h3><p><strong>① 先 SQL，后 NoSQL</strong></p>
+<p>绝大多数项目从 MySQL / PostgreSQL 起步就够了。遇到具体瓶颈（缓存、搜索、海量写入、复杂关系）再引入对应专用数据库。一开始就上&quot;全家桶&quot;是过度设计。</p>
+<p><strong>② 没有银弹，组合使用</strong></p>
+<p>工业界真实系统几乎都是多库组合：核心业务用 MySQL/PG，缓存用 Redis，搜索用 ES，日志用 MongoDB/ES，监控用 InfluxDB，分析用 ClickHouse。<strong>让每个数据库只做它最擅长的事</strong>。</p>
+<p><strong>③ 团队熟悉度优先</strong></p>
+<p>再先进的数据库，没人会运维也是灾难。Cassandra 写入性能强，但运维门槛极高，国内很多团队踩坑后还是换回了 MySQL 分库分表。<strong>选团队能掌控的，而不是最潮的</strong>。</p>
+<hr>
+<h2 id="九真实项目中的数据库组合架构">九、真实项目中的数据库组合架构
+</h2><p>光说不练假把式。下图是一个典型电商系统的多库协同架构：</p>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="stack-combination.svg" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="stack-combination.svg" 
+             alt="真实项目中的数据库组合架构" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">真实项目中的数据库组合架构</span>
+    
+</div></p>
+<h3 id="数据流拆解">数据流拆解
+</h3><p><strong>① 写路径</strong>：订单服务先写 MySQL（强一致保证），同时发 Kafka 事件，下游消费者异步更新 ES 搜索索引和推荐系统特征库。这是经典的 <strong>&ldquo;先写主库，再异步同步&rdquo;</strong> 模式。</p>
+<p><strong>② 读路径</strong>：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>请求类型</th>
+<th>走的数据库</th>
+<th>理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>商品详情</td>
+<td>Redis 缓存 → MongoDB</td>
+<td>缓存挡 95% 流量，回源用文档库装多变 SKU</td>
+</tr>
+<tr>
+<td>商品搜索</td>
+<td>Elasticsearch</td>
+<td>倒排索引秒级响应</td>
+</tr>
+<tr>
+<td>好友推荐</td>
+<td>Neo4j</td>
+<td>多跳关系遍历</td>
+</tr>
+<tr>
+<td>个人订单</td>
+<td>MySQL</td>
+<td>强一致，按用户分库</td>
+</tr>
+<tr>
+<td>监控大盘</td>
+<td>InfluxDB</td>
+<td>时序聚合，秒级出图</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>③ 监控旁路</strong>：所有服务通过 SDK 把指标推送到 InfluxDB，<strong>不参与业务主链路</strong>，监控挂掉不影响交易。这是旁路系统的设计铁律。</p>
+<h3 id="为什么要拆">为什么要拆？
+</h3><p>如果不拆，全塞进 MySQL 会发生什么？</p>
+<ul>
+<li>商品搜索做 LIKE &lsquo;%关键词%&rsquo; → 全表扫描，慢到超时</li>
+<li>监控指标每秒几十万条写入 → MySQL 单机扛不住</li>
+<li>好友推荐用 4 层自连接 → 几秒出不来结果</li>
+<li>商品 SKU 字段每类目都不同 → ALTER TABLE 改到吐血</li>
+</ul>
+<p>每个专用数据库的存在，都是为了 <strong>解决某一类 MySQL 不擅长的问题</strong>。</p>
+<hr>
+<h2 id="十核心差异对照表">十、核心差异对照表
+</h2><p>最后用一张表把主流数据库的关键指标摊开对比：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>数据库</th>
+<th>类型</th>
+<th>一致性</th>
+<th>Schema</th>
+<th>事务</th>
+<th>水平扩展</th>
+<th>典型 QPS</th>
+<th>适合场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>MySQL</strong></td>
+<td>关系</td>
+<td>ACID</td>
+<td>严格</td>
+<td>强</td>
+<td>难（需中间件）</td>
+<td>几千</td>
+<td>Web 主流</td>
+</tr>
+<tr>
+<td><strong>PostgreSQL</strong></td>
+<td>关系</td>
+<td>ACID</td>
+<td>严格</td>
+<td>强</td>
+<td>难</td>
+<td>几千</td>
+<td>复杂业务</td>
+</tr>
+<tr>
+<td><strong>SQLite</strong></td>
+<td>关系</td>
+<td>ACID</td>
+<td>严格</td>
+<td>强</td>
+<td>不可</td>
+<td>单线程</td>
+<td>嵌入式</td>
+</tr>
+<tr>
+<td><strong>Redis</strong></td>
+<td>KV</td>
+<td>CP</td>
+<td>无</td>
+<td>弱</td>
+<td>集群分片</td>
+<td>10万+</td>
+<td>缓存</td>
+</tr>
+<tr>
+<td><strong>MongoDB</strong></td>
+<td>文档</td>
+<td>CP（可调）</td>
+<td>灵活</td>
+<td>4.0+ 多文档</td>
+<td>易分片</td>
+<td>几万</td>
+<td>内容管理</td>
+</tr>
+<tr>
+<td><strong>Cassandra</strong></td>
+<td>列族</td>
+<td>AP（可调）</td>
+<td>灵活</td>
+<td>弱</td>
+<td>极易</td>
+<td>10万+ 写入</td>
+<td>海量写入</td>
+</tr>
+<tr>
+<td><strong>Neo4j</strong></td>
+<td>图</td>
+<td>ACID</td>
+<td>半结构</td>
+<td>强</td>
+<td>难</td>
+<td>几千</td>
+<td>关系网络</td>
+</tr>
+<tr>
+<td><strong>Elasticsearch</strong></td>
+<td>搜索</td>
+<td>近实时</td>
+<td>动态映射</td>
+<td>弱</td>
+<td>易分片</td>
+<td>几万</td>
+<td>全文搜索</td>
+</tr>
+<tr>
+<td><strong>InfluxDB</strong></td>
+<td>时序</td>
+<td>CP</td>
+<td>标签+字段</td>
+<td>弱</td>
+<td>集群版收费</td>
+<td>10万+ 写入</td>
+<td>监控指标</td>
+</tr>
+<tr>
+<td><strong>ClickHouse</strong></td>
+<td>列存</td>
+<td>CP</td>
+<td>严格</td>
+<td>弱</td>
+<td>易分片</td>
+<td>100万+ 写入</td>
+<td>大数据分析</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="总结">总结
+</h2><p>回到最初的问题：<strong>SQLite、MySQL、MongoDB 有什么区别？</strong> 它们不是&quot;谁更好&quot;的关系，而是&quot;为不同问题而生&quot;的不同工具。</p>
+<p>回顾本文核心要点：</p>
+<ul>
+<li><strong>没有银弹</strong>：每种数据库都是某组矛盾的产物，关系型解决一致性、NoSQL 解决扩展性、专用库解决极端场景</li>
+<li><strong>理论先行</strong>：理解 ACID / BASE / CAP，是看懂所有数据库设计意图的钥匙</li>
+<li><strong>SQL 不死</strong>：关系型依然是 90% 业务系统的默认选择，NoSQL 是补充而非替代</li>
+<li><strong>组合才是常态</strong>：工业界真实系统几乎都是多库协同，让每个数据库只做它最擅长的事</li>
+<li><strong>选型三铁律</strong>：先 SQL 后 NoSQL、没有银弹要组合、团队熟悉度优先</li>
+</ul>
+<p>下一步行动建议：</p>
+<ol>
+<li><strong>审视你当前的项目</strong>：是不是把所有数据都塞在 MySQL 里了？哪些场景其实更适合专用数据库？</li>
+<li><strong>挑一个不熟的数据库试一试</strong>：Redis / MongoDB / ES 任选一个，跑一遍官方 Quick Start</li>
+<li><strong>关注 NewSQL</strong>：TiDB、CockroachDB、YugabyteDB 这些&quot;既有 ACID 又能水平扩展&quot;的下一代数据库正在崛起</li>
+</ol>
+<p>记住：<strong>好的架构师不在于会多少种数据库，而在于知道每种数据库的边界在哪</strong>。</p>
+<hr>
+<blockquote>
+<p><em>本文涉及的所有数据库选型都基于公开文档与工程实践，具体落地还需结合团队技术栈、运维能力、预算综合判断。</em></p>
+</blockquote>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/zh-cn/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/">数据库</a>
+        
+            <a href="/zh-cn/tags/mysql/">MySQL</a>
+        
+            <a href="/zh-cn/tags/mongodb/">MongoDB</a>
+        
+            <a href="/zh-cn/tags/redis/">Redis</a>
+        
+            <a href="/zh-cn/tags/%E6%9E%B6%E6%9E%84/">架构</a>
+        
+    </section>
+
+
+    </footer>
+
+
+    
+</article>
+
+    
+
+    
+
+     
+    
+        
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+        2026 SymphonyW
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.26.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.js" defer></script><script type="text/javascript" src="/ts/custom.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+<script>
+window.MathJax = {
+  tex: {
+    
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  svg: {
+    fontCache: 'global'
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    </body>
+</html>

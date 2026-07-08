@@ -7,7 +7,612 @@
         <generator>Hugo -- gohugo.io</generator>
         <language>en</language>
         <copyright>SymphonyW</copyright>
-        <lastBuildDate>Wed, 25 Mar 2026 22:08:57 +0800</lastBuildDate><atom:link href="https://SymphonyW.github.io/tags/redis/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Tue, 07 Jul 2026 21:04:00 +0800</lastBuildDate><atom:link href="https://SymphonyW.github.io/tags/redis/index.xml" rel="self" type="application/rss+xml" /><item>
+        <title>Databases Panorama:From SQLite to MongoDB, A Complete Guide</title>
+        <link>https://SymphonyW.github.io/p/databases-panoramafrom-sqlite-to-mongodb-a-complete-guide/</link>
+        <pubDate>Tue, 07 Jul 2026 21:04:00 +0800</pubDate>
+        
+        <guid>https://SymphonyW.github.io/p/databases-panoramafrom-sqlite-to-mongodb-a-complete-guide/</guid>
+        <description>&lt;img src="https://SymphonyW.github.io/p/databases-panoramafrom-sqlite-to-mongodb-a-complete-guide/bg.png" alt="Featured image of post Databases Panorama:From SQLite to MongoDB, A Complete Guide" /&gt;&lt;h1 id=&#34;数据库全景指南从-sqlite-到-mongodb一文搞懂选型与差异&#34;&gt;数据库全景指南：从 SQLite 到 MongoDB，一文搞懂选型与差异
+&lt;/h1&gt;&lt;blockquote&gt;
+&lt;p&gt;MySQL、PostgreSQL、MongoDB、Redis、Cassandra、Neo4j、Elasticsearch…… 数据库多到让人眼花。本文从分类、原理、模型、选型、组合五个维度，带你看清它们各自的边界与适用场景。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;一为什么会有这么多数据库&#34;&gt;一、为什么会有这么多数据库？
+&lt;/h2&gt;&lt;p&gt;先抛一个真实的尴尬场景：&lt;/p&gt;
+&lt;p&gt;新人入职第一天，被安排设计一个博客系统。他下意识打开 Navicat，建了一张 &lt;code&gt;articles&lt;/code&gt; 表，写到第三天发现：文章正文要存富文本，字数可能上万；评论数据要嵌套在文章里；标签数量不固定；还要做全文搜索。继续用 MySQL 越写越别扭，最后只能上 ES 做搜索、MongoDB 存正文、MySQL 存元数据。&lt;/p&gt;
+&lt;p&gt;这不是个例。&lt;strong&gt;没有一种数据库能赢下所有场景&lt;/strong&gt;，根本原因是存储需求里同时存在四组矛盾：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;结构化 vs 灵活&lt;/strong&gt;：业务模型固定还是多变&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;一致性 vs 可用性&lt;/strong&gt;：要数据绝对正确，还是允许短暂数据不一致换可用性&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;规模 vs 性能&lt;/strong&gt;：单机极致性能还是分布式海量吞吐&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;读写均衡 vs 海量写入&lt;/strong&gt;：典型 Web 应用还是 IoT 流式写入&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;围绕这些矛盾，业界演化出了关系型、键值、文档、列族、图、搜索、时序、列存分析等 &lt;strong&gt;八大分支&lt;/strong&gt;。每解决一组矛盾，就诞生一类新数据库。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;二数据库分类全景图&#34;&gt;二、数据库分类全景图
+&lt;/h2&gt;&lt;p&gt;&lt;div class=&#34;post-image-container&#34; style=&#34;margin: 15px auto; text-align: center; width: 85%;&#34;&gt;
+    
+    &lt;a href=&#34;db-categories.svg&#34; 
+        
+       target=&#34;_blank&#34; 
+       class=&#34;gallery-item&#34;&gt; &lt;img src=&#34;db-categories.svg&#34; 
+             alt=&#34;数据库分类全景图&#34; 
+             style=&#34;max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);&#34;&gt;
+             
+    &lt;/a&gt;
+    
+        &lt;span style=&#34;display: block; margin-top: 10px; color: #666; font-size: 0.9em;&#34;&gt;数据库分类全景图&lt;/span&gt;
+    
+&lt;/div&gt;&lt;/p&gt;
+&lt;p&gt;上图把主流数据库按&amp;quot;数据模型 + 适用场景&amp;quot;分成了 8 类。下面我们逐类展开，但在分类之前，必须先理解三个底层概念：&lt;strong&gt;ACID、CAP、BASE&lt;/strong&gt;。它们决定了数据库的&amp;quot;性格&amp;quot;。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;三acid-vs-base两种一致性哲学&#34;&gt;三、ACID vs BASE：两种一致性哲学
+&lt;/h2&gt;&lt;p&gt;&lt;div class=&#34;post-image-container&#34; style=&#34;margin: 15px auto; text-align: center; width: 85%;&#34;&gt;
+    
+    &lt;a href=&#34;acid-base.svg&#34; 
+        
+       target=&#34;_blank&#34; 
+       class=&#34;gallery-item&#34;&gt; &lt;img src=&#34;acid-base.svg&#34; 
+             alt=&#34;ACID vs BASE：两种一致性哲学&#34; 
+             style=&#34;max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);&#34;&gt;
+             
+    &lt;/a&gt;
+    
+        &lt;span style=&#34;display: block; margin-top: 10px; color: #666; font-size: 0.9em;&#34;&gt;ACID vs BASE：两种一致性哲学&lt;/span&gt;
+    
+&lt;/div&gt;&lt;/p&gt;
+&lt;h3 id=&#34;acid关系型数据库的承诺&#34;&gt;ACID：关系型数据库的承诺
+&lt;/h3&gt;&lt;p&gt;ACID 是事务的四大保证，是关系型数据库压箱底的能力：&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;字母&lt;/th&gt;
+&lt;th&gt;含义&lt;/th&gt;
+&lt;th&gt;通俗解释&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;strong&gt;A&lt;/strong&gt; Atomicity 原子性&lt;/td&gt;
+&lt;td&gt;事务要么全成功，要么全回滚&lt;/td&gt;
+&lt;td&gt;转账扣款和加款必须同时发生&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;strong&gt;C&lt;/strong&gt; Consistency 一致性&lt;/td&gt;
+&lt;td&gt;事务前后满足所有约束&lt;/td&gt;
+&lt;td&gt;主键、外键、CHECK 不能被破坏&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;strong&gt;I&lt;/strong&gt; Isolation 隔离性&lt;/td&gt;
+&lt;td&gt;并发事务互不干扰&lt;/td&gt;
+&lt;td&gt;MVCC + 锁机制保证&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;strong&gt;D&lt;/strong&gt; Durability 持久性&lt;/td&gt;
+&lt;td&gt;提交后即使宕机也不丢&lt;/td&gt;
+&lt;td&gt;通过 WAL / redo log 实现&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;strong&gt;为 ACID 付出的代价&lt;/strong&gt;：锁竞争、跨节点协调延迟、水平扩展难。这也是为什么单机 MySQL 通常撑到几千 QPS 就开始考虑读写分离。&lt;/p&gt;
+&lt;h3 id=&#34;base分布式系统的妥协&#34;&gt;BASE：分布式系统的妥协
+&lt;/h3&gt;&lt;p&gt;当系统走向分布式，强一致性的代价过高，业界提出 BASE 作为 AP 系统的设计哲学：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;BA&lt;/strong&gt; Basically Available 基本可用：允许响应变慢、允许功能降级&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;S&lt;/strong&gt; Soft State 软状态：允许存在中间状态&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;E&lt;/strong&gt; Eventually Consistent 最终一致：不保证任意时刻一致，但保证最终收敛&lt;/li&gt;
+&lt;/ul&gt;
+&lt;blockquote&gt;
+&lt;p&gt;关键认知：&lt;strong&gt;ACID 中的 C 是事务一致性（约束不被破坏），CAP 中的 C 是副本一致性（多节点数据相同）&lt;/strong&gt;，两者不是一回事。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;四cap-定理分布式系统的三角抉择&#34;&gt;四、CAP 定理：分布式系统的三角抉择
+&lt;/h2&gt;&lt;p&gt;&lt;div class=&#34;post-image-container&#34; style=&#34;margin: 15px auto; text-align: center; width: 85%;&#34;&gt;
+    
+    &lt;a href=&#34;cap-theorem.svg&#34; 
+        
+       target=&#34;_blank&#34; 
+       class=&#34;gallery-item&#34;&gt; &lt;img src=&#34;cap-theorem.svg&#34; 
+             alt=&#34;CAP 定理：分布式系统的三角抉择&#34; 
+             style=&#34;max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);&#34;&gt;
+             
+    &lt;/a&gt;
+    
+        &lt;span style=&#34;display: block; margin-top: 10px; color: #666; font-size: 0.9em;&#34;&gt;CAP 定理：分布式系统的三角抉择&lt;/span&gt;
+    
+&lt;/div&gt;&lt;/p&gt;
+&lt;p&gt;CAP 定理由 Eric Brewer 在 2000 年提出，断言：&lt;strong&gt;一个分布式系统最多只能同时满足 Consistency（一致性）、Availability（可用性）、Partition tolerance（分区容错）三者中的两个&lt;/strong&gt;。&lt;/p&gt;
+&lt;h3 id=&#34;三个关键认知&#34;&gt;三个关键认知
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;① P 不可避免&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;真实分布式系统必然存在网络分区（交换机抖动、机房断连、节点宕机）。所以工程师实际上只能在 &lt;strong&gt;C 和 A 之间做选择&lt;/strong&gt;：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;分区时拒绝写入 → CP，保证数据正确，但牺牲可用性&lt;/li&gt;
+&lt;li&gt;分区时仍可读写 → AP，保证可用性，但允许数据短暂不一致&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;② 三种组合的典型代表&lt;/strong&gt;&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;组合&lt;/th&gt;
+&lt;th&gt;牺牲项&lt;/th&gt;
+&lt;th&gt;典型数据库&lt;/th&gt;
+&lt;th&gt;典型场景&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;strong&gt;CA&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;分区容错&lt;/td&gt;
+&lt;td&gt;MySQL 单机、PostgreSQL 单机&lt;/td&gt;
+&lt;td&gt;传统单机业务&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;strong&gt;CP&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;可用性&lt;/td&gt;
+&lt;td&gt;HBase、MongoDB、Redis 集群&lt;/td&gt;
+&lt;td&gt;强一致优先的金融、配置&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;strong&gt;AP&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;一致性&lt;/td&gt;
+&lt;td&gt;Cassandra、DynamoDB、Eureka&lt;/td&gt;
+&lt;td&gt;高可用的社交、推荐&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;strong&gt;③ 同一业务可灵活切换&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;注册中心是个经典例子：&lt;strong&gt;ZooKeeper 是 CP&lt;/strong&gt;，选举期间不可用；&lt;strong&gt;Eureka 是 AP&lt;/strong&gt;，节点之间不强制同步。Netflix 选 Eureka，因为它能容忍注册信息短暂不一致，但不能容忍服务发现挂掉。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;五关系型数据库稳如泰山的基石&#34;&gt;五、关系型数据库：稳如泰山的基石
+&lt;/h2&gt;&lt;p&gt;关系型数据库以 &lt;strong&gt;二维表 + SQL + ACID 事务&lt;/strong&gt; 为核心，是 90% 业务系统的默认选择。&lt;/p&gt;
+&lt;h3 id=&#34;51-五大主流-rdbms-对比&#34;&gt;5.1 五大主流 RDBMS 对比
+&lt;/h3&gt;&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;数据库&lt;/th&gt;
+&lt;th&gt;厂商 / 协议&lt;/th&gt;
+&lt;th&gt;强项&lt;/th&gt;
+&lt;th&gt;适用场景&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;strong&gt;MySQL&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;开源（GPL/商业双协议）&lt;/td&gt;
+&lt;td&gt;生态成熟、运维资料最多&lt;/td&gt;
+&lt;td&gt;Web 应用、电商、CMS&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;strong&gt;PostgreSQL&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;开源（BSD）&lt;/td&gt;
+&lt;td&gt;复杂查询、JSON、PostGIS、扩展性强&lt;/td&gt;
+&lt;td&gt;复杂业务、地理数据、数据分析&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;strong&gt;SQLite&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;开源（公有领域）&lt;/td&gt;
+&lt;td&gt;嵌入式、零配置、单文件&lt;/td&gt;
+&lt;td&gt;移动端、嵌入式、原型、测试&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;strong&gt;Oracle&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;商业&lt;/td&gt;
+&lt;td&gt;企业级功能、稳定性、技术支持&lt;/td&gt;
+&lt;td&gt;银行、电信、政府核心系统&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;strong&gt;SQL Server&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;商业（微软）&lt;/td&gt;
+&lt;td&gt;与 .NET 生态深度集成&lt;/td&gt;
+&lt;td&gt;企业内部系统、Windows 环境&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;h3 id=&#34;52-选型经验&#34;&gt;5.2 选型经验
+&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;个人项目 / 小工具&lt;/strong&gt;：SQLite，单文件零配置&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Web 应用首选&lt;/strong&gt;：MySQL（运维生态好）或 PostgreSQL（功能强、复杂查询爽）&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;企业核心系统有预算&lt;/strong&gt;：Oracle 或 SQL Server，看团队技术栈&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;要不要选 PostgreSQL 而不是 MySQL？&lt;/strong&gt; 如果业务里有复杂分析、地理数据、强约束、JSON 字段，PG 更合适；如果只是 CRUD + 简单关联，MySQL 更省心&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;53-关系型的硬伤&#34;&gt;5.3 关系型的硬伤
+&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;水平扩展难&lt;/strong&gt;：分库分表后跨库 JOIN、事务都成噩梦，需要引入 ShardingSphere、Vitess 之类的中间件&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Schema 变更贵&lt;/strong&gt;：上亿行表加索引可能锁表几小时&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;高并发写入瓶颈&lt;/strong&gt;：单机通常几千 QPS，靠缓存兜底&lt;/li&gt;
+&lt;/ul&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;六nosql-的崛起四大家族&#34;&gt;六、NoSQL 的崛起：四大家族
+&lt;/h2&gt;&lt;p&gt;NoSQL（Not Only SQL）的核心动机：&lt;strong&gt;通过放松某个约束（一致性 / Schema / 关系），换取扩展性、性能或灵活性&lt;/strong&gt;。&lt;/p&gt;
+&lt;h3 id=&#34;61-sql-vs-nosql-数据模型对比&#34;&gt;6.1 SQL vs NoSQL 数据模型对比
+&lt;/h3&gt;&lt;p&gt;&lt;div class=&#34;post-image-container&#34; style=&#34;margin: 15px auto; text-align: center; width: 85%;&#34;&gt;
+    
+    &lt;a href=&#34;sql-vs-nosql.svg&#34; 
+        
+       target=&#34;_blank&#34; 
+       class=&#34;gallery-item&#34;&gt; &lt;img src=&#34;sql-vs-nosql.svg&#34; 
+             alt=&#34;SQL vs NoSQL：数据模型架构对比&#34; 
+             style=&#34;max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);&#34;&gt;
+             
+    &lt;/a&gt;
+    
+        &lt;span style=&#34;display: block; margin-top: 10px; color: #666; font-size: 0.9em;&#34;&gt;SQL vs NoSQL：数据模型架构对比&lt;/span&gt;
+    
+&lt;/div&gt;&lt;/p&gt;
+&lt;p&gt;左图是关系型的方式：&lt;strong&gt;范式化拆表 + 外键关联&lt;/strong&gt;，查 Alice 的订单要 JOIN 两张表。
+右图是文档型的方式：&lt;strong&gt;聚合存储 + 内嵌文档&lt;/strong&gt;，Alice 的订单直接嵌在她的文档里，一次读取拿全。&lt;/p&gt;
+&lt;p&gt;两种模型各有利弊：&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;维度&lt;/th&gt;
+&lt;th&gt;关系型（SQL）&lt;/th&gt;
+&lt;th&gt;文档型（NoSQL）&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;Schema&lt;/td&gt;
+&lt;td&gt;严格固定&lt;/td&gt;
+&lt;td&gt;灵活可变&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;关联查询&lt;/td&gt;
+&lt;td&gt;JOIN 强&lt;/td&gt;
+&lt;td&gt;弱（要靠应用层）&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;数据冗余&lt;/td&gt;
+&lt;td&gt;低（范式化）&lt;/td&gt;
+&lt;td&gt;高（反范式）&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;事务&lt;/td&gt;
+&lt;td&gt;强 ACID&lt;/td&gt;
+&lt;td&gt;弱（多文档 4.0+ 才支持）&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;扩展性&lt;/td&gt;
+&lt;td&gt;垂直为主&lt;/td&gt;
+&lt;td&gt;易水平分片&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;适合&lt;/td&gt;
+&lt;td&gt;关系复杂、强一致&lt;/td&gt;
+&lt;td&gt;模型多变、读多写少&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;h3 id=&#34;62-键值型redis&#34;&gt;6.2 键值型：Redis
+&lt;/h3&gt;&lt;p&gt;Redis 是最被低估的&amp;quot;瑞士军刀&amp;quot;。它表面上是个缓存，实际上能做：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;缓存&lt;/strong&gt;：最常见，热点数据加速&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;会话存储&lt;/strong&gt;：分布式 Session&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;排行榜&lt;/strong&gt;：ZSet 天生支持&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;消息队列&lt;/strong&gt;：List / Stream&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;限流器&lt;/strong&gt;：INCR + EXPIRE&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;分布式锁&lt;/strong&gt;：SETNX / Redlock&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;选型提醒&lt;/strong&gt;：Redis 是 &lt;strong&gt;CP 系统&lt;/strong&gt;（集群模式下）—— 主节点挂掉会触发故障转移，期间集群不可用。不是所有 Redis 都&amp;quot;高可用&amp;quot;。&lt;/p&gt;
+&lt;h3 id=&#34;63-文档型mongodb&#34;&gt;6.3 文档型：MongoDB
+&lt;/h3&gt;&lt;p&gt;MongoDB 用 BSON（二进制 JSON）存储，每个文档自包含。它的甜点场景：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;内容管理&lt;/strong&gt;：文章、评论、附件，结构天然嵌套&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;IoT 设备元数据&lt;/strong&gt;：不同设备字段不同，灵活 Schema 太香&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;快速迭代业务&lt;/strong&gt;：需求变就加字段，不用 ALTER TABLE&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;日志聚合&lt;/strong&gt;：MongoDB 的聚合管道 + 副本集很合用&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;坑点&lt;/strong&gt;：MongoDB 4.0 才支持多文档事务，复杂事务场景慎用。索引设计不当会让查询慢到怀疑人生。&lt;/p&gt;
+&lt;h3 id=&#34;64-列族型cassandra--hbase&#34;&gt;6.4 列族型：Cassandra / HBase
+&lt;/h3&gt;&lt;p&gt;列族型数据库把&amp;quot;行&amp;quot;打散成&amp;quot;列族&amp;quot;，&lt;strong&gt;同一列的数据连续存储&lt;/strong&gt;，对&amp;quot;按列聚合 + 海量写入&amp;quot;特别友好。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Cassandra&lt;/strong&gt;：AWS Dynamo 论文的开源实现，无主架构，写入性能极强。Netflix、Instagram、Apple 都在用&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;HBase&lt;/strong&gt;：基于 HDFS，强一致，适合离线大数据&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;ScyllaDB&lt;/strong&gt;：用 C++ 重写的 Cassandra，性能高一个数量级&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;典型场景&lt;/strong&gt;：时序数据、推荐特征存储、消息历史归档。Cassandra 在写入 QPS 上能轻松甩开 MySQL 一个数量级。&lt;/p&gt;
+&lt;h3 id=&#34;65-图型neo4j&#34;&gt;6.5 图型：Neo4j
+&lt;/h3&gt;&lt;p&gt;如果业务核心是 &lt;strong&gt;关系&lt;/strong&gt;（不是表关联，而是多跳关系遍历），用图数据库比 SQL 递归查询快几个数量级。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-fallback&#34; data-lang=&#34;fallback&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;// Neo4j 查询：找到 Alice 三度人脉里喜欢 Go 语言的人
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;MATCH (a:User {name:&amp;#39;Alice&amp;#39;})-[:KNOWS*1..3]-(friend:User)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;WHERE friend.language = &amp;#39;Go&amp;#39;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;RETURN friend
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;strong&gt;典型场景&lt;/strong&gt;：社交网络（好友推荐）、反欺诈（团伙识别）、知识图谱、IT 资产拓扑。&lt;/p&gt;
+&lt;p&gt;用 MySQL 写&amp;quot;找三度人脉&amp;quot;要用 4 层自连接，性能爆炸；Neo4j 用邻接表存储，时间复杂度近似 O(1)。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;七专用场景数据库搜索--时序--列存&#34;&gt;七、专用场景数据库：搜索 / 时序 / 列存
+&lt;/h2&gt;&lt;p&gt;通用数据库做不到极致，专用数据库在特定领域把性能压榨到极限。&lt;/p&gt;
+&lt;h3 id=&#34;71-搜索引擎elasticsearch&#34;&gt;7.1 搜索引擎：Elasticsearch
+&lt;/h3&gt;&lt;p&gt;ES 用 &lt;strong&gt;倒排索引&lt;/strong&gt; 实现秒级全文检索，是 ELK（Elasticsearch + Logstash + Kibana）的核心。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;商品搜索&lt;/strong&gt;：分词、同义词、纠错、相关性排序&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;日志分析&lt;/strong&gt;：海量日志聚合，按时间维度切片&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;可观测性&lt;/strong&gt;：APM、链路追踪数据存储&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;重要认知&lt;/strong&gt;：ES 不是数据库替代品。它写入延迟较高（近实时，1 秒刷新），不适合做强一致主存储。通常 &lt;strong&gt;MySQL 是真相源，ES 是搜索副本&lt;/strong&gt;，通过 Canal/Debezium 同步。&lt;/p&gt;
+&lt;h3 id=&#34;72-时序数据库influxdb--timescaledb&#34;&gt;7.2 时序数据库：InfluxDB / TimescaleDB
+&lt;/h3&gt;&lt;p&gt;时序数据有显著特征：&lt;strong&gt;写多读少、按时间顺序、自动降采样、旧数据可丢弃&lt;/strong&gt;。专用 TSDB 的写入性能比 MySQL 高 1-2 个数量级。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;InfluxDB&lt;/strong&gt;：Go 写的，单机性能强，TSM 存储引擎&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;TimescaleDB&lt;/strong&gt;：PostgreSQL 扩展，能用 SQL，事务保证更好&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Prometheus&lt;/strong&gt;：监控专用，pull 模型&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;TDengine&lt;/strong&gt;：国产，物联网场景优化&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;典型场景&lt;/strong&gt;：服务器监控、IoT 传感器、金融行情、用户行为埋点。&lt;/p&gt;
+&lt;h3 id=&#34;73-列存分析clickhouse&#34;&gt;7.3 列存分析：ClickHouse
+&lt;/h3&gt;&lt;p&gt;OLAP 场景的核心诉求：&lt;strong&gt;扫描 TB 级数据，做 GROUP BY 聚合，秒级返回&lt;/strong&gt;。行存数据库（MySQL）做这种扫描会读大量无关列，列存数据库只读需要的列，性能差几十倍。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-sql&#34; data-lang=&#34;sql&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;-- ClickHouse 典型查询：秒级扫描 10 亿行
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;SELECT&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;    &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;toDate&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;event_time&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;AS&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;day&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;    &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;city&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;    &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;count&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;()&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;AS&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;pv&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;    &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;uniq&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;user_id&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;AS&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;uv&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;FROM&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;events&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;WHERE&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;event_time&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;o&#34;&gt;&amp;gt;=&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;today&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;()&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;o&#34;&gt;-&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;mi&#34;&gt;30&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;GROUP&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;BY&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;day&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;city&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;ORDER&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;BY&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;day&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;DESC&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;pv&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;DESC&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;strong&gt;对比&lt;/strong&gt;：同样的查询，MySQL 要几十分钟，ClickHouse 通常 1 秒内。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;八数据库选型决策树&#34;&gt;八、数据库选型决策树
+&lt;/h2&gt;&lt;p&gt;讲了这么多，实战怎么选？下图给出一份决策路径：&lt;/p&gt;
+&lt;p&gt;&lt;div class=&#34;post-image-container&#34; style=&#34;margin: 15px auto; text-align: center; width: 85%;&#34;&gt;
+    
+    &lt;a href=&#34;db-selection.svg&#34; 
+        
+       target=&#34;_blank&#34; 
+       class=&#34;gallery-item&#34;&gt; &lt;img src=&#34;db-selection.svg&#34; 
+             alt=&#34;数据库选型决策树&#34; 
+             style=&#34;max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);&#34;&gt;
+             
+    &lt;/a&gt;
+    
+        &lt;span style=&#34;display: block; margin-top: 10px; color: #666; font-size: 0.9em;&#34;&gt;数据库选型决策树&lt;/span&gt;
+    
+&lt;/div&gt;&lt;/p&gt;
+&lt;h3 id=&#34;三条选型铁律&#34;&gt;三条选型铁律
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;① 先 SQL，后 NoSQL&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;绝大多数项目从 MySQL / PostgreSQL 起步就够了。遇到具体瓶颈（缓存、搜索、海量写入、复杂关系）再引入对应专用数据库。一开始就上&amp;quot;全家桶&amp;quot;是过度设计。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;② 没有银弹，组合使用&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;工业界真实系统几乎都是多库组合：核心业务用 MySQL/PG，缓存用 Redis，搜索用 ES，日志用 MongoDB/ES，监控用 InfluxDB，分析用 ClickHouse。&lt;strong&gt;让每个数据库只做它最擅长的事&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;③ 团队熟悉度优先&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;再先进的数据库，没人会运维也是灾难。Cassandra 写入性能强，但运维门槛极高，国内很多团队踩坑后还是换回了 MySQL 分库分表。&lt;strong&gt;选团队能掌控的，而不是最潮的&lt;/strong&gt;。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;九真实项目中的数据库组合架构&#34;&gt;九、真实项目中的数据库组合架构
+&lt;/h2&gt;&lt;p&gt;光说不练假把式。下图是一个典型电商系统的多库协同架构：&lt;/p&gt;
+&lt;p&gt;&lt;div class=&#34;post-image-container&#34; style=&#34;margin: 15px auto; text-align: center; width: 85%;&#34;&gt;
+    
+    &lt;a href=&#34;stack-combination.svg&#34; 
+        
+       target=&#34;_blank&#34; 
+       class=&#34;gallery-item&#34;&gt; &lt;img src=&#34;stack-combination.svg&#34; 
+             alt=&#34;真实项目中的数据库组合架构&#34; 
+             style=&#34;max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);&#34;&gt;
+             
+    &lt;/a&gt;
+    
+        &lt;span style=&#34;display: block; margin-top: 10px; color: #666; font-size: 0.9em;&#34;&gt;真实项目中的数据库组合架构&lt;/span&gt;
+    
+&lt;/div&gt;&lt;/p&gt;
+&lt;h3 id=&#34;数据流拆解&#34;&gt;数据流拆解
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;① 写路径&lt;/strong&gt;：订单服务先写 MySQL（强一致保证），同时发 Kafka 事件，下游消费者异步更新 ES 搜索索引和推荐系统特征库。这是经典的 &lt;strong&gt;&amp;ldquo;先写主库，再异步同步&amp;rdquo;&lt;/strong&gt; 模式。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;② 读路径&lt;/strong&gt;：&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;请求类型&lt;/th&gt;
+&lt;th&gt;走的数据库&lt;/th&gt;
+&lt;th&gt;理由&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;商品详情&lt;/td&gt;
+&lt;td&gt;Redis 缓存 → MongoDB&lt;/td&gt;
+&lt;td&gt;缓存挡 95% 流量，回源用文档库装多变 SKU&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;商品搜索&lt;/td&gt;
+&lt;td&gt;Elasticsearch&lt;/td&gt;
+&lt;td&gt;倒排索引秒级响应&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;好友推荐&lt;/td&gt;
+&lt;td&gt;Neo4j&lt;/td&gt;
+&lt;td&gt;多跳关系遍历&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;个人订单&lt;/td&gt;
+&lt;td&gt;MySQL&lt;/td&gt;
+&lt;td&gt;强一致，按用户分库&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;监控大盘&lt;/td&gt;
+&lt;td&gt;InfluxDB&lt;/td&gt;
+&lt;td&gt;时序聚合，秒级出图&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;strong&gt;③ 监控旁路&lt;/strong&gt;：所有服务通过 SDK 把指标推送到 InfluxDB，&lt;strong&gt;不参与业务主链路&lt;/strong&gt;，监控挂掉不影响交易。这是旁路系统的设计铁律。&lt;/p&gt;
+&lt;h3 id=&#34;为什么要拆&#34;&gt;为什么要拆？
+&lt;/h3&gt;&lt;p&gt;如果不拆，全塞进 MySQL 会发生什么？&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;商品搜索做 LIKE &amp;lsquo;%关键词%&amp;rsquo; → 全表扫描，慢到超时&lt;/li&gt;
+&lt;li&gt;监控指标每秒几十万条写入 → MySQL 单机扛不住&lt;/li&gt;
+&lt;li&gt;好友推荐用 4 层自连接 → 几秒出不来结果&lt;/li&gt;
+&lt;li&gt;商品 SKU 字段每类目都不同 → ALTER TABLE 改到吐血&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;每个专用数据库的存在，都是为了 &lt;strong&gt;解决某一类 MySQL 不擅长的问题&lt;/strong&gt;。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;十核心差异对照表&#34;&gt;十、核心差异对照表
+&lt;/h2&gt;&lt;p&gt;最后用一张表把主流数据库的关键指标摊开对比：&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;数据库&lt;/th&gt;
+&lt;th&gt;类型&lt;/th&gt;
+&lt;th&gt;一致性&lt;/th&gt;
+&lt;th&gt;Schema&lt;/th&gt;
+&lt;th&gt;事务&lt;/th&gt;
+&lt;th&gt;水平扩展&lt;/th&gt;
+&lt;th&gt;典型 QPS&lt;/th&gt;
+&lt;th&gt;适合场景&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;strong&gt;MySQL&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;关系&lt;/td&gt;
+&lt;td&gt;ACID&lt;/td&gt;
+&lt;td&gt;严格&lt;/td&gt;
+&lt;td&gt;强&lt;/td&gt;
+&lt;td&gt;难（需中间件）&lt;/td&gt;
+&lt;td&gt;几千&lt;/td&gt;
+&lt;td&gt;Web 主流&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;strong&gt;PostgreSQL&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;关系&lt;/td&gt;
+&lt;td&gt;ACID&lt;/td&gt;
+&lt;td&gt;严格&lt;/td&gt;
+&lt;td&gt;强&lt;/td&gt;
+&lt;td&gt;难&lt;/td&gt;
+&lt;td&gt;几千&lt;/td&gt;
+&lt;td&gt;复杂业务&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;strong&gt;SQLite&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;关系&lt;/td&gt;
+&lt;td&gt;ACID&lt;/td&gt;
+&lt;td&gt;严格&lt;/td&gt;
+&lt;td&gt;强&lt;/td&gt;
+&lt;td&gt;不可&lt;/td&gt;
+&lt;td&gt;单线程&lt;/td&gt;
+&lt;td&gt;嵌入式&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;strong&gt;Redis&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;KV&lt;/td&gt;
+&lt;td&gt;CP&lt;/td&gt;
+&lt;td&gt;无&lt;/td&gt;
+&lt;td&gt;弱&lt;/td&gt;
+&lt;td&gt;集群分片&lt;/td&gt;
+&lt;td&gt;10万+&lt;/td&gt;
+&lt;td&gt;缓存&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;strong&gt;MongoDB&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;文档&lt;/td&gt;
+&lt;td&gt;CP（可调）&lt;/td&gt;
+&lt;td&gt;灵活&lt;/td&gt;
+&lt;td&gt;4.0+ 多文档&lt;/td&gt;
+&lt;td&gt;易分片&lt;/td&gt;
+&lt;td&gt;几万&lt;/td&gt;
+&lt;td&gt;内容管理&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;strong&gt;Cassandra&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;列族&lt;/td&gt;
+&lt;td&gt;AP（可调）&lt;/td&gt;
+&lt;td&gt;灵活&lt;/td&gt;
+&lt;td&gt;弱&lt;/td&gt;
+&lt;td&gt;极易&lt;/td&gt;
+&lt;td&gt;10万+ 写入&lt;/td&gt;
+&lt;td&gt;海量写入&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;strong&gt;Neo4j&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;图&lt;/td&gt;
+&lt;td&gt;ACID&lt;/td&gt;
+&lt;td&gt;半结构&lt;/td&gt;
+&lt;td&gt;强&lt;/td&gt;
+&lt;td&gt;难&lt;/td&gt;
+&lt;td&gt;几千&lt;/td&gt;
+&lt;td&gt;关系网络&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;strong&gt;Elasticsearch&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;搜索&lt;/td&gt;
+&lt;td&gt;近实时&lt;/td&gt;
+&lt;td&gt;动态映射&lt;/td&gt;
+&lt;td&gt;弱&lt;/td&gt;
+&lt;td&gt;易分片&lt;/td&gt;
+&lt;td&gt;几万&lt;/td&gt;
+&lt;td&gt;全文搜索&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;strong&gt;InfluxDB&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;时序&lt;/td&gt;
+&lt;td&gt;CP&lt;/td&gt;
+&lt;td&gt;标签+字段&lt;/td&gt;
+&lt;td&gt;弱&lt;/td&gt;
+&lt;td&gt;集群版收费&lt;/td&gt;
+&lt;td&gt;10万+ 写入&lt;/td&gt;
+&lt;td&gt;监控指标&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;strong&gt;ClickHouse&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;列存&lt;/td&gt;
+&lt;td&gt;CP&lt;/td&gt;
+&lt;td&gt;严格&lt;/td&gt;
+&lt;td&gt;弱&lt;/td&gt;
+&lt;td&gt;易分片&lt;/td&gt;
+&lt;td&gt;100万+ 写入&lt;/td&gt;
+&lt;td&gt;大数据分析&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;总结&#34;&gt;总结
+&lt;/h2&gt;&lt;p&gt;回到最初的问题：&lt;strong&gt;SQLite、MySQL、MongoDB 有什么区别？&lt;/strong&gt; 它们不是&amp;quot;谁更好&amp;quot;的关系，而是&amp;quot;为不同问题而生&amp;quot;的不同工具。&lt;/p&gt;
+&lt;p&gt;回顾本文核心要点：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;没有银弹&lt;/strong&gt;：每种数据库都是某组矛盾的产物，关系型解决一致性、NoSQL 解决扩展性、专用库解决极端场景&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;理论先行&lt;/strong&gt;：理解 ACID / BASE / CAP，是看懂所有数据库设计意图的钥匙&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;SQL 不死&lt;/strong&gt;：关系型依然是 90% 业务系统的默认选择，NoSQL 是补充而非替代&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;组合才是常态&lt;/strong&gt;：工业界真实系统几乎都是多库协同，让每个数据库只做它最擅长的事&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;选型三铁律&lt;/strong&gt;：先 SQL 后 NoSQL、没有银弹要组合、团队熟悉度优先&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;下一步行动建议：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;审视你当前的项目&lt;/strong&gt;：是不是把所有数据都塞在 MySQL 里了？哪些场景其实更适合专用数据库？&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;挑一个不熟的数据库试一试&lt;/strong&gt;：Redis / MongoDB / ES 任选一个，跑一遍官方 Quick Start&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;关注 NewSQL&lt;/strong&gt;：TiDB、CockroachDB、YugabyteDB 这些&amp;quot;既有 ACID 又能水平扩展&amp;quot;的下一代数据库正在崛起&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;记住：&lt;strong&gt;好的架构师不在于会多少种数据库，而在于知道每种数据库的边界在哪&lt;/strong&gt;。&lt;/p&gt;
+&lt;hr&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;em&gt;本文涉及的所有数据库选型都基于公开文档与工程实践，具体落地还需结合团队技术栈、运维能力、预算综合判断。&lt;/em&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+</description>
+        </item>
+        <item>
         <title>Redis Interview Questions (Continuously Updated)</title>
         <link>https://SymphonyW.github.io/p/redis-interview-questions-continuously-updated/</link>
         <pubDate>Wed, 25 Mar 2026 22:08:57 +0800</pubDate>

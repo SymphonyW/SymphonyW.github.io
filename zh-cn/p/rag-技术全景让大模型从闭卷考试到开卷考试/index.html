@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html lang="zh-cn" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="RAG 技术全景：让大模型从&quot;闭卷考试&quot;到&quot;开卷考试&quot; 大模型很强，但它会&quot;一本正经地胡说八道&quot;。RAG（Retrieval-Augmented Generation，检索增强生成）给大模型外挂了一个&quot;知识库&quot;，让它从闭卷考试变成开卷考试，回答既准又能溯源。本文用 6 张图带你完整搞懂 RAG。 一、先聊痛点：大模型的&quot;幻觉&quot;从哪来？ 你大概遇到过这样的场景：问 GPT 一个公司内部的政策问题，或者让它总结一份最新发布的财报，它信誓旦旦地给你一段听起来很专业的回答——但仔细一查，全是编的。 这就是大模型的幻觉（Hallucination）。它不是故意的，而是由其工作方式决定的：LLM 本质上是在做&quot;下一个 token 预测&quot;，它根据训练时记住的概率分布生成文本，分不清&quot;知道&quot;和&quot;不知道&quot;。 原生 LLM 在企业级场景下有四个硬伤： 知识截止：训练数据有截止日期，不知道今天发生的事 幻觉问题：没见过的知识就靠&quot;编&quot;，还很自信 领域知识不足：对企业内部文档、专业细分领域不熟悉 无法溯源：回答不知道来自哪里，没法核验 要解决这些问题，传统思路是微调（Fine-tuning）——用领域数据重新训练模型。但微调又贵又慢，而且知识一更新就得再来一遍。 RAG 给了另一条路：不重新训练模型，而是给它外挂一个可随时更新的知识库，回答时先去知识库里检索，再基于检索到的内容作答。 原生 LLM vs RAG：闭卷考试 vs 开卷考试 就像考试一样：原生 LLM 是闭卷考试，全凭记忆，记不清就编；RAG 是开卷考试，遇到不会的可以翻书，答案有据可循。 二、RAG 是什么：核心思想一句话 RAG = 检索（Retrieval）+ 增强（Augmentation）+ 生成（Generation） 在 LLM 生成回答之前，先从外部知识库中检索相关资料，把这些资料增强到 Prompt 里作为上下文，再让 LLM 基于这些上下文生成回答。 用一句话概括：RAG 让 LLM 从&quot;闭卷考试&quot;变成&quot;开卷考试&quot;。 它和微调的根本区别在于：微调把知识&quot;烧进&quot;模型权重里，RAG 把知识放在模型之外的数据库里，用的时候现查。这也决定了两者的适用边界——后面会详细对比。 三、RAG 工作流程：三阶段详解 RAG 工作流程：检索 → 增强 → 生成 RAG 的完整流程可以拆成离线建库和在线问答两大阶段。在线问答又分为检索、增强、生成三步。 3.1 离线阶段：把文档变成可检索的向量库 这一步是&quot;建图书馆&quot;的过程，通常一次性完成，知识更新时增量重建： 文档加载：读取 PDF、Word、HTML、Markdown 等原始文档 切分（Chunking）：把长文档切成小段。为什么不整篇存？因为检索时要找最相关的片段，整篇文档向量会&quot;稀释&quot;语义；而且 LLM 上下文有限，塞不下整篇 向量化（Embedding）：用嵌入模型把每段文本转成一个高维向量（通常 768~1536 维），语义相近的文本在向量空间里距离也近 存入向量数据库：把向量和原文一起存进去，建好索引，供后续快速检索 3.">
+<title>RAG 技术全景：让大模型从&#34;闭卷考试&#34;到&#34;开卷考试&#34;</title>
+
+<link rel='canonical' href='https://SymphonyW.github.io/zh-cn/p/rag-%E6%8A%80%E6%9C%AF%E5%85%A8%E6%99%AF%E8%AE%A9%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%BB%8E%E9%97%AD%E5%8D%B7%E8%80%83%E8%AF%95%E5%88%B0%E5%BC%80%E5%8D%B7%E8%80%83%E8%AF%95/'>
+
+<link rel="stylesheet" href="/scss/style.min.cc2767508dce3983bbc22bfea97375903af8251e7a4fff21e2e1be6357cf5356.css"><meta property='og:title' content="RAG 技术全景：让大模型从\"闭卷考试\"到\"开卷考试\"">
+<meta property='og:description' content="RAG 技术全景：让大模型从&quot;闭卷考试&quot;到&quot;开卷考试&quot; 大模型很强，但它会&quot;一本正经地胡说八道&quot;。RAG（Retrieval-Augmented Generation，检索增强生成）给大模型外挂了一个&quot;知识库&quot;，让它从闭卷考试变成开卷考试，回答既准又能溯源。本文用 6 张图带你完整搞懂 RAG。 一、先聊痛点：大模型的&quot;幻觉&quot;从哪来？ 你大概遇到过这样的场景：问 GPT 一个公司内部的政策问题，或者让它总结一份最新发布的财报，它信誓旦旦地给你一段听起来很专业的回答——但仔细一查，全是编的。 这就是大模型的幻觉（Hallucination）。它不是故意的，而是由其工作方式决定的：LLM 本质上是在做&quot;下一个 token 预测&quot;，它根据训练时记住的概率分布生成文本，分不清&quot;知道&quot;和&quot;不知道&quot;。 原生 LLM 在企业级场景下有四个硬伤： 知识截止：训练数据有截止日期，不知道今天发生的事 幻觉问题：没见过的知识就靠&quot;编&quot;，还很自信 领域知识不足：对企业内部文档、专业细分领域不熟悉 无法溯源：回答不知道来自哪里，没法核验 要解决这些问题，传统思路是微调（Fine-tuning）——用领域数据重新训练模型。但微调又贵又慢，而且知识一更新就得再来一遍。 RAG 给了另一条路：不重新训练模型，而是给它外挂一个可随时更新的知识库，回答时先去知识库里检索，再基于检索到的内容作答。 原生 LLM vs RAG：闭卷考试 vs 开卷考试 就像考试一样：原生 LLM 是闭卷考试，全凭记忆，记不清就编；RAG 是开卷考试，遇到不会的可以翻书，答案有据可循。 二、RAG 是什么：核心思想一句话 RAG = 检索（Retrieval）+ 增强（Augmentation）+ 生成（Generation） 在 LLM 生成回答之前，先从外部知识库中检索相关资料，把这些资料增强到 Prompt 里作为上下文，再让 LLM 基于这些上下文生成回答。 用一句话概括：RAG 让 LLM 从&quot;闭卷考试&quot;变成&quot;开卷考试&quot;。 它和微调的根本区别在于：微调把知识&quot;烧进&quot;模型权重里，RAG 把知识放在模型之外的数据库里，用的时候现查。这也决定了两者的适用边界——后面会详细对比。 三、RAG 工作流程：三阶段详解 RAG 工作流程：检索 → 增强 → 生成 RAG 的完整流程可以拆成离线建库和在线问答两大阶段。在线问答又分为检索、增强、生成三步。 3.1 离线阶段：把文档变成可检索的向量库 这一步是&quot;建图书馆&quot;的过程，通常一次性完成，知识更新时增量重建： 文档加载：读取 PDF、Word、HTML、Markdown 等原始文档 切分（Chunking）：把长文档切成小段。为什么不整篇存？因为检索时要找最相关的片段，整篇文档向量会&quot;稀释&quot;语义；而且 LLM 上下文有限，塞不下整篇 向量化（Embedding）：用嵌入模型把每段文本转成一个高维向量（通常 768~1536 维），语义相近的文本在向量空间里距离也近 存入向量数据库：把向量和原文一起存进去，建好索引，供后续快速检索 3.">
+<meta property='og:url' content='https://SymphonyW.github.io/zh-cn/p/rag-%E6%8A%80%E6%9C%AF%E5%85%A8%E6%99%AF%E8%AE%A9%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%BB%8E%E9%97%AD%E5%8D%B7%E8%80%83%E8%AF%95%E5%88%B0%E5%BC%80%E5%8D%B7%E8%80%83%E8%AF%95/'>
+<meta property='og:site_name' content='SymphonyW'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='RAG' /><meta property='article:tag' content='LLM' /><meta property='article:tag' content='AI' /><meta property='article:tag' content='向量数据库' /><meta property='article:published_time' content='2026-07-08T15:00:00&#43;08:00'/><meta property='article:modified_time' content='2026-07-08T15:00:00&#43;08:00'/><meta property='og:image' content='https://SymphonyW.github.io/zh-cn/p/rag-%E6%8A%80%E6%9C%AF%E5%85%A8%E6%99%AF%E8%AE%A9%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%BB%8E%E9%97%AD%E5%8D%B7%E8%80%83%E8%AF%95%E5%88%B0%E5%BC%80%E5%8D%B7%E8%80%83%E8%AF%95/bg.png' />
+<meta name="twitter:title" content="RAG 技术全景：让大模型从\"闭卷考试\"到\"开卷考试\"">
+<meta name="twitter:description" content="RAG 技术全景：让大模型从&quot;闭卷考试&quot;到&quot;开卷考试&quot; 大模型很强，但它会&quot;一本正经地胡说八道&quot;。RAG（Retrieval-Augmented Generation，检索增强生成）给大模型外挂了一个&quot;知识库&quot;，让它从闭卷考试变成开卷考试，回答既准又能溯源。本文用 6 张图带你完整搞懂 RAG。 一、先聊痛点：大模型的&quot;幻觉&quot;从哪来？ 你大概遇到过这样的场景：问 GPT 一个公司内部的政策问题，或者让它总结一份最新发布的财报，它信誓旦旦地给你一段听起来很专业的回答——但仔细一查，全是编的。 这就是大模型的幻觉（Hallucination）。它不是故意的，而是由其工作方式决定的：LLM 本质上是在做&quot;下一个 token 预测&quot;，它根据训练时记住的概率分布生成文本，分不清&quot;知道&quot;和&quot;不知道&quot;。 原生 LLM 在企业级场景下有四个硬伤： 知识截止：训练数据有截止日期，不知道今天发生的事 幻觉问题：没见过的知识就靠&quot;编&quot;，还很自信 领域知识不足：对企业内部文档、专业细分领域不熟悉 无法溯源：回答不知道来自哪里，没法核验 要解决这些问题，传统思路是微调（Fine-tuning）——用领域数据重新训练模型。但微调又贵又慢，而且知识一更新就得再来一遍。 RAG 给了另一条路：不重新训练模型，而是给它外挂一个可随时更新的知识库，回答时先去知识库里检索，再基于检索到的内容作答。 原生 LLM vs RAG：闭卷考试 vs 开卷考试 就像考试一样：原生 LLM 是闭卷考试，全凭记忆，记不清就编；RAG 是开卷考试，遇到不会的可以翻书，答案有据可循。 二、RAG 是什么：核心思想一句话 RAG = 检索（Retrieval）+ 增强（Augmentation）+ 生成（Generation） 在 LLM 生成回答之前，先从外部知识库中检索相关资料，把这些资料增强到 Prompt 里作为上下文，再让 LLM 基于这些上下文生成回答。 用一句话概括：RAG 让 LLM 从&quot;闭卷考试&quot;变成&quot;开卷考试&quot;。 它和微调的根本区别在于：微调把知识&quot;烧进&quot;模型权重里，RAG 把知识放在模型之外的数据库里，用的时候现查。这也决定了两者的适用边界——后面会详细对比。 三、RAG 工作流程：三阶段详解 RAG 工作流程：检索 → 增强 → 生成 RAG 的完整流程可以拆成离线建库和在线问答两大阶段。在线问答又分为检索、增强、生成三步。 3.1 离线阶段：把文档变成可检索的向量库 这一步是&quot;建图书馆&quot;的过程，通常一次性完成，知识更新时增量重建： 文档加载：读取 PDF、Word、HTML、Markdown 等原始文档 切分（Chunking）：把长文档切成小段。为什么不整篇存？因为检索时要找最相关的片段，整篇文档向量会&quot;稀释&quot;语义；而且 LLM 上下文有限，塞不下整篇 向量化（Embedding）：用嵌入模型把每段文本转成一个高维向量（通常 768~1536 维），语义相近的文本在向量空间里距离也近 存入向量数据库：把向量和原文一起存进去，建好索引，供后续快速检索 3."><meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content='https://SymphonyW.github.io/zh-cn/p/rag-%E6%8A%80%E6%9C%AF%E5%85%A8%E6%99%AF%E8%AE%A9%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%BB%8E%E9%97%AD%E5%8D%B7%E8%80%83%E8%AF%95%E5%88%B0%E5%BC%80%E5%8D%B7%E8%80%83%E8%AF%95/bg.png' />
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/zh-cn/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hua20e9d08cce84e79524a418ee5d4524c_7426_300x0_resize_box_3.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">😁</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/zh-cn">SymphonyW</a></h1>
+            <h2 class="site-description">Welcome to my Blog.</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0'
+                        target="_blank"
+                        title="Bilibili"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.0.0-beta2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M488.6 104.1C505.3 122.2 513 143.8 511.9 169.8V372.2C511.5 398.6 502.7 420.3 485.4 437.3C468.2 454.3 446.3 463.2 419.9 464H92.02C65.57 463.2 43.81 454.2 26.74 436.8C9.682 419.4 .7667 396.5 0 368.2V169.8C.7667 143.8 9.682 122.2 26.74 104.1C43.81 87.75 65.57 78.77 92.02 78H121.4L96.05 52.19C90.3 46.46 87.42 39.19 87.42 30.4C87.42 21.6 90.3 14.34 96.05 8.603C101.8 2.868 109.1 0 117.9 0C126.7 0 134 2.868 139.8 8.603L213.1 78H301.1L375.6 8.603C381.7 2.868 389.2 0 398 0C406.8 0 414.1 2.868 419.9 8.603C425.6 14.34 428.5 21.6 428.5 30.4C428.5 39.19 425.6 46.46 419.9 52.19L394.6 78L423.9 78C450.3 78.77 471.9 87.75 488.6 104.1H488.6zM449.8 173.8C449.4 164.2 446.1 156.4 439.1 150.3C433.9 144.2 425.1 140.9 416.4 140.5H96.05C86.46 140.9 78.6 144.2 72.47 150.3C66.33 156.4 63.07 164.2 62.69 173.8V368.2C62.69 377.4 65.95 385.2 72.47 391.7C78.99 398.2 86.85 401.5 96.05 401.5H416.4C425.6 401.5 433.4 398.2 439.7 391.7C446 385.2 449.4 377.4 449.8 368.2L449.8 173.8zM185.5 216.5C191.8 222.8 195.2 230.6 195.6 239.7V273C195.2 282.2 191.9 289.9 185.8 296.2C179.6 302.5 171.8 305.7 162.2 305.7C152.6 305.7 144.7 302.5 138.6 296.2C132.5 289.9 129.2 282.2 128.8 273V239.7C129.2 230.6 132.6 222.8 138.9 216.5C145.2 210.2 152.1 206.9 162.2 206.5C171.4 206.9 179.2 210.2 185.5 216.5H185.5zM377 216.5C383.3 222.8 386.7 230.6 387.1 239.7V273C386.7 282.2 383.4 289.9 377.3 296.2C371.2 302.5 363.3 305.7 353.7 305.7C344.1 305.7 336.3 302.5 330.1 296.2C323.1 289.9 320.7 282.2 320.4 273V239.7C320.7 230.6 324.1 222.8 330.4 216.5C336.7 210.2 344.5 206.9 353.7 206.5C362.9 206.9 370.7 210.2 377 216.5H377z"/></svg>
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://github.com/SymphonyW'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/zh-cn/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/zh-cn/post/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>博客</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>归档</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>搜索</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>链接</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch" class="language-switcher">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <div class="language-switcher__tabs" aria-label="Language">
+                                <a class="language-switcher__tab "
+                                        href="/p/rag-fully-explainedfrom-closed-book-to-open-book-llms/"
+                                        >
+                                        English
+                                    </a>
+                                <a class="language-switcher__tab is-current"
+                                        href="/zh-cn/p/rag-%E6%8A%80%E6%9C%AF%E5%85%A8%E6%99%AF%E8%AE%A9%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%BB%8E%E9%97%AD%E5%8D%B7%E8%80%83%E8%AF%95%E5%88%B0%E5%BC%80%E5%8D%B7%E8%80%83%E8%AF%95/"
+                                        aria-current="true">
+                                        中文
+                                    </a>
+                                
+                            </div>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#一先聊痛点大模型的幻觉从哪来">一、先聊痛点：大模型的&quot;幻觉&quot;从哪来？</a></li>
+    <li><a href="#二rag-是什么核心思想一句话">二、RAG 是什么：核心思想一句话</a></li>
+    <li><a href="#三rag-工作流程三阶段详解">三、RAG 工作流程：三阶段详解</a>
+      <ol>
+        <li><a href="#31-离线阶段把文档变成可检索的向量库">3.1 离线阶段：把文档变成可检索的向量库</a></li>
+        <li><a href="#32-在线阶段检索--增强--生成">3.2 在线阶段：检索 → 增强 → 生成</a></li>
+      </ol>
+    </li>
+    <li><a href="#四完整架构图">四、完整架构图</a></li>
+    <li><a href="#五核心组件选型">五、核心组件选型</a></li>
+    <li><a href="#六进阶技术从能用到好用">六、进阶技术：从&quot;能用&quot;到&quot;好用&quot;</a>
+      <ol>
+        <li><a href="#61-query-改写让问题更适合检索">6.1 Query 改写（让问题更适合检索）</a></li>
+        <li><a href="#62-混合检索--rerank多路召回精排提纯">6.2 混合检索 + Rerank（多路召回，精排提纯）</a></li>
+        <li><a href="#63-graphrag基于知识图谱的全局检索">6.3 GraphRAG：基于知识图谱的全局检索</a></li>
+        <li><a href="#64-self-rag--自适应-rag让模型自己决定要不要检索">6.4 Self-RAG / 自适应 RAG：让模型自己决定要不要检索</a></li>
+      </ol>
+    </li>
+    <li><a href="#七方案对比rag-vs-微调-vs-长上下文">七、方案对比：RAG vs 微调 vs 长上下文</a></li>
+    <li><a href="#八实战用-langchain-跑通一个最小-rag">八、实战：用 LangChain 跑通一个最小 RAG</a></li>
+    <li><a href="#九常见挑战与优化方向">九、常见挑战与优化方向</a></li>
+    <li><a href="#十典型应用场景">十、典型应用场景</a></li>
+    <li><a href="#总结">总结</a></li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="has-image main-article">
+    <header class="article-header">
+        <div class="article-image">
+            <a href="/zh-cn/p/rag-%E6%8A%80%E6%9C%AF%E5%85%A8%E6%99%AF%E8%AE%A9%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%BB%8E%E9%97%AD%E5%8D%B7%E8%80%83%E8%AF%95%E5%88%B0%E5%BC%80%E5%8D%B7%E8%80%83%E8%AF%95/">
+                <img src="/zh-cn/p/rag-%E6%8A%80%E6%9C%AF%E5%85%A8%E6%99%AF%E8%AE%A9%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%BB%8E%E9%97%AD%E5%8D%B7%E8%80%83%E8%AF%95%E5%88%B0%E5%BC%80%E5%8D%B7%E8%80%83%E8%AF%95/bg_hue42602111cbdf43a7b55d02fb6f689c9_36783_800x0_resize_box_3.png"
+                        srcset="/zh-cn/p/rag-%E6%8A%80%E6%9C%AF%E5%85%A8%E6%99%AF%E8%AE%A9%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%BB%8E%E9%97%AD%E5%8D%B7%E8%80%83%E8%AF%95%E5%88%B0%E5%BC%80%E5%8D%B7%E8%80%83%E8%AF%95/bg_hue42602111cbdf43a7b55d02fb6f689c9_36783_800x0_resize_box_3.png 800w, /zh-cn/p/rag-%E6%8A%80%E6%9C%AF%E5%85%A8%E6%99%AF%E8%AE%A9%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%BB%8E%E9%97%AD%E5%8D%B7%E8%80%83%E8%AF%95%E5%88%B0%E5%BC%80%E5%8D%B7%E8%80%83%E8%AF%95/bg_hue42602111cbdf43a7b55d02fb6f689c9_36783_1600x0_resize_box_3.png 1600w"
+                        width="800" 
+                        height="526" 
+                        loading="lazy"
+                        alt="Featured image of post RAG 技术全景：让大模型从&#34;闭卷考试&#34;到&#34;开卷考试&#34;" />
+                
+            </a>
+        </div>
+    
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/zh-cn/p/rag-%E6%8A%80%E6%9C%AF%E5%85%A8%E6%99%AF%E8%AE%A9%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%BB%8E%E9%97%AD%E5%8D%B7%E8%80%83%E8%AF%95%E5%88%B0%E5%BC%80%E5%8D%B7%E8%80%83%E8%AF%95/">RAG 技术全景：让大模型从&#34;闭卷考试&#34;到&#34;开卷考试&#34;</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published">2026-07-08 15:00</time>
+            </div>
+        
+
+        
+    </footer>
+    
+
+    
+        <footer class="article-translations">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+            <div>
+                
+                    <a href="https://SymphonyW.github.io/p/rag-fully-explainedfrom-closed-book-to-open-book-llms/" class="link">English</a>
+                
+            </div>
+        </footer>
+    
+</div>
+
+</header>
+
+    <section class="article-content">
+    
+    
+    <h1 id="rag-技术全景让大模型从闭卷考试到开卷考试">RAG 技术全景：让大模型从&quot;闭卷考试&quot;到&quot;开卷考试&quot;
+</h1><blockquote>
+<p>大模型很强，但它会&quot;一本正经地胡说八道&quot;。RAG（Retrieval-Augmented Generation，检索增强生成）给大模型外挂了一个&quot;知识库&quot;，让它从闭卷考试变成开卷考试，回答既准又能溯源。本文用 6 张图带你完整搞懂 RAG。</p>
+</blockquote>
+<hr>
+<h2 id="一先聊痛点大模型的幻觉从哪来">一、先聊痛点：大模型的&quot;幻觉&quot;从哪来？
+</h2><p>你大概遇到过这样的场景：问 GPT 一个公司内部的政策问题，或者让它总结一份最新发布的财报，它信誓旦旦地给你一段听起来很专业的回答——但仔细一查，全是编的。</p>
+<p>这就是大模型的<strong>幻觉（Hallucination）</strong>。它不是故意的，而是由其工作方式决定的：LLM 本质上是在做&quot;下一个 token 预测&quot;，它根据训练时记住的概率分布生成文本，分不清&quot;知道&quot;和&quot;不知道&quot;。</p>
+<p>原生 LLM 在企业级场景下有四个硬伤：</p>
+<ol>
+<li><strong>知识截止</strong>：训练数据有截止日期，不知道今天发生的事</li>
+<li><strong>幻觉问题</strong>：没见过的知识就靠&quot;编&quot;，还很自信</li>
+<li><strong>领域知识不足</strong>：对企业内部文档、专业细分领域不熟悉</li>
+<li><strong>无法溯源</strong>：回答不知道来自哪里，没法核验</li>
+</ol>
+<p>要解决这些问题，传统思路是<strong>微调（Fine-tuning）</strong>——用领域数据重新训练模型。但微调又贵又慢，而且知识一更新就得再来一遍。</p>
+<p>RAG 给了另一条路：<strong>不重新训练模型，而是给它外挂一个可随时更新的知识库，回答时先去知识库里检索，再基于检索到的内容作答。</strong></p>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="llm-vs-rag.svg" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="llm-vs-rag.svg" 
+             alt="原生 LLM vs RAG：闭卷考试 vs 开卷考试" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">原生 LLM vs RAG：闭卷考试 vs 开卷考试</span>
+    
+</div></p>
+<p>就像考试一样：原生 LLM 是闭卷考试，全凭记忆，记不清就编；RAG 是开卷考试，遇到不会的可以翻书，答案有据可循。</p>
+<hr>
+<h2 id="二rag-是什么核心思想一句话">二、RAG 是什么：核心思想一句话
+</h2><p><strong>RAG = 检索（Retrieval）+ 增强（Augmentation）+ 生成（Generation）</strong></p>
+<p>在 LLM 生成回答之前，先从外部知识库中<strong>检索</strong>相关资料，把这些资料<strong>增强</strong>到 Prompt 里作为上下文，再让 LLM 基于这些上下文<strong>生成</strong>回答。</p>
+<blockquote>
+<p>用一句话概括：<strong>RAG 让 LLM 从&quot;闭卷考试&quot;变成&quot;开卷考试&quot;。</strong></p>
+</blockquote>
+<p>它和微调的根本区别在于：微调把知识&quot;烧进&quot;模型权重里，RAG 把知识放在模型之外的数据库里，用的时候现查。这也决定了两者的适用边界——后面会详细对比。</p>
+<hr>
+<h2 id="三rag-工作流程三阶段详解">三、RAG 工作流程：三阶段详解
+</h2><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="rag-overview.svg" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="rag-overview.svg" 
+             alt="RAG 工作流程：检索 → 增强 → 生成" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">RAG 工作流程：检索 → 增强 → 生成</span>
+    
+</div></p>
+<p>RAG 的完整流程可以拆成<strong>离线建库</strong>和<strong>在线问答</strong>两大阶段。在线问答又分为检索、增强、生成三步。</p>
+<h3 id="31-离线阶段把文档变成可检索的向量库">3.1 离线阶段：把文档变成可检索的向量库
+</h3><p>这一步是&quot;建图书馆&quot;的过程，通常一次性完成，知识更新时增量重建：</p>
+<ol>
+<li><strong>文档加载</strong>：读取 PDF、Word、HTML、Markdown 等原始文档</li>
+<li><strong>切分（Chunking）</strong>：把长文档切成小段。为什么不整篇存？因为检索时要找最相关的片段，整篇文档向量会&quot;稀释&quot;语义；而且 LLM 上下文有限，塞不下整篇</li>
+<li><strong>向量化（Embedding）</strong>：用嵌入模型把每段文本转成一个高维向量（通常 768~1536 维），语义相近的文本在向量空间里距离也近</li>
+<li><strong>存入向量数据库</strong>：把向量和原文一起存进去，建好索引，供后续快速检索</li>
+</ol>
+<h3 id="32-在线阶段检索--增强--生成">3.2 在线阶段：检索 → 增强 → 生成
+</h3><p>用户每一次提问，都会实时跑这三步：</p>
+<p><strong>① 检索 Retrieval</strong></p>
+<ul>
+<li>把用户问题用同一个 Embedding 模型转成向量</li>
+<li>在向量数据库中做相似度检索（通常用余弦相似度），召回 Top-K（一般 3~10 条）最相关的文档片段</li>
+</ul>
+<p><strong>② 增强 Augmentation</strong></p>
+<ul>
+<li>把检索到的片段拼到 Prompt 模板里，作为上下文</li>
+<li>一个典型的 Prompt 长这样：</li>
+</ul>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">你是一个严谨的问答助手，请根据以下参考资料回答用户问题。
+</span></span><span class="line"><span class="cl">如果资料中没有答案，请回答&#34;根据现有资料无法回答&#34;，不要编造。
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">【参考资料】
+</span></span><span class="line"><span class="cl">{检索到的文档片段1}
+</span></span><span class="line"><span class="cl">{检索到的文档片段2}
+</span></span><span class="line"><span class="cl">...
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">【用户问题】
+</span></span><span class="line"><span class="cl">{用户的问题}
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p><strong>③ 生成 Generation</strong></p>
+<ul>
+<li>把拼好的 Prompt 喂给 LLM，生成最终回答</li>
+<li>可以要求模型在回答中标注引用来源，实现可溯源</li>
+</ul>
+<hr>
+<h2 id="四完整架构图">四、完整架构图
+</h2><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="rag-architecture.svg" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="rag-architecture.svg" 
+             alt="RAG 完整架构：离线建库 &#43; 在线问答" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">RAG 完整架构：离线建库 &#43; 在线问答</span>
+    
+</div></p>
+<p>这张图把离线和在线两条流水线放在了一起。注意几个关键点：</p>
+<ul>
+<li><strong>Embedding 模型必须一致</strong>：离线建库用哪个模型，在线检索时也要用同一个，否则向量空间不兼容</li>
+<li><strong>知识更新无需重训模型</strong>：新增文档只需走一遍&quot;切分 → 向量化 → 入库&quot;，模型权重完全不动</li>
+<li><strong>检索质量是 RAG 的命门</strong>：如果第一步召回的片段就不相关，后面 LLM 再强也答不好</li>
+</ul>
+<hr>
+<h2 id="五核心组件选型">五、核心组件选型
+</h2><p>RAG 系统由四个核心组件构成，选型直接影响效果：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>组件</th>
+<th>作用</th>
+<th>常见选型</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Embedding 模型</strong></td>
+<td>文本转向量，决定语义匹配上限</td>
+<td>BGE（智源）、M3E、OpenAI text-embedding-3、Cohere、bge-m3</td>
+</tr>
+<tr>
+<td><strong>向量数据库</strong></td>
+<td>存储与检索向量</td>
+<td>Milvus、Qdrant、Chroma、Pinecone、FAISS、Weaviate</td>
+</tr>
+<tr>
+<td><strong>LLM</strong></td>
+<td>基于上下文生成回答</td>
+<td>GPT-4、Claude、Qwen、DeepSeek、Llama、GLM</td>
+</tr>
+<tr>
+<td><strong>编排框架</strong></td>
+<td>串联整个流程</td>
+<td>LangChain、LlamaIndex、Haystack、DSPy</td>
+</tr>
+</tbody>
+</table></div>
+<p>几个选型经验：</p>
+<ul>
+<li><strong>中文场景</strong>：Embedding 优先考虑 <code>bge-large-zh</code> 或 <code>bge-m3</code>，比 OpenAI 的英文模型在中文检索上更准</li>
+<li><strong>轻量起步</strong>：向量库用 Chroma（纯 Python，单机嵌入式）跑通流程，量大了再换 Milvus / Qdrant</li>
+<li><strong>框架选择</strong>：快速原型用 LangChain，文档密集型场景用 LlamaIndex（它对文档处理和索引抽象更细致）</li>
+</ul>
+<hr>
+<h2 id="六进阶技术从能用到好用">六、进阶技术：从&quot;能用&quot;到&quot;好用&quot;
+</h2><p>朴素 RAG（一次向量检索 + 拼 Prompt）能跑通，但效果往往一般。真正生产级的 RAG 通常会在四个方向上做增强：</p>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="advanced-rag.svg" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="advanced-rag.svg" 
+             alt="RAG 进阶技术矩阵" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">RAG 进阶技术矩阵</span>
+    
+</div></p>
+<h3 id="61-query-改写让问题更适合检索">6.1 Query 改写（让问题更适合检索）
+</h3><p>用户的问题往往是口语化、模糊的，直接拿去检索效果差。常见技巧：</p>
+<ul>
+<li><strong>Query Rewriting</strong>：让 LLM 把&quot;那个东西怎么用&quot;改写成&quot;产品 X 的使用方法&quot;</li>
+<li><strong>HyDE（Hypothetical Document Embeddings）</strong>：先让 LLM 生成一个假设性答案，再用这个答案的向量去检索——因为&quot;答案&quot;和&quot;答案&quot;的语义比&quot;问题&quot;和&quot;答案&quot;更接近</li>
+<li><strong>Multi-Query</strong>：把一个问题拆成多个子问题分别检索，结果合并去重</li>
+<li><strong>Step-back Prompting</strong>：先抽象出上位概念再检索，比如&quot;2024 年诺贝尔物理学奖得主&quot;先退到&quot;诺贝尔物理学奖近年得主&quot;</li>
+</ul>
+<h3 id="62-混合检索--rerank多路召回精排提纯">6.2 混合检索 + Rerank（多路召回，精排提纯）
+</h3><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="retrieval-detail.svg" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="retrieval-detail.svg" 
+             alt="混合检索 &#43; 重排：提升召回质量" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">混合检索 &#43; 重排：提升召回质量</span>
+    
+</div></p>
+<p>单靠向量检索有个问题：它擅长语义匹配，但对<strong>专有名词、产品型号、人名</strong>这种精确字面匹配反而不如传统检索。所以生产系统通常用<strong>混合检索</strong>：</p>
+<ul>
+<li><strong>向量检索</strong>（语义）+ <strong>BM25 关键词检索</strong>（字面）并行召回</li>
+<li>用 <strong>RRF（Reciprocal Rank Fusion）</strong> 融合两路结果</li>
+<li>再用 <strong>Cross-Encoder 重排模型</strong>（如 <code>bge-reranker-large</code>、Cohere Rerank）对召回结果做精排</li>
+<li>最后取 Top-K 喂给 LLM</li>
+</ul>
+<p>Rerank 的关键区别：Embedding 是把 query 和 doc <strong>分别</strong>编码再算相似度（双塔），而 Cross-Encoder 是把 query 和 doc <strong>拼一起</strong>送进模型（交叉编码），精度高得多，但速度慢——所以先用向量检索粗筛，再用 Rerank 精排，兼顾速度和精度。</p>
+<h3 id="63-graphrag基于知识图谱的全局检索">6.3 GraphRAG：基于知识图谱的全局检索
+</h3><p>微软 2024 年提出的 GraphRAG 解决的是朴素 RAG 的另一个痛点：<strong>局部性</strong>。向量检索只能召回和问题相似的片段，回答不了&quot;总结整个文档集的核心主题&quot;这种全局性问题。</p>
+<p>GraphRAG 的做法：</p>
+<ol>
+<li>用 LLM 从文档中抽取<strong>实体和关系</strong>，构建知识图谱</li>
+<li>用<strong>社区检测算法</strong>（如 Leiden）把图谱分成主题层次化的社区</li>
+<li>为每个社区生成摘要</li>
+<li>查询时根据问题粒度选择社区摘要或具体节点回答</li>
+</ol>
+<p>它特别适合&quot;全局性总结&quot;&ldquo;跨文档推理&quot;类问题，代价是建图成本高、更新麻烦。</p>
+<h3 id="64-self-rag--自适应-rag让模型自己决定要不要检索">6.4 Self-RAG / 自适应 RAG：让模型自己决定要不要检索
+</h3><p>不是每个问题都需要检索——&ldquo;1+1 等于几&quot;还去查库就浪费了。Self-RAG 让模型学会自我反思：</p>
+<ul>
+<li><strong>是否检索</strong>：判断问题是否需要外部知识，简单问题直接答</li>
+<li><strong>检索结果是否相关</strong>：过滤掉无关片段</li>
+<li><strong>生成是否忠于检索</strong>：检查答案有没有脱离资料编造</li>
+</ul>
+<p>好处是省 token、降延迟，坏处是需要训练模型学会这些判断（或用 prompt 模拟），实现复杂度高。</p>
+<hr>
+<h2 id="七方案对比rag-vs-微调-vs-长上下文">七、方案对比：RAG vs 微调 vs 长上下文
+</h2><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="solution-comparison.svg" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="solution-comparison.svg" 
+             alt="四种知识注入方案横向对比" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">四种知识注入方案横向对比</span>
+    
+</div></p>
+<p>随着模型上下文窗口越来越长（Claude 200K、Gemini 1M、GPT-4o 128K），有人质疑 RAG 是不是过时了——直接把所有文档塞进上下文不就行了？</p>
+<p>实际并非如此，三者各有定位：</p>
+<ul>
+<li><strong>长上下文</strong>：贵（按 token 计费）、易&quot;迷失在中间&rdquo;（Lost in the Middle 现象）、不可溯源。适合一次性分析单份长文档</li>
+<li><strong>RAG</strong>：经济、可扩展到海量文档、可溯源。适合知识库问答</li>
+<li><strong>微调</strong>：改变模型行为/风格，而非注入事实知识。适合固定格式输出、领域术语适配</li>
+<li><strong>RAG + 微调</strong>：效果最好，成本最高，用于高精度专业场景</li>
+</ul>
+<p>经验法则：<strong>知识频繁变化 → RAG；风格/格式固定 → 微调；两者都要 → 结合用。</strong></p>
+<hr>
+<h2 id="八实战用-langchain-跑通一个最小-rag">八、实战：用 LangChain 跑通一个最小 RAG
+</h2><p>理论讲完，来看一段能跑的代码。用 LangChain + Chroma + OpenAI 实现 30 行的 RAG：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span><span class="lnt">25
+</span><span class="lnt">26
+</span><span class="lnt">27
+</span><span class="lnt">28
+</span><span class="lnt">29
+</span><span class="lnt">30
+</span><span class="lnt">31
+</span><span class="lnt">32
+</span><span class="lnt">33
+</span><span class="lnt">34
+</span><span class="lnt">35
+</span><span class="lnt">36
+</span><span class="lnt">37
+</span><span class="lnt">38
+</span><span class="lnt">39
+</span><span class="lnt">40
+</span><span class="lnt">41
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-python" data-lang="python"><span class="line"><span class="cl"><span class="kn">from</span> <span class="nn">langchain_community.document_loaders</span> <span class="kn">import</span> <span class="n">TextDocumentLoader</span>
+</span></span><span class="line"><span class="cl"><span class="kn">from</span> <span class="nn">langchain_text_splitters</span> <span class="kn">import</span> <span class="n">RecursiveCharacterTextSplitter</span>
+</span></span><span class="line"><span class="cl"><span class="kn">from</span> <span class="nn">langchain_openai</span> <span class="kn">import</span> <span class="n">OpenAIEmbeddings</span><span class="p">,</span> <span class="n">ChatOpenAI</span>
+</span></span><span class="line"><span class="cl"><span class="kn">from</span> <span class="nn">langchain_community.vectorstores</span> <span class="kn">import</span> <span class="n">Chroma</span>
+</span></span><span class="line"><span class="cl"><span class="kn">from</span> <span class="nn">langchain_core.prompts</span> <span class="kn">import</span> <span class="n">ChatPromptTemplate</span>
+</span></span><span class="line"><span class="cl"><span class="kn">from</span> <span class="nn">langchain_core.runnables</span> <span class="kn">import</span> <span class="n">RunnablePassthrough</span>
+</span></span><span class="line"><span class="cl"><span class="kn">from</span> <span class="nn">langchain_core.output_parsers</span> <span class="kn">import</span> <span class="n">StrOutputParser</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># ① 离线建库：加载 → 切分 → 向量化 → 入库</span>
+</span></span><span class="line"><span class="cl"><span class="n">docs</span> <span class="o">=</span> <span class="n">TextDocumentLoader</span><span class="p">(</span><span class="s2">&#34;knowledge.txt&#34;</span><span class="p">)</span><span class="o">.</span><span class="n">load</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl"><span class="n">chunks</span> <span class="o">=</span> <span class="n">RecursiveCharacterTextSplitter</span><span class="p">(</span>
+</span></span><span class="line"><span class="cl">    <span class="n">chunk_size</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">chunk_overlap</span><span class="o">=</span><span class="mi">50</span>      <span class="c1"># 500 字一段，重叠 50 字</span>
+</span></span><span class="line"><span class="cl"><span class="p">)</span><span class="o">.</span><span class="n">split_documents</span><span class="p">(</span><span class="n">docs</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="n">vectorstore</span> <span class="o">=</span> <span class="n">Chroma</span><span class="o">.</span><span class="n">from_documents</span><span class="p">(</span>
+</span></span><span class="line"><span class="cl">    <span class="n">chunks</span><span class="p">,</span> <span class="n">OpenAIEmbeddings</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&#34;text-embedding-3-small&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="n">retriever</span> <span class="o">=</span> <span class="n">vectorstore</span><span class="o">.</span><span class="n">as_retriever</span><span class="p">(</span><span class="n">search_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s2">&#34;k&#34;</span><span class="p">:</span> <span class="mi">4</span><span class="p">})</span>  <span class="c1"># 召回 Top-4</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># ② 在线问答：检索 → 增强 → 生成</span>
+</span></span><span class="line"><span class="cl"><span class="n">prompt</span> <span class="o">=</span> <span class="n">ChatPromptTemplate</span><span class="o">.</span><span class="n">from_template</span><span class="p">(</span><span class="s2">&#34;&#34;&#34;
+</span></span></span><span class="line"><span class="cl"><span class="s2">你是严谨的问答助手，根据以下资料回答问题。资料中没有答案就说&#34;无法回答&#34;，不要编造。
+</span></span></span><span class="line"><span class="cl"><span class="s2">
+</span></span></span><span class="line"><span class="cl"><span class="s2">【资料】
+</span></span></span><span class="line"><span class="cl"><span class="s2"></span><span class="si">{context}</span><span class="s2">
+</span></span></span><span class="line"><span class="cl"><span class="s2">
+</span></span></span><span class="line"><span class="cl"><span class="s2">【问题】
+</span></span></span><span class="line"><span class="cl"><span class="s2"></span><span class="si">{question}</span><span class="s2">
+</span></span></span><span class="line"><span class="cl"><span class="s2">&#34;&#34;&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="k">def</span> <span class="nf">format_docs</span><span class="p">(</span><span class="n">docs</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">    <span class="k">return</span> <span class="s2">&#34;</span><span class="se">\n\n</span><span class="s2">&#34;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">d</span><span class="o">.</span><span class="n">page_content</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">docs</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="n">rag_chain</span> <span class="o">=</span> <span class="p">(</span>
+</span></span><span class="line"><span class="cl">    <span class="p">{</span><span class="s2">&#34;context&#34;</span><span class="p">:</span> <span class="n">retriever</span> <span class="o">|</span> <span class="n">format_docs</span><span class="p">,</span> <span class="s2">&#34;question&#34;</span><span class="p">:</span> <span class="n">RunnablePassthrough</span><span class="p">()}</span>
+</span></span><span class="line"><span class="cl">    <span class="o">|</span> <span class="n">prompt</span>
+</span></span><span class="line"><span class="cl">    <span class="o">|</span> <span class="n">ChatOpenAI</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&#34;gpt-4o-mini&#34;</span><span class="p">,</span> <span class="n">temperature</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">    <span class="o">|</span> <span class="n">StrOutputParser</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl"><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># ③ 提问</span>
+</span></span><span class="line"><span class="cl"><span class="nb">print</span><span class="p">(</span><span class="n">rag_chain</span><span class="o">.</span><span class="n">invoke</span><span class="p">(</span><span class="s2">&#34;公司请假流程是什么？&#34;</span><span class="p">))</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这段代码虽然简单，但已经包含了 RAG 的所有核心环节。生产化时再把 Embedding 换成 BGE、加上 Rerank、换成 Milvus，骨架不变。</p>
+<hr>
+<h2 id="九常见挑战与优化方向">九、常见挑战与优化方向
+</h2><p>实际落地 RAG，踩坑往往不在模型，而在检索。下面是常见问题对应的优化手段：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>症状</th>
+<th>根因</th>
+<th>优化方向</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>检索结果不相关</td>
+<td>Query 与文档语义差距大</td>
+<td>Query 改写、换更强的 Embedding</td>
+</tr>
+<tr>
+<td>召回准确但答非所问</td>
+<td>片段顺序/噪声干扰</td>
+<td>加 Rerank 精排、调 Top-K</td>
+</tr>
+<tr>
+<td>答案不忠于资料</td>
+<td>LLM 忽略上下文编造</td>
+<td>Prompt 加约束、降 temperature、强制引用</td>
+</tr>
+<tr>
+<td>专有名词召回差</td>
+<td>纯向量检索短板</td>
+<td>加 BM25 混合检索</td>
+</tr>
+<tr>
+<td>上下文超长</td>
+<td>召回太多塞不下</td>
+<td>上下文压缩、LongLLMLingua、换长上下文模型</td>
+</tr>
+<tr>
+<td>知识更新延迟</td>
+<td>索引重建慢</td>
+<td>增量索引、流式更新</td>
+</tr>
+<tr>
+<td>答案无法溯源</td>
+<td>未保留片段来源</td>
+<td>检索结果带 metadata，Prompt 要求标注引用</td>
+</tr>
+</tbody>
+</table></div>
+<p>一个经验：<strong>80% 的 RAG 优化工作都在检索阶段</strong>，而不是生成阶段。先把检索做准，效果立刻提升一大截。</p>
+<hr>
+<h2 id="十典型应用场景">十、典型应用场景
+</h2><ul>
+<li><strong>企业知识问答</strong>：基于内部 Wiki、手册、合同的智能客服与员工助手</li>
+<li><strong>法律/医疗咨询</strong>：基于法条、判例、药品说明、病历的精准问答</li>
+<li><strong>代码助手</strong>：基于私有代码库的代码生成（Cursor、Copilot Workspace 都用了 RAG 思想）</li>
+<li><strong>教育辅导</strong>：基于教材的个性化答疑，答案可指向课本页码</li>
+<li><strong>智能搜索</strong>：搜索引擎的 AI 摘要（Perplexity、Bing Chat、Google AI Overviews）</li>
+<li><strong>数据分析</strong>：Text-to-SQL，基于数据库 schema 的自然语言查询</li>
+</ul>
+<hr>
+<h2 id="总结">总结
+</h2><p>RAG 不是某个具体工具，而是一种 <strong>&ldquo;把外部知识检索和大模型生成结合起来&rdquo;</strong> 的架构思想。它的价值在于：让大模型能用最新、最准、可溯源的外部知识来回答问题，而无需重新训练。</p>
+<p>回顾本文要点：</p>
+<ul>
+<li><strong>核心思想</strong>：检索 → 增强 → 生成，让 LLM 从闭卷变开卷</li>
+<li><strong>两大阶段</strong>：离线建库（切分+向量化+入库）+ 在线问答（检索+增强+生成）</li>
+<li><strong>命门在检索</strong>：80% 的优化工作都在检索阶段</li>
+<li><strong>进阶四件套</strong>：Query 改写、混合检索+Rerank、GraphRAG、Self-RAG</li>
+<li><strong>方案选择</strong>：知识频繁变化用 RAG，风格固定用微调，高精度场景结合使用</li>
+</ul>
+<p>随着模型上下文窗口变长、多模态能力增强，RAG 的形态还在演进（比如多模态 RAG、Agentic RAG），但&quot;外挂知识库&quot;这个核心思想短期内不会过时——毕竟，开卷考试永远比背书更可靠。</p>
+<p>如果你对其中某个环节（比如向量数据库选型、Embedding 微调、GraphRAG 实现）想深入，欢迎在评论区交流。</p>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/zh-cn/tags/rag/">RAG</a>
+        
+            <a href="/zh-cn/tags/llm/">LLM</a>
+        
+            <a href="/zh-cn/tags/ai/">AI</a>
+        
+            <a href="/zh-cn/tags/%E5%90%91%E9%87%8F%E6%95%B0%E6%8D%AE%E5%BA%93/">向量数据库</a>
+        
+    </section>
+
+
+    </footer>
+
+
+    
+</article>
+
+    
+
+    
+
+<aside class="related-content--wrapper">
+    <h2 class="section-title">相关文章</h2>
+    <div class="related-content">
+        <div class="flex article-list--tile">
+            
+                
+<article class="has-image">
+    <a href="/zh-cn/p/%E7%BB%8F%E5%85%B8%E9%9D%A2%E8%AF%95%E9%A2%98rag-%E6%A3%80%E7%B4%A2-top-k-%E5%88%B0%E5%BA%95%E6%80%8E%E4%B9%88%E8%AE%BE/">
+        
+        
+            <div class="article-image">
+                <img src="/zh-cn/p/%E7%BB%8F%E5%85%B8%E9%9D%A2%E8%AF%95%E9%A2%98rag-%E6%A3%80%E7%B4%A2-top-k-%E5%88%B0%E5%BA%95%E6%80%8E%E4%B9%88%E8%AE%BE/bg.ba0e4d5311424eaae4d946105e223381_huf0a9a86dfd251dead7c2b6a80382f7be_722874_250x150_fill_box_smart1_3.png" 
+                        width="250" 
+                        height="150" 
+                        loading="lazy"
+                        alt="Featured image of post 经典面试题：RAG 检索 top-k 到底怎么设？"
+                        
+                        data-hash="md5-ug5NUxFCTqrk2UYQXiIzgQ==">
+                
+            </div>
+        
+
+        <div class="article-details">
+            <h2 class="article-title">经典面试题：RAG 检索 top-k 到底怎么设？</h2>
+        </div>
+    </a>
+</article>
+
+            
+        </div>
+    </div>
+</aside>
+
+     
+    
+        
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+        2026 SymphonyW
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.26.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.js" defer></script><script type="text/javascript" src="/ts/custom.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+<script>
+window.MathJax = {
+  tex: {
+    
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  svg: {
+    fontCache: 'global'
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    </body>
+</html>
