@@ -1,0 +1,1319 @@
+<!DOCTYPE html>
+<html lang="zh-cn" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Strapi 全解：从 Headless CMS 到可定制的 Node.js API 后端 如果一个项目既需要“让运营人员自己维护内容”，又需要“让网站、App、小程序共享同一套 API”，从零编写管理后台、权限、文件上传和 CRUD 往往很不划算。Strapi 的价值，就是把这些重复工作变成可配置的基础设施，同时保留继续写代码的出口。 本文以 Strapi 5 为基准。读完你会弄清四件事：Strapi 到底是什么、它用了哪些技术、内容模型如何变成后端 API，以及它与 Java、Go、Python 后端真正的区别。 一、Strapi 是什么？ Strapi 是一个开源、可自托管的 Headless CMS（无头内容管理系统），也是一个以内容为中心的 Node.js 后端框架。 这里的“无头”不是没有管理界面，而是不绑定面向访客的前端页面： 内容团队在 Strapi Admin 中录入文章、商品、活动和媒体； Strapi 将内容保存到数据库，并通过 REST 或 GraphQL 提供； React、Vue、Next.js、Nuxt、Flutter、小程序甚至 IoT 设备都可以消费同一份内容； 前端如何渲染、部署到哪里，与 CMS 后端彼此独立。 Strapi Headless 架构：一份内容通过 API 分发到多个终端 传统 CMS 通常把“内容管理”和“页面模板”绑在一起；Strapi 只负责内容与 API。它更像一个带可视化建模、管理后台和权限系统的后端工程脚手架。 先纠正一个比较口径： Strapi 不是和 Java、Go、Python 同一层级的东西。Strapi 是一套成品框架与 CMS；Java、Go、Python 是语言及其后端生态。更合理的比较对象是 Strapi vs Spring Boot、Go Web 框架、Django/DRF 或 FastAPI。">
+<title>Strapi 全解：从 Headless CMS 到可定制的 Node.js API 后端</title>
+
+<link rel='canonical' href='https://SymphonyW.github.io/zh-cn/p/strapi-guide/'>
+
+<link rel="stylesheet" href="/scss/style.min.1251edbd5d2188d23e73b1b3b4438816c788f1a85abbe07d1ccd04b6713bba76.css"><meta property='og:title' content="Strapi 全解：从 Headless CMS 到可定制的 Node.js API 后端">
+<meta property='og:description' content="Strapi 全解：从 Headless CMS 到可定制的 Node.js API 后端 如果一个项目既需要“让运营人员自己维护内容”，又需要“让网站、App、小程序共享同一套 API”，从零编写管理后台、权限、文件上传和 CRUD 往往很不划算。Strapi 的价值，就是把这些重复工作变成可配置的基础设施，同时保留继续写代码的出口。 本文以 Strapi 5 为基准。读完你会弄清四件事：Strapi 到底是什么、它用了哪些技术、内容模型如何变成后端 API，以及它与 Java、Go、Python 后端真正的区别。 一、Strapi 是什么？ Strapi 是一个开源、可自托管的 Headless CMS（无头内容管理系统），也是一个以内容为中心的 Node.js 后端框架。 这里的“无头”不是没有管理界面，而是不绑定面向访客的前端页面： 内容团队在 Strapi Admin 中录入文章、商品、活动和媒体； Strapi 将内容保存到数据库，并通过 REST 或 GraphQL 提供； React、Vue、Next.js、Nuxt、Flutter、小程序甚至 IoT 设备都可以消费同一份内容； 前端如何渲染、部署到哪里，与 CMS 后端彼此独立。 Strapi Headless 架构：一份内容通过 API 分发到多个终端 传统 CMS 通常把“内容管理”和“页面模板”绑在一起；Strapi 只负责内容与 API。它更像一个带可视化建模、管理后台和权限系统的后端工程脚手架。 先纠正一个比较口径： Strapi 不是和 Java、Go、Python 同一层级的东西。Strapi 是一套成品框架与 CMS；Java、Go、Python 是语言及其后端生态。更合理的比较对象是 Strapi vs Spring Boot、Go Web 框架、Django/DRF 或 FastAPI。">
+<meta property='og:url' content='https://SymphonyW.github.io/zh-cn/p/strapi-guide/'>
+<meta property='og:site_name' content='SymphonyW'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='Strapi' /><meta property='article:tag' content='Headless CMS' /><meta property='article:tag' content='Node.js' /><meta property='article:tag' content='API' /><meta property='article:tag' content='后端架构' /><meta property='article:published_time' content='2026-07-10T22:50:00&#43;08:00'/><meta property='article:modified_time' content='2026-07-10T22:50:00&#43;08:00'/><meta property='og:image' content='https://SymphonyW.github.io/zh-cn/p/strapi-guide/bg.png' />
+<meta name="twitter:title" content="Strapi 全解：从 Headless CMS 到可定制的 Node.js API 后端">
+<meta name="twitter:description" content="Strapi 全解：从 Headless CMS 到可定制的 Node.js API 后端 如果一个项目既需要“让运营人员自己维护内容”，又需要“让网站、App、小程序共享同一套 API”，从零编写管理后台、权限、文件上传和 CRUD 往往很不划算。Strapi 的价值，就是把这些重复工作变成可配置的基础设施，同时保留继续写代码的出口。 本文以 Strapi 5 为基准。读完你会弄清四件事：Strapi 到底是什么、它用了哪些技术、内容模型如何变成后端 API，以及它与 Java、Go、Python 后端真正的区别。 一、Strapi 是什么？ Strapi 是一个开源、可自托管的 Headless CMS（无头内容管理系统），也是一个以内容为中心的 Node.js 后端框架。 这里的“无头”不是没有管理界面，而是不绑定面向访客的前端页面： 内容团队在 Strapi Admin 中录入文章、商品、活动和媒体； Strapi 将内容保存到数据库，并通过 REST 或 GraphQL 提供； React、Vue、Next.js、Nuxt、Flutter、小程序甚至 IoT 设备都可以消费同一份内容； 前端如何渲染、部署到哪里，与 CMS 后端彼此独立。 Strapi Headless 架构：一份内容通过 API 分发到多个终端 传统 CMS 通常把“内容管理”和“页面模板”绑在一起；Strapi 只负责内容与 API。它更像一个带可视化建模、管理后台和权限系统的后端工程脚手架。 先纠正一个比较口径： Strapi 不是和 Java、Go、Python 同一层级的东西。Strapi 是一套成品框架与 CMS；Java、Go、Python 是语言及其后端生态。更合理的比较对象是 Strapi vs Spring Boot、Go Web 框架、Django/DRF 或 FastAPI。"><meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content='https://SymphonyW.github.io/zh-cn/p/strapi-guide/bg.png' />
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/zh-cn/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hua20e9d08cce84e79524a418ee5d4524c_7426_300x0_resize_box_3.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">😁</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/zh-cn">SymphonyW</a></h1>
+            <h2 class="site-description">Welcome to my Blog.</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0'
+                        target="_blank"
+                        title="Bilibili"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.0.0-beta2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M488.6 104.1C505.3 122.2 513 143.8 511.9 169.8V372.2C511.5 398.6 502.7 420.3 485.4 437.3C468.2 454.3 446.3 463.2 419.9 464H92.02C65.57 463.2 43.81 454.2 26.74 436.8C9.682 419.4 .7667 396.5 0 368.2V169.8C.7667 143.8 9.682 122.2 26.74 104.1C43.81 87.75 65.57 78.77 92.02 78H121.4L96.05 52.19C90.3 46.46 87.42 39.19 87.42 30.4C87.42 21.6 90.3 14.34 96.05 8.603C101.8 2.868 109.1 0 117.9 0C126.7 0 134 2.868 139.8 8.603L213.1 78H301.1L375.6 8.603C381.7 2.868 389.2 0 398 0C406.8 0 414.1 2.868 419.9 8.603C425.6 14.34 428.5 21.6 428.5 30.4C428.5 39.19 425.6 46.46 419.9 52.19L394.6 78L423.9 78C450.3 78.77 471.9 87.75 488.6 104.1H488.6zM449.8 173.8C449.4 164.2 446.1 156.4 439.1 150.3C433.9 144.2 425.1 140.9 416.4 140.5H96.05C86.46 140.9 78.6 144.2 72.47 150.3C66.33 156.4 63.07 164.2 62.69 173.8V368.2C62.69 377.4 65.95 385.2 72.47 391.7C78.99 398.2 86.85 401.5 96.05 401.5H416.4C425.6 401.5 433.4 398.2 439.7 391.7C446 385.2 449.4 377.4 449.8 368.2L449.8 173.8zM185.5 216.5C191.8 222.8 195.2 230.6 195.6 239.7V273C195.2 282.2 191.9 289.9 185.8 296.2C179.6 302.5 171.8 305.7 162.2 305.7C152.6 305.7 144.7 302.5 138.6 296.2C132.5 289.9 129.2 282.2 128.8 273V239.7C129.2 230.6 132.6 222.8 138.9 216.5C145.2 210.2 152.1 206.9 162.2 206.5C171.4 206.9 179.2 210.2 185.5 216.5H185.5zM377 216.5C383.3 222.8 386.7 230.6 387.1 239.7V273C386.7 282.2 383.4 289.9 377.3 296.2C371.2 302.5 363.3 305.7 353.7 305.7C344.1 305.7 336.3 302.5 330.1 296.2C323.1 289.9 320.7 282.2 320.4 273V239.7C320.7 230.6 324.1 222.8 330.4 216.5C336.7 210.2 344.5 206.9 353.7 206.5C362.9 206.9 370.7 210.2 377 216.5H377z"/></svg>
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://github.com/SymphonyW'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/zh-cn/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/zh-cn/post/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>博客</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>归档</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/stats/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chart-bar" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="12" width="4" height="8" rx="1" />
+  <rect x="10" y="8" width="4" height="12" rx="1" />
+  <rect x="17" y="4" width="4" height="16" rx="1" />
+  <line x1="4" y1="20" x2="20" y2="20" />
+</svg>
+
+                
+                <span>写作记录</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>搜索</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>链接</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch" class="language-switcher">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <div class="language-switcher__tabs" aria-label="Language">
+                                <a class="language-switcher__tab "
+                                        href="/p/strapi-guide/"
+                                        >
+                                        English
+                                    </a>
+                                <a class="language-switcher__tab is-current"
+                                        href="/zh-cn/p/strapi-guide/"
+                                        aria-current="true">
+                                        中文
+                                    </a>
+                                
+                            </div>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#一strapi-是什么">一、Strapi 是什么？</a></li>
+    <li><a href="#二strapi-的核心特点">二、Strapi 的核心特点</a></li>
+    <li><a href="#三strapi-的技术栈">三、Strapi 的技术栈</a></li>
+    <li><a href="#四它是怎么生成后端-api-的">四、它是怎么“生成”后端 API 的？</a>
+      <ol>
+        <li><a href="#41-从零跑起一个-api">4.1 从零跑起一个 API</a></li>
+        <li><a href="#42-自动-crud-不够时怎么办">4.2 自动 CRUD 不够时怎么办？</a></li>
+      </ol>
+    </li>
+    <li><a href="#五与-javagopython-后端有什么区别">五、与 Java、Go、Python 后端有什么区别？</a>
+      <ol>
+        <li><a href="#51-strapi-vs-java默认能力与领域控制力">5.1 Strapi vs Java：默认能力与领域控制力</a></li>
+        <li><a href="#52-strapi-vs-go交付速度与运行效率">5.2 Strapi vs Go：交付速度与运行效率</a></li>
+        <li><a href="#53-strapi-vs-python与-django-最像但重心不同">5.3 Strapi vs Python：与 Django 最像，但重心不同</a></li>
+      </ol>
+    </li>
+    <li><a href="#六什么时候该选-strapi">六、什么时候该选 Strapi？</a>
+      <ol>
+        <li><a href="#很适合">很适合</a></li>
+        <li><a href="#谨慎选择">谨慎选择</a></li>
+      </ol>
+    </li>
+    <li><a href="#七生产落地的-8-条建议">七、生产落地的 8 条建议</a></li>
+    <li><a href="#总结">总结</a></li>
+    <li><a href="#参考资料">参考资料</a></li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="has-image main-article">
+    <header class="article-header">
+        <div class="article-image">
+            <a href="/zh-cn/p/strapi-guide/">
+                <img src="/zh-cn/p/strapi-guide/bg_hu701f84bece1a75c9a9061a83387136de_1067825_800x0_resize_box_3.png"
+                        srcset="/zh-cn/p/strapi-guide/bg_hu701f84bece1a75c9a9061a83387136de_1067825_800x0_resize_box_3.png 800w, /zh-cn/p/strapi-guide/bg_hu701f84bece1a75c9a9061a83387136de_1067825_1600x0_resize_box_3.png 1600w"
+                        width="800" 
+                        height="411" 
+                        loading="lazy"
+                        alt="Featured image of post Strapi 全解：从 Headless CMS 到可定制的 Node.js API 后端" />
+                
+            </a>
+        </div>
+    
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/zh-cn/p/strapi-guide/">Strapi 全解：从 Headless CMS 到可定制的 Node.js API 后端</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published">2026-07-10 22:50</time>
+            </div>
+        
+
+        
+    </footer>
+    
+
+    
+        <footer class="article-translations">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+            <div>
+                
+                    <a href="https://SymphonyW.github.io/p/strapi-guide/" class="link">English</a>
+                
+            </div>
+        </footer>
+    
+</div>
+
+</header>
+
+    
+    <section class="article-tags">
+        
+            <a href="/zh-cn/tags/strapi/">Strapi</a>
+        
+            <a href="/zh-cn/tags/headless-cms/">Headless CMS</a>
+        
+            <a href="/zh-cn/tags/node.js/">Node.js</a>
+        
+            <a href="/zh-cn/tags/api/">API</a>
+        
+            <a href="/zh-cn/tags/%E5%90%8E%E7%AB%AF%E6%9E%B6%E6%9E%84/">后端架构</a>
+        
+    </section>
+
+
+    <section class="article-content">
+    
+    
+    <h1 id="strapi-全解从-headless-cms-到可定制的-nodejs-api-后端">Strapi 全解：从 Headless CMS 到可定制的 Node.js API 后端
+</h1><blockquote>
+<p>如果一个项目既需要“让运营人员自己维护内容”，又需要“让网站、App、小程序共享同一套 API”，从零编写管理后台、权限、文件上传和 CRUD 往往很不划算。Strapi 的价值，就是把这些重复工作变成可配置的基础设施，同时保留继续写代码的出口。</p>
+</blockquote>
+<p>本文以 <strong>Strapi 5</strong> 为基准。读完你会弄清四件事：Strapi 到底是什么、它用了哪些技术、内容模型如何变成后端 API，以及它与 Java、Go、Python 后端真正的区别。</p>
+<hr>
+<h2 id="一strapi-是什么">一、Strapi 是什么？
+</h2><p><a class="link" href="https://strapi.io/"  target="_blank" rel="noopener"
+    >Strapi</a> 是一个开源、可自托管的 <strong>Headless CMS（无头内容管理系统）</strong>，也是一个以内容为中心的 Node.js 后端框架。</p>
+<p>这里的“无头”不是没有管理界面，而是<strong>不绑定面向访客的前端页面</strong>：</p>
+<ul>
+<li>内容团队在 Strapi Admin 中录入文章、商品、活动和媒体；</li>
+<li>Strapi 将内容保存到数据库，并通过 REST 或 GraphQL 提供；</li>
+<li>React、Vue、Next.js、Nuxt、Flutter、小程序甚至 IoT 设备都可以消费同一份内容；</li>
+<li>前端如何渲染、部署到哪里，与 CMS 后端彼此独立。</li>
+</ul>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="headless-architecture.svg" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="headless-architecture.svg" 
+             alt="Strapi Headless 架构：一份内容通过 API 分发到多个终端" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">Strapi Headless 架构：一份内容通过 API 分发到多个终端</span>
+    
+</div></p>
+<p>传统 CMS 通常把“内容管理”和“页面模板”绑在一起；Strapi 只负责内容与 API。它更像一个带可视化建模、管理后台和权限系统的后端工程脚手架。</p>
+<blockquote>
+<p><strong>先纠正一个比较口径：</strong> Strapi 不是和 Java、Go、Python 同一层级的东西。Strapi 是一套成品框架与 CMS；Java、Go、Python 是语言及其后端生态。更合理的比较对象是 <strong>Strapi vs Spring Boot、Go Web 框架、Django/DRF 或 FastAPI</strong>。</p>
+</blockquote>
+<hr>
+<h2 id="二strapi-的核心特点">二、Strapi 的核心特点
+</h2><div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>特点</th>
+<th>它解决了什么问题</th>
+<th>需要注意什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>可视化内容建模</td>
+<td>用 Content-Type Builder 定义字段、关系、组件和动态区域</td>
+<td>复杂领域模型仍需代码设计，不能把建模完全交给运营</td>
+</tr>
+<tr>
+<td>自动 REST API</td>
+<td>创建内容类型后自动获得增删改查接口</td>
+<td>内容类型默认私有，必须配置权限或 Token</td>
+</tr>
+<tr>
+<td>GraphQL 支持</td>
+<td>安装 GraphQL 插件后，根据模型生成查询与 Mutation</td>
+<td>需要控制查询深度与复杂度，避免昂贵请求</td>
+</tr>
+<tr>
+<td>完整管理后台</td>
+<td>内容编辑、媒体库、草稿发布、国际化等开箱即用</td>
+<td>深度定制 Admin 会进入 React 前端开发范畴</td>
+</tr>
+<tr>
+<td>可扩展后端</td>
+<td>可写 Route、Policy、Middleware、Controller、Service 和生命周期逻辑</td>
+<td>自定义逻辑越多，越应补齐测试与分层</td>
+</tr>
+<tr>
+<td>多数据库支持</td>
+<td>支持 SQLite、PostgreSQL、MySQL、MariaDB</td>
+<td>Strapi 5 不支持 MongoDB，也不适合直接接管既有数据库</td>
+</tr>
+<tr>
+<td>API 安全能力</td>
+<td>Public/Authenticated 角色、API Token、字段和操作权限</td>
+<td>“有权限系统”不等于自动安全，仍要做限流、审计和密钥管理</td>
+</tr>
+<tr>
+<td>自托管与云部署</td>
+<td>代码和数据可掌握在自己手中，也可使用 Strapi Cloud</td>
+<td>自托管时，升级、备份、监控与扩容由团队负责</td>
+</tr>
+</tbody>
+</table></div>
+<p>它最突出的优势不是“某个接口跑得最快”，而是把一组常见需求一次交付：</p>
+<p><strong>数据库模型 + CRUD API + 内容后台 + 权限 + 媒体 + 发布工作流。</strong></p>
+<p>这正是内容型项目中最耗费重复劳动的部分。</p>
+<hr>
+<h2 id="三strapi-的技术栈">三、Strapi 的技术栈
+</h2><p>从外到内看，一套典型 Strapi 5 应用包含这些层次：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>层次</th>
+<th>主要技术</th>
+<th>职责</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>运行时</td>
+<td>Node.js</td>
+<td>运行 JavaScript / TypeScript 后端，擅长 I/O 密集型请求</td>
+</tr>
+<tr>
+<td>开发语言</td>
+<td>TypeScript 或 JavaScript</td>
+<td>编写配置、控制器、服务、策略与插件</td>
+</tr>
+<tr>
+<td>HTTP 层</td>
+<td>Koa 生态与 Strapi 路由层</td>
+<td>接收请求、执行中间件并构造响应</td>
+</tr>
+<tr>
+<td>管理后台</td>
+<td>React + Strapi Design System</td>
+<td>提供内容管理与系统配置界面</td>
+</tr>
+<tr>
+<td>数据访问</td>
+<td>Strapi Document Service / Query Engine</td>
+<td>统一处理内容、文档、多语言与草稿发布语义</td>
+</tr>
+<tr>
+<td>SQL 抽象</td>
+<td>Knex</td>
+<td>连接 SQLite、PostgreSQL、MySQL 等关系数据库</td>
+</tr>
+<tr>
+<td>API</td>
+<td>REST；可选 GraphQL 插件</td>
+<td>向不同终端分发内容</td>
+</tr>
+<tr>
+<td>扩展机制</td>
+<td>Plugin、Provider、Middleware、Policy、Lifecycle</td>
+<td>对接对象存储、邮件、鉴权和业务逻辑</td>
+</tr>
+</tbody>
+</table></div>
+<p>Strapi 5 中的 <strong>Document</strong> 值得单独理解：同一篇内容可能同时有草稿版、发布版和多个语言版本，<code>documentId</code> 用来标识它们所属的逻辑文档。因此，单条 REST 接口使用的是：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">GET /api/articles/:documentId
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>而不是旧教程中常见的数字 <code>id</code>。此外，Strapi 5 的响应已经扁平化，字段直接位于 <code>data</code> 对象中，不再放在 <code>data.attributes</code> 里。</p>
+<hr>
+<h2 id="四它是怎么生成后端-api-的">四、它是怎么“生成”后端 API 的？
+</h2><p>Strapi 的核心思路是 <strong>Content Model First</strong>：先描述内容结构，再由框架装配数据库结构、管理表单和 API。</p>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="api-generation.svg" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="api-generation.svg" 
+             alt="从内容模型到数据库、管理后台与 REST/GraphQL API" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">从内容模型到数据库、管理后台与 REST/GraphQL API</span>
+    
+</div></p>
+<p>假设我们创建一个 Collection Type：<code>Article</code>，并定义以下字段：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>约束</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>title</code></td>
+<td>Short text</td>
+<td>必填</td>
+</tr>
+<tr>
+<td><code>slug</code></td>
+<td>UID</td>
+<td>基于 title，唯一</td>
+</tr>
+<tr>
+<td><code>summary</code></td>
+<td>Long text</td>
+<td>可选</td>
+</tr>
+<tr>
+<td><code>content</code></td>
+<td>Blocks / Rich text</td>
+<td>正文</td>
+</tr>
+<tr>
+<td><code>cover</code></td>
+<td>Media</td>
+<td>单张图片</td>
+</tr>
+<tr>
+<td><code>author</code></td>
+<td>Relation</td>
+<td>多篇文章属于一个作者</td>
+</tr>
+<tr>
+<td><code>featured</code></td>
+<td>Boolean</td>
+<td>默认 false</td>
+</tr>
+</tbody>
+</table></div>
+<p>保存模型后，Strapi 会完成几件事：</p>
+<ol>
+<li>把模型保存为项目中的 schema；</li>
+<li>同步对应的数据库表、列和关系；</li>
+<li>在 Admin 中生成文章编辑表单和列表；</li>
+<li>注册核心 Controller 与 Service；</li>
+<li>注册 <code>/api/articles</code> 的 REST CRUD 路由；</li>
+<li>如果安装了 GraphQL 插件，再把模型加入 GraphQL Schema。</li>
+</ol>
+<p>REST 接口随即具备下面这些约定：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>动作</th>
+<th>方法与路径</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>查询列表</td>
+<td><code>GET /api/articles</code></td>
+</tr>
+<tr>
+<td>查询单篇</td>
+<td><code>GET /api/articles/:documentId</code></td>
+</tr>
+<tr>
+<td>创建</td>
+<td><code>POST /api/articles</code></td>
+</tr>
+<tr>
+<td>更新</td>
+<td><code>PUT /api/articles/:documentId</code></td>
+</tr>
+<tr>
+<td>删除</td>
+<td><code>DELETE /api/articles/:documentId</code></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="41-从零跑起一个-api">4.1 从零跑起一个 API
+</h3><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">npx create-strapi@latest blog-api --quickstart
+</span></span><span class="line"><span class="cl"><span class="nb">cd</span> blog-api
+</span></span><span class="line"><span class="cl">npm run develop
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>打开 <code>http://localhost:1337/admin</code> 创建管理员，然后在 Content-Type Builder 中建立 <code>Article</code>。</p>
+<p>新内容类型<strong>默认是私有的</strong>。你可以在 Settings → Users &amp; Permissions 中仅开放 <code>find</code>、<code>findOne</code>，也可以给服务器端调用者创建 API Token。生产环境更推荐最小权限 Token，而不是把写接口设为 Public。</p>
+<p>查询已发布文章：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">curl <span class="s1">&#39;http://localhost:1337/api/articles?sort=publishedAt:desc&amp;pagination[pageSize]=10&#39;</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>  -H <span class="s1">&#39;Authorization: Bearer &lt;token&gt;&#39;</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>按条件过滤，并显式取回封面与作者：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">curl <span class="s1">&#39;http://localhost:1337/api/articles?filters[featured][$eq]=true&amp;populate[cover]=true&amp;populate[author]=true&#39;</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>  -H <span class="s1">&#39;Authorization: Bearer &lt;token&gt;&#39;</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>创建文章时，业务字段必须包在 <code>data</code> 中：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">curl -X POST <span class="s1">&#39;http://localhost:1337/api/articles&#39;</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>  -H <span class="s1">&#39;Authorization: Bearer &lt;token&gt;&#39;</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>  -H <span class="s1">&#39;Content-Type: application/json&#39;</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>  -d <span class="s1">&#39;{
+</span></span></span><span class="line"><span class="cl"><span class="s1">    &#34;data&#34;: {
+</span></span></span><span class="line"><span class="cl"><span class="s1">      &#34;title&#34;: &#34;Hello Strapi&#34;,
+</span></span></span><span class="line"><span class="cl"><span class="s1">      &#34;slug&#34;: &#34;hello-strapi&#34;,
+</span></span></span><span class="line"><span class="cl"><span class="s1">      &#34;summary&#34;: &#34;My first content API&#34;,
+</span></span></span><span class="line"><span class="cl"><span class="s1">      &#34;featured&#34;: true
+</span></span></span><span class="line"><span class="cl"><span class="s1">    }
+</span></span></span><span class="line"><span class="cl"><span class="s1">  }&#39;</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>一个典型的 Strapi 5 列表响应如下：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;data&#34;</span><span class="p">:</span> <span class="p">[</span>
+</span></span><span class="line"><span class="cl">    <span class="p">{</span>
+</span></span><span class="line"><span class="cl">      <span class="nt">&#34;id&#34;</span><span class="p">:</span> <span class="mi">17</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">      <span class="nt">&#34;documentId&#34;</span><span class="p">:</span> <span class="s2">&#34;n7m6d9p3k2x8...&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">      <span class="nt">&#34;title&#34;</span><span class="p">:</span> <span class="s2">&#34;Hello Strapi&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">      <span class="nt">&#34;slug&#34;</span><span class="p">:</span> <span class="s2">&#34;hello-strapi&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">      <span class="nt">&#34;featured&#34;</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">      <span class="nt">&#34;publishedAt&#34;</span><span class="p">:</span> <span class="s2">&#34;2026-07-10T14:20:00.000Z&#34;</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl">  <span class="p">],</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;meta&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;pagination&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">      <span class="nt">&#34;page&#34;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">      <span class="nt">&#34;pageSize&#34;</span><span class="p">:</span> <span class="mi">10</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">      <span class="nt">&#34;pageCount&#34;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">      <span class="nt">&#34;total&#34;</span><span class="p">:</span> <span class="mi">1</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl">  <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><blockquote>
+<p><strong>常见坑：</strong> 关系、媒体、组件和 Dynamic Zone 默认不会被填充。不要习惯性使用 <code>populate=*</code> 拉取一切；生产环境应明确选择字段和关联，控制响应体积与数据库查询成本。</p>
+</blockquote>
+<h3 id="42-自动-crud-不够时怎么办">4.2 自动 CRUD 不够时怎么办？
+</h3><p>Strapi 并没有把你锁在自动生成代码里。比如要增加 <code>GET /api/articles/featured</code>，可以写自定义路由、控制器和服务：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-ts" data-lang="ts"><span class="line"><span class="cl"><span class="c1">// src/api/article/routes/01-featured.ts
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kr">export</span> <span class="k">default</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">routes</span><span class="o">:</span> <span class="p">[</span>
+</span></span><span class="line"><span class="cl">    <span class="p">{</span>
+</span></span><span class="line"><span class="cl">      <span class="nx">method</span><span class="o">:</span> <span class="s1">&#39;GET&#39;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">      <span class="nx">path</span><span class="o">:</span> <span class="s1">&#39;/articles/featured&#39;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">      <span class="nx">handler</span><span class="o">:</span> <span class="s1">&#39;article.featured&#39;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">      <span class="nx">config</span><span class="o">:</span> <span class="p">{</span> <span class="nx">auth</span>: <span class="kt">false</span> <span class="p">},</span>
+</span></span><span class="line"><span class="cl">    <span class="p">},</span>
+</span></span><span class="line"><span class="cl">  <span class="p">],</span>
+</span></span><span class="line"><span class="cl"><span class="p">};</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-ts" data-lang="ts"><span class="line"><span class="cl"><span class="c1">// src/api/article/controllers/article.ts
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kr">import</span> <span class="p">{</span> <span class="nx">factories</span> <span class="p">}</span> <span class="kr">from</span> <span class="s1">&#39;@strapi/strapi&#39;</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kr">export</span> <span class="k">default</span> <span class="nx">factories</span><span class="p">.</span><span class="nx">createCoreController</span><span class="p">(</span>
+</span></span><span class="line"><span class="cl">  <span class="s1">&#39;api::article.article&#39;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="p">({</span> <span class="nx">strapi</span> <span class="p">})</span> <span class="o">=&gt;</span> <span class="p">({</span>
+</span></span><span class="line"><span class="cl">    <span class="kr">async</span> <span class="nx">featured</span><span class="p">(</span><span class="nx">ctx</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">      <span class="kr">const</span> <span class="nx">data</span> <span class="o">=</span> <span class="k">await</span> <span class="nx">strapi</span>
+</span></span><span class="line"><span class="cl">        <span class="p">.</span><span class="nx">service</span><span class="p">(</span><span class="s1">&#39;api::article.article&#39;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">        <span class="p">.</span><span class="nx">findFeatured</span><span class="p">();</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">      <span class="nx">ctx</span><span class="p">.</span><span class="nx">body</span> <span class="o">=</span> <span class="p">{</span> <span class="nx">data</span> <span class="p">};</span>
+</span></span><span class="line"><span class="cl">    <span class="p">},</span>
+</span></span><span class="line"><span class="cl">  <span class="p">})</span>
+</span></span><span class="line"><span class="cl"><span class="p">);</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-ts" data-lang="ts"><span class="line"><span class="cl"><span class="c1">// src/api/article/services/article.ts
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kr">import</span> <span class="p">{</span> <span class="nx">factories</span> <span class="p">}</span> <span class="kr">from</span> <span class="s1">&#39;@strapi/strapi&#39;</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kr">export</span> <span class="k">default</span> <span class="nx">factories</span><span class="p">.</span><span class="nx">createCoreService</span><span class="p">(</span>
+</span></span><span class="line"><span class="cl">  <span class="s1">&#39;api::article.article&#39;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="p">({</span> <span class="nx">strapi</span> <span class="p">})</span> <span class="o">=&gt;</span> <span class="p">({</span>
+</span></span><span class="line"><span class="cl">    <span class="kr">async</span> <span class="nx">findFeatured() {</span>
+</span></span><span class="line"><span class="cl">      <span class="k">return</span> <span class="nx">strapi</span><span class="p">.</span><span class="nx">documents</span><span class="p">(</span><span class="s1">&#39;api::article.article&#39;</span><span class="p">).</span><span class="nx">findMany</span><span class="p">({</span>
+</span></span><span class="line"><span class="cl">        <span class="nx">filters</span><span class="o">:</span> <span class="p">{</span> <span class="nx">featured</span>: <span class="kt">true</span> <span class="p">},</span>
+</span></span><span class="line"><span class="cl">        <span class="nx">status</span><span class="o">:</span> <span class="s1">&#39;published&#39;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="nx">sort</span><span class="o">:</span> <span class="p">[</span><span class="s1">&#39;publishedAt:desc&#39;</span><span class="p">],</span>
+</span></span><span class="line"><span class="cl">        <span class="nx">limit</span>: <span class="kt">5</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">      <span class="p">});</span>
+</span></span><span class="line"><span class="cl">    <span class="p">},</span>
+</span></span><span class="line"><span class="cl">  <span class="p">})</span>
+</span></span><span class="line"><span class="cl"><span class="p">);</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>请求进入后，并不是 Controller 直接拼 SQL，而是沿着分层链路运行：</p>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="request-pipeline.svg" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="request-pipeline.svg" 
+             alt="Strapi 请求链路：Route、Middleware、Policy、Controller、Service、Document Service 到数据库" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">Strapi 请求链路：Route、Middleware、Policy、Controller、Service、Document Service 到数据库</span>
+    
+</div></p>
+<ul>
+<li><strong>Route</strong> 决定方法、路径和处理器；</li>
+<li><strong>Middleware</strong> 处理日志、CORS、限流、请求改写等横切逻辑；</li>
+<li><strong>Policy</strong> 判断当前身份能否执行该动作；</li>
+<li><strong>Controller</strong> 读取 HTTP 上下文并组织响应；</li>
+<li><strong>Service</strong> 承载可复用业务逻辑；</li>
+<li><strong>Document Service</strong> 处理文档、语言、草稿/发布等 Strapi 语义；</li>
+<li><strong>Database / Knex</strong> 才最终访问关系数据库。</li>
+</ul>
+<p>这种分层和 Spring Boot、Django 的 Controller/Service/Repository 思路并不陌生；区别在于 Strapi 已经替你实现了大量默认层。</p>
+<hr>
+<h2 id="五与-javagopython-后端有什么区别">五、与 Java、Go、Python 后端有什么区别？
+</h2><p>先看一张定位图：</p>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="backend-comparison.svg" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="backend-comparison.svg" 
+             alt="Strapi、Spring Boot、Go Web 与 Python Web 后端的工程定位对比" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">Strapi、Spring Boot、Go Web 与 Python Web 后端的工程定位对比</span>
+    
+</div></p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>维度</th>
+<th>Strapi（Node.js/TS）</th>
+<th>Java（Spring Boot）</th>
+<th>Go（Gin/Chi/Fiber 等）</th>
+<th>Python（Django/DRF/FastAPI）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>起步方式</td>
+<td>内容模型优先，自动生成 CRUD 与 Admin</td>
+<td>代码优先，显式设计实体、接口与分层</td>
+<td>代码优先，组合库并显式实现</td>
+<td>Django 偏全栈；DRF/FastAPI 以代码定义 API</td>
+</tr>
+<tr>
+<td>首个内容 API</td>
+<td>非常快，分钟级</td>
+<td>较慢，但工程规范与能力完整</td>
+<td>较快，但后台、权限、媒体需另配</td>
+<td>Django + Admin 很快；FastAPI 仍需管理端</td>
+</tr>
+<tr>
+<td>管理后台</td>
+<td>一等公民，面向内容团队</td>
+<td>通常另做或采购</td>
+<td>通常另做</td>
+<td>Django Admin 强；FastAPI 默认无</td>
+</tr>
+<tr>
+<td>类型系统</td>
+<td>TypeScript 静态检查，运行时仍是 JS</td>
+<td>强静态类型，编译期约束成熟</td>
+<td>简洁强类型，编译快</td>
+<td>动态类型为主，可用 type hints / Pydantic</td>
+</tr>
+<tr>
+<td>并发模型</td>
+<td>事件循环，适合 I/O 密集型</td>
+<td>线程池/虚拟线程，生态成熟</td>
+<td>goroutine 轻量并发</td>
+<td>async 可处理 I/O；CPU 密集受解释器模型影响</td>
+</tr>
+<tr>
+<td>性能与资源</td>
+<td>通常足够支撑内容 API，不以极限吞吐见长</td>
+<td>吞吐稳定，但 JVM 启动与内存成本较高</td>
+<td>吞吐高、内存低、单二进制部署</td>
+<td>开发效率高，极限吞吐通常不是优势</td>
+</tr>
+<tr>
+<td>事务与复杂领域</td>
+<td>能做，但 CMS 抽象不适合所有复杂交易</td>
+<td>强项：事务、DDD、消息与企业集成</td>
+<td>显式、可控，但很多能力要自行组合</td>
+<td>Django ORM 事务成熟；复杂系统仍需严谨分层</td>
+</tr>
+<tr>
+<td>可定制性</td>
+<td>默认能力多，越偏离内容 CRUD 定制成本越高</td>
+<td>几乎不设上限，但样板和工程成本更高</td>
+<td>控制力强、魔法少</td>
+<td>从 Django 的“全家桶”到 FastAPI 的轻量均可选</td>
+</tr>
+<tr>
+<td>部署形态</td>
+<td>Node 应用 + 数据库 + 媒体存储</td>
+<td>JVM/JAR/容器</td>
+<td>单二进制或容器</td>
+<td>Python 运行时 + WSGI/ASGI 服务器</td>
+</tr>
+<tr>
+<td>最适合</td>
+<td>CMS、官网、多渠道内容、产品目录</td>
+<td>核心交易、复杂企业系统、大型团队</td>
+<td>高性能服务、网关、云原生基础设施</td>
+<td>数据/AI 服务、业务后台、快速 API 开发</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="51-strapi-vs-java默认能力与领域控制力">5.1 Strapi vs Java：默认能力与领域控制力
+</h3><p>Spring Boot 通常从领域模型、DTO、Repository、Service、Controller 一层层搭建。前期代码更多，但复杂事务、消息中间件、审计、强类型契约和大型团队治理都很成熟。</p>
+<p>Strapi 则先送你一套能用的内容平台。对于“文章、作者、分类、媒体、国际化”这类模型，它能省掉大量工作；但如果系统核心是支付清算、库存扣减、复杂审批或跨服务事务，Java 的显式领域模型通常更稳妥。</p>
+<h3 id="52-strapi-vs-go交付速度与运行效率">5.2 Strapi vs Go：交付速度与运行效率
+</h3><p>Go 服务倾向于少魔法、显式依赖和小体积部署。它能用更少内存提供很高吞吐，特别适合网关、基础设施和高并发微服务。</p>
+<p>代价是 Go Web 框架很少直接送你内容后台、媒体库、草稿发布与细粒度内容权限。若项目主要是内容运营，Strapi 更快；若核心目标是极低延迟、资源效率或简单可靠的服务进程，Go 更合适。</p>
+<h3 id="53-strapi-vs-python与-django-最像但重心不同">5.3 Strapi vs Python：与 Django 最像，但重心不同
+</h3><p>Django Admin 让 Python 阵营也能快速得到数据管理后台，Django REST Framework 再提供序列化、权限和 API。因此 Django/DRF 是这里与 Strapi 最接近的组合。</p>
+<p>区别在于：Django 更像通用 Web 框架，Admin 主要服务内部数据管理；Strapi 从一开始就围绕“结构化内容、多渠道分发、编辑体验”设计。FastAPI 则更轻，特别适合类型清晰的 API、数据和 AI 服务，但不会自动给你完整 CMS。</p>
+<hr>
+<h2 id="六什么时候该选-strapi">六、什么时候该选 Strapi？
+</h2><h3 id="很适合">很适合
+</h3><ul>
+<li>企业官网、营销站、新闻与博客；</li>
+<li>多语言、多品牌、多终端共享内容；</li>
+<li>App、小程序、网站共用文章、Banner、活动和配置；</li>
+<li>产品目录、案例库、帮助中心；</li>
+<li>前端团队需要快速获得可用后端，内容团队又必须独立编辑；</li>
+<li>MVP 中大量需求属于标准 CRUD + 内容工作流。</li>
+</ul>
+<h3 id="谨慎选择">谨慎选择
+</h3><ul>
+<li>银行账务、支付、交易撮合、复杂库存等强事务核心；</li>
+<li>需要直接接管庞大既有数据库的系统；</li>
+<li>大量 CPU 密集计算、极端低延迟或极限吞吐服务；</li>
+<li>API 主要是复杂动作和跨域编排，内容 CRUD 只占很小比例；</li>
+<li>团队完全没有 Node.js/TypeScript 运维与升级经验。</li>
+</ul>
+<p>一个很实用的组合是：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">Strapi 管内容与运营配置
+</span></span><span class="line"><span class="cl">        +
+</span></span><span class="line"><span class="cl">Java / Go / Python 管核心业务
+</span></span><span class="line"><span class="cl">        +
+</span></span><span class="line"><span class="cl">API Gateway 或 BFF 统一对前端提供契约
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>不要强迫一项技术包办所有问题。Strapi 可以是系统中的“内容服务”，而不是整个后端。</p>
+<hr>
+<h2 id="七生产落地的-8-条建议">七、生产落地的 8 条建议
+</h2><ol>
+<li><strong>生产使用 PostgreSQL 或 MySQL。</strong> SQLite 适合本地体验和轻量场景，不适合多数多实例生产部署。</li>
+<li><strong>权限遵循最小化。</strong> 写接口不要设为 Public，给不同调用方发放不同作用域的 API Token。</li>
+<li><strong>显式 populate 与 fields。</strong> 只查需要的字段和关联，避免查询爆炸与巨大 JSON。</li>
+<li><strong>把业务逻辑放进 Service。</strong> Controller 只处理 HTTP，Policy 做授权，Service 保持可测试。</li>
+<li><strong>模型随代码发布。</strong> 在开发环境修改内容模型，把 schema 与迁移纳入 Git 和发布流程。</li>
+<li><strong>媒体放对象存储。</strong> 多实例部署不要依赖单机磁盘，可接 S3 兼容存储与 CDN。</li>
+<li><strong>补齐缓存和可观测性。</strong> 热点内容可放 CDN/Redis，同时记录慢查询、错误率和事件循环延迟。</li>
+<li><strong>升级前阅读迁移说明。</strong> 插件与自定义 Admin 是升级风险最高的部分，先在预发布环境验证。</li>
+</ol>
+<hr>
+<h2 id="总结">总结
+</h2><p>理解 Strapi 的最好方式，不是把它叫作“低代码后端”，而是把它看成：</p>
+<blockquote>
+<p><strong>一个以结构化内容为核心、自动提供管理后台和 API、同时允许继续写 Node.js/TypeScript 代码的 Headless CMS 框架。</strong></p>
+</blockquote>
+<p>它用约定和自动化换取了极高的内容型项目交付速度；Java、Go、Python 通用后端则用更多显式代码换取更广的业务边界、性能特征或生态能力。</p>
+<p>选择标准也因此很清楚：</p>
+<ul>
+<li>核心问题是“怎样高效管理并分发内容”——优先考虑 Strapi；</li>
+<li>核心问题是“怎样实现复杂交易、极限性能或专用计算”——优先考虑 Java、Go 或 Python；</li>
+<li>两类问题同时存在——让 Strapi 做内容服务，与核心业务后端协作。</li>
+</ul>
+<hr>
+<h2 id="参考资料">参考资料
+</h2><ul>
+<li><a class="link" href="https://docs.strapi.io/"  target="_blank" rel="noopener"
+    >Strapi 5 官方文档</a></li>
+<li><a class="link" href="https://docs.strapi.io/cms/api/rest"  target="_blank" rel="noopener"
+    >REST API Reference</a></li>
+<li><a class="link" href="https://docs.strapi.io/cms/backend-customization"  target="_blank" rel="noopener"
+    >Back-end Customization</a></li>
+<li><a class="link" href="https://docs.strapi.io/cms/api/document-service"  target="_blank" rel="noopener"
+    >Document Service API</a></li>
+<li><a class="link" href="https://docs.strapi.io/cms/api/graphql"  target="_blank" rel="noopener"
+    >GraphQL API</a></li>
+<li><a class="link" href="https://docs.strapi.io/cms/configurations/database"  target="_blank" rel="noopener"
+    >Database Configuration</a></li>
+<li><a class="link" href="https://github.com/strapi/strapi"  target="_blank" rel="noopener"
+    >Strapi GitHub Repository</a></li>
+</ul>
+<blockquote>
+<p>本文基于 2026 年 7 月可用的 Strapi 5 官方资料撰写。版本升级可能改变命令、运行时要求和插件行为，落地时请以对应版本文档为准。</p>
+</blockquote>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/zh-cn/tags/strapi/">Strapi</a>
+        
+            <a href="/zh-cn/tags/headless-cms/">Headless CMS</a>
+        
+            <a href="/zh-cn/tags/node.js/">Node.js</a>
+        
+            <a href="/zh-cn/tags/api/">API</a>
+        
+            <a href="/zh-cn/tags/%E5%90%8E%E7%AB%AF%E6%9E%B6%E6%9E%84/">后端架构</a>
+        
+    </section>
+
+
+    </footer>
+
+
+    
+</article>
+
+    
+
+    
+
+     
+    
+        
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+        2026 SymphonyW
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.26.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.js" defer></script><script type="text/javascript" src="/ts/custom.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+<script>
+window.MathJax = {
+  tex: {
+    
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  svg: {
+    fontCache: 'global'
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    </body>
+</html>
