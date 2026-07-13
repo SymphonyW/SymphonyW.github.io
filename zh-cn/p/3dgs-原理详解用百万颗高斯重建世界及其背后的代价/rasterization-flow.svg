@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 580" width="1200" height="580">
+  <defs>
+    <linearGradient id="r2g1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#60a5fa"/><stop offset="100%" stop-color="#1d4ed8"/></linearGradient>
+    <linearGradient id="r2g2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#a78bfa"/><stop offset="100%" stop-color="#6d28d9"/></linearGradient>
+    <linearGradient id="r2g3" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#fb923c"/><stop offset="100%" stop-color="#c2410c"/></linearGradient>
+    <linearGradient id="r2g4" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#f472b6"/><stop offset="100%" stop-color="#be185d"/></linearGradient>
+    <marker id="arr2" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><polygon points="0,0 8,3 0,6" fill="#94a3b8"/></marker>
+  </defs>
+  <rect width="1200" height="580" fill="#f8fafc"/>
+  <text x="600" y="46" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="28" font-weight="700" fill="#1e293b">可微光栅化：3D 高斯如何变成像素</text>
+
+  <!-- Step 1: project -->
+  <g transform="translate(40,100)">
+    <rect width="260" height="180" rx="14" fill="url(#r2g1)"/>
+    <text x="130" y="42" text-anchor="middle" font-size="32">🎥</text>
+    <text x="130" y="80" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="700" fill="#fff">① 投影到屏幕</text>
+    <text x="130" y="108" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="12" fill="#dbeafe">3D 高斯 → 2D 高斯</text>
+    <text x="130" y="128" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="12" fill="#dbeafe">用投影雅可比 J 缩放协方差</text>
+    <text x="130" y="155" text-anchor="middle" font-family="Consolas,Menlo,monospace" font-size="12" fill="#bfdbfe">Σ' = J · W · Σ · Wᵀ · Jᵀ</text>
+  </g>
+  <line x1="305" y1="190" x2="335" y2="190" stroke="#94a3b8" stroke-width="3" marker-end="url(#arr2)"/>
+
+  <!-- Step 2: tile -->
+  <g transform="translate(340,100)">
+    <rect width="260" height="180" rx="14" fill="url(#r2g2)"/>
+    <text x="130" y="42" text-anchor="middle" font-size="32">🧩</text>
+    <text x="130" y="80" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="700" fill="#fff">② 划分 Tile</text>
+    <text x="130" y="108" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="12" fill="#ede9fe">屏幕分 16×16 网格</text>
+    <text x="130" y="128" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="12" fill="#ede9fe">每个高斯分到一个或多个 Tile</text>
+    <text x="130" y="155" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="12" fill="#ddd6fe">剔除视锥外 + 远处裁剪</text>
+  </g>
+  <line x1="605" y1="190" x2="635" y2="190" stroke="#94a3b8" stroke-width="3" marker-end="url(#arr2)"/>
+
+  <!-- Step 3: sort -->
+  <g transform="translate(640,100)">
+    <rect width="260" height="180" rx="14" fill="url(#r2g3)"/>
+    <text x="130" y="42" text-anchor="middle" font-size="32">🔢</text>
+    <text x="130" y="80" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="700" fill="#fff">③ 深度排序</text>
+    <text x="130" y="108" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="12" fill="#ffedd5">每个 Tile 内按视点距离</text>
+    <text x="130" y="128" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="12" fill="#ffedd5">从前到后排序</text>
+    <text x="130" y="155" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="12" fill="#fed7aa">GPU 单 pass 基数排序</text>
+  </g>
+  <line x1="905" y1="190" x2="935" y2="190" stroke="#94a3b8" stroke-width="3" marker-end="url(#arr2)"/>
+
+  <!-- Step 4: alpha blend -->
+  <g transform="translate(940,100)">
+    <rect width="220" height="180" rx="14" fill="url(#r2g4)"/>
+    <text x="110" y="42" text-anchor="middle" font-size="32">🎨</text>
+    <text x="110" y="80" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="17" font-weight="700" fill="#fff">④ Alpha 混合</text>
+    <text x="110" y="108" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="12" fill="#fce7f3">逐像素前向累积</text>
+    <text x="110" y="128" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="12" fill="#fce7f3">T=1 后可提前终止</text>
+    <text x="110" y="155" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="11" fill="#fbcfe8">可微 → 反传梯度</text>
+  </g>
+
+  <!-- pixel detail -->
+  <g transform="translate(40,330)">
+    <rect width="1120" height="160" rx="12" fill="#fff" stroke="#cbd5e1"/>
+    <text x="20" y="30" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="700" fill="#1e293b">单个像素的颜色计算（前向 α 混合）</text>
+
+    <!-- pixel column -->
+    <g transform="translate(40,55)">
+      <rect x="0" y="0" width="60" height="22" fill="#fca5a5" opacity="0.85"/>
+      <text x="-8" y="16" text-anchor="end" font-family="Segoe UI,Arial,sans-serif" font-size="11" fill="#475569">高斯1</text>
+      <rect x="0" y="24" width="60" height="22" fill="#fcd34d" opacity="0.7"/>
+      <text x="-8" y="40" text-anchor="end" font-family="Segoe UI,Arial,sans-serif" font-size="11" fill="#475569">高斯2</text>
+      <rect x="0" y="48" width="60" height="22" fill="#86efac" opacity="0.6"/>
+      <text x="-8" y="64" text-anchor="end" font-family="Segoe UI,Arial,sans-serif" font-size="11" fill="#475569">高斯3</text>
+      <rect x="0" y="72" width="60" height="22" fill="#93c5fd" opacity="0.5"/>
+      <text x="-8" y="88" text-anchor="end" font-family="Segoe UI,Arial,sans-serif" font-size="11" fill="#475569">高斯4</text>
+    </g>
+
+    <!-- formula -->
+    <g transform="translate(180,55)">
+      <text x="0" y="20" font-family="Consolas,Menlo,monospace" font-size="14" fill="#1e293b">C = Σᵢ  cᵢ · αᵢ · ∏ⱼ<ᵢ (1 − αⱼ)</text>
+      <text x="0" y="48" font-family="Segoe UI,Arial,sans-serif" font-size="13" fill="#475569">其中：</text>
+      <text x="0" y="68" font-family="Consolas,Menlo,monospace" font-size="13" fill="#1e293b">  cᵢ  — 第 i 个高斯在该视角下的颜色（由 SH 计算）</text>
+      <text x="0" y="86" font-family="Consolas,Menlo,monospace" font-size="13" fill="#1e293b">  αᵢ  — 不透明度 × 2D 高斯在该像素的高斯值</text>
+      <text x="0" y="104" font-family="Consolas,Menlo,monospace" font-size="13" fill="#1e293b">  Tᵢ = ∏ⱼ<ᵢ (1 − αⱼ) — 透射率，累积到第 i 个之前还剩多少光</text>
+    </g>
+
+    <!-- right hint -->
+    <g transform="translate(720,55)">
+      <rect width="380" height="100" rx="10" fill="#fff7ed" stroke="#fed7aa"/>
+      <text x="14" y="24" font-family="Segoe UI,Arial,sans-serif" font-size="14" font-weight="700" fill="#9a3412">⚡ 为什么这么快？</text>
+      <text x="14" y="48" font-family="Segoe UI,Arial,sans-serif" font-size="12" fill="#7c2d12">• 不走神经网络前向 → 无 MLP 计算</text>
+      <text x="14" y="68" font-family="Segoe UI,Arial,sans-serif" font-size="12" fill="#7c2d12">• Tile 并行 → 一个线程块处理一个 Tile</text>
+      <text x="14" y="88" font-family="Segoe UI,Arial,sans-serif" font-size="12" fill="#7c2d12">• T→0 时提前 break，跳过被遮挡高斯</text>
+    </g>
+  </g>
+
+  <text x="600" y="540" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="12" fill="#94a3b8">这是首个既能高质量渲染、又完全可微的实时光栅化器，梯度能从像素一路流回到每个 3D 高斯的全部属性。</text>
+</svg>

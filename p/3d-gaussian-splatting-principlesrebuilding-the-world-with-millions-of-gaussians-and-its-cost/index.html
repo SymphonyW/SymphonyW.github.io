@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="3DGS 原理详解：用百万颗高斯重建世界，及其背后的代价 2023 年 SIGGRAPH 最佳论文 &ldquo;3D Gaussian Splatting for Real-Time Radiance Field Rendering&rdquo; 把&quot;神经辐射场&quot;从「一帧几秒」拉到了「实时 100 FPS」，从此新视角合成（Novel View Synthesis）这条赛道被彻底改写。本文从零讲清楚 3DGS 是怎么工作的、为什么这么快，以及它天生的几道&quot;硬伤&quot;。 目录 一、为什么需要 3DGS 二、整体流程一览 三、表示：一个高斯长什么样 四、渲染：从 3D 椭球到像素 五、训练：自适应密度控制是灵魂 六、与 NeRF 的范式对决 七、3DGS 的六大缺陷 八、总结 一、为什么需要 3DGS 新视角合成的目标是：给一组同一场景的多视角照片，训练出一个能从任意新视角渲染出照片级图像的模型。它的应用横跨 VR/AR、影视特效、数字孪生、自动驾驶仿真、文物数字化等领域。 这条路上有两个关键节点： NeRF（2020 ECCV）：用一个 MLP 把 (位置, 方向) 映射到 (颜色, 密度)，再通过体渲染方程积出像素颜色。质量惊艳，但每渲染一张图要几秒到几十秒——实时化遥不可及。 3DGS（2023 SIGGRAPH）：放弃隐式 MLP，改用一组显式 3D 高斯椭球直接表示场景，搭配定制化可微光栅化器，把渲染压到 100+ FPS。 为什么 3DGS 这么关键？因为它证明了：高质量新视角合成不一定要走&quot;体渲染积分&quot;的老路，直接用一组显式基元做 α 混合就够了。 这一思路转变让 3DGS 的生态在两年内爆发式生长。 二、整体流程一览 3DGS 整体流程：从一组照片到实时新视角渲染 3DGS 的完整生命周期可以拆成 5 步：">
+<title>3D Gaussian Splatting Principles:Rebuilding the World with Millions of Gaussians and Its Cost</title>
+
+<link rel='canonical' href='https://SymphonyW.github.io/p/3d-gaussian-splatting-principlesrebuilding-the-world-with-millions-of-gaussians-and-its-cost/'>
+
+<link rel="stylesheet" href="/scss/style.min.1251edbd5d2188d23e73b1b3b4438816c788f1a85abbe07d1ccd04b6713bba76.css"><meta property='og:title' content="3D Gaussian Splatting Principles:Rebuilding the World with Millions of Gaussians and Its Cost">
+<meta property='og:description' content="3DGS 原理详解：用百万颗高斯重建世界，及其背后的代价 2023 年 SIGGRAPH 最佳论文 &ldquo;3D Gaussian Splatting for Real-Time Radiance Field Rendering&rdquo; 把&quot;神经辐射场&quot;从「一帧几秒」拉到了「实时 100 FPS」，从此新视角合成（Novel View Synthesis）这条赛道被彻底改写。本文从零讲清楚 3DGS 是怎么工作的、为什么这么快，以及它天生的几道&quot;硬伤&quot;。 目录 一、为什么需要 3DGS 二、整体流程一览 三、表示：一个高斯长什么样 四、渲染：从 3D 椭球到像素 五、训练：自适应密度控制是灵魂 六、与 NeRF 的范式对决 七、3DGS 的六大缺陷 八、总结 一、为什么需要 3DGS 新视角合成的目标是：给一组同一场景的多视角照片，训练出一个能从任意新视角渲染出照片级图像的模型。它的应用横跨 VR/AR、影视特效、数字孪生、自动驾驶仿真、文物数字化等领域。 这条路上有两个关键节点： NeRF（2020 ECCV）：用一个 MLP 把 (位置, 方向) 映射到 (颜色, 密度)，再通过体渲染方程积出像素颜色。质量惊艳，但每渲染一张图要几秒到几十秒——实时化遥不可及。 3DGS（2023 SIGGRAPH）：放弃隐式 MLP，改用一组显式 3D 高斯椭球直接表示场景，搭配定制化可微光栅化器，把渲染压到 100+ FPS。 为什么 3DGS 这么关键？因为它证明了：高质量新视角合成不一定要走&quot;体渲染积分&quot;的老路，直接用一组显式基元做 α 混合就够了。 这一思路转变让 3DGS 的生态在两年内爆发式生长。 二、整体流程一览 3DGS 整体流程：从一组照片到实时新视角渲染 3DGS 的完整生命周期可以拆成 5 步：">
+<meta property='og:url' content='https://SymphonyW.github.io/p/3d-gaussian-splatting-principlesrebuilding-the-world-with-millions-of-gaussians-and-its-cost/'>
+<meta property='og:site_name' content='SymphonyW'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='3DGS' /><meta property='article:tag' content='Computer Vision' /><meta property='article:tag' content='Neural Rendering' /><meta property='article:published_time' content='2026-07-13T21:43:00&#43;08:00'/><meta property='article:modified_time' content='2026-07-13T21:43:00&#43;08:00'/><meta property='og:image' content='https://SymphonyW.github.io/p/3d-gaussian-splatting-principlesrebuilding-the-world-with-millions-of-gaussians-and-its-cost/bg.png' />
+<meta name="twitter:title" content="3D Gaussian Splatting Principles:Rebuilding the World with Millions of Gaussians and Its Cost">
+<meta name="twitter:description" content="3DGS 原理详解：用百万颗高斯重建世界，及其背后的代价 2023 年 SIGGRAPH 最佳论文 &ldquo;3D Gaussian Splatting for Real-Time Radiance Field Rendering&rdquo; 把&quot;神经辐射场&quot;从「一帧几秒」拉到了「实时 100 FPS」，从此新视角合成（Novel View Synthesis）这条赛道被彻底改写。本文从零讲清楚 3DGS 是怎么工作的、为什么这么快，以及它天生的几道&quot;硬伤&quot;。 目录 一、为什么需要 3DGS 二、整体流程一览 三、表示：一个高斯长什么样 四、渲染：从 3D 椭球到像素 五、训练：自适应密度控制是灵魂 六、与 NeRF 的范式对决 七、3DGS 的六大缺陷 八、总结 一、为什么需要 3DGS 新视角合成的目标是：给一组同一场景的多视角照片，训练出一个能从任意新视角渲染出照片级图像的模型。它的应用横跨 VR/AR、影视特效、数字孪生、自动驾驶仿真、文物数字化等领域。 这条路上有两个关键节点： NeRF（2020 ECCV）：用一个 MLP 把 (位置, 方向) 映射到 (颜色, 密度)，再通过体渲染方程积出像素颜色。质量惊艳，但每渲染一张图要几秒到几十秒——实时化遥不可及。 3DGS（2023 SIGGRAPH）：放弃隐式 MLP，改用一组显式 3D 高斯椭球直接表示场景，搭配定制化可微光栅化器，把渲染压到 100+ FPS。 为什么 3DGS 这么关键？因为它证明了：高质量新视角合成不一定要走&quot;体渲染积分&quot;的老路，直接用一组显式基元做 α 混合就够了。 这一思路转变让 3DGS 的生态在两年内爆发式生长。 二、整体流程一览 3DGS 整体流程：从一组照片到实时新视角渲染 3DGS 的完整生命周期可以拆成 5 步："><meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content='https://SymphonyW.github.io/p/3d-gaussian-splatting-principlesrebuilding-the-world-with-millions-of-gaussians-and-its-cost/bg.png' />
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="Toggle Menu">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hua20e9d08cce84e79524a418ee5d4524c_7426_300x0_resize_box_3.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">😁</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">SymphonyW</a></h1>
+            <h2 class="site-description">Welcome to my Blog.</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0'
+                        target="_blank"
+                        title="Bilibili"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.0.0-beta2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M488.6 104.1C505.3 122.2 513 143.8 511.9 169.8V372.2C511.5 398.6 502.7 420.3 485.4 437.3C468.2 454.3 446.3 463.2 419.9 464H92.02C65.57 463.2 43.81 454.2 26.74 436.8C9.682 419.4 .7667 396.5 0 368.2V169.8C.7667 143.8 9.682 122.2 26.74 104.1C43.81 87.75 65.57 78.77 92.02 78H121.4L96.05 52.19C90.3 46.46 87.42 39.19 87.42 30.4C87.42 21.6 90.3 14.34 96.05 8.603C101.8 2.868 109.1 0 117.9 0C126.7 0 134 2.868 139.8 8.603L213.1 78H301.1L375.6 8.603C381.7 2.868 389.2 0 398 0C406.8 0 414.1 2.868 419.9 8.603C425.6 14.34 428.5 21.6 428.5 30.4C428.5 39.19 425.6 46.46 419.9 52.19L394.6 78L423.9 78C450.3 78.77 471.9 87.75 488.6 104.1H488.6zM449.8 173.8C449.4 164.2 446.1 156.4 439.1 150.3C433.9 144.2 425.1 140.9 416.4 140.5H96.05C86.46 140.9 78.6 144.2 72.47 150.3C66.33 156.4 63.07 164.2 62.69 173.8V368.2C62.69 377.4 65.95 385.2 72.47 391.7C78.99 398.2 86.85 401.5 96.05 401.5H416.4C425.6 401.5 433.4 398.2 439.7 391.7C446 385.2 449.4 377.4 449.8 368.2L449.8 173.8zM185.5 216.5C191.8 222.8 195.2 230.6 195.6 239.7V273C195.2 282.2 191.9 289.9 185.8 296.2C179.6 302.5 171.8 305.7 162.2 305.7C152.6 305.7 144.7 302.5 138.6 296.2C132.5 289.9 129.2 282.2 128.8 273V239.7C129.2 230.6 132.6 222.8 138.9 216.5C145.2 210.2 152.1 206.9 162.2 206.5C171.4 206.9 179.2 210.2 185.5 216.5H185.5zM377 216.5C383.3 222.8 386.7 230.6 387.1 239.7V273C386.7 282.2 383.4 289.9 377.3 296.2C371.2 302.5 363.3 305.7 353.7 305.7C344.1 305.7 336.3 302.5 330.1 296.2C323.1 289.9 320.7 282.2 320.4 273V239.7C320.7 230.6 324.1 222.8 330.4 216.5C336.7 210.2 344.5 206.9 353.7 206.5C362.9 206.9 370.7 210.2 377 216.5H377z"/></svg>
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://github.com/SymphonyW'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>Home</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/post/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Blog</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/stats/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chart-bar" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="12" width="4" height="8" rx="1" />
+  <rect x="10" y="8" width="4" height="12" rx="1" />
+  <rect x="17" y="4" width="4" height="16" rx="1" />
+  <line x1="4" y1="20" x2="20" y2="20" />
+</svg>
+
+                
+                <span>Stats</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch" class="language-switcher">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <div class="language-switcher__tabs" aria-label="Language">
+                                <a class="language-switcher__tab is-current"
+                                        href="/p/3d-gaussian-splatting-principlesrebuilding-the-world-with-millions-of-gaussians-and-its-cost/"
+                                        aria-current="true">
+                                        English
+                                    </a>
+                                <a class="language-switcher__tab "
+                                        href="/zh-cn/p/3dgs-%E5%8E%9F%E7%90%86%E8%AF%A6%E8%A7%A3%E7%94%A8%E7%99%BE%E4%B8%87%E9%A2%97%E9%AB%98%E6%96%AF%E9%87%8D%E5%BB%BA%E4%B8%96%E7%95%8C%E5%8F%8A%E5%85%B6%E8%83%8C%E5%90%8E%E7%9A%84%E4%BB%A3%E4%BB%B7/"
+                                        >
+                                        中文
+                                    </a>
+                                
+                            </div>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>Dark Mode</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">Table of contents</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#目录">目录</a></li>
+    <li><a href="#一为什么需要-3dgs">一、为什么需要 3DGS</a></li>
+    <li><a href="#二整体流程一览">二、整体流程一览</a></li>
+    <li><a href="#三表示一个高斯长什么样">三、表示：一个高斯长什么样</a>
+      <ol>
+        <li><a href="#31-协方差的参数化技巧">3.1 协方差的参数化技巧</a></li>
+        <li><a href="#32-为什么用球谐sh而不是直接存-rgb">3.2 为什么用球谐（SH）而不是直接存 RGB？</a></li>
+      </ol>
+    </li>
+    <li><a href="#四渲染从-3d-椭球到像素">四、渲染：从 3D 椭球到像素</a>
+      <ol>
+        <li><a href="#41-投影3d-高斯--2d-高斯">4.1 投影：3D 高斯 → 2D 高斯</a></li>
+        <li><a href="#42-划分-tile">4.2 划分 Tile</a></li>
+        <li><a href="#43-深度排序">4.3 深度排序</a></li>
+        <li><a href="#44-alpha-混合">4.4 Alpha 混合</a></li>
+        <li><a href="#45-为什么这套渲染管线这么快">4.5 为什么这套渲染管线这么快？</a></li>
+      </ol>
+    </li>
+    <li><a href="#五训练自适应密度控制是灵魂">五、训练：自适应密度控制是灵魂</a>
+      <ol>
+        <li><a href="#51-三种密度操作">5.1 三种密度操作</a></li>
+        <li><a href="#52-训练损失">5.2 训练损失</a></li>
+        <li><a href="#53-训练流程">5.3 训练流程</a></li>
+      </ol>
+    </li>
+    <li><a href="#六与-nerf-的范式对决">六、与 NeRF 的范式对决</a></li>
+    <li><a href="#七3dgs-的六大缺陷">七、3DGS 的六大缺陷</a>
+      <ol>
+        <li><a href="#71-存储爆炸">7.1 存储爆炸</a></li>
+        <li><a href="#72-训练不算快">7.2 训练不算快</a></li>
+        <li><a href="#73-无法泛化">7.3 无法泛化</a></li>
+        <li><a href="#74-视觉伪影">7.4 视觉伪影</a></li>
+        <li><a href="#75-动态场景弱">7.5 动态场景弱</a></li>
+        <li><a href="#76-鲁棒性弱">7.6 鲁棒性弱</a></li>
+      </ol>
+    </li>
+    <li><a href="#八总结">八、总结</a>
+      <ol>
+        <li><a href="#81-3dgs-一句话总结">8.1 3DGS 一句话总结</a></li>
+        <li><a href="#82-它的核心贡献">8.2 它的核心贡献</a></li>
+        <li><a href="#83-它的根本代价">8.3 它的根本代价</a></li>
+      </ol>
+    </li>
+    <li><a href="#参考资料">参考资料</a></li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="has-image main-article">
+    <header class="article-header">
+        <div class="article-image">
+            <a href="/p/3d-gaussian-splatting-principlesrebuilding-the-world-with-millions-of-gaussians-and-its-cost/">
+                <img src="/p/3d-gaussian-splatting-principlesrebuilding-the-world-with-millions-of-gaussians-and-its-cost/bg_hue2a0d639f71003411058814a81015544_1765320_800x0_resize_box_3.png"
+                        srcset="/p/3d-gaussian-splatting-principlesrebuilding-the-world-with-millions-of-gaussians-and-its-cost/bg_hue2a0d639f71003411058814a81015544_1765320_800x0_resize_box_3.png 800w, /p/3d-gaussian-splatting-principlesrebuilding-the-world-with-millions-of-gaussians-and-its-cost/bg_hue2a0d639f71003411058814a81015544_1765320_1600x0_resize_box_3.png 1600w"
+                        width="800" 
+                        height="450" 
+                        loading="lazy"
+                        alt="Featured image of post 3D Gaussian Splatting Principles:Rebuilding the World with Millions of Gaussians and Its Cost" />
+                
+            </a>
+        </div>
+    
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/p/3d-gaussian-splatting-principlesrebuilding-the-world-with-millions-of-gaussians-and-its-cost/">3D Gaussian Splatting Principles:Rebuilding the World with Millions of Gaussians and Its Cost</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published">2026-07-13 21:43</time>
+            </div>
+        
+
+        
+    </footer>
+    
+
+    
+        <footer class="article-translations">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+            <div>
+                
+                    <a href="https://SymphonyW.github.io/zh-cn/p/3dgs-%E5%8E%9F%E7%90%86%E8%AF%A6%E8%A7%A3%E7%94%A8%E7%99%BE%E4%B8%87%E9%A2%97%E9%AB%98%E6%96%AF%E9%87%8D%E5%BB%BA%E4%B8%96%E7%95%8C%E5%8F%8A%E5%85%B6%E8%83%8C%E5%90%8E%E7%9A%84%E4%BB%A3%E4%BB%B7/" class="link">中文</a>
+                
+            </div>
+        </footer>
+    
+</div>
+
+</header>
+
+    
+    <section class="article-tags">
+        
+            <a href="/tags/3dgs/">3DGS</a>
+        
+            <a href="/tags/computer-vision/">Computer Vision</a>
+        
+            <a href="/tags/neural-rendering/">Neural Rendering</a>
+        
+    </section>
+
+
+    <section class="article-content">
+    
+    
+    <h1 id="3dgs-原理详解用百万颗高斯重建世界及其背后的代价">3DGS 原理详解：用百万颗高斯重建世界，及其背后的代价
+</h1><blockquote>
+<p>2023 年 SIGGRAPH 最佳论文 <strong>&ldquo;3D Gaussian Splatting for Real-Time Radiance Field Rendering&rdquo;</strong> 把&quot;神经辐射场&quot;从「一帧几秒」拉到了「实时 100 FPS」，从此新视角合成（Novel View Synthesis）这条赛道被彻底改写。本文从零讲清楚 3DGS 是怎么工作的、为什么这么快，以及它天生的几道&quot;硬伤&quot;。</p>
+</blockquote>
+<hr>
+<h2 id="目录">目录
+</h2><ul>
+<li><a class="link" href="#%e4%b8%80%e4%b8%ba%e4%bb%80%e4%b9%88%e9%9c%80%e8%a6%81-3dgs" >一、为什么需要 3DGS</a></li>
+<li><a class="link" href="#%e4%ba%8c%e6%95%b4%e4%bd%93%e6%b5%81%e7%a8%8b%e4%b8%80%e8%a7%88" >二、整体流程一览</a></li>
+<li><a class="link" href="#%e4%b8%89%e8%a1%a8%e7%a4%ba%e4%b8%80%e4%b8%aa%e9%ab%98%e6%96%af%e9%95%bf%e4%bb%80%e4%b9%88%e6%a0%b7" >三、表示：一个高斯长什么样</a></li>
+<li><a class="link" href="#%e5%9b%9b%e6%b8%b2%e6%9f%93%e4%bb%8e-3d-%e6%a4%ad%e7%90%83%e5%88%b0%e5%83%8f%e7%b4%a0" >四、渲染：从 3D 椭球到像素</a></li>
+<li><a class="link" href="#%e4%ba%94%e8%ae%ad%e7%bb%83%e8%87%aa%e9%80%82%e5%ba%94%e5%af%86%e5%ba%a6%e6%8e%a7%e5%88%b6%e6%98%af%e7%81%b5%e9%ad%82" >五、训练：自适应密度控制是灵魂</a></li>
+<li><a class="link" href="#%e5%85%ad%e4%b8%8e-nerf-%e7%9a%84%e8%8c%83%e5%bc%8f%e5%af%b9%e5%86%b3" >六、与 NeRF 的范式对决</a></li>
+<li><a class="link" href="#%e4%b8%833dgs-%e7%9a%84%e5%85%ad%e5%a4%a7%e7%bc%ba%e9%99%b7" >七、3DGS 的六大缺陷</a></li>
+<li><a class="link" href="#%e5%85%ab%e6%80%bb%e7%bb%93" >八、总结</a></li>
+</ul>
+<hr>
+<h2 id="一为什么需要-3dgs">一、为什么需要 3DGS
+</h2><p>新视角合成的目标是：<strong>给一组同一场景的多视角照片，训练出一个能从任意新视角渲染出照片级图像的模型</strong>。它的应用横跨 VR/AR、影视特效、数字孪生、自动驾驶仿真、文物数字化等领域。</p>
+<p>这条路上有两个关键节点：</p>
+<ol>
+<li><strong>NeRF（2020 ECCV）</strong>：用一个 MLP 把 <code>(位置, 方向)</code> 映射到 <code>(颜色, 密度)</code>，再通过体渲染方程积出像素颜色。质量惊艳，但<strong>每渲染一张图要几秒到几十秒</strong>——实时化遥不可及。</li>
+<li><strong>3DGS（2023 SIGGRAPH）</strong>：放弃隐式 MLP，改用一组<strong>显式 3D 高斯椭球</strong>直接表示场景，搭配<strong>定制化可微光栅化器</strong>，把渲染压到 <strong>100+ FPS</strong>。</li>
+</ol>
+<p>为什么 3DGS 这么关键？因为它证明了：<strong>高质量新视角合成不一定要走&quot;体渲染积分&quot;的老路，直接用一组显式基元做 α 混合就够了。</strong> 这一思路转变让 3DGS 的生态在两年内爆发式生长。</p>
+<hr>
+<h2 id="二整体流程一览">二、整体流程一览
+</h2><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="3dgs-pipeline.svg" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="3dgs-pipeline.svg" 
+             alt="3DGS 整体流程：从一组照片到实时新视角渲染" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">3DGS 整体流程：从一组照片到实时新视角渲染</span>
+    
+</div></p>
+<p>3DGS 的完整生命周期可以拆成 5 步：</p>
+<ol>
+<li><strong>输入图像</strong>：100~300 张多视角照片，相机姿态已知（通常由 COLMAP 估计）。</li>
+<li><strong>SfM 初始化</strong>：用运动恢复结构（SfM）得到稀疏点云，作为高斯椭球的初始位置。</li>
+<li><strong>构建 3D 高斯集合</strong>：每个稀疏点扩展为一个完整的 3D 高斯（位置 + 协方差 + 颜色 + 不透明度）。</li>
+<li><strong>训练优化</strong>：随机梯度下降，配合<strong>自适应密度控制</strong>（克隆 / 分裂 / 剪枝）调整高斯数量。</li>
+<li><strong>实时渲染</strong>：用专用光栅化器把所有高斯投影、排序、α 混合成像素。</li>
+</ol>
+<blockquote>
+<p>一个关键认知：训练完成后得到的只是一个 <code>.ply</code> 文件，<strong>推理阶段不需要任何神经网络</strong>，整个渲染就是 GPU 上的几何运算 + 颜色混合。</p>
+</blockquote>
+<hr>
+<h2 id="三表示一个高斯长什么样">三、表示：一个高斯长什么样
+</h2><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="gaussian-anatomy.svg" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="gaussian-anatomy.svg" 
+             alt="单个 3D 高斯的解剖：5 类可优化属性" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">单个 3D 高斯的解剖：5 类可优化属性</span>
+    
+</div></p>
+<p>3DGS 不用体素、不用 MLP，而是把场景表示为<strong>百万级个 3D 高斯椭球</strong>。每个高斯有 5 类可优化属性：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>属性</th>
+<th>含义</th>
+<th>参数量</th>
+<th>激活方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>位置 μ</td>
+<td>高斯椭球的中心</td>
+<td>3</td>
+<td>直接优化</td>
+</tr>
+<tr>
+<td>缩放 s</td>
+<td>椭球的半轴长度</td>
+<td>3</td>
+<td>指数激活（保证非负）</td>
+</tr>
+<tr>
+<td>旋转 q</td>
+<td>椭球的朝向（四元数）</td>
+<td>4</td>
+<td>归一化后使用</td>
+</tr>
+<tr>
+<td>不透明度 α</td>
+<td>渲染时的&quot;权重&quot;</td>
+<td>1</td>
+<td>Sigmoid</td>
+</tr>
+<tr>
+<td>颜色（SH 系数）</td>
+<td>视角相关颜色</td>
+<td>48（3 阶 SH）</td>
+<td>球谐求值</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="31-协方差的参数化技巧">3.1 协方差的参数化技巧
+</h3><p>直接学习一个 3×3 的协方差矩阵 Σ 有两个坑：</p>
+<ul>
+<li>必须是<strong>半正定</strong>的，否则不是合法的协方差；</li>
+<li>9 个参数冗余，优化困难。</li>
+</ul>
+<p>3DGS 的做法是把它<strong>分解为缩放 s 和旋转 R</strong>：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">Σ = R · diag(s) · diag(s)ᵀ · Rᵀ
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这样只需要 7 个参数（3 个缩放 + 4 个四元数），且<strong>自动半正定</strong>，对优化器友好。</p>
+<h3 id="32-为什么用球谐sh而不是直接存-rgb">3.2 为什么用球谐（SH）而不是直接存 RGB？
+</h3><p>真实世界里，<strong>同一个点从不同角度看，颜色是不一样的</strong>——金属的高光、玻璃的反射、毛发的次表面散射都是典型。直接存一个 RGB 就丢失了这种视角依赖。</p>
+<p>3DGS 借鉴 NeRF 的做法，用**球谐函数（Spherical Harmonics, SH）**来表达颜色——给定观察方向 d，通过 SH 基函数求值得到 RGB。原论文用 3 阶 SH（共 48 个系数），足以刻画大多数视角相关的着色效果。</p>
+<hr>
+<h2 id="四渲染从-3d-椭球到像素">四、渲染：从 3D 椭球到像素
+</h2><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="rasterization-flow.svg" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="rasterization-flow.svg" 
+             alt="可微光栅化：3D 高斯如何变成像素" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">可微光栅化：3D 高斯如何变成像素</span>
+    
+</div></p>
+<p>3DGS 真正的杀手锏是它的<strong>可微光栅化器</strong>。它把传统图形学的高性能光栅化流水线，改造成了完全可微的版本。整个过程分 4 步：</p>
+<h3 id="41-投影3d-高斯--2d-高斯">4.1 投影：3D 高斯 → 2D 高斯
+</h3><p>3D 高斯在世界坐标系下是一个椭球。渲染时，要把它&quot;压&quot;到屏幕空间。</p>
+<p>数学上，这个过程是通过<strong>投影雅可比矩阵 J</strong>完成的：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">Σ&#39; = J · W · Σ · Wᵀ · Jᵀ
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>其中 W 是世界到相机的变换，J 是投影的局部线性化。Σ&rsquo; 就是 2D 屏幕空间下的协方差矩阵——一个 2×2 的椭圆。</p>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="splatting-concept.svg" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="splatting-concept.svg" 
+             alt="Splatting 是什么：3D 椭球&amp;quot;压扁&amp;quot;成 2D 色块" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">Splatting 是什么：3D 椭球&amp;quot;压扁&amp;quot;成 2D 色块</span>
+    
+</div></p>
+<blockquote>
+<p>这一步是 3DGS 与传统体渲染最大的不同：<strong>它不是采样射线，而是直接把所有高斯&quot;喷&quot;（splat）到屏幕上</strong>。</p>
+</blockquote>
+<h3 id="42-划分-tile">4.2 划分 Tile
+</h3><p>屏幕被切成 16×16 的网格。每个 2D 高斯根据其覆盖范围，<strong>被分配到一个或多个 Tile</strong>。同时做两件事剔除：</p>
+<ul>
+<li><strong>视锥剔除</strong>：完全在视锥外的高斯直接丢弃；</li>
+<li><strong>远处裁剪</strong>：太远的高斯直接剔除（避免无效贡献）。</li>
+</ul>
+<h3 id="43-深度排序">4.3 深度排序
+</h3><p>α 混合必须<strong>从前到后</strong>进行（否则会有错误的遮挡）。3DGS 在每个 Tile 内对高斯按视点距离排序——这里用了一个 GPU 友好的<strong>单 pass 基数排序</strong>，是速度的关键之一。</p>
+<h3 id="44-alpha-混合">4.4 Alpha 混合
+</h3><p>每个像素的颜色由所有覆盖它的高斯按顺序累积：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">C = Σᵢ  cᵢ · αᵢ · ∏ⱼ&lt;ᵢ (1 − αⱼ)
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>其中：</p>
+<ul>
+<li><code>cᵢ</code>：第 i 个高斯在该视角下的颜色（由 SH 求值）；</li>
+<li><code>αᵢ</code>：不透明度 × 该像素在 2D 高斯分布下的取值；</li>
+<li><code>Tᵢ = ∏ⱼ&lt;ᵢ (1 − αⱼ)</code>：透射率，表示&quot;剩余多少光&quot;。</li>
+</ul>
+<p><strong>优化技巧</strong>：当 <code>Tᵢ</code> 趋近 0 时，说明后续高斯被完全遮挡，可以直接 <code>break</code> 跳过——大幅节省渲染开销。</p>
+<h3 id="45-为什么这套渲染管线这么快">4.5 为什么这套渲染管线这么快？
+</h3><ul>
+<li><strong>不走神经网络前向</strong>，没有 MLP 计算；</li>
+<li><strong>Tile 并行</strong>：一个 GPU 线程块处理一个 Tile，并行度极高；</li>
+<li><strong>提前终止</strong>：T→0 时跳过被遮挡高斯。</li>
+</ul>
+<p>这就是为什么 3DGS 能在 1080p 下跑到 100+ FPS，而 NeRF 同尺寸场景只能跑几秒一张。</p>
+<hr>
+<h2 id="五训练自适应密度控制是灵魂">五、训练：自适应密度控制是灵魂
+</h2><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="adaptive-control.svg" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="adaptive-control.svg" 
+             alt="自适应密度控制：3DGS 训练的灵魂" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">自适应密度控制：3DGS 训练的灵魂</span>
+    
+</div></p>
+<p>只靠 SGD 优化高斯属性是<strong>不够的</strong>——SfM 给出的初始点云非常稀疏（几万个点），无法表达复杂场景。3DGS 的核心创新之一是<strong>自适应密度控制（Adaptive Density Control）</strong>：每 100 次迭代触发一次密度调整，根据每个高斯的&quot;位置梯度&quot;和&quot;大小&quot;决定下一步动作。</p>
+<h3 id="51-三种密度操作">5.1 三种密度操作
+</h3><div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>操作</th>
+<th>触发条件</th>
+<th>物理含义</th>
+<th>具体动作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>克隆 Clone</strong></td>
+<td>小高斯 + 位置梯度大</td>
+<td>欠重建区域，需要更多高斯</td>
+<td>复制一份并随机位移</td>
+</tr>
+<tr>
+<td><strong>分裂 Split</strong></td>
+<td>大高斯 + 位置梯度大</td>
+<td>一个高斯覆盖太大，需细分</td>
+<td>替换为 2 个更小的高斯</td>
+</tr>
+<tr>
+<td><strong>剪枝 Prune</strong></td>
+<td>α &lt; ε / 过大 / SH 重置</td>
+<td>该高斯对渲染几乎没贡献</td>
+<td>直接删除</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>位置梯度大</strong>意味着：这个高斯&quot;想要&quot;往某个方向移动，说明当前几何表示不到位。3DGS 用这个信号判断哪些区域需要更精细的几何。</p>
+<h3 id="52-训练损失">5.2 训练损失
+</h3><p>3DGS 用一个简单的组合损失：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">L = (1 − λ) · L1 + λ · D-SSIM
+</span></span></code></pre></td></tr></table>
+</div>
+</div><ul>
+<li><code>L1</code>：像素级绝对误差，保证整体颜色准确；</li>
+<li><code>D-SSIM</code>：结构相似度的 1-SSIM 版本，保证结构和感知质量；</li>
+<li><code>λ = 0.2</code> 在大多数场景下表现良好。</li>
+</ul>
+<h3 id="53-训练流程">5.3 训练流程
+</h3><ol>
+<li>用 SfM 稀疏点云初始化每个高斯的位置；</li>
+<li>高斯大小、旋转、颜色初始值用启发式设定（如平均距离）；</li>
+<li>每 100 步触发一次密度控制；</li>
+<li>训练 30000 步左右收敛，单场景约 30~45 分钟。</li>
+</ol>
+<blockquote>
+<p>这套机制的妙处在于：<strong>初始只有几万个高斯，最终能膨胀到几百万个</strong>——数量自动匹配场景复杂度，比固定分辨率网格灵活得多。</p>
+</blockquote>
+<hr>
+<h2 id="六与-nerf-的范式对决">六、与 NeRF 的范式对决
+</h2><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="3dgs-vs-nerf.svg" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="3dgs-vs-nerf.svg" 
+             alt="NeRF vs 3DGS：两种范式的对决" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">NeRF vs 3DGS：两种范式的对决</span>
+    
+</div></p>
+<p>3DGS 与 NeRF 经常被放在一起对比，因为它们解决的是同一类问题。这里做一个全面的对照：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>维度</th>
+<th>NeRF</th>
+<th>3DGS</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>表示方式</td>
+<td>隐式（MLP）</td>
+<td>显式（高斯集合）</td>
+</tr>
+<tr>
+<td>模型大小</td>
+<td>紧凑（MB 级）</td>
+<td>庞大（数百 MB ~ GB）</td>
+</tr>
+<tr>
+<td>渲染速度</td>
+<td>慢（秒级 / 张）</td>
+<td>快（100+ FPS）</td>
+</tr>
+<tr>
+<td>训练时间</td>
+<td>几小时</td>
+<td>30~45 分钟</td>
+</tr>
+<tr>
+<td>几何平滑性</td>
+<td>平滑，无悬浮</td>
+<td>容易产生悬浮物</td>
+</tr>
+<tr>
+<td>可编辑性</td>
+<td>困难</td>
+<td>直接操作高斯即可</td>
+</tr>
+<tr>
+<td>视角相关性</td>
+<td>强（依赖方向 d）</td>
+<td>强（依赖 SH）</td>
+</tr>
+<tr>
+<td>像素独立计算</td>
+<td>是（射线采样）</td>
+<td>否（Tile 共享排序）</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>核心差异在渲染范式</strong>：NeRF 走&quot;逐像素射线采样 + 体渲染积分&quot;，每个像素都要做几十~几百次 MLP 前向；3DGS 走&quot;Tile + α 混合&quot;，所有高斯一次性光栅化到屏幕。</p>
+<p>3DGS 之所以能赢下实时性，本质上是把&quot;每像素都要重复做的昂贵计算&quot;换成了&quot;一次性光栅化的廉价操作&quot;。</p>
+<hr>
+<h2 id="七3dgs-的六大缺陷">七、3DGS 的六大缺陷
+</h2><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="limitations-overview.svg" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="limitations-overview.svg" 
+             alt="3DGS 的六大缺陷全景" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">3DGS 的六大缺陷全景</span>
+    
+</div></p>
+<p>3DGS 并不完美。事实上，原论文本身就公开承认了这些局限，而过去两年大量后续工作都是围绕它们做&quot;打补丁&quot;。下面详细展开六大缺陷。</p>
+<h3 id="71-存储爆炸">7.1 存储爆炸
+</h3><p>这是最显眼的问题。一个 3D 高斯需要存储：</p>
+<ul>
+<li>位置 3 + 缩放 3 + 旋转 4 + 不透明度 1 + SH(3 阶) 48 = <strong>59 个 float ≈ 236 字节</strong></li>
+</ul>
+<p>一个无边界场景通常有 <strong>百万级</strong>高斯，单场景动辄 200~700 MB。这意味着：</p>
+<ul>
+<li><strong>移动端 / Web 端难以部署</strong>：浏览器加载一个 500MB 的 <code>.ply</code> 不现实；</li>
+<li><strong>存储成本飙升</strong>：一个数字孪生项目要存数百个场景，就是几十~几百 GB；</li>
+<li><strong>传输带宽吃紧</strong>：流式渲染 4K 场景对网络要求极高。</li>
+</ul>
+<blockquote>
+<p>这也是我之前那个 <a class="link" href="../3dgs-platform-dev-log/" >3DGS 压缩分析平台</a> 的核心动机——压缩几乎是 3DGS 落地的必经之路。</p>
+</blockquote>
+<p><strong>代表后续工作</strong>：LightGaussian（剪枝 + SH 蒸馏 + VQ 量化）、CompGS、SOG、EulerGS、3DGS 量化剪枝等，目标压缩比 10×~50×。</p>
+<h3 id="72-训练不算快">7.2 训练不算快
+</h3><p>虽然 3DGS 训练比 NeRF 快很多，但 30~45 分钟 / 场景在工业场景仍偏慢。更严重的问题是：</p>
+<ul>
+<li><strong>显存占用大</strong>：训练时百万高斯需要 24GB+ 显存；</li>
+<li><strong>密度膨胀期显存飙升</strong>：分裂操作会让高斯数量在某个阶段爆炸式增长；</li>
+<li><strong>难以分钟级训练</strong>：交互式应用（如实时重建）几乎不可行。</li>
+</ul>
+<p><strong>代表后续工作</strong>：Mip-Splatting（抗锯齿）、AbsGrad（绝对梯度策略，加速收敛）、Warm-start 初始化等。</p>
+<h3 id="73-无法泛化">7.3 无法泛化
+</h3><p>3DGS 必须<strong>每场景独立训练</strong>，不能&quot;喂一张新图就出模型&quot;。少样本（few-shot）场景下，高斯密度控制很容易崩塌——没有足够的视角监督，高斯会胡乱增长。</p>
+<p>这与生俱来的限制让 3DGS 难以应用在：</p>
+<ul>
+<li>AR 实时建模（用户拍几张照就出模型）；</li>
+<li>机器人感知（环境快速重建）；</li>
+<li>大规模城市采集（场景太多，逐个训练不现实）。</li>
+</ul>
+<p><strong>代表后续工作</strong>：PixelSplat、MVSplat、Splatter Image、LRM-Gauss 等——这些工作用 transformer 前馈网络直接从图像预测高斯参数，1 秒推理出模型，但质量仍不及原始 3DGS。</p>
+<h3 id="74-视觉伪影">7.4 视觉伪影
+</h3><p>3DGS 的渲染常见几类伪影：</p>
+<ul>
+<li><strong>悬浮高斯（Floaters / &ldquo;飞虫&rdquo;）</strong>：训练过程中没有被剪掉的离群高斯，会在视角移动时出现在场景中&quot;飘&quot;的小色块；</li>
+<li><strong>&ldquo;弹出&quot;伪影（Popping）</strong>：视角切换时某些高斯突然出现/消失，因为密度控制在不同视角下表现不一致；</li>
+<li><strong>缩放锯齿</strong>：放大场景时，2D 高斯投影的离散性导致锯齿严重；</li>
+<li><strong>远距离模糊</strong>：远处高斯采样不足，渲染时模糊。</li>
+</ul>
+<p>这些问题大多源于一个根本原因：<strong>3DGS 用&quot;离散点集 + 各向异性高斯&quot;近似连续场景，在高频细节和反走样处理上天生不如体渲染</strong>。</p>
+<p><strong>代表后续工作</strong>：Mip-Splatting（3D 平滑滤波 + 屏幕空间膨胀，是当前抗锯齿的事实标准）、3DGS 正则化、深度一致性损失等。</p>
+<h3 id="75-动态场景弱">7.5 动态场景弱
+</h3><p>原版 3DGS 只支持<strong>静态场景</strong>。一旦场景中有运动物体，或者要做长视频重建，问题就出现了：</p>
+<ul>
+<li>高斯没有时间维度，无法表达运动；</li>
+<li>直接逐帧训练会导致帧间不一致（&ldquo;闪烁&rdquo;）；</li>
+<li>长视频的存储和计算成本爆炸。</li>
+</ul>
+<p><strong>代表后续工作</strong>：4DGS、Deformable 3DGS（用形变场建模时间）、Dynamic 3D Gaussians、SC-GS（用控制网格驱动高斯运动）等。</p>
+<h3 id="76-鲁棒性弱">7.6 鲁棒性弱
+</h3><p>3DGS 强依赖 <strong>SfM 点云质量</strong>：</p>
+<ul>
+<li>纹理稀疏区域（如白墙、天空）SfM 给不出点，3DGS 重建直接失败；</li>
+<li>反光、透明物体 SfM 误差大，3DGS 跟着出错；</li>
+<li>大场景下 SfM 漂移，导致重建几何偏差。</li>
+</ul>
+<p>此外，3DGS 对<strong>初始化超参数</strong>也比较敏感——初始高斯大小、密度控制阈值等都需要场景相关调参。</p>
+<p><strong>代表后续工作</strong>：无 SfM 初始化（如随机点云、均匀采样）、深度监督（用 monodepth 先验）、GS-SLAM 类方法（在线增量重建）等。</p>
+<hr>
+<h2 id="八总结">八、总结
+</h2><h3 id="81-3dgs-一句话总结">8.1 3DGS 一句话总结
+</h3><blockquote>
+<p><strong>3DGS = 显式高斯表示 + 可微光栅化 + 自适应密度控制。</strong></p>
+</blockquote>
+<p>它把&quot;高质量新视角合成&quot;从&quot;实验室 demo&quot;推向了&quot;实时交互&rdquo;，是过去两年计算机视觉最有影响力的工作之一。</p>
+<h3 id="82-它的核心贡献">8.2 它的核心贡献
+</h3><ol>
+<li><strong>表示</strong>：用百万级 3D 高斯显式建模场景，可微可优化；</li>
+<li><strong>渲染</strong>：定制可微光栅化器，把神经渲染速度提升两个数量级；</li>
+<li><strong>训练</strong>：自适应密度控制（克隆 / 分裂 / 剪枝）让表示自适应场景复杂度。</li>
+</ol>
+<h3 id="83-它的根本代价">8.3 它的根本代价
+</h3><div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>速度</th>
+<th>→</th>
+<th>牺牲了存储（数百 MB / 场景）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>显式性</td>
+<td>→</td>
+<td>牺牲了几何平滑性（悬浮伪影）</td>
+</tr>
+<tr>
+<td>自适应</td>
+<td>→</td>
+<td>牺牲了训练稳定性（对初始化敏感）</td>
+</tr>
+<tr>
+<td>实时性</td>
+<td>→</td>
+<td>牺牲了泛化能力（每场景重训）</td>
+</tr>
+</tbody>
+</table></div>
+<p>每一次&quot;快&quot;的背后，都对应着一个&quot;慢&quot;的代价——这正是 3DGS 生态持续生长的动力。理解了这些缺陷，你就能更准确地选择何时用 3DGS、何时该走 NeRF 路线、何时该用混合方案。</p>
+<hr>
+<h2 id="参考资料">参考资料
+</h2><ul>
+<li>原论文：<a class="link" href="https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/"  target="_blank" rel="noopener"
+    >3D Gaussian Splatting for Real-Time Radiance Field Rendering (SIGGRAPH 2023)</a></li>
+<li>项目主页：<a class="link" href="https://github.com/graphdeco-inria/gaussian-splatting"  target="_blank" rel="noopener"
+    >https://github.com/graphdeco-inria/gaussian-splatting</a></li>
+<li>Mip-Splatting：<a class="link" href="https://github.com/nerfstudio-project/gsplat"  target="_blank" rel="noopener"
+    >https://github.com/nerfstudio-project/gsplat</a></li>
+<li>LightGaussian：<a class="link" href="https://lightgaussian.github.io/"  target="_blank" rel="noopener"
+    >https://lightgaussian.github.io/</a></li>
+</ul>
+<hr>
+<blockquote>
+<p>本文是 <a class="link" href="../3dgs-platform-dev-log/" >3DGS 压缩分析平台开发日志</a> 的姊妹篇——前者讲平台工程，本文讲清背后的算法原理。两者结合阅读，效果更佳。</p>
+</blockquote>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/3dgs/">3DGS</a>
+        
+            <a href="/tags/computer-vision/">Computer Vision</a>
+        
+            <a href="/tags/neural-rendering/">Neural Rendering</a>
+        
+    </section>
+
+
+    </footer>
+
+
+    
+</article>
+
+    
+
+    
+
+     
+    
+        
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+        2026 SymphonyW
+    </section>
+    
+    <section class="powerby">
+        Built with <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> <br />
+        Theme <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.26.0">Stack</a></b> designed by <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a>
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.js" defer></script><script type="text/javascript" src="/ts/custom.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+<script>
+window.MathJax = {
+  tex: {
+    
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  svg: {
+    fontCache: 'global'
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    </body>
+</html>
