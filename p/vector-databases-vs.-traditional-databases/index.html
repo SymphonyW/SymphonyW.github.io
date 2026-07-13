@@ -1,0 +1,1949 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="向量数据库与传统数据库 在传统的软件系统中，数据库主要负责存储用户、订单、商品、日志等结构化数据。当我们需要查询某个用户时，通常会使用用户 ID、手机号或者用户名作为条件。 例如： 1 2 3 SELECT * FROM users WHERE username = &#39;zhangsan&#39;; 这种查询的特点是：查询条件明确，数据库需要找到精确匹配的数据。 但是在人工智能应用中，我们可能会遇到另一类问题： 找出与这段文字含义最接近的文章。 找到与当前商品风格相似的商品。 根据一张图片搜索视觉上相似的图片。 从知识库中找到能够回答用户问题的内容。 判断两段代码是否实现了相似的功能。 这些问题很难仅通过 =、LIKE 或普通关键字查询解决。 向量数据库正是为了解决这类“相似性检索”问题而出现的。 flowchart LR A[传统数据库] --> B[精确匹配] A --> C[范围查询] A --> D[事务处理] E[向量数据库] --> F[语义相似度搜索] E --> G[图片相似度搜索] E --> H[多模态检索] 什么是传统数据库 传统数据库通常指关系型数据库，以及部分通用型 NoSQL 数据库，例如： MySQL PostgreSQL Oracle SQL Server MongoDB Redis 关系型数据库将数据组织成表，每张表由行和列构成。 例如，一个商品表可能是： id name category price stock 1001 机械键盘 外设 399 20 1002 无线鼠标 外设 199 35 1003 显示器 显示设备 1599 8 我们可以按照字段进行精确查询：">
+<title>Vector Databases vs. Traditional Databases</title>
+
+<link rel='canonical' href='https://SymphonyW.github.io/p/vector-databases-vs.-traditional-databases/'>
+
+<link rel="stylesheet" href="/scss/style.min.1251edbd5d2188d23e73b1b3b4438816c788f1a85abbe07d1ccd04b6713bba76.css"><meta property='og:title' content="Vector Databases vs. Traditional Databases">
+<meta property='og:description' content="向量数据库与传统数据库 在传统的软件系统中，数据库主要负责存储用户、订单、商品、日志等结构化数据。当我们需要查询某个用户时，通常会使用用户 ID、手机号或者用户名作为条件。 例如： 1 2 3 SELECT * FROM users WHERE username = &#39;zhangsan&#39;; 这种查询的特点是：查询条件明确，数据库需要找到精确匹配的数据。 但是在人工智能应用中，我们可能会遇到另一类问题： 找出与这段文字含义最接近的文章。 找到与当前商品风格相似的商品。 根据一张图片搜索视觉上相似的图片。 从知识库中找到能够回答用户问题的内容。 判断两段代码是否实现了相似的功能。 这些问题很难仅通过 =、LIKE 或普通关键字查询解决。 向量数据库正是为了解决这类“相似性检索”问题而出现的。 flowchart LR A[传统数据库] --> B[精确匹配] A --> C[范围查询] A --> D[事务处理] E[向量数据库] --> F[语义相似度搜索] E --> G[图片相似度搜索] E --> H[多模态检索] 什么是传统数据库 传统数据库通常指关系型数据库，以及部分通用型 NoSQL 数据库，例如： MySQL PostgreSQL Oracle SQL Server MongoDB Redis 关系型数据库将数据组织成表，每张表由行和列构成。 例如，一个商品表可能是： id name category price stock 1001 机械键盘 外设 399 20 1002 无线鼠标 外设 199 35 1003 显示器 显示设备 1599 8 我们可以按照字段进行精确查询：">
+<meta property='og:url' content='https://SymphonyW.github.io/p/vector-databases-vs.-traditional-databases/'>
+<meta property='og:site_name' content='SymphonyW'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='Vector Database' /><meta property='article:tag' content='Database' /><meta property='article:tag' content='RAG' /><meta property='article:published_time' content='2026-07-13T21:24:23&#43;08:00'/><meta property='article:modified_time' content='2026-07-13T21:24:23&#43;08:00'/><meta property='og:image' content='https://SymphonyW.github.io/p/vector-databases-vs.-traditional-databases/bg.png' />
+<meta name="twitter:title" content="Vector Databases vs. Traditional Databases">
+<meta name="twitter:description" content="向量数据库与传统数据库 在传统的软件系统中，数据库主要负责存储用户、订单、商品、日志等结构化数据。当我们需要查询某个用户时，通常会使用用户 ID、手机号或者用户名作为条件。 例如： 1 2 3 SELECT * FROM users WHERE username = &#39;zhangsan&#39;; 这种查询的特点是：查询条件明确，数据库需要找到精确匹配的数据。 但是在人工智能应用中，我们可能会遇到另一类问题： 找出与这段文字含义最接近的文章。 找到与当前商品风格相似的商品。 根据一张图片搜索视觉上相似的图片。 从知识库中找到能够回答用户问题的内容。 判断两段代码是否实现了相似的功能。 这些问题很难仅通过 =、LIKE 或普通关键字查询解决。 向量数据库正是为了解决这类“相似性检索”问题而出现的。 flowchart LR A[传统数据库] --> B[精确匹配] A --> C[范围查询] A --> D[事务处理] E[向量数据库] --> F[语义相似度搜索] E --> G[图片相似度搜索] E --> H[多模态检索] 什么是传统数据库 传统数据库通常指关系型数据库，以及部分通用型 NoSQL 数据库，例如： MySQL PostgreSQL Oracle SQL Server MongoDB Redis 关系型数据库将数据组织成表，每张表由行和列构成。 例如，一个商品表可能是： id name category price stock 1001 机械键盘 外设 399 20 1002 无线鼠标 外设 199 35 1003 显示器 显示设备 1599 8 我们可以按照字段进行精确查询："><meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content='https://SymphonyW.github.io/p/vector-databases-vs.-traditional-databases/bg.png' />
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="Toggle Menu">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hua20e9d08cce84e79524a418ee5d4524c_7426_300x0_resize_box_3.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">😁</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">SymphonyW</a></h1>
+            <h2 class="site-description">Welcome to my Blog.</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0'
+                        target="_blank"
+                        title="Bilibili"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.0.0-beta2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M488.6 104.1C505.3 122.2 513 143.8 511.9 169.8V372.2C511.5 398.6 502.7 420.3 485.4 437.3C468.2 454.3 446.3 463.2 419.9 464H92.02C65.57 463.2 43.81 454.2 26.74 436.8C9.682 419.4 .7667 396.5 0 368.2V169.8C.7667 143.8 9.682 122.2 26.74 104.1C43.81 87.75 65.57 78.77 92.02 78H121.4L96.05 52.19C90.3 46.46 87.42 39.19 87.42 30.4C87.42 21.6 90.3 14.34 96.05 8.603C101.8 2.868 109.1 0 117.9 0C126.7 0 134 2.868 139.8 8.603L213.1 78H301.1L375.6 8.603C381.7 2.868 389.2 0 398 0C406.8 0 414.1 2.868 419.9 8.603C425.6 14.34 428.5 21.6 428.5 30.4C428.5 39.19 425.6 46.46 419.9 52.19L394.6 78L423.9 78C450.3 78.77 471.9 87.75 488.6 104.1H488.6zM449.8 173.8C449.4 164.2 446.1 156.4 439.1 150.3C433.9 144.2 425.1 140.9 416.4 140.5H96.05C86.46 140.9 78.6 144.2 72.47 150.3C66.33 156.4 63.07 164.2 62.69 173.8V368.2C62.69 377.4 65.95 385.2 72.47 391.7C78.99 398.2 86.85 401.5 96.05 401.5H416.4C425.6 401.5 433.4 398.2 439.7 391.7C446 385.2 449.4 377.4 449.8 368.2L449.8 173.8zM185.5 216.5C191.8 222.8 195.2 230.6 195.6 239.7V273C195.2 282.2 191.9 289.9 185.8 296.2C179.6 302.5 171.8 305.7 162.2 305.7C152.6 305.7 144.7 302.5 138.6 296.2C132.5 289.9 129.2 282.2 128.8 273V239.7C129.2 230.6 132.6 222.8 138.9 216.5C145.2 210.2 152.1 206.9 162.2 206.5C171.4 206.9 179.2 210.2 185.5 216.5H185.5zM377 216.5C383.3 222.8 386.7 230.6 387.1 239.7V273C386.7 282.2 383.4 289.9 377.3 296.2C371.2 302.5 363.3 305.7 353.7 305.7C344.1 305.7 336.3 302.5 330.1 296.2C323.1 289.9 320.7 282.2 320.4 273V239.7C320.7 230.6 324.1 222.8 330.4 216.5C336.7 210.2 344.5 206.9 353.7 206.5C362.9 206.9 370.7 210.2 377 216.5H377z"/></svg>
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://github.com/SymphonyW'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>Home</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/post/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Blog</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/stats/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chart-bar" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="12" width="4" height="8" rx="1" />
+  <rect x="10" y="8" width="4" height="12" rx="1" />
+  <rect x="17" y="4" width="4" height="16" rx="1" />
+  <line x1="4" y1="20" x2="20" y2="20" />
+</svg>
+
+                
+                <span>Stats</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch" class="language-switcher">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <div class="language-switcher__tabs" aria-label="Language">
+                                <a class="language-switcher__tab is-current"
+                                        href="/p/vector-databases-vs.-traditional-databases/"
+                                        aria-current="true">
+                                        English
+                                    </a>
+                                <a class="language-switcher__tab "
+                                        href="/zh-cn/p/%E5%90%91%E9%87%8F%E6%95%B0%E6%8D%AE%E5%BA%93%E4%B8%8E%E4%BC%A0%E7%BB%9F%E6%95%B0%E6%8D%AE%E5%BA%93/"
+                                        >
+                                        中文
+                                    </a>
+                                
+                            </div>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>Dark Mode</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">Table of contents</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#什么是传统数据库">什么是传统数据库</a></li>
+    <li><a href="#什么是向量">什么是向量</a></li>
+    <li><a href="#什么是向量数据库">什么是向量数据库</a></li>
+    <li><a href="#向量数据库与传统数据库的核心区别">向量数据库与传统数据库的核心区别</a></li>
+    <li><a href="#精确查询与相似度查询">精确查询与相似度查询</a></li>
+    <li><a href="#向量相似度如何计算">向量相似度如何计算</a>
+      <ol>
+        <li><a href="#余弦相似度">余弦相似度</a></li>
+      </ol>
+    </li>
+    <li><a href="#为什么不能直接遍历所有向量">为什么不能直接遍历所有向量</a></li>
+    <li><a href="#常见的向量索引">常见的向量索引</a>
+      <ol>
+        <li><a href="#hnsw">HNSW</a></li>
+        <li><a href="#ivf">IVF</a></li>
+        <li><a href="#pq">PQ</a></li>
+      </ol>
+    </li>
+    <li><a href="#向量数据库的基本数据模型">向量数据库的基本数据模型</a></li>
+    <li><a href="#向量数据库如何应用于-rag">向量数据库如何应用于 RAG</a></li>
+    <li><a href="#向量数据库不能替代传统数据库">向量数据库不能替代传统数据库</a></li>
+    <li><a href="#关键字搜索与向量搜索">关键字搜索与向量搜索</a></li>
+    <li><a href="#混合检索">混合检索</a></li>
+    <li><a href="#向量搜索的-top-k">向量搜索的 Top-K</a></li>
+    <li><a href="#文档为什么需要分块">文档为什么需要分块</a></li>
+    <li><a href="#一个简单的向量检索示例">一个简单的向量检索示例</a></li>
+    <li><a href="#向量数据库的典型应用场景">向量数据库的典型应用场景</a>
+      <ol>
+        <li><a href="#rag-知识库">RAG 知识库</a></li>
+        <li><a href="#语义搜索">语义搜索</a></li>
+        <li><a href="#推荐系统">推荐系统</a></li>
+        <li><a href="#图片搜索">图片搜索</a></li>
+        <li><a href="#多模态检索">多模态检索</a></li>
+        <li><a href="#代码搜索">代码搜索</a></li>
+        <li><a href="#异常检测">异常检测</a></li>
+      </ol>
+    </li>
+    <li><a href="#如何选择数据库">如何选择数据库</a></li>
+    <li><a href="#使用向量数据库时需要关注什么">使用向量数据库时需要关注什么</a>
+      <ol>
+        <li><a href="#embedding-模型">Embedding 模型</a></li>
+        <li><a href="#向量维度">向量维度</a></li>
+        <li><a href="#召回率">召回率</a></li>
+        <li><a href="#数据更新">数据更新</a></li>
+        <li><a href="#元数据过滤">元数据过滤</a></li>
+        <li><a href="#数据一致性">数据一致性</a></li>
+      </ol>
+    </li>
+    <li><a href="#常见误区">常见误区</a>
+      <ol>
+        <li><a href="#向量数据库就是大语言模型数据库">向量数据库就是大语言模型数据库</a></li>
+        <li><a href="#向量数据库可以直接回答问题">向量数据库可以直接回答问题</a></li>
+        <li><a href="#向量维度越高越好">向量维度越高越好</a></li>
+        <li><a href="#使用向量数据库就不需要传统数据库">使用向量数据库就不需要传统数据库</a></li>
+        <li><a href="#相似度最高的内容一定正确">相似度最高的内容一定正确</a></li>
+      </ol>
+    </li>
+    <li><a href="#总结">总结</a></li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="has-image main-article">
+    <header class="article-header">
+        <div class="article-image">
+            <a href="/p/vector-databases-vs.-traditional-databases/">
+                <img src="/p/vector-databases-vs.-traditional-databases/bg_hu040920c01aa01bd4e2daf37dcdbf48b8_1226831_800x0_resize_box_3.png"
+                        srcset="/p/vector-databases-vs.-traditional-databases/bg_hu040920c01aa01bd4e2daf37dcdbf48b8_1226831_800x0_resize_box_3.png 800w, /p/vector-databases-vs.-traditional-databases/bg_hu040920c01aa01bd4e2daf37dcdbf48b8_1226831_1600x0_resize_box_3.png 1600w"
+                        width="800" 
+                        height="450" 
+                        loading="lazy"
+                        alt="Featured image of post Vector Databases vs. Traditional Databases" />
+                
+            </a>
+        </div>
+    
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/p/vector-databases-vs.-traditional-databases/">Vector Databases vs. Traditional Databases</a>
+        </h2>
+    
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published">2026-07-13 21:24</time>
+            </div>
+        
+
+        
+    </footer>
+    
+
+    
+        <footer class="article-translations">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+            <div>
+                
+                    <a href="https://SymphonyW.github.io/zh-cn/p/%E5%90%91%E9%87%8F%E6%95%B0%E6%8D%AE%E5%BA%93%E4%B8%8E%E4%BC%A0%E7%BB%9F%E6%95%B0%E6%8D%AE%E5%BA%93/" class="link">中文</a>
+                
+            </div>
+        </footer>
+    
+</div>
+
+</header>
+
+    
+    <section class="article-tags">
+        
+            <a href="/tags/vector-database/">Vector Database</a>
+        
+            <a href="/tags/database/">Database</a>
+        
+            <a href="/tags/rag/">RAG</a>
+        
+    </section>
+
+
+    <section class="article-content">
+    
+    
+    <h1 id="向量数据库与传统数据库">向量数据库与传统数据库
+</h1><p>在传统的软件系统中，数据库主要负责存储用户、订单、商品、日志等结构化数据。当我们需要查询某个用户时，通常会使用用户 ID、手机号或者用户名作为条件。</p>
+<p>例如：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-sql" data-lang="sql"><span class="line"><span class="cl"><span class="k">SELECT</span><span class="w"> </span><span class="o">*</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="k">FROM</span><span class="w"> </span><span class="n">users</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="k">WHERE</span><span class="w"> </span><span class="n">username</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;zhangsan&#39;</span><span class="p">;</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>这种查询的特点是：<strong>查询条件明确，数据库需要找到精确匹配的数据。</strong></p>
+<p>但是在人工智能应用中，我们可能会遇到另一类问题：</p>
+<ul>
+<li>找出与这段文字含义最接近的文章。</li>
+<li>找到与当前商品风格相似的商品。</li>
+<li>根据一张图片搜索视觉上相似的图片。</li>
+<li>从知识库中找到能够回答用户问题的内容。</li>
+<li>判断两段代码是否实现了相似的功能。</li>
+</ul>
+<p>这些问题很难仅通过 <code>=</code>、<code>LIKE</code> 或普通关键字查询解决。</p>
+<p>向量数据库正是为了解决这类“相似性检索”问题而出现的。</p>
+<div class="mermaid">flowchart LR
+    A[传统数据库] --> B[精确匹配]
+    A --> C[范围查询]
+    A --> D[事务处理]
+
+    E[向量数据库] --> F[语义相似度搜索]
+    E --> G[图片相似度搜索]
+    E --> H[多模态检索]
+</div><h2 id="什么是传统数据库">什么是传统数据库
+</h2><p>传统数据库通常指关系型数据库，以及部分通用型 NoSQL 数据库，例如：</p>
+<ul>
+<li>MySQL</li>
+<li>PostgreSQL</li>
+<li>Oracle</li>
+<li>SQL Server</li>
+<li>MongoDB</li>
+<li>Redis</li>
+</ul>
+<p>关系型数据库将数据组织成表，每张表由行和列构成。</p>
+<p>例如，一个商品表可能是：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th style="text-align:right">id</th>
+<th>name</th>
+<th>category</th>
+<th style="text-align:right">price</th>
+<th style="text-align:right">stock</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:right">1001</td>
+<td>机械键盘</td>
+<td>外设</td>
+<td style="text-align:right">399</td>
+<td style="text-align:right">20</td>
+</tr>
+<tr>
+<td style="text-align:right">1002</td>
+<td>无线鼠标</td>
+<td>外设</td>
+<td style="text-align:right">199</td>
+<td style="text-align:right">35</td>
+</tr>
+<tr>
+<td style="text-align:right">1003</td>
+<td>显示器</td>
+<td>显示设备</td>
+<td style="text-align:right">1599</td>
+<td style="text-align:right">8</td>
+</tr>
+</tbody>
+</table></div>
+<p>我们可以按照字段进行精确查询：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-sql" data-lang="sql"><span class="line"><span class="cl"><span class="k">SELECT</span><span class="w"> </span><span class="o">*</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="k">FROM</span><span class="w"> </span><span class="n">products</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="k">WHERE</span><span class="w"> </span><span class="n">category</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;外设&#39;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="k">AND</span><span class="w"> </span><span class="n">price</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">300</span><span class="p">;</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>传统数据库擅长处理以下任务：</p>
+<ul>
+<li>根据主键查询数据。</li>
+<li>根据字段进行过滤和排序。</li>
+<li>执行增删改查操作。</li>
+<li>保证事务一致性。</li>
+<li>维护实体之间的关联关系。</li>
+<li>进行统计、聚合和报表分析。</li>
+</ul>
+<p>例如，在电商系统中，订单创建通常涉及库存扣减、订单写入和支付记录生成。这些操作必须满足事务要求。</p>
+<div class="mermaid">sequenceDiagram
+    participant U as 用户
+    participant O as 订单服务
+    participant DB as 传统数据库
+
+    U->>O: 创建订单
+    O->>DB: 开启事务
+    O->>DB: 扣减库存
+    O->>DB: 创建订单
+    O->>DB: 写入支付记录
+    DB-->>O: 提交事务
+    O-->>U: 订单创建成功
+</div><p>传统数据库关注的是：</p>
+<blockquote>
+<p>数据是否准确、关系是否完整、事务是否可靠。</p>
+</blockquote>
+<h2 id="什么是向量">什么是向量
+</h2><p>要理解向量数据库，首先需要理解向量。</p>
+<p>在人工智能系统中，文本、图片、音频和视频可以通过模型转换成一组数字。这组数字称为向量，也常被称为 Embedding。</p>
+<p>例如，下面三句话：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">我喜欢骑自行车旅行。
+</span></span><span class="line"><span class="cl">周末我经常骑车去郊外。
+</span></span><span class="line"><span class="cl">数据库出现了连接超时。
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>经过 Embedding 模型处理后，可能会被转换为：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">我喜欢骑自行车旅行。
+</span></span><span class="line"><span class="cl">→ [0.12, -0.31, 0.85, 0.47, ...]
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">周末我经常骑车去郊外。
+</span></span><span class="line"><span class="cl">→ [0.15, -0.28, 0.81, 0.51, ...]
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">数据库出现了连接超时。
+</span></span><span class="line"><span class="cl">→ [-0.62, 0.73, 0.05, -0.16, ...]
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>前两句话的含义比较接近，因此它们对应的向量在向量空间中的距离也会更近。</p>
+<div class="mermaid">quadrantChart
+    title 文本在向量空间中的示意分布
+    x-axis 低运动相关度 --> 高运动相关度
+    y-axis 低旅行相关度 --> 高旅行相关度
+    quadrant-1 骑行与旅行
+    quadrant-2 旅行主题
+    quadrant-3 技术主题
+    quadrant-4 运动主题
+    "骑自行车去郊外旅行": [0.88, 0.86]
+    "周末骑车锻炼": [0.82, 0.55]
+    "计划去北欧旅行": [0.45, 0.91]
+    "数据库连接超时": [0.12, 0.16]
+</div><p>这里的坐标只是示意。真实的 Embedding 向量往往包含几百甚至几千个维度，人类无法直接观察这些高维空间。</p>
+<p>Embedding 的核心作用，是将原始数据的“语义特征”编码为数值。</p>
+<h2 id="什么是向量数据库">什么是向量数据库
+</h2><p>向量数据库是一类专门用于存储、索引和查询高维向量的数据系统。</p>
+<p>一条向量数据通常不只有向量本身，还会包含原始内容和元数据。</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;id&#34;</span><span class="p">:</span> <span class="s2">&#34;article-1001&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;vector&#34;</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.12</span><span class="p">,</span> <span class="mf">-0.31</span><span class="p">,</span> <span class="mf">0.85</span><span class="p">,</span> <span class="mf">0.47</span><span class="p">],</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;metadata&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;title&#34;</span><span class="p">:</span> <span class="s2">&#34;如何搭建企业内部 SkillHub&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;category&#34;</span><span class="p">:</span> <span class="s2">&#34;AI 工程&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;author&#34;</span><span class="p">:</span> <span class="s2">&#34;Xinzhan Wu&#34;</span>
+</span></span><span class="line"><span class="cl">  <span class="p">},</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;content&#34;</span><span class="p">:</span> <span class="s2">&#34;本文介绍基于 npm Registry 构建企业内部 SkillHub 的方案。&#34;</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>向量数据库可以回答这样的问题：</p>
+<blockquote>
+<p>哪些数据的向量与当前查询向量最接近？</p>
+</blockquote>
+<p>它的基本工作流程如下。</p>
+<div class="mermaid">flowchart LR
+    A[用户输入问题] --> B[Embedding 模型]
+    B --> C[查询向量]
+    C --> D[向量数据库]
+    D --> E[相似度搜索]
+    E --> F[返回 Top-K 结果]
+</div><p>例如，用户输入：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">企业内部应该如何管理 AI Skill？
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>即使知识库中没有完全相同的句子，向量数据库仍然可能找到以下内容：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">基于 npm Registry 构建企业内部 SkillHub
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>原因是两段文本在语义上比较接近。</p>
+<p>传统关键字搜索关注“是否出现相同的词”，而向量搜索关注“表达的含义是否接近”。</p>
+<h2 id="向量数据库与传统数据库的核心区别">向量数据库与传统数据库的核心区别
+</h2><div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>对比维度</th>
+<th>传统数据库</th>
+<th>向量数据库</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>主要数据</td>
+<td>字符串、数字、日期、JSON</td>
+<td>高维浮点向量</td>
+</tr>
+<tr>
+<td>典型查询</td>
+<td>精确匹配、范围查询、关联查询</td>
+<td>相似度查询、Top-K 查询</td>
+</tr>
+<tr>
+<td>查询条件</td>
+<td><code>id = 1</code>、<code>price &lt; 100</code></td>
+<td>与查询向量最相似</td>
+</tr>
+<tr>
+<td>索引结构</td>
+<td>B+ 树、哈希索引、倒排索引</td>
+<td>HNSW、IVF、PQ</td>
+</tr>
+<tr>
+<td>核心目标</td>
+<td>准确性与事务一致性</td>
+<td>检索速度与召回率</td>
+</tr>
+<tr>
+<td>典型场景</td>
+<td>订单、用户、支付、库存</td>
+<td>RAG、推荐、图片搜索</td>
+</tr>
+<tr>
+<td>结果特点</td>
+<td>条件满足或不满足</td>
+<td>按相似程度排序</td>
+</tr>
+<tr>
+<td>常用指标</td>
+<td>QPS、延迟、事务成功率</td>
+<td>Recall、Top-K、查询延迟</td>
+</tr>
+<tr>
+<td>是否擅长事务</td>
+<td>是</td>
+<td>通常不是核心能力</td>
+</tr>
+<tr>
+<td>是否支持语义搜索</td>
+<td>通常不直接支持</td>
+<td>是</td>
+</tr>
+</tbody>
+</table></div>
+<p>两者最根本的区别在于查询方式。</p>
+<p>传统数据库查询的是：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">哪些数据满足确定的条件？
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>向量数据库查询的是：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">哪些数据与当前内容最相似？
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h2 id="精确查询与相似度查询">精确查询与相似度查询
+</h2><p>假设数据库中有以下三篇文章：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">文章 A：使用 Go 开发高并发后端服务
+</span></span><span class="line"><span class="cl">文章 B：Golang 服务端性能优化方法
+</span></span><span class="line"><span class="cl">文章 C：React 前端组件设计实践
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>用户搜索：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">如何提高 Go 后端程序的性能？
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>使用传统关键字匹配时，“Golang”和“Go”可能被认为是两个不同的词，“后端程序”和“服务端”也不完全相同。</p>
+<p>使用向量搜索时，文章 A 和文章 B 的向量通常都会与查询向量比较接近。</p>
+<div class="mermaid">flowchart TD
+    Q[如何提高 Go 后端程序的性能] --> E[生成查询向量]
+
+    E --> A[文章 A 向量<br/>相似度 0.89]
+    E --> B[文章 B 向量<br/>相似度 0.93]
+    E --> C[文章 C 向量<br/>相似度 0.32]
+
+    B --> R1[Top 1]
+    A --> R2[Top 2]
+</div><p>向量数据库最终会按照相似度排序，返回最接近的若干条数据。</p>
+<h2 id="向量相似度如何计算">向量相似度如何计算
+</h2><p>常见的向量相似度计算方式包括：</p>
+<ul>
+<li>余弦相似度。</li>
+<li>欧氏距离。</li>
+<li>点积。</li>
+</ul>
+<h3 id="余弦相似度">余弦相似度
+</h3><p>余弦相似度关注两个向量方向之间的夹角。</p>
+<p>其计算公式为：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">cos(A, B) = (A · B) / (||A|| × ||B||)
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>余弦相似度越接近 <code>1</code>，通常表示两个向量越相似。</p>
+<p>例如：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-python" data-lang="python"><span class="line"><span class="cl"><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="k">def</span> <span class="nf">cosine_similarity</span><span class="p">(</span><span class="n">vector_a</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">vector_b</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">    <span class="s2">&#34;&#34;&#34;计算两个向量的余弦相似度。&#34;&#34;&#34;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="n">denominator</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">vector_a</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">vector_b</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="c1"># 避免零向量导致除零错误</span>
+</span></span><span class="line"><span class="cl">    <span class="k">if</span> <span class="n">denominator</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">        <span class="k">return</span> <span class="mf">0.0</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">vector_a</span><span class="p">,</span> <span class="n">vector_b</span><span class="p">)</span> <span class="o">/</span> <span class="n">denominator</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="n">vector_a</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.2</span><span class="p">,</span> <span class="mf">0.8</span><span class="p">,</span> <span class="mf">0.4</span><span class="p">])</span>
+</span></span><span class="line"><span class="cl"><span class="n">vector_b</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.7</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">])</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="n">similarity</span> <span class="o">=</span> <span class="n">cosine_similarity</span><span class="p">(</span><span class="n">vector_a</span><span class="p">,</span> <span class="n">vector_b</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&#34;相似度：</span><span class="si">{</span><span class="n">similarity</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&#34;</span><span class="p">)</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>如果数据规模很小，可以逐个计算向量距离。</p>
+<p>但如果数据库中存在数百万甚至数十亿条向量，逐条计算的成本会非常高，因此需要使用专门的向量索引。</p>
+<h2 id="为什么不能直接遍历所有向量">为什么不能直接遍历所有向量
+</h2><p>假设数据库中有 1000 万条向量，每条向量有 1536 个维度。</p>
+<p>用户每查询一次，都需要将查询向量与 1000 万条向量分别计算距离。</p>
+<p>粗略计算量为：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">1000 万 × 1536 次浮点运算
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这种方式被称为暴力搜索或精确搜索。</p>
+<p>精确搜索能够得到绝对准确的结果，但随着数据规模增长，查询延迟会迅速增加。</p>
+<p>因此，大多数向量数据库使用近似最近邻搜索：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">Approximate Nearest Neighbor，ANN
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>ANN 不一定遍历所有向量，而是借助索引快速缩小搜索范围。</p>
+<p>它牺牲少量准确率，换取显著的性能提升。</p>
+<div class="mermaid">flowchart LR
+    A[查询向量] --> B{搜索方式}
+
+    B --> C[暴力搜索]
+    C --> D[遍历全部向量]
+    D --> E[结果准确<br/>速度较慢]
+
+    B --> F[ANN 搜索]
+    F --> G[通过索引筛选候选集]
+    G --> H[结果近似<br/>速度较快]
+</div><h2 id="常见的向量索引">常见的向量索引
+</h2><h3 id="hnsw">HNSW
+</h3><p>HNSW 的全称是 Hierarchical Navigable Small World，即分层可导航小世界图。</p>
+<p>它会将向量组织成多层图结构。</p>
+<p>查询时先在较高层快速确定大致方向，再逐层向下寻找更接近的向量。</p>
+<div class="mermaid">flowchart TD
+    subgraph L3[第三层：稀疏节点]
+        A1((A)) --- A2((B))
+    end
+
+    subgraph L2[第二层：中等密度]
+        B1((A)) --- B2((C))
+        B2 --- B3((B))
+    end
+
+    subgraph L1[第一层：高密度节点]
+        C1((A)) --- C2((D))
+        C2 --- C3((C))
+        C3 --- C4((E))
+        C4 --- C5((B))
+    end
+
+    A1 -.向下搜索.-> B1
+    A2 -.向下搜索.-> B3
+    B2 -.向下搜索.-> C3
+</div><p>HNSW 通常具有较高的召回率和较低的查询延迟，但需要占用较多内存。</p>
+<p>适合：</p>
+<ul>
+<li>中低延迟在线检索。</li>
+<li>RAG 知识库。</li>
+<li>实时推荐系统。</li>
+<li>数据规模在内存可承受范围内的系统。</li>
+</ul>
+<h3 id="ivf">IVF
+</h3><p>IVF 的全称是 Inverted File Index，即倒排文件索引。</p>
+<p>它会先通过聚类将向量划分到不同的中心区域。查询时只搜索与查询向量最接近的几个聚类，而不是遍历所有向量。</p>
+<div class="mermaid">flowchart TD
+    Q[查询向量] --> C{选择最近的聚类}
+
+    C --> C1[聚类 1]
+    C --> C2[聚类 2]
+    C --> C3[聚类 3]
+    C --> C4[聚类 4]
+
+    C2 --> S1[搜索聚类 2 内的向量]
+    C3 --> S2[搜索聚类 3 内的向量]
+
+    S1 --> R[合并并返回 Top-K]
+    S2 --> R
+</div><p>IVF 可以通过调整搜索的聚类数量，在查询速度和召回率之间进行权衡。</p>
+<h3 id="pq">PQ
+</h3><p>PQ 的全称是 Product Quantization，即乘积量化。</p>
+<p>它会将高维向量切分为多个子向量，再对每个子向量进行量化编码。</p>
+<p>原本需要使用大量浮点数保存的向量，可以被压缩为较短的编码。</p>
+<p>PQ 的优势是：</p>
+<ul>
+<li>降低向量存储空间。</li>
+<li>减少内存占用。</li>
+<li>加快距离计算。</li>
+</ul>
+<p>代价是量化过程可能造成一定精度损失。</p>
+<h2 id="向量数据库的基本数据模型">向量数据库的基本数据模型
+</h2><p>向量数据库中的一条记录通常包含三部分。</p>
+<div class="mermaid">flowchart LR
+    A[向量记录] --> B[唯一标识 ID]
+    A --> C[Embedding 向量]
+    A --> D[Metadata 元数据]
+
+    D --> E[类别]
+    D --> F[时间]
+    D --> G[作者]
+    D --> H[权限]
+</div><p>例如：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;id&#34;</span><span class="p">:</span> <span class="s2">&#34;doc-001&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;vector&#34;</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.21</span><span class="p">,</span> <span class="mf">-0.37</span><span class="p">,</span> <span class="mf">0.66</span><span class="p">,</span> <span class="mf">0.19</span><span class="p">],</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;metadata&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;department&#34;</span><span class="p">:</span> <span class="s2">&#34;研发部&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;document_type&#34;</span><span class="p">:</span> <span class="s2">&#34;技术文档&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;visibility&#34;</span><span class="p">:</span> <span class="s2">&#34;internal&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;created_at&#34;</span><span class="p">:</span> <span class="s2">&#34;2026-07-13&#34;</span>
+</span></span><span class="line"><span class="cl">  <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>元数据非常重要。</p>
+<p>在真实系统中，通常不能只进行向量搜索，还需要添加过滤条件。</p>
+<p>例如：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">找出与用户问题最相关的文档，
+</span></span><span class="line"><span class="cl">并且文档所属部门必须是研发部，
+</span></span><span class="line"><span class="cl">文档权限必须是 internal。
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>对应的逻辑类似于：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-python" data-lang="python"><span class="line"><span class="cl"><span class="n">results</span> <span class="o">=</span> <span class="n">vector_database</span><span class="o">.</span><span class="n">search</span><span class="p">(</span>
+</span></span><span class="line"><span class="cl">    <span class="n">vector</span><span class="o">=</span><span class="n">query_vector</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">top_k</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nb">filter</span><span class="o">=</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="s2">&#34;department&#34;</span><span class="p">:</span> <span class="s2">&#34;研发部&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="s2">&#34;visibility&#34;</span><span class="p">:</span> <span class="s2">&#34;internal&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="p">},</span>
+</span></span><span class="line"><span class="cl"><span class="p">)</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这种方式称为带元数据过滤的向量检索。</p>
+<h2 id="向量数据库如何应用于-rag">向量数据库如何应用于 RAG
+</h2><p>RAG 的全称是 Retrieval-Augmented Generation，即检索增强生成。</p>
+<p>它的核心思想是：</p>
+<blockquote>
+<p>在大语言模型生成答案之前，先从知识库中检索相关资料，再将资料交给模型生成答案。</p>
+</blockquote>
+<p>完整流程如下。</p>
+<div class="mermaid">flowchart TD
+    A[企业文档] --> B[文档切分]
+    B --> C[Embedding 模型]
+    C --> D[生成文本向量]
+    D --> E[写入向量数据库]
+
+    U[用户提问] --> F[生成查询向量]
+    F --> G[向量相似度搜索]
+    E --> G
+
+    G --> H[返回 Top-K 文档片段]
+    H --> I[构造 Prompt]
+    U --> I
+
+    I --> J[大语言模型]
+    J --> K[生成最终答案]
+</div><p>假设企业知识库中存在如下内容：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">Skill 包发布前需要完成安全扫描、版本检查和元数据校验。
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>用户提问：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">内部 Skill 发布之前需要检查什么？
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>系统会先将问题转换成向量，再从向量数据库中找到相关文档片段，最后让大语言模型根据检索结果回答。</p>
+<p>向量数据库在 RAG 中主要承担以下职责：</p>
+<ul>
+<li>存储文档向量。</li>
+<li>根据用户问题进行语义检索。</li>
+<li>返回最相关的上下文。</li>
+<li>支持权限、部门、时间等元数据过滤。</li>
+</ul>
+<p>需要注意的是，向量数据库本身不会生成答案，它只负责检索相关内容。</p>
+<h2 id="向量数据库不能替代传统数据库">向量数据库不能替代传统数据库
+</h2><p>向量数据库与传统数据库并不是替代关系。</p>
+<p>例如，一个 AI 知识库系统可能同时使用：</p>
+<div class="mermaid">flowchart LR
+    A[应用服务] --> B[PostgreSQL]
+    A --> C[向量数据库]
+    A --> D[对象存储]
+
+    B --> E[用户信息]
+    B --> F[文档元数据]
+    B --> G[权限与任务状态]
+
+    C --> H[文本向量]
+    C --> I[语义检索索引]
+
+    D --> J[PDF 原文件]
+    D --> K[图片与附件]
+</div><p>其中：</p>
+<ul>
+<li>PostgreSQL 保存用户、权限、任务和业务状态。</li>
+<li>向量数据库保存 Embedding 和向量索引。</li>
+<li>对象存储保存 PDF、Word、图片等原始文件。</li>
+</ul>
+<p>当用户上传一份文档时，系统可能执行以下操作：</p>
+<ol>
+<li>将原始文件上传到对象存储。</li>
+<li>在传统数据库中记录文档名称、上传者和权限。</li>
+<li>对文档进行解析和分块。</li>
+<li>调用 Embedding 模型生成向量。</li>
+<li>将文本片段和向量写入向量数据库。</li>
+</ol>
+<p>传统数据库负责业务事实，向量数据库负责语义检索。</p>
+<h2 id="关键字搜索与向量搜索">关键字搜索与向量搜索
+</h2><p>传统全文搜索通常基于倒排索引。</p>
+<p>例如，用户搜索：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">Go 高并发开发
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>系统会查找包含“Go”“高并发”“开发”等关键词的文档。</p>
+<p>关键字搜索的优点是：</p>
+<ul>
+<li>对专有名词、代码、型号和编号比较准确。</li>
+<li>搜索结果容易解释。</li>
+<li>对完全匹配的关键词非常敏感。</li>
+</ul>
+<p>向量搜索的优点是：</p>
+<ul>
+<li>可以理解近义词。</li>
+<li>可以处理不同表达方式。</li>
+<li>能够按照语义相关程度排序。</li>
+<li>更适合自然语言问题。</li>
+</ul>
+<p>两者也各有缺点。</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>搜索方式</th>
+<th>优点</th>
+<th>缺点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>关键字搜索</td>
+<td>精确、可解释、适合专有名词</td>
+<td>难以理解语义和近义表达</td>
+</tr>
+<tr>
+<td>向量搜索</td>
+<td>支持语义检索、表达方式更灵活</td>
+<td>可能忽略关键字的精确性</td>
+</tr>
+<tr>
+<td>混合搜索</td>
+<td>同时利用关键词和语义</td>
+<td>架构和排序逻辑更复杂</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="混合检索">混合检索
+</h2><p>在实际的 RAG 系统中，单纯使用向量搜索并不总能获得最佳效果。</p>
+<p>例如，用户搜索：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">错误码 YN0031 是什么意思？
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这里的 <code>YN0031</code> 是一个精确错误码。</p>
+<p>向量搜索可能认为它与 Yarn、依赖安装、Node.js 等内容相关，但关键字搜索可以直接找到包含 <code>YN0031</code> 的文档。</p>
+<p>因此，许多系统会同时执行：</p>
+<ul>
+<li>关键字检索。</li>
+<li>向量检索。</li>
+<li>结果重排。</li>
+</ul>
+<div class="mermaid">flowchart TD
+    Q[用户查询] --> K[关键字检索]
+    Q --> V[向量检索]
+
+    K --> R[结果融合]
+    V --> R
+
+    R --> RR[重排序模型]
+    RR --> T[最终 Top-K 结果]
+</div><p>这种方式称为混合检索。</p>
+<p>一种简单的混合评分公式是：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">最终得分 = α × 向量相似度 + β × 关键字匹配得分
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>其中：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">α + β = 1
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>对于自然语言问题，可以提高向量相似度的权重。</p>
+<p>对于错误码、产品型号、文件名和函数名，可以提高关键字匹配的权重。</p>
+<h2 id="向量搜索的-top-k">向量搜索的 Top-K
+</h2><p>向量数据库通常通过 <code>Top-K</code> 参数控制返回结果数量。</p>
+<p>例如：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-python" data-lang="python"><span class="line"><span class="cl"><span class="n">results</span> <span class="o">=</span> <span class="n">vector_database</span><span class="o">.</span><span class="n">search</span><span class="p">(</span>
+</span></span><span class="line"><span class="cl">    <span class="n">vector</span><span class="o">=</span><span class="n">query_vector</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">top_k</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl"><span class="p">)</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>表示返回与查询向量最相似的 5 条数据。</p>
+<p><code>Top-K</code> 并不是越大越好。</p>
+<p>Top-K 太小可能漏掉重要信息，Top-K 太大则可能引入无关内容，并增加大语言模型的上下文长度。</p>
+<div class="mermaid">flowchart LR
+    A[Top-K 太小] --> B[可能遗漏相关文档]
+    C[适中的 Top-K] --> D[相关性和上下文长度平衡]
+    E[Top-K 太大] --> F[噪声增多、Token 消耗增加]
+</div><p>实际项目中通常需要结合以下因素调节：</p>
+<ul>
+<li>文档分块大小。</li>
+<li>Embedding 模型效果。</li>
+<li>用户问题长度。</li>
+<li>大语言模型上下文窗口。</li>
+<li>是否使用重排序模型。</li>
+<li>数据库检索召回率。</li>
+</ul>
+<h2 id="文档为什么需要分块">文档为什么需要分块
+</h2><p>大多数情况下，不会直接将整篇文档转换成一个向量。</p>
+<p>假设一篇文档包含 10000 字，同时讨论安装、配置、权限和故障排查。将整篇文章生成一个向量，会导致不同主题被压缩到同一个表示中。</p>
+<p>因此，通常需要先对文档进行分块。</p>
+<div class="mermaid">flowchart LR
+    A[完整文档] --> B[分块 1<br/>系统介绍]
+    A --> C[分块 2<br/>安装步骤]
+    A --> D[分块 3<br/>配置说明]
+    A --> E[分块 4<br/>故障排查]
+
+    B --> F[向量 1]
+    C --> G[向量 2]
+    D --> H[向量 3]
+    E --> I[向量 4]
+</div><p>分块后，用户询问安装问题时，系统可以直接检索“安装步骤”对应的片段，而不是返回整篇文档。</p>
+<p>常见分块策略包括：</p>
+<ul>
+<li>固定字符数分块。</li>
+<li>固定 Token 数分块。</li>
+<li>按段落分块。</li>
+<li>按 Markdown 标题分块。</li>
+<li>按语义边界分块。</li>
+<li>滑动窗口分块。</li>
+</ul>
+<p>分块大小需要根据文档类型进行调整。</p>
+<p>代码文档更适合按照类、函数或模块边界分块；普通文章可以按照标题和段落分块。</p>
+<h2 id="一个简单的向量检索示例">一个简单的向量检索示例
+</h2><p>下面使用 Python 模拟一个最简单的向量搜索过程。</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span><span class="lnt">25
+</span><span class="lnt">26
+</span><span class="lnt">27
+</span><span class="lnt">28
+</span><span class="lnt">29
+</span><span class="lnt">30
+</span><span class="lnt">31
+</span><span class="lnt">32
+</span><span class="lnt">33
+</span><span class="lnt">34
+</span><span class="lnt">35
+</span><span class="lnt">36
+</span><span class="lnt">37
+</span><span class="lnt">38
+</span><span class="lnt">39
+</span><span class="lnt">40
+</span><span class="lnt">41
+</span><span class="lnt">42
+</span><span class="lnt">43
+</span><span class="lnt">44
+</span><span class="lnt">45
+</span><span class="lnt">46
+</span><span class="lnt">47
+</span><span class="lnt">48
+</span><span class="lnt">49
+</span><span class="lnt">50
+</span><span class="lnt">51
+</span><span class="lnt">52
+</span><span class="lnt">53
+</span><span class="lnt">54
+</span><span class="lnt">55
+</span><span class="lnt">56
+</span><span class="lnt">57
+</span><span class="lnt">58
+</span><span class="lnt">59
+</span><span class="lnt">60
+</span><span class="lnt">61
+</span><span class="lnt">62
+</span><span class="lnt">63
+</span><span class="lnt">64
+</span><span class="lnt">65
+</span><span class="lnt">66
+</span><span class="lnt">67
+</span><span class="lnt">68
+</span><span class="lnt">69
+</span><span class="lnt">70
+</span><span class="lnt">71
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-python" data-lang="python"><span class="line"><span class="cl"><span class="kn">from</span> <span class="nn">dataclasses</span> <span class="kn">import</span> <span class="n">dataclass</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="nd">@dataclass</span>
+</span></span><span class="line"><span class="cl"><span class="k">class</span> <span class="nc">Document</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">    <span class="s2">&#34;&#34;&#34;知识库文档。&#34;&#34;&#34;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="n">document_id</span><span class="p">:</span> <span class="nb">str</span>
+</span></span><span class="line"><span class="cl">    <span class="n">content</span><span class="p">:</span> <span class="nb">str</span>
+</span></span><span class="line"><span class="cl">    <span class="n">vector</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="k">def</span> <span class="nf">cosine_similarity</span><span class="p">(</span><span class="n">vector_a</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">vector_b</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">    <span class="s2">&#34;&#34;&#34;计算余弦相似度。&#34;&#34;&#34;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="n">denominator</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">vector_a</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">vector_b</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="k">if</span> <span class="n">denominator</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">        <span class="k">return</span> <span class="mf">0.0</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">vector_a</span><span class="p">,</span> <span class="n">vector_b</span><span class="p">)</span> <span class="o">/</span> <span class="n">denominator</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="k">def</span> <span class="nf">search_documents</span><span class="p">(</span>
+</span></span><span class="line"><span class="cl">    <span class="n">query_vector</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">documents</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Document</span><span class="p">],</span>
+</span></span><span class="line"><span class="cl">    <span class="n">top_k</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl"><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="n">Document</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]:</span>
+</span></span><span class="line"><span class="cl">    <span class="s2">&#34;&#34;&#34;按照相似度返回 Top-K 文档。&#34;&#34;&#34;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="n">scored_documents</span> <span class="o">=</span> <span class="p">[</span>
+</span></span><span class="line"><span class="cl">        <span class="p">(</span><span class="n">document</span><span class="p">,</span> <span class="n">cosine_similarity</span><span class="p">(</span><span class="n">query_vector</span><span class="p">,</span> <span class="n">document</span><span class="o">.</span><span class="n">vector</span><span class="p">))</span>
+</span></span><span class="line"><span class="cl">        <span class="k">for</span> <span class="n">document</span> <span class="ow">in</span> <span class="n">documents</span>
+</span></span><span class="line"><span class="cl">    <span class="p">]</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="c1"># 按照相似度从高到低排序</span>
+</span></span><span class="line"><span class="cl">    <span class="n">scored_documents</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">item</span><span class="p">:</span> <span class="n">item</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">reverse</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="k">return</span> <span class="n">scored_documents</span><span class="p">[:</span><span class="n">top_k</span><span class="p">]</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="n">documents</span> <span class="o">=</span> <span class="p">[</span>
+</span></span><span class="line"><span class="cl">    <span class="n">Document</span><span class="p">(</span>
+</span></span><span class="line"><span class="cl">        <span class="n">document_id</span><span class="o">=</span><span class="s2">&#34;doc-1&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="n">content</span><span class="o">=</span><span class="s2">&#34;使用 Go 构建高并发后端服务&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="n">vector</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.8</span><span class="p">,</span> <span class="mf">0.7</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">]),</span>
+</span></span><span class="line"><span class="cl">    <span class="p">),</span>
+</span></span><span class="line"><span class="cl">    <span class="n">Document</span><span class="p">(</span>
+</span></span><span class="line"><span class="cl">        <span class="n">document_id</span><span class="o">=</span><span class="s2">&#34;doc-2&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="n">content</span><span class="o">=</span><span class="s2">&#34;React 组件状态管理实践&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="n">vector</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">,</span> <span class="mf">0.9</span><span class="p">]),</span>
+</span></span><span class="line"><span class="cl">    <span class="p">),</span>
+</span></span><span class="line"><span class="cl">    <span class="n">Document</span><span class="p">(</span>
+</span></span><span class="line"><span class="cl">        <span class="n">document_id</span><span class="o">=</span><span class="s2">&#34;doc-3&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="n">content</span><span class="o">=</span><span class="s2">&#34;Golang 服务端性能优化&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="n">vector</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.9</span><span class="p">,</span> <span class="mf">0.6</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">]),</span>
+</span></span><span class="line"><span class="cl">    <span class="p">),</span>
+</span></span><span class="line"><span class="cl"><span class="p">]</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="n">query_vector</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.85</span><span class="p">,</span> <span class="mf">0.65</span><span class="p">,</span> <span class="mf">0.15</span><span class="p">])</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="n">results</span> <span class="o">=</span> <span class="n">search_documents</span><span class="p">(</span>
+</span></span><span class="line"><span class="cl">    <span class="n">query_vector</span><span class="o">=</span><span class="n">query_vector</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">documents</span><span class="o">=</span><span class="n">documents</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">top_k</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl"><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="k">for</span> <span class="n">document</span><span class="p">,</span> <span class="n">score</span> <span class="ow">in</span> <span class="n">results</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&#34;</span><span class="si">{</span><span class="n">document</span><span class="o">.</span><span class="n">document_id</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">score</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2"> - </span><span class="si">{</span><span class="n">document</span><span class="o">.</span><span class="n">content</span><span class="si">}</span><span class="s2">&#34;</span><span class="p">)</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这个示例本质上仍然是暴力搜索。</p>
+<p>真实的向量数据库会使用 HNSW、IVF 等索引结构，并处理数据持久化、并发查询、分片、过滤和容错等问题。</p>
+<h2 id="向量数据库的典型应用场景">向量数据库的典型应用场景
+</h2><h3 id="rag-知识库">RAG 知识库
+</h3><p>将企业文档、产品手册和技术资料转换为向量，让大语言模型根据内部知识回答问题。</p>
+<h3 id="语义搜索">语义搜索
+</h3><p>用户不需要输入完全一致的关键词，只需要描述自己的意图，系统就能找到相关内容。</p>
+<h3 id="推荐系统">推荐系统
+</h3><p>将用户、商品或内容表示为向量，根据向量之间的距离生成推荐结果。</p>
+<div class="mermaid">flowchart LR
+    A[用户行为] --> B[用户向量]
+    C[商品信息] --> D[商品向量]
+
+    B --> E[相似度计算]
+    D --> E
+
+    E --> F[推荐商品列表]
+</div><h3 id="图片搜索">图片搜索
+</h3><p>通过图像模型将图片转换成向量，实现以图搜图。</p>
+<p>例如：</p>
+<ul>
+<li>上传一张鞋子的图片，搜索外观相似的商品。</li>
+<li>上传一张人脸图片，搜索相似人物。</li>
+<li>上传一张风景图片，查找相似的摄影作品。</li>
+</ul>
+<h3 id="多模态检索">多模态检索
+</h3><p>文本和图片可以通过多模态模型映射到相同的向量空间。</p>
+<p>用户可以输入：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">寻找一张冬季北欧雪山和湖泊的图片
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>系统通过文本向量搜索相似的图片向量。</p>
+<h3 id="代码搜索">代码搜索
+</h3><p>将函数、类和代码文件转换成向量后，可以根据自然语言描述搜索代码。</p>
+<p>例如：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">查找负责校验 JWT Token 的函数
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>即使代码中没有出现完全相同的注释，系统仍然可能找到相关实现。</p>
+<h3 id="异常检测">异常检测
+</h3><p>正常数据通常集中在向量空间中的某些区域。如果一条新数据与其他数据距离明显较远，它可能是异常数据。</p>
+<p>该方法可以用于：</p>
+<ul>
+<li>欺诈检测。</li>
+<li>日志异常分析。</li>
+<li>网络攻击检测。</li>
+<li>工业设备故障预警。</li>
+</ul>
+<h2 id="如何选择数据库">如何选择数据库
+</h2><p>选择数据库时，不应该先问“哪个数据库更先进”，而应该先明确数据和查询模式。</p>
+<div class="mermaid">flowchart TD
+    A{系统主要查询什么} --> B[根据 ID 或字段查询]
+    A --> C[根据语义或相似度查询]
+    A --> D[两种查询都需要]
+
+    B --> E[传统数据库]
+    C --> F[向量数据库]
+    D --> G[传统数据库 + 向量数据库]
+</div><p>可以按照下面的方式判断。</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>需求</th>
+<th>推荐方案</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>用户、订单、支付、库存</td>
+<td>传统关系型数据库</td>
+</tr>
+<tr>
+<td>事务和强一致性</td>
+<td>传统关系型数据库</td>
+</tr>
+<tr>
+<td>文档语义搜索</td>
+<td>向量数据库</td>
+</tr>
+<tr>
+<td>图片相似度搜索</td>
+<td>向量数据库</td>
+</tr>
+<tr>
+<td>企业知识库问答</td>
+<td>向量数据库配合传统数据库</td>
+</tr>
+<tr>
+<td>精确错误码搜索</td>
+<td>全文搜索或传统索引</td>
+</tr>
+<tr>
+<td>同时需要语义和关键词</td>
+<td>混合检索</td>
+</tr>
+<tr>
+<td>既有业务数据又有 AI 检索</td>
+<td>多数据库组合</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="使用向量数据库时需要关注什么">使用向量数据库时需要关注什么
+</h2><h3 id="embedding-模型">Embedding 模型
+</h3><p>向量数据库只能根据已有向量进行搜索，向量质量主要取决于 Embedding 模型。</p>
+<p>如果 Embedding 模型无法正确理解业务术语，即使向量数据库性能很好，检索结果也不会理想。</p>
+<h3 id="向量维度">向量维度
+</h3><p>更高的维度通常可以表达更丰富的信息，但也会增加：</p>
+<ul>
+<li>存储空间。</li>
+<li>内存占用。</li>
+<li>索引构建时间。</li>
+<li>相似度计算成本。</li>
+</ul>
+<h3 id="召回率">召回率
+</h3><p>ANN 搜索是近似搜索，因此可能无法返回理论上最相似的全部结果。</p>
+<p>召回率可以表示为：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">Recall@K = 检索到的真实相关结果数量 / 理论相关结果数量
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>系统需要在查询延迟、内存占用和召回率之间进行平衡。</p>
+<h3 id="数据更新">数据更新
+</h3><p>某些向量索引适合静态数据，某些适合频繁更新。</p>
+<p>如果系统中的向量会持续新增、修改和删除，需要关注：</p>
+<ul>
+<li>索引是否支持动态更新。</li>
+<li>删除数据后是否需要重建索引。</li>
+<li>新数据写入后多久可以被查询。</li>
+<li>索引构建是否会影响在线请求。</li>
+</ul>
+<h3 id="元数据过滤">元数据过滤
+</h3><p>企业系统通常存在复杂的权限条件。</p>
+<p>例如：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">用户只能检索自己所在部门的内部文档。
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>因此，向量数据库是否支持高效的元数据过滤十分重要。</p>
+<h3 id="数据一致性">数据一致性
+</h3><p>如果传统数据库中的文档已经删除，但向量数据库中的向量仍然存在，用户可能检索到失效内容。</p>
+<p>系统需要设计数据同步机制。</p>
+<div class="mermaid">sequenceDiagram
+    participant APP as 应用服务
+    participant DB as 传统数据库
+    participant VDB as 向量数据库
+
+    APP->>DB: 删除文档记录
+    DB-->>APP: 删除成功
+    APP->>VDB: 删除对应向量
+    VDB-->>APP: 删除成功
+</div><p>在复杂系统中，还可以通过消息队列和补偿任务保证最终一致性。</p>
+<h2 id="常见误区">常见误区
+</h2><h3 id="向量数据库就是大语言模型数据库">向量数据库就是大语言模型数据库
+</h3><p>向量数据库不是专门存储大语言模型的数据库。</p>
+<p>它存储的是向量、原始内容和元数据，可以用于文本、图片、音频、推荐和异常检测等多种场景。</p>
+<h3 id="向量数据库可以直接回答问题">向量数据库可以直接回答问题
+</h3><p>向量数据库负责检索，不负责生成自然语言答案。</p>
+<p>在 RAG 系统中，最终答案通常由大语言模型生成。</p>
+<h3 id="向量维度越高越好">向量维度越高越好
+</h3><p>维度越高不一定意味着检索效果越好。</p>
+<p>最终效果取决于模型训练数据、业务场景、文本质量和检索策略。</p>
+<h3 id="使用向量数据库就不需要传统数据库">使用向量数据库就不需要传统数据库
+</h3><p>向量数据库通常无法替代订单、用户、权限、库存和支付系统中的传统数据库。</p>
+<p>实际应用更常见的是组合使用。</p>
+<h3 id="相似度最高的内容一定正确">相似度最高的内容一定正确
+</h3><p>向量相似度只表示语义或特征上的接近程度，并不等于事实正确。</p>
+<p>因此，RAG 系统还需要考虑：</p>
+<ul>
+<li>文档是否过期。</li>
+<li>数据源是否可信。</li>
+<li>用户是否有访问权限。</li>
+<li>检索内容是否真正能够回答问题。</li>
+<li>是否需要使用重排序模型。</li>
+</ul>
+<h2 id="总结">总结
+</h2><p>传统数据库和向量数据库解决的是不同类型的问题。</p>
+<p>传统数据库擅长：</p>
+<ul>
+<li>精确查询。</li>
+<li>结构化数据管理。</li>
+<li>事务处理。</li>
+<li>数据关系维护。</li>
+<li>聚合和统计。</li>
+</ul>
+<p>向量数据库擅长：</p>
+<ul>
+<li>语义搜索。</li>
+<li>相似度检索。</li>
+<li>图片与多模态搜索。</li>
+<li>推荐系统。</li>
+<li>RAG 知识检索。</li>
+</ul>
+<p>两者之间并不是竞争或替代关系。</p>
+<p>在现代 AI 应用中，一种常见的架构是：</p>
+<div class="mermaid">flowchart LR
+    U[用户请求] --> A[应用服务]
+
+    A --> DB[传统数据库]
+    A --> VDB[向量数据库]
+    A --> LLM[大语言模型]
+
+    DB --> B[用户、权限、业务状态]
+    VDB --> C[语义相关上下文]
+
+    B --> A
+    C --> A
+    A --> LLM
+    LLM --> R[最终回答]
+</div><p>传统数据库保存明确的业务事实，向量数据库提供基于语义的检索能力，大语言模型负责理解问题并组织答案。</p>
+<p>可以将它们概括为：</p>
+<blockquote>
+<p>传统数据库负责找到“符合条件的数据”，向量数据库负责找到“含义相近的数据”。</p>
+</blockquote>
+<p>理解这一差异，是设计 RAG、智能搜索、推荐系统和多模态应用的基础。</p>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/vector-database/">Vector Database</a>
+        
+            <a href="/tags/database/">Database</a>
+        
+            <a href="/tags/rag/">RAG</a>
+        
+    </section>
+
+
+    </footer>
+
+
+    
+</article>
+
+    
+
+    
+
+<aside class="related-content--wrapper">
+    <h2 class="section-title">Related content</h2>
+    <div class="related-content">
+        <div class="flex article-list--tile">
+            
+                
+<article class="has-image">
+    <a href="/p/classic-interview-questionhow-exactly-should-you-set-rag-retrieval-top-k/">
+        
+        
+            <div class="article-image">
+                <img src="/p/classic-interview-questionhow-exactly-should-you-set-rag-retrieval-top-k/bg.ba0e4d5311424eaae4d946105e223381_huf0a9a86dfd251dead7c2b6a80382f7be_722874_250x150_fill_box_smart1_3.png" 
+                        width="250" 
+                        height="150" 
+                        loading="lazy"
+                        alt="Featured image of post Classic interview question:How exactly should you set RAG retrieval top-k?"
+                        
+                        data-hash="md5-ug5NUxFCTqrk2UYQXiIzgQ==">
+                
+            </div>
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Classic interview question:How exactly should you set RAG retrieval top-k?</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="has-image">
+    <a href="/p/rag-fully-explainedfrom-closed-book-to-open-book-llms/">
+        
+        
+            <div class="article-image">
+                <img src="/p/rag-fully-explainedfrom-closed-book-to-open-book-llms/bg.102e738fb4a4088f22d652143bb6dcfe_hue42602111cbdf43a7b55d02fb6f689c9_36783_250x150_fill_box_smart1_3.png" 
+                        width="250" 
+                        height="150" 
+                        loading="lazy"
+                        alt="Featured image of post RAG Fully Explained:From &#34;Closed-Book&#34; to &#34;Open-Book&#34; LLMs"
+                        
+                        data-hash="md5-EC5zj7SkCI8i1lIUO7bc/g==">
+                
+            </div>
+        
+
+        <div class="article-details">
+            <h2 class="article-title">RAG Fully Explained:From &#34;Closed-Book&#34; to &#34;Open-Book&#34; LLMs</h2>
+        </div>
+    </a>
+</article>
+
+            
+        </div>
+    </div>
+</aside>
+
+     
+    
+        
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+        2026 SymphonyW
+    </section>
+    
+    <section class="powerby">
+        Built with <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> <br />
+        Theme <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.26.0">Stack</a></b> designed by <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a>
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.js" defer></script><script type="text/javascript" src="/ts/custom.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+<script>
+window.MathJax = {
+  tex: {
+    
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  svg: {
+    fontCache: 'global'
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script><script type="module">
+  
+  const currentScheme = document.documentElement.getAttribute('data-scheme');
+  const isDark = currentScheme === 'dark';
+
+  import('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs').then(({ default: mermaid }) => {
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: isDark ? 'dark' : 'default',
+      securityLevel: 'loose',
+      fontFamily: 'inherit'
+    });
+
+    
+    const observer = new MutationObserver(() => {
+      const scheme = document.documentElement.getAttribute('data-scheme');
+      const dark = scheme === 'dark';
+      mermaid.initialize({ startOnLoad: false, theme: dark ? 'dark' : 'default', securityLevel: 'loose' });
+      document.querySelectorAll('.mermaid').forEach((el) => {
+        
+        el.removeAttribute('data-processed');
+        el.innerHTML = el.textContent;
+      });
+      mermaid.run({ querySelector: '.mermaid' });
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-scheme'] });
+  });
+</script>
+    </body>
+</html>
