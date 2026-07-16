@@ -1,0 +1,424 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+    <channel>
+        <title>三维重建 on SymphonyW</title>
+        <link>https://SymphonyW.github.io/zh-cn/tags/%E4%B8%89%E7%BB%B4%E9%87%8D%E5%BB%BA/</link>
+        <description>Recent content in 三维重建 on SymphonyW</description>
+        <generator>Hugo -- gohugo.io</generator>
+        <language>zh-cn</language>
+        <copyright>SymphonyW</copyright>
+        <lastBuildDate>Thu, 16 Jul 2026 21:46:40 +0800</lastBuildDate><atom:link href="https://SymphonyW.github.io/zh-cn/tags/%E4%B8%89%E7%BB%B4%E9%87%8D%E5%BB%BA/index.xml" rel="self" type="application/rss+xml" /><item>
+        <title>SfM 原理详解：从多张照片恢复三维结构</title>
+        <link>https://SymphonyW.github.io/zh-cn/p/sfm-principle/</link>
+        <pubDate>Thu, 16 Jul 2026 21:46:40 +0800</pubDate>
+        
+        <guid>https://SymphonyW.github.io/zh-cn/p/sfm-principle/</guid>
+        <description>&lt;img src="https://SymphonyW.github.io/zh-cn/p/sfm-principle/bg.svg" alt="Featured image of post SfM 原理详解：从多张照片恢复三维结构" /&gt;&lt;h1 id=&#34;sfm-原理详解从多张照片恢复三维结构&#34;&gt;SfM 原理详解：从多张照片恢复三维结构
+&lt;/h1&gt;&lt;blockquote&gt;
+&lt;p&gt;SfM（Structure from Motion，运动恢复结构）解决的问题很朴素：&lt;strong&gt;只给一组从不同位置拍摄的照片，能不能同时恢复相机的运动轨迹和场景的三维结构？&lt;/strong&gt;&lt;br&gt;
+答案是可以，但它靠的不是“AI 猜形状”，而是一整套严密的多视图几何。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;目录&#34;&gt;目录
+&lt;/h2&gt;&lt;ul&gt;
+&lt;li&gt;&lt;a class=&#34;link&#34; href=&#34;#%e4%b8%80sfm-%e5%88%b0%e5%ba%95%e5%9c%a8%e6%b1%82%e4%bb%80%e4%b9%88&#34; &gt;一、SfM 到底在求什么&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a class=&#34;link&#34; href=&#34;#%e4%ba%8c%e6%95%b4%e4%bd%93%e6%b5%81%e7%a8%8b&#34; &gt;二、整体流程&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a class=&#34;link&#34; href=&#34;#%e4%b8%89%e7%89%b9%e5%be%81%e4%b8%8e%e5%8c%b9%e9%85%8d&#34; &gt;三、特征与匹配&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a class=&#34;link&#34; href=&#34;#%e5%9b%9b%e5%af%b9%e6%9e%81%e5%87%a0%e4%bd%95&#34; &gt;四、对极几何&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a class=&#34;link&#34; href=&#34;#%e4%ba%94%e4%b8%89%e8%a7%92%e5%8c%96&#34; &gt;五、三角化&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a class=&#34;link&#34; href=&#34;#%e5%85%ad%e5%a2%9e%e9%87%8f%e5%bc%8f%e9%87%8d%e5%bb%ba&#34; &gt;六、增量式重建&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a class=&#34;link&#34; href=&#34;#%e4%b8%83bundle-adjustment&#34; &gt;七、Bundle Adjustment&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a class=&#34;link&#34; href=&#34;#%e5%85%ab%e5%b0%ba%e5%ba%a6%e5%a4%b1%e8%b4%a5%e5%9c%ba%e6%99%af%e4%b8%8e%e4%b8%8b%e6%b8%b8%e4%bb%bb%e5%8a%a1&#34; &gt;八、尺度、失败场景与下游任务&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a class=&#34;link&#34; href=&#34;#%e4%b9%9d%e6%80%bb%e7%bb%93&#34; &gt;九、总结&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;一sfm-到底在求什么&#34;&gt;一、SfM 到底在求什么
+&lt;/h2&gt;&lt;p&gt;把 SfM 拆开看：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Structure&lt;/strong&gt;：场景里的三维点在哪里；&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Motion&lt;/strong&gt;：相机拍每张照片时在哪里、朝向哪里。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;输入通常是一组有重叠视野的图片，输出则是相机参数和稀疏点云。&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;项目&lt;/th&gt;
+&lt;th&gt;SfM 中的含义&lt;/th&gt;
+&lt;th&gt;典型结果&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;输入图像&lt;/td&gt;
+&lt;td&gt;同一场景的多视角照片，可以有序也可以无序&lt;/td&gt;
+&lt;td&gt;JPG / PNG&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;相机内参&lt;/td&gt;
+&lt;td&gt;焦距、主点、畸变等相机自身参数&lt;/td&gt;
+&lt;td&gt;$K, d$&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;相机外参&lt;/td&gt;
+&lt;td&gt;每张图像对应的位姿&lt;/td&gt;
+&lt;td&gt;$R, t$&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;三维结构&lt;/td&gt;
+&lt;td&gt;被多张图共同观测到的空间点&lt;/td&gt;
+&lt;td&gt;sparse point cloud&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;观测轨迹&lt;/td&gt;
+&lt;td&gt;哪些 2D 特征点来自同一个 3D 点&lt;/td&gt;
+&lt;td&gt;tracks&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;最核心的一句话是：&lt;strong&gt;SfM 通过同名点约束，把“二维像素坐标”反推出“三维点 + 相机位姿”。&lt;/strong&gt;&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;二整体流程&#34;&gt;二、整体流程
+&lt;/h2&gt;&lt;p&gt;&lt;div class=&#34;post-image-container&#34; style=&#34;margin: 15px auto; text-align: center; width: 85%;&#34;&gt;
+    
+    &lt;a href=&#34;sfm-pipeline.svg&#34; 
+        
+       target=&#34;_blank&#34; 
+       class=&#34;gallery-item&#34;&gt; &lt;img src=&#34;sfm-pipeline.svg&#34; 
+             alt=&#34;SfM 整体流水线：从图像输入到稀疏重建&#34; 
+             style=&#34;max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);&#34;&gt;
+             
+    &lt;/a&gt;
+    
+        &lt;span style=&#34;display: block; margin-top: 10px; color: #666; font-size: 0.9em;&#34;&gt;SfM 整体流水线：从图像输入到稀疏重建&lt;/span&gt;
+    
+&lt;/div&gt;&lt;/p&gt;
+&lt;p&gt;一条典型的 SfM 流水线可以拆成 6 步：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;特征提取&lt;/strong&gt;：在每张图里找稳定的局部特征点，例如角点、纹理块、边缘交汇处。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;特征匹配&lt;/strong&gt;：在不同图片之间找“看起来像同一个三维点”的 2D 特征。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;两视图几何估计&lt;/strong&gt;：用匹配点估计基础矩阵 $F$ 或本质矩阵 $E$，过滤错误匹配。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;初始化重建&lt;/strong&gt;：选择一对质量好的图片，估计相对位姿并三角化出第一批 3D 点。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;增量注册相机&lt;/strong&gt;：不断把新图片加入已有重建，用 PnP 求位姿，再三角化新点。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Bundle Adjustment&lt;/strong&gt;：把所有相机和三维点一起优化，最小化重投影误差。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;这条流水线有一个重要特点：&lt;strong&gt;SfM 先追求几何一致性，而不是追求稠密表面。&lt;/strong&gt; 因此它输出的点云通常是稀疏的，但相机位姿很有价值。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;三特征与匹配&#34;&gt;三、特征与匹配
+&lt;/h2&gt;&lt;p&gt;&lt;div class=&#34;post-image-container&#34; style=&#34;margin: 15px auto; text-align: center; width: 85%;&#34;&gt;
+    
+    &lt;a href=&#34;feature-matching.svg&#34; 
+        
+       target=&#34;_blank&#34; 
+       class=&#34;gallery-item&#34;&gt; &lt;img src=&#34;feature-matching.svg&#34; 
+             alt=&#34;特征匹配：在不同照片中找同一个三维点的投影&#34; 
+             style=&#34;max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);&#34;&gt;
+             
+    &lt;/a&gt;
+    
+        &lt;span style=&#34;display: block; margin-top: 10px; color: #666; font-size: 0.9em;&#34;&gt;特征匹配：在不同照片中找同一个三维点的投影&lt;/span&gt;
+    
+&lt;/div&gt;&lt;/p&gt;
+&lt;p&gt;SfM 的第一步不是直接估计三维，而是先回答一个更基础的问题：&lt;strong&gt;照片 A 里的这个点，和照片 B 里的哪个点是同一个真实空间点？&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;这通常靠局部特征完成。一个特征点包含两部分：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;关键点位置&lt;/strong&gt;：它在图像中的 $(u, v)$ 像素坐标；&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;描述子&lt;/strong&gt;：一段向量，用来描述它周围局部纹理的样子。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;常见特征包括 SIFT、SURF、ORB、AKAZE 等。经典 SfM 系统很喜欢 SIFT，因为它对尺度、旋转、光照变化相对稳定；实时或移动端系统则常用 ORB 这类更快的二进制特征。&lt;/p&gt;
+&lt;p&gt;匹配时最直观的方法是：对图像 A 的每个描述子，在图像 B 中找距离最近的描述子。但这会产生很多误匹配，所以还需要过滤：&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;过滤策略&lt;/th&gt;
+&lt;th&gt;作用&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;最近邻比值测试&lt;/td&gt;
+&lt;td&gt;如果第一近和第二近太接近，说明匹配不可靠&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;双向一致性检查&lt;/td&gt;
+&lt;td&gt;A 匹配到 B，B 也必须匹配回 A&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;RANSAC&lt;/td&gt;
+&lt;td&gt;用几何模型反复抽样，剔除不满足对极约束的离群点&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;如果匹配阶段错得太多，后面的几何估计会全部崩掉。所以很多 SfM 工程问题，本质上都是“匹配图不够好”的问题。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;四对极几何&#34;&gt;四、对极几何
+&lt;/h2&gt;&lt;p&gt;&lt;div class=&#34;post-image-container&#34; style=&#34;margin: 15px auto; text-align: center; width: 85%;&#34;&gt;
+    
+    &lt;a href=&#34;epipolar-geometry.svg&#34; 
+        
+       target=&#34;_blank&#34; 
+       class=&#34;gallery-item&#34;&gt; &lt;img src=&#34;epipolar-geometry.svg&#34; 
+             alt=&#34;对极几何：一个点在另一张图中只能落在对应的对极线上&#34; 
+             style=&#34;max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);&#34;&gt;
+             
+    &lt;/a&gt;
+    
+        &lt;span style=&#34;display: block; margin-top: 10px; color: #666; font-size: 0.9em;&#34;&gt;对极几何：一个点在另一张图中只能落在对应的对极线上&lt;/span&gt;
+    
+&lt;/div&gt;&lt;/p&gt;
+&lt;p&gt;有了两张图片之间的匹配点后，SfM 会估计它们之间的相对几何关系。这里最核心的是&lt;strong&gt;对极约束&lt;/strong&gt;：&lt;/p&gt;
+&lt;p&gt;$$
+x_2^\top F x_1 = 0
+$$&lt;/p&gt;
+&lt;p&gt;其中 $x_1$ 和 $x_2$ 是同一个三维点在两张图中的齐次像素坐标，$F$ 是基础矩阵。&lt;/p&gt;
+&lt;p&gt;这条公式表达了一个强约束：&lt;br&gt;
+&lt;strong&gt;给定图 1 中的点 $x_1$，它在图 2 中的对应点 $x_2$ 不可能出现在任意位置，而必须落在一条对极线上。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;如果相机内参 $K$ 已知，可以进一步使用本质矩阵：&lt;/p&gt;
+&lt;p&gt;$$
+E = K_2^\top F K_1
+$$&lt;/p&gt;
+&lt;p&gt;本质矩阵可以分解出两台相机之间的相对旋转 $R$ 和平移方向 $t$。注意这里说的是&lt;strong&gt;平移方向&lt;/strong&gt;，不是绝对距离，因为纯视觉 SfM 天生存在尺度不确定性。&lt;/p&gt;
+&lt;p&gt;在真实数据里，匹配点必然有噪声和误匹配。因此实际估计 $F$ 或 $E$ 时，通常会配合 RANSAC：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;随机抽一小组匹配点；&lt;/li&gt;
+&lt;li&gt;估计一个候选 $F$ 或 $E$；&lt;/li&gt;
+&lt;li&gt;统计有多少匹配点满足对极约束；&lt;/li&gt;
+&lt;li&gt;重复多次，选择内点最多的模型。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;这一步的意义很大：它把“看起来像”的特征匹配，变成了“几何上说得通”的匹配。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;五三角化&#34;&gt;五、三角化
+&lt;/h2&gt;&lt;p&gt;&lt;div class=&#34;post-image-container&#34; style=&#34;margin: 15px auto; text-align: center; width: 85%;&#34;&gt;
+    
+    &lt;a href=&#34;triangulation.svg&#34; 
+        
+       target=&#34;_blank&#34; 
+       class=&#34;gallery-item&#34;&gt; &lt;img src=&#34;triangulation.svg&#34; 
+             alt=&#34;三角化：两条视线在空间中交会，恢复三维点&#34; 
+             style=&#34;max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);&#34;&gt;
+             
+    &lt;/a&gt;
+    
+        &lt;span style=&#34;display: block; margin-top: 10px; color: #666; font-size: 0.9em;&#34;&gt;三角化：两条视线在空间中交会，恢复三维点&lt;/span&gt;
+    
+&lt;/div&gt;&lt;/p&gt;
+&lt;p&gt;当两台相机的相对位姿已知，并且知道同一个点在两张图中的像素位置，就可以把两条观测射线反投影到三维空间。理想情况下，两条射线会在真实三维点处相交。&lt;/p&gt;
+&lt;p&gt;但真实世界不理想：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;像素定位有误差；&lt;/li&gt;
+&lt;li&gt;镜头畸变不可能完全校正；&lt;/li&gt;
+&lt;li&gt;特征匹配可能有轻微偏移；&lt;/li&gt;
+&lt;li&gt;两条射线往往不会精确相交。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;所以三角化通常求的是一个最小二乘意义下的三维点，使它投影回各个相机后的误差尽量小。&lt;/p&gt;
+&lt;p&gt;用投影矩阵 $P_i$ 表示第 $i$ 个相机，用三维点 $X$ 表示空间点，观测像素为 $x_i$，重投影关系可以写成：&lt;/p&gt;
+&lt;p&gt;$$
+x_i \sim P_i X
+$$&lt;/p&gt;
+&lt;p&gt;三角化后还要做几个检查：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;正深度检查&lt;/strong&gt;：点必须在相机前方，不能跑到相机背后；&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;重投影误差检查&lt;/strong&gt;：投影回图像后不能偏离观测点太远；&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;视差检查&lt;/strong&gt;：两张图视角太接近时，三角化会非常不稳定。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这也是为什么拍摄 SfM 数据时，不能只原地转圈拍。原地旋转能估计相机朝向，但几乎没有平移基线，很难稳定恢复深度。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;六增量式重建&#34;&gt;六、增量式重建
+&lt;/h2&gt;&lt;p&gt;&lt;div class=&#34;post-image-container&#34; style=&#34;margin: 15px auto; text-align: center; width: 85%;&#34;&gt;
+    
+    &lt;a href=&#34;incremental-sfm.svg&#34; 
+        
+       target=&#34;_blank&#34; 
+       class=&#34;gallery-item&#34;&gt; &lt;img src=&#34;incremental-sfm.svg&#34; 
+             alt=&#34;增量式 SfM：初始化一对图像，然后反复注册新相机、三角化新点、BA 优化&#34; 
+             style=&#34;max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);&#34;&gt;
+             
+    &lt;/a&gt;
+    
+        &lt;span style=&#34;display: block; margin-top: 10px; color: #666; font-size: 0.9em;&#34;&gt;增量式 SfM：初始化一对图像，然后反复注册新相机、三角化新点、BA 优化&lt;/span&gt;
+    
+&lt;/div&gt;&lt;/p&gt;
+&lt;p&gt;工程上最常见的是&lt;strong&gt;增量式 SfM&lt;/strong&gt;。它不是一次性把所有照片全部解出来，而是先找一对靠谱的种子图像，再逐步扩张。&lt;/p&gt;
+&lt;p&gt;典型循环如下：&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;阶段&lt;/th&gt;
+&lt;th&gt;做什么&lt;/th&gt;
+&lt;th&gt;判断好坏的关键&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;选择种子对&lt;/td&gt;
+&lt;td&gt;找匹配多、视差足、内点比例高的两张图&lt;/td&gt;
+&lt;td&gt;baseline 不能太小&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;初始化&lt;/td&gt;
+&lt;td&gt;分解 $E$ 得到相对位姿，三角化第一批点&lt;/td&gt;
+&lt;td&gt;正深度点足够多&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;注册新图像&lt;/td&gt;
+&lt;td&gt;用已知 3D 点和新图 2D 特征做 PnP&lt;/td&gt;
+&lt;td&gt;2D-3D 对应足够多&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;三角化新点&lt;/td&gt;
+&lt;td&gt;新相机加入后，与旧相机共同生成更多 3D 点&lt;/td&gt;
+&lt;td&gt;视差和误差合格&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;局部 BA&lt;/td&gt;
+&lt;td&gt;优化最近加入的相机和相关点&lt;/td&gt;
+&lt;td&gt;快速修正局部漂移&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;全局 BA&lt;/td&gt;
+&lt;td&gt;间隔性优化所有相机和点&lt;/td&gt;
+&lt;td&gt;抑制累计误差&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;其中 PnP（Perspective-n-Point）解决的是这个问题：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;已知若干个 3D 点 $X_j$，以及它们在当前图片中的 2D 投影 $x_j$，求这张图片对应的相机位姿 $R, t$。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;PnP 是增量式 SfM 能“接上新照片”的关键。只要一张新图能和已有点云建立足够多的 2D-3D 对应，就可以估计它的相机位姿，再继续扩展重建。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;七bundle-adjustment&#34;&gt;七、Bundle Adjustment
+&lt;/h2&gt;&lt;p&gt;&lt;div class=&#34;post-image-container&#34; style=&#34;margin: 15px auto; text-align: center; width: 85%;&#34;&gt;
+    
+    &lt;a href=&#34;bundle-adjustment.svg&#34; 
+        
+       target=&#34;_blank&#34; 
+       class=&#34;gallery-item&#34;&gt; &lt;img src=&#34;bundle-adjustment.svg&#34; 
+             alt=&#34;Bundle Adjustment：同时优化相机位姿和三维点，让重投影误差最小&#34; 
+             style=&#34;max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);&#34;&gt;
+             
+    &lt;/a&gt;
+    
+        &lt;span style=&#34;display: block; margin-top: 10px; color: #666; font-size: 0.9em;&#34;&gt;Bundle Adjustment：同时优化相机位姿和三维点，让重投影误差最小&lt;/span&gt;
+    
+&lt;/div&gt;&lt;/p&gt;
+&lt;p&gt;前面的步骤会不断累积误差：匹配有误差、相机位姿有误差、三角化有误差。Bundle Adjustment（BA）就是 SfM 的全局校准器。&lt;/p&gt;
+&lt;p&gt;它的目标是最小化所有观测的重投影误差：&lt;/p&gt;
+&lt;p&gt;$$
+\min_{{P_i}, {X_j}} \sum_{i,j} \rho \left(\left|x_{ij} - \pi(P_i, X_j)\right|^2\right)
+$$&lt;/p&gt;
+&lt;p&gt;其中：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;$P_i$：第 $i$ 个相机的参数，包括位姿，也可能包括内参；&lt;/li&gt;
+&lt;li&gt;$X_j$：第 $j$ 个三维点；&lt;/li&gt;
+&lt;li&gt;$x_{ij}$：第 $j$ 个点在第 $i$ 张图中的实际观测；&lt;/li&gt;
+&lt;li&gt;$\pi(P_i, X_j)$：把三维点投影到第 $i$ 张图的预测位置；&lt;/li&gt;
+&lt;li&gt;$\rho$：鲁棒损失函数，用来减小离群点影响。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;BA 的直觉很简单：&lt;br&gt;
+&lt;strong&gt;如果某个三维点和相机位姿是对的，那么这个点投影回所有观测过它的照片时，都应该落回原来的特征点附近。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;BA 很耗时，因为变量很多：几百张图、几十万个点、上百万条观测都很常见。但它的稀疏结构非常强：一个观测只连接一个相机和一个三维点。因此实际系统会利用稀疏矩阵和 Schur Complement 来加速求解。&lt;/p&gt;
+&lt;p&gt;没有 BA 的 SfM 往往会出现“局部看起来对，整体慢慢弯掉”的问题；有 BA 后，整个重建会被全局观测一起拉回更一致的位置。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;八尺度失败场景与下游任务&#34;&gt;八、尺度、失败场景与下游任务
+&lt;/h2&gt;&lt;p&gt;&lt;div class=&#34;post-image-container&#34; style=&#34;margin: 15px auto; text-align: center; width: 85%;&#34;&gt;
+    
+    &lt;a href=&#34;sfm-output.svg&#34; 
+        
+       target=&#34;_blank&#34; 
+       class=&#34;gallery-item&#34;&gt; &lt;img src=&#34;sfm-output.svg&#34; 
+             alt=&#34;SfM 的输出：相机位姿和稀疏点云，通常作为 MVS、NeRF、3DGS 的输入&#34; 
+             style=&#34;max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);&#34;&gt;
+             
+    &lt;/a&gt;
+    
+        &lt;span style=&#34;display: block; margin-top: 10px; color: #666; font-size: 0.9em;&#34;&gt;SfM 的输出：相机位姿和稀疏点云，通常作为 MVS、NeRF、3DGS 的输入&lt;/span&gt;
+    
+&lt;/div&gt;&lt;/p&gt;
+&lt;h3 id=&#34;81-尺度不确定性&#34;&gt;8.1 尺度不确定性
+&lt;/h3&gt;&lt;p&gt;单目 SfM 最大的限制是&lt;strong&gt;没有绝对尺度&lt;/strong&gt;。如果所有相机平移和所有三维点坐标同时放大 10 倍，投影到图像上的像素位置不会变。&lt;/p&gt;
+&lt;p&gt;因此 SfM 输出的模型只能确定“相对形状”。要恢复真实尺度，需要额外信息，例如：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;已知相机间基线；&lt;/li&gt;
+&lt;li&gt;标定板或已知尺寸物体；&lt;/li&gt;
+&lt;li&gt;GPS / IMU；&lt;/li&gt;
+&lt;li&gt;深度传感器；&lt;/li&gt;
+&lt;li&gt;人工指定两点距离。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;82-常见失败场景&#34;&gt;8.2 常见失败场景
+&lt;/h3&gt;&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;场景&lt;/th&gt;
+&lt;th&gt;为什么难&lt;/th&gt;
+&lt;th&gt;典型表现&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;纹理少&lt;/td&gt;
+&lt;td&gt;找不到稳定特征&lt;/td&gt;
+&lt;td&gt;白墙、玻璃、纯色物体重建失败&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;重复纹理&lt;/td&gt;
+&lt;td&gt;匹配容易混淆&lt;/td&gt;
+&lt;td&gt;楼宇窗格、栅栏、瓷砖产生错误结构&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;动态物体多&lt;/td&gt;
+&lt;td&gt;几何假设被破坏&lt;/td&gt;
+&lt;td&gt;行人、车辆形成漂浮点&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;视角变化太大&lt;/td&gt;
+&lt;td&gt;特征外观差异大&lt;/td&gt;
+&lt;td&gt;匹配数量不足&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;基线太小&lt;/td&gt;
+&lt;td&gt;深度三角化不稳定&lt;/td&gt;
+&lt;td&gt;点云很扁、深度噪声大&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;纯旋转拍摄&lt;/td&gt;
+&lt;td&gt;没有平移视差&lt;/td&gt;
+&lt;td&gt;能拼全景，但难恢复三维&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;h3 id=&#34;83-和-mvsnerf3dgs-的关系&#34;&gt;8.3 和 MVS、NeRF、3DGS 的关系
+&lt;/h3&gt;&lt;p&gt;SfM 不是完整的三维重建终点，更像是几何地基：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;MVS（Multi-View Stereo）&lt;/strong&gt;：用 SfM 的相机位姿进一步估计稠密深度图、网格和纹理；&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;NeRF&lt;/strong&gt;：通常需要 SfM 提供训练图像对应的相机位姿；&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;3DGS&lt;/strong&gt;：常用 SfM 输出的稀疏点云初始化高斯位置；&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;视觉 SLAM&lt;/strong&gt;：和 SfM 共享很多几何模块，但更强调实时性和在线定位。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;所以当你看到 COLMAP 生成的 sparse reconstruction 时，不要误以为“只重建出这么几个点”。它真正值钱的是：&lt;strong&gt;这些点和相机位姿已经形成了一个几何一致的坐标系。&lt;/strong&gt;&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;九总结&#34;&gt;九、总结
+&lt;/h2&gt;&lt;p&gt;SfM 的主线可以压缩成一句话：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;先用特征匹配建立跨图像对应关系，再用对极几何估计相机关系，用三角化恢复三维点，最后通过 BA 同时优化所有相机和点。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;更工程化地看，它是一套不断回答下面三个问题的系统：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;哪些像素来自同一个三维点？&lt;/strong&gt;&lt;br&gt;
+靠特征匹配、track 构建和 RANSAC 过滤。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;每张照片拍摄时相机在哪里？&lt;/strong&gt;&lt;br&gt;
+靠两视图几何初始化，靠 PnP 增量注册新相机。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;三维点到底在哪里最合理？&lt;/strong&gt;&lt;br&gt;
+靠三角化生成初值，靠 Bundle Adjustment 全局修正。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;理解了 SfM，再看 COLMAP、MVS、NeRF、3DGS 这些系统时，很多流程都会突然清晰起来：它们并不是孤立的技术，而是建立在同一套多视图几何地基之上。&lt;/p&gt;
+</description>
+        </item>
+        
+    </channel>
+</rss>

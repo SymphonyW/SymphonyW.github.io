@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="A visual explanation of Structure from Motion, from feature matching and epipolar geometry to triangulation, PnP, and Bundle Adjustment.">
+<title>How SfM Works: Recovering 3D Structure from Photos</title>
+
+<link rel='canonical' href='https://SymphonyW.github.io/p/sfm-principle/'>
+
+<link rel="stylesheet" href="/scss/style.min.1251edbd5d2188d23e73b1b3b4438816c788f1a85abbe07d1ccd04b6713bba76.css"><meta property='og:title' content="How SfM Works: Recovering 3D Structure from Photos">
+<meta property='og:description' content="A visual explanation of Structure from Motion, from feature matching and epipolar geometry to triangulation, PnP, and Bundle Adjustment.">
+<meta property='og:url' content='https://SymphonyW.github.io/p/sfm-principle/'>
+<meta property='og:site_name' content='SymphonyW'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='SfM' /><meta property='article:tag' content='Computer Vision' /><meta property='article:tag' content='3D Reconstruction' /><meta property='article:published_time' content='2026-07-16T21:46:40&#43;08:00'/><meta property='article:modified_time' content='2026-07-16T21:46:40&#43;08:00'/><meta property='og:image' content='https://SymphonyW.github.io/p/sfm-principle/bg.svg' />
+<meta name="twitter:title" content="How SfM Works: Recovering 3D Structure from Photos">
+<meta name="twitter:description" content="A visual explanation of Structure from Motion, from feature matching and epipolar geometry to triangulation, PnP, and Bundle Adjustment."><meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content='https://SymphonyW.github.io/p/sfm-principle/bg.svg' />
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="Toggle Menu">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hua20e9d08cce84e79524a418ee5d4524c_7426_300x0_resize_box_3.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">😁</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">SymphonyW</a></h1>
+            <h2 class="site-description">Welcome to my Blog.</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0'
+                        target="_blank"
+                        title="Bilibili"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.0.0-beta2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M488.6 104.1C505.3 122.2 513 143.8 511.9 169.8V372.2C511.5 398.6 502.7 420.3 485.4 437.3C468.2 454.3 446.3 463.2 419.9 464H92.02C65.57 463.2 43.81 454.2 26.74 436.8C9.682 419.4 .7667 396.5 0 368.2V169.8C.7667 143.8 9.682 122.2 26.74 104.1C43.81 87.75 65.57 78.77 92.02 78H121.4L96.05 52.19C90.3 46.46 87.42 39.19 87.42 30.4C87.42 21.6 90.3 14.34 96.05 8.603C101.8 2.868 109.1 0 117.9 0C126.7 0 134 2.868 139.8 8.603L213.1 78H301.1L375.6 8.603C381.7 2.868 389.2 0 398 0C406.8 0 414.1 2.868 419.9 8.603C425.6 14.34 428.5 21.6 428.5 30.4C428.5 39.19 425.6 46.46 419.9 52.19L394.6 78L423.9 78C450.3 78.77 471.9 87.75 488.6 104.1H488.6zM449.8 173.8C449.4 164.2 446.1 156.4 439.1 150.3C433.9 144.2 425.1 140.9 416.4 140.5H96.05C86.46 140.9 78.6 144.2 72.47 150.3C66.33 156.4 63.07 164.2 62.69 173.8V368.2C62.69 377.4 65.95 385.2 72.47 391.7C78.99 398.2 86.85 401.5 96.05 401.5H416.4C425.6 401.5 433.4 398.2 439.7 391.7C446 385.2 449.4 377.4 449.8 368.2L449.8 173.8zM185.5 216.5C191.8 222.8 195.2 230.6 195.6 239.7V273C195.2 282.2 191.9 289.9 185.8 296.2C179.6 302.5 171.8 305.7 162.2 305.7C152.6 305.7 144.7 302.5 138.6 296.2C132.5 289.9 129.2 282.2 128.8 273V239.7C129.2 230.6 132.6 222.8 138.9 216.5C145.2 210.2 152.1 206.9 162.2 206.5C171.4 206.9 179.2 210.2 185.5 216.5H185.5zM377 216.5C383.3 222.8 386.7 230.6 387.1 239.7V273C386.7 282.2 383.4 289.9 377.3 296.2C371.2 302.5 363.3 305.7 353.7 305.7C344.1 305.7 336.3 302.5 330.1 296.2C323.1 289.9 320.7 282.2 320.4 273V239.7C320.7 230.6 324.1 222.8 330.4 216.5C336.7 210.2 344.5 206.9 353.7 206.5C362.9 206.9 370.7 210.2 377 216.5H377z"/></svg>
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://github.com/SymphonyW'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>Home</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/post/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Blog</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/stats/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chart-bar" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="12" width="4" height="8" rx="1" />
+  <rect x="10" y="8" width="4" height="12" rx="1" />
+  <rect x="17" y="4" width="4" height="16" rx="1" />
+  <line x1="4" y1="20" x2="20" y2="20" />
+</svg>
+
+                
+                <span>Stats</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch" class="language-switcher">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <div class="language-switcher__tabs" aria-label="Language">
+                                <a class="language-switcher__tab is-current"
+                                        href="/p/sfm-principle/"
+                                        aria-current="true">
+                                        English
+                                    </a>
+                                <a class="language-switcher__tab "
+                                        href="/zh-cn/p/sfm-principle/"
+                                        >
+                                        中文
+                                    </a>
+                                
+                            </div>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>Dark Mode</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">Table of contents</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#what-sfm-solves">What SfM Solves</a></li>
+    <li><a href="#the-pipeline">The Pipeline</a></li>
+    <li><a href="#features-and-matches">Features and Matches</a></li>
+    <li><a href="#epipolar-geometry">Epipolar Geometry</a></li>
+    <li><a href="#triangulation">Triangulation</a></li>
+    <li><a href="#incremental-reconstruction">Incremental Reconstruction</a></li>
+    <li><a href="#bundle-adjustment">Bundle Adjustment</a></li>
+    <li><a href="#scale-failure-cases-and-downstream-use">Scale, Failure Cases, and Downstream Use</a></li>
+    <li><a href="#summary">Summary</a></li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="has-image main-article">
+    <header class="article-header">
+        <div class="article-image">
+            <a href="/p/sfm-principle/">
+                
+                    <img src="/p/sfm-principle/bg.svg" loading="lazy" alt="Featured image of post How SfM Works: Recovering 3D Structure from Photos" />
+                
+            </a>
+        </div>
+    
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/p/sfm-principle/">How SfM Works: Recovering 3D Structure from Photos</a>
+        </h2>
+    
+        
+        <h3 class="article-subtitle">
+            A visual explanation of Structure from Motion, from feature matching and epipolar geometry to triangulation, PnP, and Bundle Adjustment.
+        </h3>
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published">2026-07-16 21:46</time>
+            </div>
+        
+
+        
+    </footer>
+    
+
+    
+        <footer class="article-translations">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+            <div>
+                
+                    <a href="https://SymphonyW.github.io/zh-cn/p/sfm-principle/" class="link">中文</a>
+                
+            </div>
+        </footer>
+    
+</div>
+
+</header>
+
+    
+    <section class="article-tags">
+        
+            <a href="/tags/sfm/">SfM</a>
+        
+            <a href="/tags/computer-vision/">Computer Vision</a>
+        
+            <a href="/tags/3d-reconstruction/">3D Reconstruction</a>
+        
+    </section>
+
+
+    <section class="article-content">
+    
+    
+    <h1 id="how-sfm-works-recovering-3d-structure-from-photos">How SfM Works: Recovering 3D Structure from Photos
+</h1><blockquote>
+<p>Structure from Motion answers a deceptively simple question: <strong>given only photos of the same scene from different viewpoints, can we recover both the camera motion and the 3D structure?</strong><br>
+Yes, but the answer is not magic. It is multi-view geometry stitched into a robust engineering pipeline.</p>
+</blockquote>
+<hr>
+<h2 id="what-sfm-solves">What SfM Solves
+</h2><p>SfM estimates two things at the same time:</p>
+<ul>
+<li><strong>Structure</strong>: where the scene points are in 3D.</li>
+<li><strong>Motion</strong>: where each camera was and how it was oriented when the photo was taken.</li>
+</ul>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Meaning in SfM</th>
+<th>Typical output</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Images</td>
+<td>Overlapping photos of the same scene</td>
+<td>JPG / PNG</td>
+</tr>
+<tr>
+<td>Intrinsics</td>
+<td>Focal length, principal point, distortion</td>
+<td>$K, d$</td>
+</tr>
+<tr>
+<td>Extrinsics</td>
+<td>Pose of every image</td>
+<td>$R, t$</td>
+</tr>
+<tr>
+<td>3D structure</td>
+<td>Points observed by multiple images</td>
+<td>sparse point cloud</td>
+</tr>
+<tr>
+<td>Tracks</td>
+<td>Which 2D observations belong to the same 3D point</td>
+<td>feature tracks</td>
+</tr>
+</tbody>
+</table></div>
+<p>The core idea is: <strong>use corresponding image points to infer cameras and 3D points that are geometrically consistent.</strong></p>
+<hr>
+<h2 id="the-pipeline">The Pipeline
+</h2><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="sfm-pipeline.svg" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="sfm-pipeline.svg" 
+             alt="SfM pipeline from image input to sparse reconstruction" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">SfM pipeline from image input to sparse reconstruction</span>
+    
+</div></p>
+<p>A typical SfM system follows this sequence:</p>
+<ol>
+<li><strong>Extract features</strong> in each image.</li>
+<li><strong>Match features</strong> between overlapping image pairs.</li>
+<li><strong>Estimate two-view geometry</strong> with the fundamental matrix $F$ or essential matrix $E$.</li>
+<li><strong>Initialize</strong> from a strong image pair and triangulate the first 3D points.</li>
+<li><strong>Register new cameras</strong> with PnP and triangulate additional points.</li>
+<li><strong>Run Bundle Adjustment</strong> to jointly refine cameras and 3D structure.</li>
+</ol>
+<p>SfM optimizes for geometric consistency first. Its point cloud is usually sparse, but its camera poses are extremely useful for downstream reconstruction and rendering.</p>
+<hr>
+<h2 id="features-and-matches">Features and Matches
+</h2><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="feature-matching.svg" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="feature-matching.svg" 
+             alt="Feature matching across two images" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">Feature matching across two images</span>
+    
+</div></p>
+<p>Before estimating geometry, SfM must answer a smaller question: <strong>which points in different images are projections of the same 3D point?</strong></p>
+<p>Local features provide this bridge. Each feature has:</p>
+<ul>
+<li>a 2D image location $(u, v)$;</li>
+<li>a descriptor vector that summarizes the local appearance.</li>
+</ul>
+<p>Classic SfM systems often use SIFT because it is relatively stable under scale, rotation, and illumination changes. Faster systems may use ORB or similar binary descriptors.</p>
+<p>Raw descriptor nearest neighbors are not enough. Practical systems filter matches using:</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>Filter</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ratio test</td>
+<td>Reject ambiguous nearest-neighbor matches</td>
+</tr>
+<tr>
+<td>Mutual check</td>
+<td>Keep only matches that agree in both directions</td>
+</tr>
+<tr>
+<td>RANSAC</td>
+<td>Keep matches that fit the estimated geometry</td>
+</tr>
+</tbody>
+</table></div>
+<p>If the match graph is poor, the rest of the reconstruction will be unstable.</p>
+<hr>
+<h2 id="epipolar-geometry">Epipolar Geometry
+</h2><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="epipolar-geometry.svg" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="epipolar-geometry.svg" 
+             alt="Epipolar geometry constraint" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">Epipolar geometry constraint</span>
+    
+</div></p>
+<p>For a matching point pair $x_1$ and $x_2$, the fundamental matrix encodes the epipolar constraint:</p>
+<p>$$
+x_2^\top F x_1 = 0
+$$</p>
+<p>This says that once a point is chosen in image 1, its match in image 2 cannot be anywhere. It must lie on the corresponding epipolar line.</p>
+<p>If camera intrinsics are known, SfM can use the essential matrix:</p>
+<p>$$
+E = K_2^\top F K_1
+$$</p>
+<p>Decomposing $E$ gives the relative rotation $R$ and translation direction $t$ between two cameras. The word “direction” matters: monocular SfM cannot recover absolute scale by itself.</p>
+<p>In real images, matches include noise and outliers, so $F$ or $E$ is usually estimated inside RANSAC. This turns visually plausible matches into geometrically plausible matches.</p>
+<hr>
+<h2 id="triangulation">Triangulation
+</h2><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="triangulation.svg" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="triangulation.svg" 
+             alt="Triangulation recovers a 3D point from two viewing rays" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">Triangulation recovers a 3D point from two viewing rays</span>
+    
+</div></p>
+<p>Once two camera poses and a matching point pair are known, SfM back-projects the two pixels into 3D rays. Ideally, the rays intersect at the true 3D point.</p>
+<p>In practice they almost never intersect exactly, because of feature noise, lens distortion, and imperfect calibration. Triangulation therefore estimates the 3D point that best explains the observed pixels.</p>
+<p>Using a projection matrix $P_i$, a 3D point $X$, and an observed pixel $x_i$:</p>
+<p>$$
+x_i \sim P_i X
+$$</p>
+<p>After triangulation, SfM checks that points are in front of the cameras, have acceptable reprojection error, and were observed with enough parallax. Small baselines make depth estimates unstable.</p>
+<hr>
+<h2 id="incremental-reconstruction">Incremental Reconstruction
+</h2><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="incremental-sfm.svg" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="incremental-sfm.svg" 
+             alt="Incremental SfM loop" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">Incremental SfM loop</span>
+    
+</div></p>
+<p>Most practical SfM pipelines are incremental:</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>Purpose</th>
+<th>Key quality signal</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Choose seed pair</td>
+<td>Start from a strong image pair</td>
+<td>enough parallax and inliers</td>
+</tr>
+<tr>
+<td>Initialize</td>
+<td>Decompose $E$ and triangulate first points</td>
+<td>positive depth points</td>
+</tr>
+<tr>
+<td>Register image</td>
+<td>Estimate a new camera with 2D-3D matches</td>
+<td>PnP inlier count</td>
+</tr>
+<tr>
+<td>Triangulate points</td>
+<td>Add new points visible in multiple cameras</td>
+<td>parallax and reprojection error</td>
+</tr>
+<tr>
+<td>Local BA</td>
+<td>Refine recently affected cameras and points</td>
+<td>fast drift correction</td>
+</tr>
+<tr>
+<td>Global BA</td>
+<td>Refine the full reconstruction</td>
+<td>global consistency</td>
+</tr>
+</tbody>
+</table></div>
+<p>PnP is what lets a new image join an existing model: given known 3D points and their 2D observations in the new image, estimate that image’s camera pose.</p>
+<hr>
+<h2 id="bundle-adjustment">Bundle Adjustment
+</h2><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="bundle-adjustment.svg" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="bundle-adjustment.svg" 
+             alt="Bundle Adjustment refines cameras and 3D points together" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">Bundle Adjustment refines cameras and 3D points together</span>
+    
+</div></p>
+<p>Bundle Adjustment is the global correction step. It jointly optimizes camera parameters and 3D point positions to minimize reprojection error:</p>
+<p>$$
+\min_{{P_i}, {X_j}} \sum_{i,j} \rho \left(\left|x_{ij} - \pi(P_i, X_j)\right|^2\right)
+$$</p>
+<p>Here:</p>
+<ul>
+<li>$P_i$ is the parameter set for camera $i$;</li>
+<li>$X_j$ is 3D point $j$;</li>
+<li>$x_{ij}$ is the observed 2D feature;</li>
+<li>$\pi(P_i, X_j)$ is the predicted projection;</li>
+<li>$\rho$ is a robust loss that reduces the impact of outliers.</li>
+</ul>
+<p>BA can be expensive, but the problem is highly sparse: one observation connects only one camera and one 3D point. Modern solvers exploit this sparsity heavily.</p>
+<p>Without BA, an SfM model may look locally plausible while bending globally. With BA, all observations pull the reconstruction toward one consistent coordinate system.</p>
+<hr>
+<h2 id="scale-failure-cases-and-downstream-use">Scale, Failure Cases, and Downstream Use
+</h2><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="sfm-output.svg" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="sfm-output.svg" 
+             alt="SfM outputs sparse points and camera poses for downstream workflows" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">SfM outputs sparse points and camera poses for downstream workflows</span>
+    
+</div></p>
+<p>Monocular SfM has no absolute scale. If all translations and all 3D points are scaled by the same factor, the projected image coordinates remain unchanged. Real scale requires extra information such as known baselines, calibration targets, GPS/IMU data, depth sensors, or manual distance constraints.</p>
+<p>Common failure cases:</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>Scene</th>
+<th>Why it fails</th>
+<th>Symptom</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Low texture</td>
+<td>few stable features</td>
+<td>blank walls or glass fail</td>
+</tr>
+<tr>
+<td>Repeated texture</td>
+<td>ambiguous matches</td>
+<td>windows, fences, and tiles create wrong geometry</td>
+</tr>
+<tr>
+<td>Dynamic objects</td>
+<td>violates static-scene assumption</td>
+<td>floating points on people or vehicles</td>
+</tr>
+<tr>
+<td>Very wide viewpoint change</td>
+<td>features look too different</td>
+<td>too few matches</td>
+</tr>
+<tr>
+<td>Tiny baseline</td>
+<td>weak triangulation</td>
+<td>flat or noisy depth</td>
+</tr>
+<tr>
+<td>Pure rotation</td>
+<td>no translational parallax</td>
+<td>panorama works, 3D structure does not</td>
+</tr>
+</tbody>
+</table></div>
+<p>SfM is usually not the end of reconstruction. It is the geometric foundation for:</p>
+<ul>
+<li><strong>MVS</strong>: dense depth maps, meshes, and textures;</li>
+<li><strong>NeRF</strong>: camera poses for neural radiance field training;</li>
+<li><strong>3DGS</strong>: sparse points as initial Gaussian positions;</li>
+<li><strong>visual SLAM</strong>: related geometry, but optimized for online operation.</li>
+</ul>
+<hr>
+<h2 id="summary">Summary
+</h2><p>SfM can be summarized as:</p>
+<blockquote>
+<p>match features across images, estimate camera geometry, triangulate 3D points, and refine everything with Bundle Adjustment.</p>
+</blockquote>
+<p>Once this pipeline is clear, tools like COLMAP, MVS systems, NeRF preprocessing, and 3D Gaussian Splatting become easier to understand. They are not isolated tricks; they are built on the same multi-view geometry foundation.</p>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/sfm/">SfM</a>
+        
+            <a href="/tags/computer-vision/">Computer Vision</a>
+        
+            <a href="/tags/3d-reconstruction/">3D Reconstruction</a>
+        
+    </section>
+
+
+    </footer>
+
+
+    
+        <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        renderMathInElement(document.body, {
+            delimiters: [
+                { left: "$$", right: "$$", display: true },
+                { left: "$", right: "$", display: false },
+                { left: "\\(", right: "\\)", display: false },
+                { left: "\\[", right: "\\]", display: true }
+            ],
+            ignoredClasses: ["gist"]
+        });})
+</script>
+    
+</article>
+
+    
+
+    
+
+     
+    
+        
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+        2026 SymphonyW
+    </section>
+    
+    <section class="powerby">
+        Built with <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> <br />
+        Theme <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.26.0">Stack</a></b> designed by <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a>
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.js" defer></script><script type="text/javascript" src="/ts/custom.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+<script>
+window.MathJax = {
+  tex: {
+    
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  svg: {
+    fontCache: 'global'
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    </body>
+</html>

@@ -1,0 +1,354 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+    <channel>
+        <title>SfM on SymphonyW</title>
+        <link>https://SymphonyW.github.io/tags/sfm/</link>
+        <description>Recent content in SfM on SymphonyW</description>
+        <generator>Hugo -- gohugo.io</generator>
+        <language>en</language>
+        <copyright>SymphonyW</copyright>
+        <lastBuildDate>Thu, 16 Jul 2026 21:46:40 +0800</lastBuildDate><atom:link href="https://SymphonyW.github.io/tags/sfm/index.xml" rel="self" type="application/rss+xml" /><item>
+        <title>How SfM Works: Recovering 3D Structure from Photos</title>
+        <link>https://SymphonyW.github.io/p/sfm-principle/</link>
+        <pubDate>Thu, 16 Jul 2026 21:46:40 +0800</pubDate>
+        
+        <guid>https://SymphonyW.github.io/p/sfm-principle/</guid>
+        <description>&lt;img src="https://SymphonyW.github.io/p/sfm-principle/bg.svg" alt="Featured image of post How SfM Works: Recovering 3D Structure from Photos" /&gt;&lt;h1 id=&#34;how-sfm-works-recovering-3d-structure-from-photos&#34;&gt;How SfM Works: Recovering 3D Structure from Photos
+&lt;/h1&gt;&lt;blockquote&gt;
+&lt;p&gt;Structure from Motion answers a deceptively simple question: &lt;strong&gt;given only photos of the same scene from different viewpoints, can we recover both the camera motion and the 3D structure?&lt;/strong&gt;&lt;br&gt;
+Yes, but the answer is not magic. It is multi-view geometry stitched into a robust engineering pipeline.&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;what-sfm-solves&#34;&gt;What SfM Solves
+&lt;/h2&gt;&lt;p&gt;SfM estimates two things at the same time:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Structure&lt;/strong&gt;: where the scene points are in 3D.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Motion&lt;/strong&gt;: where each camera was and how it was oriented when the photo was taken.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Item&lt;/th&gt;
+&lt;th&gt;Meaning in SfM&lt;/th&gt;
+&lt;th&gt;Typical output&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;Images&lt;/td&gt;
+&lt;td&gt;Overlapping photos of the same scene&lt;/td&gt;
+&lt;td&gt;JPG / PNG&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Intrinsics&lt;/td&gt;
+&lt;td&gt;Focal length, principal point, distortion&lt;/td&gt;
+&lt;td&gt;$K, d$&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Extrinsics&lt;/td&gt;
+&lt;td&gt;Pose of every image&lt;/td&gt;
+&lt;td&gt;$R, t$&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;3D structure&lt;/td&gt;
+&lt;td&gt;Points observed by multiple images&lt;/td&gt;
+&lt;td&gt;sparse point cloud&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Tracks&lt;/td&gt;
+&lt;td&gt;Which 2D observations belong to the same 3D point&lt;/td&gt;
+&lt;td&gt;feature tracks&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;The core idea is: &lt;strong&gt;use corresponding image points to infer cameras and 3D points that are geometrically consistent.&lt;/strong&gt;&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;the-pipeline&#34;&gt;The Pipeline
+&lt;/h2&gt;&lt;p&gt;&lt;div class=&#34;post-image-container&#34; style=&#34;margin: 15px auto; text-align: center; width: 85%;&#34;&gt;
+    
+    &lt;a href=&#34;sfm-pipeline.svg&#34; 
+        
+       target=&#34;_blank&#34; 
+       class=&#34;gallery-item&#34;&gt; &lt;img src=&#34;sfm-pipeline.svg&#34; 
+             alt=&#34;SfM pipeline from image input to sparse reconstruction&#34; 
+             style=&#34;max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);&#34;&gt;
+             
+    &lt;/a&gt;
+    
+        &lt;span style=&#34;display: block; margin-top: 10px; color: #666; font-size: 0.9em;&#34;&gt;SfM pipeline from image input to sparse reconstruction&lt;/span&gt;
+    
+&lt;/div&gt;&lt;/p&gt;
+&lt;p&gt;A typical SfM system follows this sequence:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;Extract features&lt;/strong&gt; in each image.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Match features&lt;/strong&gt; between overlapping image pairs.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Estimate two-view geometry&lt;/strong&gt; with the fundamental matrix $F$ or essential matrix $E$.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Initialize&lt;/strong&gt; from a strong image pair and triangulate the first 3D points.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Register new cameras&lt;/strong&gt; with PnP and triangulate additional points.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Run Bundle Adjustment&lt;/strong&gt; to jointly refine cameras and 3D structure.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;SfM optimizes for geometric consistency first. Its point cloud is usually sparse, but its camera poses are extremely useful for downstream reconstruction and rendering.&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;features-and-matches&#34;&gt;Features and Matches
+&lt;/h2&gt;&lt;p&gt;&lt;div class=&#34;post-image-container&#34; style=&#34;margin: 15px auto; text-align: center; width: 85%;&#34;&gt;
+    
+    &lt;a href=&#34;feature-matching.svg&#34; 
+        
+       target=&#34;_blank&#34; 
+       class=&#34;gallery-item&#34;&gt; &lt;img src=&#34;feature-matching.svg&#34; 
+             alt=&#34;Feature matching across two images&#34; 
+             style=&#34;max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);&#34;&gt;
+             
+    &lt;/a&gt;
+    
+        &lt;span style=&#34;display: block; margin-top: 10px; color: #666; font-size: 0.9em;&#34;&gt;Feature matching across two images&lt;/span&gt;
+    
+&lt;/div&gt;&lt;/p&gt;
+&lt;p&gt;Before estimating geometry, SfM must answer a smaller question: &lt;strong&gt;which points in different images are projections of the same 3D point?&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;Local features provide this bridge. Each feature has:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;a 2D image location $(u, v)$;&lt;/li&gt;
+&lt;li&gt;a descriptor vector that summarizes the local appearance.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Classic SfM systems often use SIFT because it is relatively stable under scale, rotation, and illumination changes. Faster systems may use ORB or similar binary descriptors.&lt;/p&gt;
+&lt;p&gt;Raw descriptor nearest neighbors are not enough. Practical systems filter matches using:&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Filter&lt;/th&gt;
+&lt;th&gt;Purpose&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;Ratio test&lt;/td&gt;
+&lt;td&gt;Reject ambiguous nearest-neighbor matches&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Mutual check&lt;/td&gt;
+&lt;td&gt;Keep only matches that agree in both directions&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;RANSAC&lt;/td&gt;
+&lt;td&gt;Keep matches that fit the estimated geometry&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;If the match graph is poor, the rest of the reconstruction will be unstable.&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;epipolar-geometry&#34;&gt;Epipolar Geometry
+&lt;/h2&gt;&lt;p&gt;&lt;div class=&#34;post-image-container&#34; style=&#34;margin: 15px auto; text-align: center; width: 85%;&#34;&gt;
+    
+    &lt;a href=&#34;epipolar-geometry.svg&#34; 
+        
+       target=&#34;_blank&#34; 
+       class=&#34;gallery-item&#34;&gt; &lt;img src=&#34;epipolar-geometry.svg&#34; 
+             alt=&#34;Epipolar geometry constraint&#34; 
+             style=&#34;max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);&#34;&gt;
+             
+    &lt;/a&gt;
+    
+        &lt;span style=&#34;display: block; margin-top: 10px; color: #666; font-size: 0.9em;&#34;&gt;Epipolar geometry constraint&lt;/span&gt;
+    
+&lt;/div&gt;&lt;/p&gt;
+&lt;p&gt;For a matching point pair $x_1$ and $x_2$, the fundamental matrix encodes the epipolar constraint:&lt;/p&gt;
+&lt;p&gt;$$
+x_2^\top F x_1 = 0
+$$&lt;/p&gt;
+&lt;p&gt;This says that once a point is chosen in image 1, its match in image 2 cannot be anywhere. It must lie on the corresponding epipolar line.&lt;/p&gt;
+&lt;p&gt;If camera intrinsics are known, SfM can use the essential matrix:&lt;/p&gt;
+&lt;p&gt;$$
+E = K_2^\top F K_1
+$$&lt;/p&gt;
+&lt;p&gt;Decomposing $E$ gives the relative rotation $R$ and translation direction $t$ between two cameras. The word “direction” matters: monocular SfM cannot recover absolute scale by itself.&lt;/p&gt;
+&lt;p&gt;In real images, matches include noise and outliers, so $F$ or $E$ is usually estimated inside RANSAC. This turns visually plausible matches into geometrically plausible matches.&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;triangulation&#34;&gt;Triangulation
+&lt;/h2&gt;&lt;p&gt;&lt;div class=&#34;post-image-container&#34; style=&#34;margin: 15px auto; text-align: center; width: 85%;&#34;&gt;
+    
+    &lt;a href=&#34;triangulation.svg&#34; 
+        
+       target=&#34;_blank&#34; 
+       class=&#34;gallery-item&#34;&gt; &lt;img src=&#34;triangulation.svg&#34; 
+             alt=&#34;Triangulation recovers a 3D point from two viewing rays&#34; 
+             style=&#34;max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);&#34;&gt;
+             
+    &lt;/a&gt;
+    
+        &lt;span style=&#34;display: block; margin-top: 10px; color: #666; font-size: 0.9em;&#34;&gt;Triangulation recovers a 3D point from two viewing rays&lt;/span&gt;
+    
+&lt;/div&gt;&lt;/p&gt;
+&lt;p&gt;Once two camera poses and a matching point pair are known, SfM back-projects the two pixels into 3D rays. Ideally, the rays intersect at the true 3D point.&lt;/p&gt;
+&lt;p&gt;In practice they almost never intersect exactly, because of feature noise, lens distortion, and imperfect calibration. Triangulation therefore estimates the 3D point that best explains the observed pixels.&lt;/p&gt;
+&lt;p&gt;Using a projection matrix $P_i$, a 3D point $X$, and an observed pixel $x_i$:&lt;/p&gt;
+&lt;p&gt;$$
+x_i \sim P_i X
+$$&lt;/p&gt;
+&lt;p&gt;After triangulation, SfM checks that points are in front of the cameras, have acceptable reprojection error, and were observed with enough parallax. Small baselines make depth estimates unstable.&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;incremental-reconstruction&#34;&gt;Incremental Reconstruction
+&lt;/h2&gt;&lt;p&gt;&lt;div class=&#34;post-image-container&#34; style=&#34;margin: 15px auto; text-align: center; width: 85%;&#34;&gt;
+    
+    &lt;a href=&#34;incremental-sfm.svg&#34; 
+        
+       target=&#34;_blank&#34; 
+       class=&#34;gallery-item&#34;&gt; &lt;img src=&#34;incremental-sfm.svg&#34; 
+             alt=&#34;Incremental SfM loop&#34; 
+             style=&#34;max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);&#34;&gt;
+             
+    &lt;/a&gt;
+    
+        &lt;span style=&#34;display: block; margin-top: 10px; color: #666; font-size: 0.9em;&#34;&gt;Incremental SfM loop&lt;/span&gt;
+    
+&lt;/div&gt;&lt;/p&gt;
+&lt;p&gt;Most practical SfM pipelines are incremental:&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Stage&lt;/th&gt;
+&lt;th&gt;Purpose&lt;/th&gt;
+&lt;th&gt;Key quality signal&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;Choose seed pair&lt;/td&gt;
+&lt;td&gt;Start from a strong image pair&lt;/td&gt;
+&lt;td&gt;enough parallax and inliers&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Initialize&lt;/td&gt;
+&lt;td&gt;Decompose $E$ and triangulate first points&lt;/td&gt;
+&lt;td&gt;positive depth points&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Register image&lt;/td&gt;
+&lt;td&gt;Estimate a new camera with 2D-3D matches&lt;/td&gt;
+&lt;td&gt;PnP inlier count&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Triangulate points&lt;/td&gt;
+&lt;td&gt;Add new points visible in multiple cameras&lt;/td&gt;
+&lt;td&gt;parallax and reprojection error&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Local BA&lt;/td&gt;
+&lt;td&gt;Refine recently affected cameras and points&lt;/td&gt;
+&lt;td&gt;fast drift correction&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Global BA&lt;/td&gt;
+&lt;td&gt;Refine the full reconstruction&lt;/td&gt;
+&lt;td&gt;global consistency&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;PnP is what lets a new image join an existing model: given known 3D points and their 2D observations in the new image, estimate that image’s camera pose.&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;bundle-adjustment&#34;&gt;Bundle Adjustment
+&lt;/h2&gt;&lt;p&gt;&lt;div class=&#34;post-image-container&#34; style=&#34;margin: 15px auto; text-align: center; width: 85%;&#34;&gt;
+    
+    &lt;a href=&#34;bundle-adjustment.svg&#34; 
+        
+       target=&#34;_blank&#34; 
+       class=&#34;gallery-item&#34;&gt; &lt;img src=&#34;bundle-adjustment.svg&#34; 
+             alt=&#34;Bundle Adjustment refines cameras and 3D points together&#34; 
+             style=&#34;max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);&#34;&gt;
+             
+    &lt;/a&gt;
+    
+        &lt;span style=&#34;display: block; margin-top: 10px; color: #666; font-size: 0.9em;&#34;&gt;Bundle Adjustment refines cameras and 3D points together&lt;/span&gt;
+    
+&lt;/div&gt;&lt;/p&gt;
+&lt;p&gt;Bundle Adjustment is the global correction step. It jointly optimizes camera parameters and 3D point positions to minimize reprojection error:&lt;/p&gt;
+&lt;p&gt;$$
+\min_{{P_i}, {X_j}} \sum_{i,j} \rho \left(\left|x_{ij} - \pi(P_i, X_j)\right|^2\right)
+$$&lt;/p&gt;
+&lt;p&gt;Here:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;$P_i$ is the parameter set for camera $i$;&lt;/li&gt;
+&lt;li&gt;$X_j$ is 3D point $j$;&lt;/li&gt;
+&lt;li&gt;$x_{ij}$ is the observed 2D feature;&lt;/li&gt;
+&lt;li&gt;$\pi(P_i, X_j)$ is the predicted projection;&lt;/li&gt;
+&lt;li&gt;$\rho$ is a robust loss that reduces the impact of outliers.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;BA can be expensive, but the problem is highly sparse: one observation connects only one camera and one 3D point. Modern solvers exploit this sparsity heavily.&lt;/p&gt;
+&lt;p&gt;Without BA, an SfM model may look locally plausible while bending globally. With BA, all observations pull the reconstruction toward one consistent coordinate system.&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;scale-failure-cases-and-downstream-use&#34;&gt;Scale, Failure Cases, and Downstream Use
+&lt;/h2&gt;&lt;p&gt;&lt;div class=&#34;post-image-container&#34; style=&#34;margin: 15px auto; text-align: center; width: 85%;&#34;&gt;
+    
+    &lt;a href=&#34;sfm-output.svg&#34; 
+        
+       target=&#34;_blank&#34; 
+       class=&#34;gallery-item&#34;&gt; &lt;img src=&#34;sfm-output.svg&#34; 
+             alt=&#34;SfM outputs sparse points and camera poses for downstream workflows&#34; 
+             style=&#34;max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);&#34;&gt;
+             
+    &lt;/a&gt;
+    
+        &lt;span style=&#34;display: block; margin-top: 10px; color: #666; font-size: 0.9em;&#34;&gt;SfM outputs sparse points and camera poses for downstream workflows&lt;/span&gt;
+    
+&lt;/div&gt;&lt;/p&gt;
+&lt;p&gt;Monocular SfM has no absolute scale. If all translations and all 3D points are scaled by the same factor, the projected image coordinates remain unchanged. Real scale requires extra information such as known baselines, calibration targets, GPS/IMU data, depth sensors, or manual distance constraints.&lt;/p&gt;
+&lt;p&gt;Common failure cases:&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Scene&lt;/th&gt;
+&lt;th&gt;Why it fails&lt;/th&gt;
+&lt;th&gt;Symptom&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;Low texture&lt;/td&gt;
+&lt;td&gt;few stable features&lt;/td&gt;
+&lt;td&gt;blank walls or glass fail&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Repeated texture&lt;/td&gt;
+&lt;td&gt;ambiguous matches&lt;/td&gt;
+&lt;td&gt;windows, fences, and tiles create wrong geometry&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Dynamic objects&lt;/td&gt;
+&lt;td&gt;violates static-scene assumption&lt;/td&gt;
+&lt;td&gt;floating points on people or vehicles&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Very wide viewpoint change&lt;/td&gt;
+&lt;td&gt;features look too different&lt;/td&gt;
+&lt;td&gt;too few matches&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Tiny baseline&lt;/td&gt;
+&lt;td&gt;weak triangulation&lt;/td&gt;
+&lt;td&gt;flat or noisy depth&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Pure rotation&lt;/td&gt;
+&lt;td&gt;no translational parallax&lt;/td&gt;
+&lt;td&gt;panorama works, 3D structure does not&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;SfM is usually not the end of reconstruction. It is the geometric foundation for:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;MVS&lt;/strong&gt;: dense depth maps, meshes, and textures;&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;NeRF&lt;/strong&gt;: camera poses for neural radiance field training;&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;3DGS&lt;/strong&gt;: sparse points as initial Gaussian positions;&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;visual SLAM&lt;/strong&gt;: related geometry, but optimized for online operation.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;summary&#34;&gt;Summary
+&lt;/h2&gt;&lt;p&gt;SfM can be summarized as:&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;match features across images, estimate camera geometry, triangulate 3D points, and refine everything with Bundle Adjustment.&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Once this pipeline is clear, tools like COLMAP, MVS systems, NeRF preprocessing, and 3D Gaussian Splatting become easier to understand. They are not isolated tricks; they are built on the same multi-view geometry foundation.&lt;/p&gt;
+</description>
+        </item>
+        
+    </channel>
+</rss>
