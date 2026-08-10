@@ -1,0 +1,1741 @@
+<!DOCTYPE html>
+<html lang="zh-cn" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="面向已经学过 Docker 的读者，从概念映射、本地集群、Deployment、Service、ConfigMap、Secret、Ingress、发布回滚和排错开始系统入门 Kubernetes。">
+<title>从 Docker 到 Kubernetes：面向 Docker 用户的 K8s 从 0 到 1 教程</title>
+
+<link rel='canonical' href='https://SymphonyW.github.io/zh-cn/p/kubernetes-from-docker/'>
+
+<link rel="stylesheet" href="/scss/style.min.4687047a1903756c84bf7a1cf7cbbf4e26bef4a42dd5bc620df47badaeed46c2.css"><meta property='og:title' content="从 Docker 到 Kubernetes：面向 Docker 用户的 K8s 从 0 到 1 教程">
+<meta property='og:description' content="面向已经学过 Docker 的读者，从概念映射、本地集群、Deployment、Service、ConfigMap、Secret、Ingress、发布回滚和排错开始系统入门 Kubernetes。">
+<meta property='og:url' content='https://SymphonyW.github.io/zh-cn/p/kubernetes-from-docker/'>
+<meta property='og:site_name' content='SymphonyW'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='Kubernetes' /><meta property='article:tag' content='K8s' /><meta property='article:tag' content='Docker' /><meta property='article:tag' content='DevOps' /><meta property='article:tag' content='Cloud Native' /><meta property='article:published_time' content='2026-08-08T18:32:47&#43;08:00'/><meta property='article:modified_time' content='2026-08-08T18:32:47&#43;08:00'/><meta property='og:image' content='https://SymphonyW.github.io/zh-cn/p/kubernetes-from-docker/bg.png' />
+<meta name="twitter:title" content="从 Docker 到 Kubernetes：面向 Docker 用户的 K8s 从 0 到 1 教程">
+<meta name="twitter:description" content="面向已经学过 Docker 的读者，从概念映射、本地集群、Deployment、Service、ConfigMap、Secret、Ingress、发布回滚和排错开始系统入门 Kubernetes。"><meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content='https://SymphonyW.github.io/zh-cn/p/kubernetes-from-docker/bg.png' />
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/zh-cn/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu5ea07d2842502bdd7540f9cbc4b41b95_5278_300x0_resize_box_3.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">😁</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/zh-cn">SymphonyW</a></h1>
+            <h2 class="site-description">Welcome to my Blog.</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0'
+                        target="_blank"
+                        title="Bilibili"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.0.0-beta2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M488.6 104.1C505.3 122.2 513 143.8 511.9 169.8V372.2C511.5 398.6 502.7 420.3 485.4 437.3C468.2 454.3 446.3 463.2 419.9 464H92.02C65.57 463.2 43.81 454.2 26.74 436.8C9.682 419.4 .7667 396.5 0 368.2V169.8C.7667 143.8 9.682 122.2 26.74 104.1C43.81 87.75 65.57 78.77 92.02 78H121.4L96.05 52.19C90.3 46.46 87.42 39.19 87.42 30.4C87.42 21.6 90.3 14.34 96.05 8.603C101.8 2.868 109.1 0 117.9 0C126.7 0 134 2.868 139.8 8.603L213.1 78H301.1L375.6 8.603C381.7 2.868 389.2 0 398 0C406.8 0 414.1 2.868 419.9 8.603C425.6 14.34 428.5 21.6 428.5 30.4C428.5 39.19 425.6 46.46 419.9 52.19L394.6 78L423.9 78C450.3 78.77 471.9 87.75 488.6 104.1H488.6zM449.8 173.8C449.4 164.2 446.1 156.4 439.1 150.3C433.9 144.2 425.1 140.9 416.4 140.5H96.05C86.46 140.9 78.6 144.2 72.47 150.3C66.33 156.4 63.07 164.2 62.69 173.8V368.2C62.69 377.4 65.95 385.2 72.47 391.7C78.99 398.2 86.85 401.5 96.05 401.5H416.4C425.6 401.5 433.4 398.2 439.7 391.7C446 385.2 449.4 377.4 449.8 368.2L449.8 173.8zM185.5 216.5C191.8 222.8 195.2 230.6 195.6 239.7V273C195.2 282.2 191.9 289.9 185.8 296.2C179.6 302.5 171.8 305.7 162.2 305.7C152.6 305.7 144.7 302.5 138.6 296.2C132.5 289.9 129.2 282.2 128.8 273V239.7C129.2 230.6 132.6 222.8 138.9 216.5C145.2 210.2 152.1 206.9 162.2 206.5C171.4 206.9 179.2 210.2 185.5 216.5H185.5zM377 216.5C383.3 222.8 386.7 230.6 387.1 239.7V273C386.7 282.2 383.4 289.9 377.3 296.2C371.2 302.5 363.3 305.7 353.7 305.7C344.1 305.7 336.3 302.5 330.1 296.2C323.1 289.9 320.7 282.2 320.4 273V239.7C320.7 230.6 324.1 222.8 330.4 216.5C336.7 210.2 344.5 206.9 353.7 206.5C362.9 206.9 370.7 210.2 377 216.5H377z"/></svg>
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://github.com/SymphonyW'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/zh-cn/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/zh-cn/post/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>博客</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>归档</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/stats/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chart-bar" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="12" width="4" height="8" rx="1" />
+  <rect x="10" y="8" width="4" height="12" rx="1" />
+  <rect x="17" y="4" width="4" height="16" rx="1" />
+  <line x1="4" y1="20" x2="20" y2="20" />
+</svg>
+
+                
+                <span>写作记录</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/diary/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-event" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12z" />
+  <path d="M16 3v4" />
+  <path d="M8 3v4" />
+  <path d="M4 11h16" />
+  <path d="M8 15h2v2h-2z" />
+</svg>
+
+                
+                <span>日记</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>搜索</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>链接</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch" class="language-switcher">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <div class="language-switcher__tabs" aria-label="Language">
+                                <a class="language-switcher__tab "
+                                        href="/p/kubernetes-from-docker/"
+                                        >
+                                        English
+                                    </a>
+                                <a class="language-switcher__tab is-current"
+                                        href="/zh-cn/p/kubernetes-from-docker/"
+                                        aria-current="true">
+                                        中文
+                                    </a>
+                                
+                            </div>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#一先换脑docker-管一台机器k8s-管一组机器">一、先换脑：Docker 管一台机器，K8s 管一组机器</a></li>
+    <li><a href="#二k8s-集群到底长什么样">二、K8s 集群到底长什么样</a></li>
+    <li><a href="#三准备本地实验环境">三、准备本地实验环境</a></li>
+    <li><a href="#四先用命令跑一个应用">四、先用命令跑一个应用</a></li>
+    <li><a href="#五真正入门用-yaml-声明应用">五、真正入门：用 YAML 声明应用</a></li>
+    <li><a href="#六发布扩缩容和回滚">六、发布、扩缩容和回滚</a></li>
+    <li><a href="#七配置和密钥不要把所有东西塞进镜像">七、配置和密钥：不要把所有东西塞进镜像</a></li>
+    <li><a href="#八service-和-ingress应用怎么被访问">八、Service 和 Ingress：应用怎么被访问</a></li>
+    <li><a href="#九排错先看状态再看事件和日志">九、排错：先看状态，再看事件和日志</a></li>
+    <li><a href="#十从能跑到能用下一步学什么">十、从能跑到能用：下一步学什么</a></li>
+    <li><a href="#参考资料">参考资料</a></li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="has-image main-article">
+    <header class="article-header">
+        <div class="article-image">
+            <a href="/zh-cn/p/kubernetes-from-docker/">
+                <img src="/zh-cn/p/kubernetes-from-docker/bg_hud58105b44ca3d738c5259844df54d51d_98528_800x0_resize_box_3.png"
+                        srcset="/zh-cn/p/kubernetes-from-docker/bg_hud58105b44ca3d738c5259844df54d51d_98528_800x0_resize_box_3.png 800w, /zh-cn/p/kubernetes-from-docker/bg_hud58105b44ca3d738c5259844df54d51d_98528_1600x0_resize_box_3.png 1600w"
+                        width="800" 
+                        height="450" 
+                        loading="lazy"
+                        alt="Featured image of post 从 Docker 到 Kubernetes：面向 Docker 用户的 K8s 从 0 到 1 教程" />
+                
+            </a>
+        </div>
+    
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/zh-cn/p/kubernetes-from-docker/">从 Docker 到 Kubernetes：面向 Docker 用户的 K8s 从 0 到 1 教程</a>
+        </h2>
+    
+        
+        <h3 class="article-subtitle">
+            面向已经学过 Docker 的读者，从概念映射、本地集群、Deployment、Service、ConfigMap、Secret、Ingress、发布回滚和排错开始系统入门 Kubernetes。
+        </h3>
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published">2026-08-08 18:32</time>
+            </div>
+        
+
+        
+    </footer>
+    
+
+    
+        <footer class="article-translations">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+            <div>
+                
+                    <a href="https://SymphonyW.github.io/p/kubernetes-from-docker/" class="link">English</a>
+                
+            </div>
+        </footer>
+    
+</div>
+
+</header>
+
+    
+    <section class="article-tags">
+        
+            <a href="/zh-cn/tags/kubernetes/">Kubernetes</a>
+        
+            <a href="/zh-cn/tags/k8s/">K8s</a>
+        
+            <a href="/zh-cn/tags/docker/">Docker</a>
+        
+            <a href="/zh-cn/tags/devops/">DevOps</a>
+        
+            <a href="/zh-cn/tags/cloud-native/">Cloud Native</a>
+        
+    </section>
+
+
+    <section class="article-content">
+    
+    
+    <h1 id="从-docker-到-kubernetes面向-docker-用户的-k8s-从-0-到-1-教程">从 Docker 到 Kubernetes：面向 Docker 用户的 K8s 从 0 到 1 教程
+</h1><blockquote>
+<p>你已经学过 Docker，说明你已经知道镜像、容器、端口映射、环境变量和日志这些东西。Kubernetes 的入门难点不在于“又多了几个命令”，而在于它把单机容器运行，升级成了<strong>面向集群的声明式应用管理</strong>。</p>
+</blockquote>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="bg.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="bg.png" 
+             alt="从 Docker 到 Kubernetes 的学习路线封面" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">从 Docker 到 Kubernetes 的学习路线封面</span>
+    
+</div></p>
+<p>本文会从 Docker 用户最熟悉的视角切入，带你完成一条完整路径：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>学完后你应该能做到</th>
+<th>对应能力</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>看懂 Pod、Deployment、Service、ConfigMap、Secret、Ingress</td>
+<td>理解 K8s 核心资源</td>
+</tr>
+<tr>
+<td>在本地启动一个 K8s 集群</td>
+<td>用 Docker Desktop、kind 或 minikube 做实验</td>
+</tr>
+<tr>
+<td>把一个 Nginx 应用部署到集群</td>
+<td>编写并应用 YAML</td>
+</tr>
+<tr>
+<td>暴露服务并在浏览器访问</td>
+<td>使用 Service、port-forward、Ingress</td>
+</tr>
+<tr>
+<td>扩缩容、滚动更新、回滚</td>
+<td>掌握发布运维基本动作</td>
+</tr>
+<tr>
+<td>排查常见错误</td>
+<td>用 <code>kubectl describe</code>、<code>logs</code>、<code>exec</code>、<code>events</code> 定位问题</td>
+</tr>
+</tbody>
+</table></div>
+<p>本文不追求把 Kubernetes 的所有概念一次塞完。先把主干跑通，再回头补网络、存储、权限、调度和生产治理，学习效率会高很多。</p>
+<hr>
+<h2 id="一先换脑docker-管一台机器k8s-管一组机器">一、先换脑：Docker 管一台机器，K8s 管一组机器
+</h2><p>用 Docker 时，你常常是在一台机器上执行：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">docker run -d --name web -p 8080:80 -e <span class="nv">APP_ENV</span><span class="o">=</span>prod nginx:alpine
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这条命令已经包含了很多信息：用什么镜像、叫什么容器、暴露什么端口、传什么环境变量、后台运行。</p>
+<p>到了 Kubernetes，思路会变成：</p>
+<blockquote>
+<p>我不直接告诉某台机器“启动这个容器”，我向集群提交一份 YAML，声明“我希望有 3 个副本一直运行，并通过一个稳定服务入口访问”。至于 Pod 放在哪个节点、挂了以后谁重建、更新时怎么替换，交给 Kubernetes 的控制器处理。</p>
+</blockquote>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="docker-k8s-map.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="docker-k8s-map.png" 
+             alt="Docker 概念如何映射到 K8s" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">Docker 概念如何映射到 K8s</span>
+    
+</div></p>
+<p>可以先用这张表记住最常用的映射：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>Docker 里你熟悉的东西</th>
+<th>Kubernetes 里的对应概念</th>
+<th>变化点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Container</td>
+<td>Pod</td>
+<td>Pod 是调度最小单位，里面通常放一个主容器</td>
+</tr>
+<tr>
+<td><code>docker run</code></td>
+<td>Deployment</td>
+<td>不只启动一次，而是持续维护期望副本数</td>
+</tr>
+<tr>
+<td><code>-p 8080:80</code></td>
+<td>Service / Ingress</td>
+<td>容器 IP 会变，访问入口需要抽象出来</td>
+</tr>
+<tr>
+<td><code>-e</code> / <code>.env</code></td>
+<td>ConfigMap / Secret</td>
+<td>配置从镜像里拆出来，由集群注入</td>
+</tr>
+<tr>
+<td><code>docker logs</code></td>
+<td><code>kubectl logs</code></td>
+<td>查看 Pod 或 Deployment 的日志</td>
+</tr>
+<tr>
+<td><code>docker exec</code></td>
+<td><code>kubectl exec</code></td>
+<td>进入某个 Pod 内部排查</td>
+</tr>
+<tr>
+<td>Docker Compose</td>
+<td>多个 K8s YAML 或 Helm Chart</td>
+<td>从本地多容器编排变成集群资源编排</td>
+</tr>
+</tbody>
+</table></div>
+<p>一句话总结：<strong>Docker 解决“容器怎么打包和运行”，Kubernetes 解决“很多容器如何在集群里持续稳定运行”。</strong></p>
+<hr>
+<h2 id="二k8s-集群到底长什么样">二、K8s 集群到底长什么样
+</h2><p>Kubernetes 集群通常由两类角色组成：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>角色</th>
+<th>负责什么</th>
+<th>可以怎么理解</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Control Plane 控制面</td>
+<td>接收 API 请求、保存状态、调度 Pod、运行控制器</td>
+<td>集群的大脑</td>
+</tr>
+<tr>
+<td>Worker Node 工作节点</td>
+<td>真正运行 Pod，维护容器网络和节点状态</td>
+<td>集群的工人</td>
+</tr>
+</tbody>
+</table></div>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="k8s-architecture.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="k8s-architecture.png" 
+             alt="Kubernetes 集群架构" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">Kubernetes 集群架构</span>
+    
+</div></p>
+<p>你平时敲的 <code>kubectl</code> 并不是直接控制容器，而是向 API Server 发请求。API Server 把你提交的资源写进集群状态，控制器再不断把“实际状态”调整成“期望状态”。</p>
+<p>这就是 Kubernetes 最核心的机制：<strong>声明式 + 控制循环</strong>。</p>
+<p>举个例子：</p>
+<ol>
+<li>你声明 <code>replicas: 3</code>。</li>
+<li>控制器发现当前只有 2 个 Pod。</li>
+<li>控制器创建第 3 个 Pod。</li>
+<li>某个 Pod 挂了，实际状态又变成 2 个。</li>
+<li>控制器继续补回 3 个。</li>
+</ol>
+<p>所以 K8s 不是一个“执行脚本工具”，而是一个持续工作的状态管理系统。</p>
+<hr>
+<h2 id="三准备本地实验环境">三、准备本地实验环境
+</h2><p>如果你已经学过 Docker，大概率已经安装了 Docker Desktop。入门阶段有三条常见路线：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>方案</th>
+<th>适合谁</th>
+<th>特点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Docker Desktop 内置 Kubernetes</td>
+<td>Windows / macOS 新手</td>
+<td>图形界面开启，最省事</td>
+</tr>
+<tr>
+<td>kind</td>
+<td>已经熟悉 Docker CLI 的人</td>
+<td>用 Docker 容器模拟 K8s 节点，创建和删除很快</td>
+</tr>
+<tr>
+<td>minikube</td>
+<td>想体验更完整本地集群的人</td>
+<td>插件丰富，文档多，适合学习</td>
+</tr>
+</tbody>
+</table></div>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="local-lab-flow.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="local-lab-flow.png" 
+             alt="本地 K8s 实验环境流程" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">本地 K8s 实验环境流程</span>
+    
+</div></p>
+<p>无论选择哪种方式，最终目标都一样：让 <code>kubectl</code> 能连上一个可用集群。</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl version --client
+</span></span><span class="line"><span class="cl">kubectl get nodes
+</span></span><span class="line"><span class="cl">kubectl get namespaces
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>如果能看到节点，说明本地集群已经可用：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">NAME             STATUS   ROLES           AGE   VERSION
+</span></span><span class="line"><span class="cl">docker-desktop   Ready    control-plane   10m   v1.xx.x
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>如果你还没有安装工具，建议优先看官方入口：</p>
+<ul>
+<li>kubectl 安装入口：<a class="link" href="https://kubernetes.io/docs/tasks/tools/"  target="_blank" rel="noopener"
+    >Install and Set Up kubectl</a></li>
+<li>kind 快速开始：<a class="link" href="https://kind.sigs.k8s.io/docs/user/quick-start/"  target="_blank" rel="noopener"
+    >kind Quick Start</a></li>
+<li>minikube 快速开始：<a class="link" href="https://minikube.sigs.k8s.io/docs/start/"  target="_blank" rel="noopener"
+    >minikube start</a></li>
+</ul>
+<p>本教程后面的命令只依赖通用的 <code>kubectl</code>，不强绑定某个本地集群方案。</p>
+<hr>
+<h2 id="四先用命令跑一个应用">四、先用命令跑一个应用
+</h2><p>先不用急着写 YAML，先用命令感受一下 Kubernetes 如何运行容器。</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl create deployment web --image<span class="o">=</span>nginx:1.27-alpine --port<span class="o">=</span><span class="m">80</span>
+</span></span><span class="line"><span class="cl">kubectl get deployments
+</span></span><span class="line"><span class="cl">kubectl get pods -o wide
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>你会看到 Kubernetes 创建了一个 Deployment，并由它管理一个 Pod。</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl expose deployment web --type<span class="o">=</span>ClusterIP --port<span class="o">=</span><span class="m">80</span>
+</span></span><span class="line"><span class="cl">kubectl get services
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p><code>ClusterIP</code> 只能在集群内部访问。为了在本机浏览器打开它，可以临时做端口转发：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl port-forward service/web 8080:80
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>然后打开：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">http://localhost:8080
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>你应该能看到 Nginx 欢迎页。</p>
+<p>这个过程和 Docker 很像：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>Docker</th>
+<th>Kubernetes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>docker run nginx</code></td>
+<td><code>kubectl create deployment web --image=nginx</code></td>
+</tr>
+<tr>
+<td><code>docker ps</code></td>
+<td><code>kubectl get pods</code></td>
+</tr>
+<tr>
+<td><code>docker logs &lt;container&gt;</code></td>
+<td><code>kubectl logs &lt;pod&gt;</code></td>
+</tr>
+<tr>
+<td><code>docker stop &lt;container&gt;</code></td>
+<td><code>kubectl delete pod &lt;pod&gt;</code>，但 Deployment 会自动拉起新 Pod</td>
+</tr>
+</tbody>
+</table></div>
+<p>注意最后一点：如果你直接删除 Pod，它会被自动重建。</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl delete pod &lt;你的 Pod 名字&gt;
+</span></span><span class="line"><span class="cl">kubectl get pods
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这就是 Deployment 的价值：它关心的是“应该有几个 Pod 活着”，而不是“某个具体 Pod 必须永远活着”。</p>
+<hr>
+<h2 id="五真正入门用-yaml-声明应用">五、真正入门：用 YAML 声明应用
+</h2><p>命令适合体验，真正的 Kubernetes 项目会把资源写成 YAML，和代码一起进 Git。这样才方便审查、回滚、复用和自动化部署。</p>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="yaml-resource-lifecycle.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="yaml-resource-lifecycle.png" 
+             alt="声明式发布流程" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">声明式发布流程</span>
+    
+</div></p>
+<p>新建一个 <code>app.yaml</code>：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span><span class="lnt">25
+</span><span class="lnt">26
+</span><span class="lnt">27
+</span><span class="lnt">28
+</span><span class="lnt">29
+</span><span class="lnt">30
+</span><span class="lnt">31
+</span><span class="lnt">32
+</span><span class="lnt">33
+</span><span class="lnt">34
+</span><span class="lnt">35
+</span><span class="lnt">36
+</span><span class="lnt">37
+</span><span class="lnt">38
+</span><span class="lnt">39
+</span><span class="lnt">40
+</span><span class="lnt">41
+</span><span class="lnt">42
+</span><span class="lnt">43
+</span><span class="lnt">44
+</span><span class="lnt">45
+</span><span class="lnt">46
+</span><span class="lnt">47
+</span><span class="lnt">48
+</span><span class="lnt">49
+</span><span class="lnt">50
+</span><span class="lnt">51
+</span><span class="lnt">52
+</span><span class="lnt">53
+</span><span class="lnt">54
+</span><span class="lnt">55
+</span><span class="lnt">56
+</span><span class="lnt">57
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">v1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">Namespace</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">k8s-lab</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nn">---</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">apps/v1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">Deployment</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">web</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l">k8s-lab</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">spec</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span><span class="m">3</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">selector</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">matchLabels</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l">web</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">template</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">labels</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l">web</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">spec</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">containers</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">nginx</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l">nginx:1.27-alpine</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">ports</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span>- <span class="nt">containerPort</span><span class="p">:</span><span class="w"> </span><span class="m">80</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">resources</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">requests</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;50m&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;64Mi&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">limits</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;200m&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;128Mi&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">readinessProbe</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">httpGet</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l">/</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="m">80</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">initialDelaySeconds</span><span class="p">:</span><span class="w"> </span><span class="m">5</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">periodSeconds</span><span class="p">:</span><span class="w"> </span><span class="m">10</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">livenessProbe</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">httpGet</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l">/</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="m">80</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">initialDelaySeconds</span><span class="p">:</span><span class="w"> </span><span class="m">15</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">periodSeconds</span><span class="p">:</span><span class="w"> </span><span class="m">20</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nn">---</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">v1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">Service</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">web</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l">k8s-lab</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">spec</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">selector</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l">web</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">ports</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="m">80</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">targetPort</span><span class="p">:</span><span class="w"> </span><span class="m">80</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l">ClusterIP</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>应用它：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl apply -f app.yaml
+</span></span><span class="line"><span class="cl">kubectl -n k8s-lab get deployments,replicasets,pods,services -o wide
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>再访问：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl -n k8s-lab port-forward service/web 8080:80
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这里有几个字段必须理解：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>字段</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>apiVersion</code></td>
+<td>资源使用哪个 API 版本</td>
+</tr>
+<tr>
+<td><code>kind</code></td>
+<td>资源类型，比如 Deployment、Service</td>
+</tr>
+<tr>
+<td><code>metadata.name</code></td>
+<td>资源名字</td>
+</tr>
+<tr>
+<td><code>metadata.namespace</code></td>
+<td>资源所在命名空间</td>
+</tr>
+<tr>
+<td><code>spec</code></td>
+<td>你期望资源长什么样</td>
+</tr>
+<tr>
+<td><code>selector.matchLabels</code></td>
+<td>Deployment 如何找到自己管理的 Pod</td>
+</tr>
+<tr>
+<td><code>template.metadata.labels</code></td>
+<td>Pod 身上的标签</td>
+</tr>
+<tr>
+<td><code>replicas</code></td>
+<td>期望副本数</td>
+</tr>
+<tr>
+<td><code>resources.requests</code></td>
+<td>调度时预留的资源</td>
+</tr>
+<tr>
+<td><code>resources.limits</code></td>
+<td>容器最多能用多少资源</td>
+</tr>
+<tr>
+<td><code>readinessProbe</code></td>
+<td>Pod 是否准备好接流量</td>
+</tr>
+<tr>
+<td><code>livenessProbe</code></td>
+<td>Pod 是否还活着，失败后可重启</td>
+</tr>
+</tbody>
+</table></div>
+<p>最容易写错的是 <code>selector</code> 和 <code>labels</code>。Deployment 的 <code>selector.matchLabels</code> 必须匹配 Pod 模板里的 <code>template.metadata.labels</code>，否则 Deployment 找不到自己要管理的 Pod。</p>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="pod-deployment-service.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="pod-deployment-service.png" 
+             alt="Pod、Deployment、Service 的关系" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">Pod、Deployment、Service 的关系</span>
+    
+</div></p>
+<p>日常开发里，你可以先记住这条链：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">Deployment -&gt; ReplicaSet -&gt; Pod
+</span></span><span class="line"><span class="cl">Service -&gt; 根据 label 找到一组 Pod -&gt; 提供稳定访问入口
+</span></span></code></pre></td></tr></table>
+</div>
+</div><hr>
+<h2 id="六发布扩缩容和回滚">六、发布、扩缩容和回滚
+</h2><p>Kubernetes 的发布能力主要围绕 Deployment 展开。</p>
+<p>查看当前发布状态：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl -n k8s-lab rollout status deployment/web
+</span></span><span class="line"><span class="cl">kubectl -n k8s-lab rollout <span class="nb">history</span> deployment/web
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>扩容到 5 个副本：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl -n k8s-lab scale deployment/web --replicas<span class="o">=</span><span class="m">5</span>
+</span></span><span class="line"><span class="cl">kubectl -n k8s-lab get pods
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>缩回 3 个副本：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl -n k8s-lab scale deployment/web --replicas<span class="o">=</span><span class="m">3</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>更新镜像：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl -n k8s-lab <span class="nb">set</span> image deployment/web <span class="nv">nginx</span><span class="o">=</span>nginx:stable-alpine
+</span></span><span class="line"><span class="cl">kubectl -n k8s-lab rollout status deployment/web
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>如果更新后发现有问题，回滚：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl -n k8s-lab rollout undo deployment/web
+</span></span><span class="line"><span class="cl">kubectl -n k8s-lab rollout status deployment/web
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这里的关键点是：Kubernetes 默认会滚动更新。它不会一次性杀掉所有旧 Pod，而是逐步创建新 Pod、等待新 Pod 就绪，再替换旧 Pod。</p>
+<p>生产环境里不要随便用 <code>latest</code> 镜像标签。更推荐使用不可变版本号，例如：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">registry.example.com/team/web:2026-08-08-1730-a1b2c3d
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这样你才能知道线上到底跑的是哪一次构建，也方便回滚和审计。</p>
+<hr>
+<h2 id="七配置和密钥不要把所有东西塞进镜像">七、配置和密钥：不要把所有东西塞进镜像
+</h2><p>在 Docker 里你可能会这样传环境变量：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">docker run -e <span class="nv">APP_MODE</span><span class="o">=</span>prod -e <span class="nv">API_TOKEN</span><span class="o">=</span>xxx my-app:1.0
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>在 Kubernetes 里，普通配置通常放 <code>ConfigMap</code>，敏感信息通常放 <code>Secret</code>。</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">v1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">ConfigMap</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">web-config</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l">k8s-lab</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">data</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">APP_MODE</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;demo&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">WELCOME_TEXT</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;Hello Kubernetes&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nn">---</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">v1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">Secret</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">web-secret</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l">k8s-lab</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l">Opaque</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">stringData</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">API_TOKEN</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;replace-me&#34;</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>在 Deployment 里注入：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">envFrom</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span>- <span class="nt">configMapRef</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">web-config</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span>- <span class="nt">secretRef</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">web-secret</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>完整位置是在容器配置下：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">containers</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">nginx</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l">nginx:1.27-alpine</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">envFrom</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="nt">configMapRef</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">web-config</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="nt">secretRef</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">web-secret</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>需要注意：Kubernetes 的 Secret 默认只是做了编码和访问控制，不等于天然加密保险箱。生产环境要结合 RBAC、etcd 加密、外部密钥系统和最小权限一起设计。</p>
+<hr>
+<h2 id="八service-和-ingress应用怎么被访问">八、Service 和 Ingress：应用怎么被访问
+</h2><p>Pod 的 IP 会变，不能把 Pod IP 当成长期入口。Service 的作用就是给一组 Pod 一个稳定入口。</p>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="service-ingress-flow.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="service-ingress-flow.png" 
+             alt="从外部访问集群里的应用" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">从外部访问集群里的应用</span>
+    
+</div></p>
+<p>常见入口方式：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>方式</th>
+<th>解决什么问题</th>
+<th>适合场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ClusterIP</code></td>
+<td>集群内部访问</td>
+<td>默认方式，服务之间互调</td>
+</tr>
+<tr>
+<td><code>NodePort</code></td>
+<td>从节点端口访问服务</td>
+<td>本地实验、临时调试</td>
+</tr>
+<tr>
+<td><code>LoadBalancer</code></td>
+<td>云厂商创建外部负载均衡</td>
+<td>云上生产入口</td>
+</tr>
+<tr>
+<td><code>Ingress</code></td>
+<td>基于域名和路径转发 HTTP/HTTPS</td>
+<td>Web 服务生产入口</td>
+</tr>
+<tr>
+<td><code>port-forward</code></td>
+<td>本机临时转发到 Pod 或 Service</td>
+<td>开发调试</td>
+</tr>
+</tbody>
+</table></div>
+<p>本地学习最稳的是 <code>port-forward</code>：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl -n k8s-lab port-forward service/web 8080:80
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Ingress 需要先安装或启用 Ingress Controller。启用后，一个典型 Ingress 资源长这样：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">networking.k8s.io/v1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">Ingress</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">web</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l">k8s-lab</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">spec</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">rules</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="l">web.localtest.me</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">http</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">paths</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span>- <span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l">/</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">pathType</span><span class="p">:</span><span class="w"> </span><span class="l">Prefix</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">backend</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">service</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">web</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                </span><span class="nt">port</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                  </span><span class="nt">number</span><span class="p">:</span><span class="w"> </span><span class="m">80</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>可以把 Ingress 理解成集群入口处的 HTTP 路由器。它不是直接替代 Service，而是把外部 HTTP 流量转发到 Service，再由 Service 转到后面的 Pod。</p>
+<hr>
+<h2 id="九排错先看状态再看事件和日志">九、排错：先看状态，再看事件和日志
+</h2><p>初学 K8s 最常见的挫败感是：YAML 已经 <code>apply</code> 了，但服务就是访问不了。不要靠猜，按固定路线排。</p>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="troubleshooting-map.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="troubleshooting-map.png" 
+             alt="K8s 排错路线图" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">K8s 排错路线图</span>
+    
+</div></p>
+<p>先看资源是否存在：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl -n k8s-lab get deployments,pods,services -o wide
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>看 Pod 详情和事件：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl -n k8s-lab describe pod &lt;pod-name&gt;
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>看日志：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl -n k8s-lab logs &lt;pod-name&gt;
+</span></span><span class="line"><span class="cl">kubectl -n k8s-lab logs deployment/web
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>进入容器：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl -n k8s-lab <span class="nb">exec</span> -it &lt;pod-name&gt; -- sh
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>按时间查看事件：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl -n k8s-lab get events --sort-by<span class="o">=</span>.metadata.creationTimestamp
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>常见状态可以这样判断：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>状态</th>
+<th>常见原因</th>
+<th>优先看什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ImagePullBackOff</code></td>
+<td>镜像名、tag、仓库权限错误</td>
+<td><code>describe pod</code> 的 Events</td>
+</tr>
+<tr>
+<td><code>CrashLoopBackOff</code></td>
+<td>应用启动后反复退出</td>
+<td><code>logs</code></td>
+</tr>
+<tr>
+<td><code>Pending</code></td>
+<td>没有合适节点、资源不足、PVC 未绑定</td>
+<td><code>describe pod</code></td>
+</tr>
+<tr>
+<td><code>Running</code> 但访问不了</td>
+<td>Service selector 错、端口错、readiness 未通过</td>
+<td><code>get svc</code>、<code>describe endpoints</code></td>
+</tr>
+<tr>
+<td><code>OOMKilled</code></td>
+<td>内存超过 limit</td>
+<td><code>describe pod</code>、资源配置</td>
+</tr>
+</tbody>
+</table></div>
+<p>一个非常实用的检查顺序：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">kubectl get pods
+</span></span><span class="line"><span class="cl">-&gt; kubectl describe pod
+</span></span><span class="line"><span class="cl">-&gt; kubectl logs
+</span></span><span class="line"><span class="cl">-&gt; kubectl get svc/endpoints
+</span></span><span class="line"><span class="cl">-&gt; kubectl exec
+</span></span><span class="line"><span class="cl">-&gt; kubectl get events
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>如果你在 Docker 里已经习惯了 <code>logs</code> 和 <code>exec</code>，K8s 排错并不陌生，只是目标对象从“容器”变成了“Pod 和资源清单”。</p>
+<hr>
+<h2 id="十从能跑到能用下一步学什么">十、从能跑到能用：下一步学什么
+</h2><p>学完本文，你已经有了 Kubernetes 的主干认知。后面建议按这个顺序补：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>重点</th>
+<th>为什么先学它</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>基础资源</td>
+<td>Pod、Deployment、Service、ConfigMap、Secret、Namespace</td>
+<td>每天都会用</td>
+</tr>
+<tr>
+<td>发布能力</td>
+<td>RollingUpdate、Rollback、健康检查、资源限制</td>
+<td>直接影响稳定性</td>
+</tr>
+<tr>
+<td>网络入口</td>
+<td>Service、Ingress、DNS、NetworkPolicy</td>
+<td>解决服务访问和隔离</td>
+</tr>
+<tr>
+<td>存储</td>
+<td>Volume、PVC、StorageClass</td>
+<td>有状态应用必需</td>
+</tr>
+<tr>
+<td>权限</td>
+<td>ServiceAccount、Role、RoleBinding、RBAC</td>
+<td>多人和生产集群必需</td>
+</tr>
+<tr>
+<td>包管理</td>
+<td>Kustomize、Helm</td>
+<td>管理复杂 YAML</td>
+</tr>
+<tr>
+<td>运维观测</td>
+<td>Metrics、日志、Tracing、告警</td>
+<td>线上排障必需</td>
+</tr>
+</tbody>
+</table></div>
+<p>最后清理实验环境：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl delete namespace k8s-lab
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>如果你用 kind 或 minikube 创建了专门的本地集群，可以继续删除集群：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kind delete cluster --name k8s-lab
+</span></span><span class="line"><span class="cl">minikube delete
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Kubernetes 入门时不要急着背所有资源。先记住这条线：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">镜像 -&gt; Deployment -&gt; Pod -&gt; Service -&gt; Ingress
+</span></span><span class="line"><span class="cl">配置 -&gt; ConfigMap / Secret
+</span></span><span class="line"><span class="cl">运维 -&gt; rollout / scale / logs / describe / exec
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这条线跑通了，你就已经从“会用 Docker 跑容器”，走到了“会用 Kubernetes 管应用”的门口。</p>
+<hr>
+<h2 id="参考资料">参考资料
+</h2><ul>
+<li><a class="link" href="https://kubernetes.io/docs/tasks/tools/"  target="_blank" rel="noopener"
+    >Kubernetes 官方文档：安装工具</a></li>
+<li><a class="link" href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"  target="_blank" rel="noopener"
+    >Kubernetes 官方文档：Deployment</a></li>
+<li><a class="link" href="https://kubernetes.io/docs/concepts/services-networking/service/"  target="_blank" rel="noopener"
+    >Kubernetes 官方文档：Service</a></li>
+<li><a class="link" href="https://kubernetes.io/docs/concepts/configuration/configmap/"  target="_blank" rel="noopener"
+    >Kubernetes 官方文档：ConfigMap</a></li>
+<li><a class="link" href="https://kubernetes.io/docs/concepts/configuration/secret/"  target="_blank" rel="noopener"
+    >Kubernetes 官方文档：Secret</a></li>
+<li><a class="link" href="https://kubernetes.io/docs/concepts/services-networking/ingress/"  target="_blank" rel="noopener"
+    >Kubernetes 官方文档：Ingress</a></li>
+<li><a class="link" href="https://kind.sigs.k8s.io/docs/user/quick-start/"  target="_blank" rel="noopener"
+    >kind 官方 Quick Start</a></li>
+<li><a class="link" href="https://minikube.sigs.k8s.io/docs/start/"  target="_blank" rel="noopener"
+    >minikube 官方 start</a></li>
+</ul>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/zh-cn/tags/kubernetes/">Kubernetes</a>
+        
+            <a href="/zh-cn/tags/k8s/">K8s</a>
+        
+            <a href="/zh-cn/tags/docker/">Docker</a>
+        
+            <a href="/zh-cn/tags/devops/">DevOps</a>
+        
+            <a href="/zh-cn/tags/cloud-native/">Cloud Native</a>
+        
+    </section>
+
+
+    </footer>
+
+
+    
+</article>
+
+    
+
+    
+
+<aside class="related-content--wrapper">
+    <h2 class="section-title">相关文章</h2>
+    <div class="related-content">
+        <div class="flex article-list--tile">
+            
+                
+<article class="has-image">
+    <a href="/zh-cn/p/docker-k8s-openshift/">
+        
+        
+            <div class="article-image">
+                <img src="/zh-cn/p/docker-k8s-openshift/bg.8af52e85e313fce3e7315fb642d8953a_huc90e2dbd83968f0005f7aa5826d340ba_110572_250x150_fill_box_smart1_3.png" 
+                        width="250" 
+                        height="150" 
+                        loading="lazy"
+                        alt="Featured image of post Docker、Kubernetes、OpenShift 的关系、特点与区别"
+                        data-key="docker-k8s-openshift" 
+                        data-hash="md5-ivUuheMT/OPnMV&#43;2QtiVOg==">
+                
+            </div>
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Docker、Kubernetes、OpenShift 的关系、特点与区别</h2>
+        </div>
+    </a>
+</article>
+
+            
+        </div>
+    </div>
+</aside>
+
+     
+    
+        
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+        2026 SymphonyW
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.26.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.js" defer></script><script type="text/javascript" src="/ts/custom.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+<script>
+window.MathJax = {
+  tex: {
+    
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  svg: {
+    fontCache: 'global'
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    </body>
+</html>
