@@ -1,0 +1,1913 @@
+<!DOCTYPE html>
+<html lang="zh-cn" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="以公司内部 Kubernetes 容器云平台为背景，梳理从服务准备、Dockerfile 编写、镜像构建与推送，到创建工作负载、配置服务入口、发布验证和常见排错的完整流程。">
+<title>K8s 容器云平台服务部署流程：从 Dockerfile 打包镜像到上线</title>
+
+<link rel='canonical' href='https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/'>
+
+<link rel="stylesheet" href="/scss/style.min.4687047a1903756c84bf7a1cf7cbbf4e26bef4a42dd5bc620df47badaeed46c2.css"><meta property='og:title' content="K8s 容器云平台服务部署流程：从 Dockerfile 打包镜像到上线">
+<meta property='og:description' content="以公司内部 Kubernetes 容器云平台为背景，梳理从服务准备、Dockerfile 编写、镜像构建与推送，到创建工作负载、配置服务入口、发布验证和常见排错的完整流程。">
+<meta property='og:url' content='https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/'>
+<meta property='og:site_name' content='SymphonyW'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='Kubernetes' /><meta property='article:tag' content='K8s' /><meta property='article:tag' content='Docker' /><meta property='article:tag' content='DevOps' /><meta property='article:tag' content='Cloud Native' /><meta property='article:published_time' content='2026-09-03T22:11:19&#43;08:00'/><meta property='article:modified_time' content='2026-09-03T22:11:19&#43;08:00'/><meta property='og:image' content='https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/bg.svg' />
+<meta name="twitter:title" content="K8s 容器云平台服务部署流程：从 Dockerfile 打包镜像到上线">
+<meta name="twitter:description" content="以公司内部 Kubernetes 容器云平台为背景，梳理从服务准备、Dockerfile 编写、镜像构建与推送，到创建工作负载、配置服务入口、发布验证和常见排错的完整流程。"><meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content='https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/bg.svg' />
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/zh-cn/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu5ea07d2842502bdd7540f9cbc4b41b95_5278_300x0_resize_box_3.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">😁</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/zh-cn">SymphonyW</a></h1>
+            <h2 class="site-description">Welcome to my Blog.</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0'
+                        target="_blank"
+                        title="Bilibili"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.0.0-beta2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M488.6 104.1C505.3 122.2 513 143.8 511.9 169.8V372.2C511.5 398.6 502.7 420.3 485.4 437.3C468.2 454.3 446.3 463.2 419.9 464H92.02C65.57 463.2 43.81 454.2 26.74 436.8C9.682 419.4 .7667 396.5 0 368.2V169.8C.7667 143.8 9.682 122.2 26.74 104.1C43.81 87.75 65.57 78.77 92.02 78H121.4L96.05 52.19C90.3 46.46 87.42 39.19 87.42 30.4C87.42 21.6 90.3 14.34 96.05 8.603C101.8 2.868 109.1 0 117.9 0C126.7 0 134 2.868 139.8 8.603L213.1 78H301.1L375.6 8.603C381.7 2.868 389.2 0 398 0C406.8 0 414.1 2.868 419.9 8.603C425.6 14.34 428.5 21.6 428.5 30.4C428.5 39.19 425.6 46.46 419.9 52.19L394.6 78L423.9 78C450.3 78.77 471.9 87.75 488.6 104.1H488.6zM449.8 173.8C449.4 164.2 446.1 156.4 439.1 150.3C433.9 144.2 425.1 140.9 416.4 140.5H96.05C86.46 140.9 78.6 144.2 72.47 150.3C66.33 156.4 63.07 164.2 62.69 173.8V368.2C62.69 377.4 65.95 385.2 72.47 391.7C78.99 398.2 86.85 401.5 96.05 401.5H416.4C425.6 401.5 433.4 398.2 439.7 391.7C446 385.2 449.4 377.4 449.8 368.2L449.8 173.8zM185.5 216.5C191.8 222.8 195.2 230.6 195.6 239.7V273C195.2 282.2 191.9 289.9 185.8 296.2C179.6 302.5 171.8 305.7 162.2 305.7C152.6 305.7 144.7 302.5 138.6 296.2C132.5 289.9 129.2 282.2 128.8 273V239.7C129.2 230.6 132.6 222.8 138.9 216.5C145.2 210.2 152.1 206.9 162.2 206.5C171.4 206.9 179.2 210.2 185.5 216.5H185.5zM377 216.5C383.3 222.8 386.7 230.6 387.1 239.7V273C386.7 282.2 383.4 289.9 377.3 296.2C371.2 302.5 363.3 305.7 353.7 305.7C344.1 305.7 336.3 302.5 330.1 296.2C323.1 289.9 320.7 282.2 320.4 273V239.7C320.7 230.6 324.1 222.8 330.4 216.5C336.7 210.2 344.5 206.9 353.7 206.5C362.9 206.9 370.7 210.2 377 216.5H377z"/></svg>
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://github.com/SymphonyW'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/zh-cn/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/zh-cn/post/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>博客</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>归档</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/stats/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chart-bar" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="12" width="4" height="8" rx="1" />
+  <rect x="10" y="8" width="4" height="12" rx="1" />
+  <rect x="17" y="4" width="4" height="16" rx="1" />
+  <line x1="4" y1="20" x2="20" y2="20" />
+</svg>
+
+                
+                <span>写作记录</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/diary/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-event" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12z" />
+  <path d="M16 3v4" />
+  <path d="M8 3v4" />
+  <path d="M4 11h16" />
+  <path d="M8 15h2v2h-2z" />
+</svg>
+
+                
+                <span>日记</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>搜索</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>链接</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch" class="language-switcher">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <div class="language-switcher__tabs" aria-label="Language">
+                                <a class="language-switcher__tab "
+                                        href="/p/k8s-container-cloud-deployment/"
+                                        >
+                                        English
+                                    </a>
+                                <a class="language-switcher__tab is-current"
+                                        href="/zh-cn/p/k8s-container-cloud-deployment/"
+                                        aria-current="true">
+                                        中文
+                                    </a>
+                                
+                            </div>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#一部署前先确认什么">一、部署前先确认什么</a></li>
+    <li><a href="#二重点根据-dockerfile-打包镜像">二、重点：根据 Dockerfile 打包镜像</a>
+      <ol>
+        <li><a href="#1-先理解-dockerfile-常用指令">1. 先理解 Dockerfile 常用指令</a></li>
+        <li><a href="#2-一个通用的镜像构建流程">2. 一个通用的镜像构建流程</a></li>
+        <li><a href="#3-go-服务-dockerfile-示例">3. Go 服务 Dockerfile 示例</a></li>
+        <li><a href="#4-java-spring-boot-服务-dockerfile-示例">4. Java Spring Boot 服务 Dockerfile 示例</a></li>
+        <li><a href="#5-nodejs-服务-dockerfile-示例">5. Node.js 服务 Dockerfile 示例</a></li>
+        <li><a href="#6-镜像-tag-怎么命名">6. 镜像 Tag 怎么命名</a></li>
+        <li><a href="#7-构建架构要和集群节点一致">7. 构建架构要和集群节点一致</a></li>
+        <li><a href="#8-登录并推送镜像仓库">8. 登录并推送镜像仓库</a></li>
+      </ol>
+    </li>
+    <li><a href="#三在容器云平台创建工作负载">三、在容器云平台创建工作负载</a></li>
+    <li><a href="#四配置服务入口">四、配置服务入口</a></li>
+    <li><a href="#五发布验证和回滚">五、发布、验证和回滚</a></li>
+    <li><a href="#六常见问题速查">六、常见问题速查</a></li>
+    <li><a href="#七上线前检查清单">七、上线前检查清单</a></li>
+    <li><a href="#总结">总结</a></li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="has-image main-article">
+    <header class="article-header">
+        <div class="article-image">
+            <a href="/zh-cn/p/k8s-container-cloud-deployment/">
+                
+                    <img src="/zh-cn/p/k8s-container-cloud-deployment/bg.svg" loading="lazy" alt="Featured image of post K8s 容器云平台服务部署流程：从 Dockerfile 打包镜像到上线" />
+                
+            </a>
+        </div>
+    
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/zh-cn/p/k8s-container-cloud-deployment/">K8s 容器云平台服务部署流程：从 Dockerfile 打包镜像到上线</a>
+        </h2>
+    
+        
+        <h3 class="article-subtitle">
+            以公司内部 Kubernetes 容器云平台为背景，梳理从服务准备、Dockerfile 编写、镜像构建与推送，到创建工作负载、配置服务入口、发布验证和常见排错的完整流程。
+        </h3>
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published">2026-09-03 22:11</time>
+            </div>
+        
+
+        
+    </footer>
+    
+
+    
+        <footer class="article-translations">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+            <div>
+                
+                    <a href="https://SymphonyW.github.io/p/k8s-container-cloud-deployment/" class="link">English</a>
+                
+            </div>
+        </footer>
+    
+</div>
+
+</header>
+
+    
+    <section class="article-tags">
+        
+            <a href="/zh-cn/tags/kubernetes/">Kubernetes</a>
+        
+            <a href="/zh-cn/tags/k8s/">K8s</a>
+        
+            <a href="/zh-cn/tags/docker/">Docker</a>
+        
+            <a href="/zh-cn/tags/devops/">DevOps</a>
+        
+            <a href="/zh-cn/tags/cloud-native/">Cloud Native</a>
+        
+    </section>
+
+
+    <section class="article-content">
+    
+    
+    <h1 id="k8s-容器云平台服务部署流程从-dockerfile-打包镜像到上线">K8s 容器云平台服务部署流程：从 Dockerfile 打包镜像到上线
+</h1><blockquote>
+<p>最近在公司内部 K8s 容器云平台上部署服务，最大的感受是：平台页面上的“创建应用”只是最后一步，真正决定部署是否顺利的，是前面这条链路：<strong>代码能稳定构建 → Dockerfile 写得正确 → 镜像能在本地跑起来 → 镜像能推到仓库 → K8s 能拉取镜像并通过探针验证服务健康。</strong></p>
+</blockquote>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="bg.svg" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="bg.svg" 
+             alt="K8s 容器云部署流程" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">K8s 容器云部署流程</span>
+    
+</div></p>
+<p>这篇文章按一次真实上线的顺序来讲，不绑定某个具体厂商控制台。只要你的公司平台底层是 Kubernetes，大部分步骤都能对应到类似的概念。</p>
+<div class="mermaid">flowchart LR
+    A[代码仓库] --> B[编写 Dockerfile]
+    B --> C[本地构建镜像]
+    C --> D[本地运行验证]
+    D --> E[推送镜像仓库]
+    E --> F[容器云平台创建工作负载]
+    F --> G[配置 Service 和 Ingress]
+    G --> H[发布验证和回滚预案]
+</div><h2 id="一部署前先确认什么">一、部署前先确认什么
+</h2><p>先把需要的信息列清楚，后面就不会在平台页面里边填边猜。</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>准备项</th>
+<th>需要确认什么</th>
+<th>常见示例</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>服务启动方式</td>
+<td>本地如何启动，监听哪个端口</td>
+<td><code>java -jar app.jar</code>、<code>./server</code>、<code>npm start</code>，端口 <code>8080</code></td>
+</tr>
+<tr>
+<td>Dockerfile</td>
+<td>是否在项目根目录，是否能完整构建运行环境</td>
+<td><code>Dockerfile</code>、<code>.dockerignore</code></td>
+</tr>
+<tr>
+<td>镜像仓库</td>
+<td>仓库地址、项目名、账号权限</td>
+<td><code>registry.example.com/team/order-api</code></td>
+</tr>
+<tr>
+<td>平台命名空间</td>
+<td>服务要部署到哪个项目 / Namespace</td>
+<td><code>team-dev</code>、<code>team-test</code>、<code>team-prod</code></td>
+</tr>
+<tr>
+<td>配置来源</td>
+<td>哪些是环境变量，哪些是密钥</td>
+<td><code>APP_ENV</code>、数据库地址、Token</td>
+</tr>
+<tr>
+<td>网络入口</td>
+<td>只集群内访问，还是需要外部域名</td>
+<td><code>ClusterIP</code>、<code>Ingress</code>、<code>Route</code>、网关</td>
+</tr>
+<tr>
+<td>资源规格</td>
+<td>CPU、内存、磁盘、实例数</td>
+<td><code>requests: 200m/256Mi</code>，<code>limits: 1/1Gi</code></td>
+</tr>
+<tr>
+<td>健康检查</td>
+<td>平台用哪个接口判断服务可用</td>
+<td><code>/healthz</code>、<code>/actuator/health</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>容器云平台通常会把 Kubernetes 的对象包装成更好填的表单。它们之间大概是这个关系：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>平台页面里的名字</th>
+<th>Kubernetes 对象</th>
+<th>主要作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>应用 / 工作负载</td>
+<td><code>Deployment</code></td>
+<td>管理 Pod 副本、滚动更新和回滚</td>
+</tr>
+<tr>
+<td>实例 / 容器组</td>
+<td><code>Pod</code></td>
+<td>真正运行容器的最小单元</td>
+</tr>
+<tr>
+<td>服务</td>
+<td><code>Service</code></td>
+<td>给一组 Pod 提供稳定的集群内访问地址</td>
+</tr>
+<tr>
+<td>路由 / 域名 / 网关</td>
+<td><code>Ingress</code> 或平台自定义入口</td>
+<td>把外部 HTTP/HTTPS 流量转进集群</td>
+</tr>
+<tr>
+<td>配置</td>
+<td><code>ConfigMap</code></td>
+<td>注入非敏感配置</td>
+</tr>
+<tr>
+<td>密钥</td>
+<td><code>Secret</code></td>
+<td>注入密码、Token、证书等敏感信息</td>
+</tr>
+<tr>
+<td>镜像拉取凭据</td>
+<td><code>imagePullSecret</code></td>
+<td>让节点有权限从私有镜像仓库拉镜像</td>
+</tr>
+</tbody>
+</table></div>
+<p>一句话：<strong>平台最终还是把你填的内容转成 Kubernetes 资源，只是帮你隐藏了一部分 YAML。</strong></p>
+<h2 id="二重点根据-dockerfile-打包镜像">二、重点：根据 Dockerfile 打包镜像
+</h2><p>Dockerfile 是镜像的构建说明书。K8s 不会拿你的源代码直接运行，它只会根据 Deployment 里的 <code>image</code> 字段去镜像仓库拉一个镜像，然后把这个镜像启动成容器。</p>
+<p>所以不要把“部署失败”一上来就归因于平台。很多问题其实发生在镜像阶段：</p>
+<ul>
+<li>镜像里没有复制到正确的产物；</li>
+<li>容器启动命令写错；</li>
+<li>服务监听了 <code>127.0.0.1</code>，导致 Pod 外部访问不到；</li>
+<li>本地能访问的配置文件没有放进镜像，也没有通过环境变量注入；</li>
+<li>镜像架构不对，比如在 ARM 机器上构建了 <code>linux/arm64</code>，但集群节点是 <code>linux/amd64</code>；</li>
+<li>私有仓库权限或 Tag 写错，导致 <code>ImagePullBackOff</code>。</li>
+</ul>
+<h3 id="1-先理解-dockerfile-常用指令">1. 先理解 Dockerfile 常用指令
+</h3><div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>指令</th>
+<th>作用</th>
+<th>注意点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>FROM</code></td>
+<td>指定基础镜像</td>
+<td>尽量使用明确版本，不要只写 <code>latest</code></td>
+</tr>
+<tr>
+<td><code>WORKDIR</code></td>
+<td>设置容器内工作目录</td>
+<td>后续 <code>COPY</code>、<code>RUN</code>、<code>CMD</code> 都会基于它执行</td>
+</tr>
+<tr>
+<td><code>COPY</code></td>
+<td>把构建上下文里的文件复制进镜像</td>
+<td>优先用 <code>COPY</code>，除非确实需要 <code>ADD</code> 的额外能力</td>
+</tr>
+<tr>
+<td><code>RUN</code></td>
+<td>构建镜像时执行命令</td>
+<td>常用于安装依赖、编译代码、清理缓存</td>
+</tr>
+<tr>
+<td><code>ARG</code></td>
+<td>构建期变量</td>
+<td>构建完成后默认不会保留为运行时环境变量</td>
+</tr>
+<tr>
+<td><code>ENV</code></td>
+<td>运行期环境变量默认值</td>
+<td>不要把密码写进 <code>ENV</code></td>
+</tr>
+<tr>
+<td><code>EXPOSE</code></td>
+<td>声明容器监听端口</td>
+<td>只是元数据，不等于真正开放端口</td>
+</tr>
+<tr>
+<td><code>USER</code></td>
+<td>指定运行用户</td>
+<td>生产环境建议不要用 <code>root</code> 跑应用</td>
+</tr>
+<tr>
+<td><code>ENTRYPOINT</code></td>
+<td>固定启动入口</td>
+<td>适合固定主进程</td>
+</tr>
+<tr>
+<td><code>CMD</code></td>
+<td>默认启动参数或命令</td>
+<td>可以被 <code>docker run</code> 后面的参数覆盖</td>
+</tr>
+</tbody>
+</table></div>
+<p>镜像构建还有一个容易被忽略的概念：<strong>构建上下文</strong>。下面命令最后的 <code>.</code> 不是装饰，它表示把当前目录作为构建上下文发给 Docker：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">docker build -t registry.example.com/team/order-api:1.0.0 .
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>如果项目目录里有 <code>.git</code>、<code>node_modules</code>、<code>target</code>、日志、临时文件，都会影响构建速度，甚至把不该进入镜像的文件带进去。因此项目根目录建议放一个 <code>.dockerignore</code>：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">.git
+</span></span><span class="line"><span class="cl">.github
+</span></span><span class="line"><span class="cl">.idea
+</span></span><span class="line"><span class="cl">.vscode
+</span></span><span class="line"><span class="cl">node_modules
+</span></span><span class="line"><span class="cl">target
+</span></span><span class="line"><span class="cl">dist
+</span></span><span class="line"><span class="cl">build
+</span></span><span class="line"><span class="cl">*.log
+</span></span><span class="line"><span class="cl">.env
+</span></span><span class="line"><span class="cl">.env.*
+</span></span><span class="line"><span class="cl">README.md
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p><code>.dockerignore</code> 的目标不是“少传几个文件”这么简单，它直接影响三件事：构建速度、镜像安全、缓存命中率。</p>
+<h3 id="2-一个通用的镜像构建流程">2. 一个通用的镜像构建流程
+</h3><p>无论是 Go、Java、Node.js 还是 Python 服务，打包镜像都可以按这条路径走：</p>
+<div class="mermaid">flowchart TD
+    A[确认本地构建命令] --> B[编写 .dockerignore]
+    B --> C[编写 Dockerfile]
+    C --> D[docker build 构建镜像]
+    D --> E[docker run 本地验证]
+    E --> F[打 Tag]
+    F --> G[docker login]
+    G --> H[docker push 推送仓库]
+    H --> I[平台使用该镜像部署]
+</div><p>先确认项目不用 Docker 也能构建成功：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="c1"># Java 示例</span>
+</span></span><span class="line"><span class="cl">./mvnw clean package -DskipTests
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># Go 示例</span>
+</span></span><span class="line"><span class="cl">go <span class="nb">test</span> ./...
+</span></span><span class="line"><span class="cl">go build -o server ./cmd/server
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># Node.js 示例</span>
+</span></span><span class="line"><span class="cl">npm ci
+</span></span><span class="line"><span class="cl">npm run build
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这一步很重要。Dockerfile 不是用来掩盖项目本身构建问题的。项目在本地基础构建都不稳定，放进 Docker 后只会更难排查。</p>
+<h3 id="3-go-服务-dockerfile-示例">3. Go 服务 Dockerfile 示例
+</h3><p>Go 服务适合用多阶段构建：第一阶段负责编译，第二阶段只保留运行需要的二进制文件。</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-dockerfile" data-lang="dockerfile"><span class="line"><span class="cl"><span class="c"># syntax=docker/dockerfile:1</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">FROM</span><span class="s"> golang:1.23-alpine AS builder</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">WORKDIR</span><span class="s"> /src</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">RUN</span> apk add --no-cache git ca-certificates<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">COPY</span> go.mod go.sum ./<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">RUN</span> go mod download<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">COPY</span> . .<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">RUN</span> <span class="nv">CGO_ENABLED</span><span class="o">=</span><span class="m">0</span> <span class="nv">GOOS</span><span class="o">=</span>linux <span class="nv">GOARCH</span><span class="o">=</span>amd64 go build -o /out/server ./cmd/server<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">FROM</span><span class="s"> alpine:3.20</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">WORKDIR</span><span class="s"> /app</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">RUN</span> addgroup -S app <span class="o">&amp;&amp;</span> adduser -S app -G app<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">COPY</span> --from<span class="o">=</span>builder /out/server /app/server<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">COPY</span> --from<span class="o">=</span>builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">USER</span><span class="s"> app</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">EXPOSE</span><span class="s"> 8080</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">ENTRYPOINT</span> <span class="p">[</span><span class="s2">&#34;/app/server&#34;</span><span class="p">]</span><span class="err">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>这个 Dockerfile 里有几个关键点：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>写法</th>
+<th>为什么这样做</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>COPY go.mod go.sum ./</code> 后先 <code>go mod download</code></td>
+<td>依赖文件不变时可以复用缓存，加快后续构建</td>
+</tr>
+<tr>
+<td><code>CGO_ENABLED=0 GOOS=linux GOARCH=amd64</code></td>
+<td>构建适合 Linux x86 节点运行的静态二进制</td>
+</tr>
+<tr>
+<td>第二阶段使用 <code>alpine</code></td>
+<td>镜像体积更小，运行层更干净</td>
+</tr>
+<tr>
+<td>创建 <code>app</code> 用户并 <code>USER app</code></td>
+<td>避免容器内进程以 root 身份运行</td>
+</tr>
+<tr>
+<td>只复制 <code>/out/server</code></td>
+<td>不把源码、编译缓存、测试文件带到最终镜像</td>
+</tr>
+</tbody>
+</table></div>
+<p>构建命令：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">docker build -t registry.example.com/team/order-api:1.0.0 .
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>本地运行验证：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">docker run --rm --name order-api <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>  -p 8080:8080 <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>  -e <span class="nv">APP_ENV</span><span class="o">=</span><span class="nb">local</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>  registry.example.com/team/order-api:1.0.0
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">curl http://localhost:8080/healthz
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>如果本地 <code>curl</code> 都不通，先不要推仓库，也不要上平台。优先检查：</p>
+<ul>
+<li>应用实际监听端口是不是 <code>8080</code>；</li>
+<li>应用是否监听 <code>0.0.0.0</code>，而不是只监听 <code>127.0.0.1</code>；</li>
+<li>启动命令是否正确；</li>
+<li>健康检查路径是否真实存在；</li>
+<li>必需环境变量是否已经传入。</li>
+</ul>
+<h3 id="4-java-spring-boot-服务-dockerfile-示例">4. Java Spring Boot 服务 Dockerfile 示例
+</h3><p>Spring Boot 服务也建议多阶段构建。构建阶段使用 JDK，运行阶段只使用 JRE。</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-dockerfile" data-lang="dockerfile"><span class="line"><span class="cl"><span class="c"># syntax=docker/dockerfile:1</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">FROM</span><span class="s"> eclipse-temurin:21-jdk AS builder</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">WORKDIR</span><span class="s"> /src</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">COPY</span> mvnw pom.xml ./<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">COPY</span> .mvn .mvn<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">RUN</span> ./mvnw -q -DskipTests dependency:go-offline<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">COPY</span> src src<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">RUN</span> ./mvnw -q -DskipTests package<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">FROM</span><span class="s"> eclipse-temurin:21-jre</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">WORKDIR</span><span class="s"> /app</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">RUN</span> useradd -r -u <span class="m">10001</span> appuser<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">COPY</span> --from<span class="o">=</span>builder /src/target/*.jar /app/app.jar<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">USER</span><span class="s"> appuser</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">EXPOSE</span><span class="s"> 8080</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">ENTRYPOINT</span> <span class="p">[</span><span class="s2">&#34;java&#34;</span><span class="p">,</span> <span class="s2">&#34;-jar&#34;</span><span class="p">,</span> <span class="s2">&#34;/app/app.jar&#34;</span><span class="p">]</span><span class="err">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>如果服务需要 JVM 参数，不建议把所有参数写死在 Dockerfile 里。可以留给平台环境变量控制：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-dockerfile" data-lang="dockerfile"><span class="line"><span class="cl"><span class="k">ENTRYPOINT</span> <span class="p">[</span><span class="s2">&#34;sh&#34;</span><span class="p">,</span> <span class="s2">&#34;-c&#34;</span><span class="p">,</span> <span class="s2">&#34;java $JAVA_OPTS -jar /app/app.jar&#34;</span><span class="p">]</span><span class="err">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>平台里再配置：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">JAVA_OPTS=-Xms512m -Xmx512m -XX:+UseG1GC
+</span></span><span class="line"><span class="cl">SPRING_PROFILES_ACTIVE=prod
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这里要注意：<code>JAVA_OPTS</code> 本身不是 Kubernetes 标准字段，它只是你的启动脚本或 <code>ENTRYPOINT</code> 读取的环境变量。写了环境变量但启动命令没使用，它就不会生效。</p>
+<h3 id="5-nodejs-服务-dockerfile-示例">5. Node.js 服务 Dockerfile 示例
+</h3><p>Node.js 服务重点是依赖缓存和不要把开发依赖带进运行镜像。</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span><span class="lnt">25
+</span><span class="lnt">26
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-dockerfile" data-lang="dockerfile"><span class="line"><span class="cl"><span class="c"># syntax=docker/dockerfile:1</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">FROM</span><span class="s"> node:22-alpine AS deps</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">WORKDIR</span><span class="s"> /app</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">COPY</span> package*.json ./<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">RUN</span> npm ci<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">FROM</span><span class="s"> node:22-alpine AS builder</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">WORKDIR</span><span class="s"> /app</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">COPY</span> --from<span class="o">=</span>deps /app/node_modules ./node_modules<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">COPY</span> . .<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">RUN</span> npm run build<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">RUN</span> npm prune --omit<span class="o">=</span>dev<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">FROM</span><span class="s"> node:22-alpine</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">WORKDIR</span><span class="s"> /app</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">ENV</span> <span class="nv">NODE_ENV</span><span class="o">=</span>production
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="k">RUN</span> addgroup -S app <span class="o">&amp;&amp;</span> adduser -S app -G app<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">COPY</span> --from<span class="o">=</span>builder /app/package*.json ./<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">COPY</span> --from<span class="o">=</span>builder /app/node_modules ./node_modules<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">COPY</span> --from<span class="o">=</span>builder /app/dist ./dist<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">USER</span><span class="s"> app</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">EXPOSE</span><span class="s"> 3000</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">CMD</span> <span class="p">[</span><span class="s2">&#34;node&#34;</span><span class="p">,</span> <span class="s2">&#34;dist/server.js&#34;</span><span class="p">]</span><span class="err">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>如果你用的是前端静态站点，最终镜像可以不是 Node，而是 Nginx：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-dockerfile" data-lang="dockerfile"><span class="line"><span class="cl"><span class="k">FROM</span><span class="s"> node:22-alpine AS builder</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">WORKDIR</span><span class="s"> /app</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">COPY</span> package*.json ./<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">RUN</span> npm ci<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">COPY</span> . .<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">RUN</span> npm run build<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">FROM</span><span class="s"> nginx:1.27-alpine</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">COPY</span> --from<span class="o">=</span>builder /app/dist /usr/share/nginx/html<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">EXPOSE</span><span class="s"> 80</span><span class="err">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><h3 id="6-镜像-tag-怎么命名">6. 镜像 Tag 怎么命名
+</h3><p>生产环境不建议只用 <code>latest</code>。<code>latest</code> 看起来方便，但它不可追踪：今天的 <code>latest</code> 和昨天的 <code>latest</code> 可能不是同一个镜像。</p>
+<p>更实用的 Tag 规则：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">registry.example.com/&lt;团队&gt;/&lt;服务名&gt;:&lt;版本号&gt;
+</span></span><span class="line"><span class="cl">registry.example.com/&lt;团队&gt;/&lt;服务名&gt;:&lt;Git提交短SHA&gt;
+</span></span><span class="line"><span class="cl">registry.example.com/&lt;团队&gt;/&lt;服务名&gt;:&lt;环境&gt;-&lt;构建号&gt;
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>示例：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">docker build -t registry.example.com/pay/order-api:1.4.2 .
+</span></span><span class="line"><span class="cl">docker build -t registry.example.com/pay/order-api:git-a18c3f2 .
+</span></span><span class="line"><span class="cl">docker build -t registry.example.com/pay/order-api:test-20260903-001 .
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>我更推荐至少保留 Git 提交信息：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="nv">GIT_SHA</span><span class="o">=</span><span class="k">$(</span>git rev-parse --short HEAD<span class="k">)</span>
+</span></span><span class="line"><span class="cl"><span class="nv">IMAGE</span><span class="o">=</span>registry.example.com/pay/order-api:<span class="si">${</span><span class="nv">GIT_SHA</span><span class="si">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">docker build -t <span class="si">${</span><span class="nv">IMAGE</span><span class="si">}</span> .
+</span></span><span class="line"><span class="cl">docker push <span class="si">${</span><span class="nv">IMAGE</span><span class="si">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这样平台回滚时，你能明确知道回到哪一次提交，而不是猜某个 Tag 当时指向什么。</p>
+<p>如果公司平台支持使用镜像 Digest，生产环境还可以把 <code>image</code> 写成不可变形式：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">registry.example.com/pay/order-api@sha256:xxxxxxxxxxxxxxxx
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Tag 适合人看，Digest 更适合机器保证不可变。</p>
+<h3 id="7-构建架构要和集群节点一致">7. 构建架构要和集群节点一致
+</h3><p>如果你在 Mac M 系列、ARM 开发机或某些 CI Runner 上构建镜像，而公司 K8s 节点是 x86，那么需要特别关注镜像架构。</p>
+<p>查看本地机器架构：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">docker version
+</span></span><span class="line"><span class="cl">docker info
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>明确构建 <code>linux/amd64</code> 镜像：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">docker buildx build <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>  --platform linux/amd64 <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>  -t registry.example.com/team/order-api:git-a18c3f2 <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>  --push .
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>如果平台 Pod 报错类似 <code>exec format error</code>，优先怀疑镜像架构和节点架构不匹配。</p>
+<h3 id="8-登录并推送镜像仓库">8. 登录并推送镜像仓库
+</h3><p>构建完成后，先确认本地有镜像：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">docker images <span class="p">|</span> grep order-api
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>登录公司镜像仓库：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">docker login registry.example.com
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>如果镜像 Tag 还不是仓库地址，需要重新打 Tag：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">docker tag order-api:local registry.example.com/pay/order-api:git-a18c3f2
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>推送：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">docker push registry.example.com/pay/order-api:git-a18c3f2
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>推送成功后，容器云平台才能从仓库拉到这个镜像。注意：<strong>K8s 集群不会使用你本机 Docker 里的镜像</strong>。除非是特殊的本地集群，生产平台只会从镜像仓库拉取。</p>
+<h2 id="三在容器云平台创建工作负载">三、在容器云平台创建工作负载
+</h2><p>镜像准备好后，才进入平台部署阶段。不同平台页面不一样，但字段基本类似。</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>配置项</th>
+<th>推荐填法</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>应用名称</td>
+<td><code>order-api</code></td>
+<td>尽量和服务名一致</td>
+</tr>
+<tr>
+<td>命名空间</td>
+<td><code>team-test</code> / <code>team-prod</code></td>
+<td>区分环境和团队</td>
+</tr>
+<tr>
+<td>镜像地址</td>
+<td><code>registry.example.com/pay/order-api:git-a18c3f2</code></td>
+<td>使用刚推送的镜像</td>
+</tr>
+<tr>
+<td>副本数</td>
+<td>测试 <code>1</code>，生产 <code>2+</code></td>
+<td>生产至少两个副本才有滚动更新意义</td>
+</tr>
+<tr>
+<td>容器端口</td>
+<td><code>8080</code></td>
+<td>必须和应用实际监听端口一致</td>
+</tr>
+<tr>
+<td>环境变量</td>
+<td>平台表单或 ConfigMap</td>
+<td>普通配置不要写死进镜像</td>
+</tr>
+<tr>
+<td>密钥</td>
+<td>Secret</td>
+<td>密码、Token、证书不要写入 Dockerfile</td>
+</tr>
+<tr>
+<td>CPU/内存</td>
+<td>先小后调</td>
+<td>requests 保证调度，limits 控制上限</td>
+</tr>
+<tr>
+<td>健康检查</td>
+<td><code>/healthz</code> 或业务健康接口</td>
+<td>Readiness 决定是否接流量</td>
+</tr>
+<tr>
+<td>镜像拉取凭据</td>
+<td>平台仓库凭据</td>
+<td>私有仓库必填</td>
+</tr>
+</tbody>
+</table></div>
+<p>如果用 YAML 表达，一个典型 Deployment 长这样：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span><span class="lnt">25
+</span><span class="lnt">26
+</span><span class="lnt">27
+</span><span class="lnt">28
+</span><span class="lnt">29
+</span><span class="lnt">30
+</span><span class="lnt">31
+</span><span class="lnt">32
+</span><span class="lnt">33
+</span><span class="lnt">34
+</span><span class="lnt">35
+</span><span class="lnt">36
+</span><span class="lnt">37
+</span><span class="lnt">38
+</span><span class="lnt">39
+</span><span class="lnt">40
+</span><span class="lnt">41
+</span><span class="lnt">42
+</span><span class="lnt">43
+</span><span class="lnt">44
+</span><span class="lnt">45
+</span><span class="lnt">46
+</span><span class="lnt">47
+</span><span class="lnt">48
+</span><span class="lnt">49
+</span><span class="lnt">50
+</span><span class="lnt">51
+</span><span class="lnt">52
+</span><span class="lnt">53
+</span><span class="lnt">54
+</span><span class="lnt">55
+</span><span class="lnt">56
+</span><span class="lnt">57
+</span><span class="lnt">58
+</span><span class="lnt">59
+</span><span class="lnt">60
+</span><span class="lnt">61
+</span><span class="lnt">62
+</span><span class="lnt">63
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">apps/v1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">Deployment</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">order-api</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l">team-test</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">labels</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l">order-api</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">spec</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span><span class="m">2</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">revisionHistoryLimit</span><span class="p">:</span><span class="w"> </span><span class="m">5</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">strategy</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l">RollingUpdate</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">rollingUpdate</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">maxUnavailable</span><span class="p">:</span><span class="w"> </span><span class="m">0</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">maxSurge</span><span class="p">:</span><span class="w"> </span><span class="m">1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">selector</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">matchLabels</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l">order-api</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">template</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">labels</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l">order-api</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">spec</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">imagePullSecrets</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">registry-secret</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">containers</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">order-api</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l">registry.example.com/pay/order-api:git-a18c3f2</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">imagePullPolicy</span><span class="p">:</span><span class="w"> </span><span class="l">IfNotPresent</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">ports</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">http</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">containerPort</span><span class="p">:</span><span class="w"> </span><span class="m">8080</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">env</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">APP_ENV</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;test&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">envFrom</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span>- <span class="nt">configMapRef</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">order-api-config</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span>- <span class="nt">secretRef</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">order-api-secret</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">resources</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">requests</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;200m&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;256Mi&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">limits</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;1&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;1Gi&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">readinessProbe</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">httpGet</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l">/healthz</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l">http</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">initialDelaySeconds</span><span class="p">:</span><span class="w"> </span><span class="m">10</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">periodSeconds</span><span class="p">:</span><span class="w"> </span><span class="m">10</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">timeoutSeconds</span><span class="p">:</span><span class="w"> </span><span class="m">2</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">failureThreshold</span><span class="p">:</span><span class="w"> </span><span class="m">3</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">livenessProbe</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">httpGet</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l">/healthz</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l">http</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">initialDelaySeconds</span><span class="p">:</span><span class="w"> </span><span class="m">30</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">periodSeconds</span><span class="p">:</span><span class="w"> </span><span class="m">20</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">timeoutSeconds</span><span class="p">:</span><span class="w"> </span><span class="m">2</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">failureThreshold</span><span class="p">:</span><span class="w"> </span><span class="m">3</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>这里最值得关注的是三件事：</p>
+<ol>
+<li><code>image</code> 必须是平台节点能访问的完整镜像地址；</li>
+<li><code>containerPort</code> 必须和应用真实监听端口一致；</li>
+<li><code>readinessProbe</code> 不通过时，Pod 即使启动了也不会接收流量。</li>
+</ol>
+<p>健康检查接口要轻量、稳定，最好只检查进程是否能处理请求，以及必要的本地依赖是否正常。不要把一堆下游系统都强绑定进去，否则某个非核心依赖抖动，会导致自己的 Pod 被平台摘流量甚至重启。</p>
+<h2 id="四配置服务入口">四、配置服务入口
+</h2><p>Deployment 只负责让 Pod 跑起来。要让其他服务或用户访问它，还需要 Service 和 Ingress。</p>
+<div class="mermaid">flowchart LR
+    U[用户或上游服务] --> I[Ingress 或网关]
+    I --> S[Service]
+    S --> P1[Pod 1]
+    S --> P2[Pod 2]
+    S --> P3[Pod 3]
+</div><p>集群内访问一般用 <code>Service</code>：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">v1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">Service</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">order-api</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l">team-test</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">spec</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l">ClusterIP</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">selector</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l">order-api</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">ports</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">http</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="m">80</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">targetPort</span><span class="p">:</span><span class="w"> </span><span class="l">http</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>这表示集群内其他服务可以通过类似下面的地址访问：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">http://order-api.team-test.svc.cluster.local
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>如果需要外部 HTTP/HTTPS 访问，通常配置 Ingress、Route 或公司网关规则：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">networking.k8s.io/v1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">Ingress</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">order-api</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l">team-test</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">spec</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">ingressClassName</span><span class="p">:</span><span class="w"> </span><span class="l">nginx</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">rules</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="l">order-api-test.example.com</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">http</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">paths</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span>- <span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l">/</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">pathType</span><span class="p">:</span><span class="w"> </span><span class="l">Prefix</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">backend</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">service</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">order-api</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                </span><span class="nt">port</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                  </span><span class="nt">number</span><span class="p">:</span><span class="w"> </span><span class="m">80</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>平台页面里可能不会叫 Ingress，而是叫“域名”“路由”“七层负载均衡”“应用入口”。核心字段仍然是：域名、路径、后端 Service、端口、证书。</p>
+<h2 id="五发布验证和回滚">五、发布、验证和回滚
+</h2><p>如果平台支持直接应用 YAML，可以这样发布：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl apply -f k8s/
+</span></span><span class="line"><span class="cl">kubectl rollout status deployment/order-api -n team-test
+</span></span><span class="line"><span class="cl">kubectl get pods -n team-test -l <span class="nv">app</span><span class="o">=</span>order-api -o wide
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>常用验证命令：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="c1"># 看 Pod 是否 Ready</span>
+</span></span><span class="line"><span class="cl">kubectl get pods -n team-test -l <span class="nv">app</span><span class="o">=</span>order-api
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># 看 Deployment 发布状态</span>
+</span></span><span class="line"><span class="cl">kubectl describe deployment order-api -n team-test
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># 看某个 Pod 事件</span>
+</span></span><span class="line"><span class="cl">kubectl describe pod &lt;pod-name&gt; -n team-test
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># 看日志</span>
+</span></span><span class="line"><span class="cl">kubectl logs -f deployment/order-api -n team-test
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># 临时端口转发验证服务</span>
+</span></span><span class="line"><span class="cl">kubectl port-forward svc/order-api 8080:80 -n team-test
+</span></span><span class="line"><span class="cl">curl http://localhost:8080/healthz
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>如果新版本有问题，先暂停扩散，再回滚：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl rollout <span class="nb">history</span> deployment/order-api -n team-test
+</span></span><span class="line"><span class="cl">kubectl rollout undo deployment/order-api -n team-test
+</span></span><span class="line"><span class="cl">kubectl rollout status deployment/order-api -n team-test
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>平台控制台一般也会提供“版本历史”“回滚”“重新部署”按钮。无论用页面还是命令，本质都是修改 Deployment 的 Pod Template，让控制器重新创建一批 Pod。</p>
+<h2 id="六常见问题速查">六、常见问题速查
+</h2><div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>现象</th>
+<th>可能原因</th>
+<th>排查方向</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ImagePullBackOff</code></td>
+<td>镜像地址错、Tag 不存在、仓库无权限</td>
+<td>查镜像仓库、<code>imagePullSecret</code>、Pod 事件</td>
+</tr>
+<tr>
+<td><code>ErrImagePull</code></td>
+<td>节点拉镜像失败</td>
+<td><code>kubectl describe pod</code> 看具体错误</td>
+</tr>
+<tr>
+<td><code>CrashLoopBackOff</code></td>
+<td>容器启动后反复退出</td>
+<td>看 <code>kubectl logs --previous</code>，检查启动命令和环境变量</td>
+</tr>
+<tr>
+<td><code>Running</code> 但 <code>0/1 Ready</code></td>
+<td>Readiness Probe 不通过</td>
+<td>检查健康检查路径、端口、超时设置</td>
+</tr>
+<tr>
+<td>外部访问 404</td>
+<td>Ingress 路径或域名规则不匹配</td>
+<td>查 Ingress 规则、网关转发路径</td>
+</tr>
+<tr>
+<td>外部访问 502/503</td>
+<td>Service 没有可用 Endpoint</td>
+<td>查 Pod Ready 状态、Service selector</td>
+</tr>
+<tr>
+<td>连接数据库失败</td>
+<td>Secret、网络策略、白名单、DNS 配置问题</td>
+<td>查环境变量、凭据、网络连通性</td>
+</tr>
+<tr>
+<td><code>OOMKilled</code></td>
+<td>内存超过 limit</td>
+<td>提高 limit，分析内存峰值，调整 JVM/运行时参数</td>
+</tr>
+<tr>
+<td><code>exec format error</code></td>
+<td>镜像架构和节点架构不一致</td>
+<td>用 <code>docker buildx --platform linux/amd64</code> 重构建</td>
+</tr>
+<tr>
+<td>修改镜像后平台没更新</td>
+<td>Tag 没变且拉取策略未强制拉取</td>
+<td>使用新 Tag，或调整 <code>imagePullPolicy</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>排错时建议按这个顺序看：</p>
+<div class="mermaid">flowchart TD
+    A[Pod 是否创建] -->|没有| B[看 Deployment 事件]
+    A -->|已创建| C[镜像是否拉取成功]
+    C -->|失败| D[查镜像地址和仓库权限]
+    C -->|成功| E[容器是否启动]
+    E -->|失败| F[查启动命令和日志]
+    E -->|成功| G[Pod 是否 Ready]
+    G -->|失败| H[查 Readiness Probe]
+    G -->|成功| I[Service 是否有 Endpoint]
+    I -->|没有| J[查 selector 和 label]
+    I -->|有| K[查 Ingress 或网关规则]
+</div><h2 id="七上线前检查清单">七、上线前检查清单
+</h2><div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>通过标准</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Dockerfile 可重复构建</td>
+<td>换一台机器或 CI 也能 <code>docker build</code> 成功</td>
+</tr>
+<tr>
+<td>镜像本地可运行</td>
+<td><code>docker run</code> 后健康检查通过</td>
+</tr>
+<tr>
+<td>镜像 Tag 可追踪</td>
+<td>Tag 包含版本号、构建号或 Git SHA</td>
+</tr>
+<tr>
+<td>镜像已推送仓库</td>
+<td>平台能看到或拉取该镜像</td>
+</tr>
+<tr>
+<td>配置未写死进镜像</td>
+<td>环境差异通过 ConfigMap / Secret 注入</td>
+</tr>
+<tr>
+<td>密码未进入 Dockerfile</td>
+<td>不在 <code>ENV</code>、源码、镜像层里保存敏感信息</td>
+</tr>
+<tr>
+<td>资源限制已配置</td>
+<td>设置合理的 requests 和 limits</td>
+</tr>
+<tr>
+<td>探针已配置</td>
+<td>Readiness 和 Liveness 路径真实可用</td>
+</tr>
+<tr>
+<td>Service selector 正确</td>
+<td>Service 能找到 Pod Endpoint</td>
+</tr>
+<tr>
+<td>入口规则已验证</td>
+<td>域名、路径、证书、网关转发正常</td>
+</tr>
+<tr>
+<td>回滚方式明确</td>
+<td>知道上一版镜像 Tag 或 Deployment revision</td>
+</tr>
+<tr>
+<td>日志和监控可用</td>
+<td>上线后能看日志、指标和告警</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="总结">总结
+</h2><p>在公司 K8s 容器云平台部署服务，可以把流程压缩成一句话：</p>
+<blockquote>
+<p><strong>先用 Dockerfile 把服务变成可运行、可追踪、可推送的镜像，再让 K8s 用 Deployment 管理副本，用 Service 稳定访问，用 Ingress 或网关承接外部流量。</strong></p>
+</blockquote>
+<p>真正建议养成的习惯有四个：</p>
+<ol>
+<li>镜像先本地跑通，再推仓库；</li>
+<li>每次发布使用唯一 Tag，不依赖 <code>latest</code>；</li>
+<li>配置和密钥交给平台注入，不写死进镜像；</li>
+<li>上线前准备好健康检查、日志查看和回滚路径。</li>
+</ol>
+<p>只要这条链路稳定，平台部署就会从“填表碰运气”变成“标准化交付流程”。</p>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/zh-cn/tags/kubernetes/">Kubernetes</a>
+        
+            <a href="/zh-cn/tags/k8s/">K8s</a>
+        
+            <a href="/zh-cn/tags/docker/">Docker</a>
+        
+            <a href="/zh-cn/tags/devops/">DevOps</a>
+        
+            <a href="/zh-cn/tags/cloud-native/">Cloud Native</a>
+        
+    </section>
+
+
+    </footer>
+
+
+    
+</article>
+
+    
+
+    
+
+<aside class="related-content--wrapper">
+    <h2 class="section-title">相关文章</h2>
+    <div class="related-content">
+        <div class="flex article-list--tile">
+            
+                
+<article class="has-image">
+    <a href="/zh-cn/p/kubernetes-from-docker/">
+        
+        
+            <div class="article-image">
+                <img src="/zh-cn/p/kubernetes-from-docker/bg.fdd349f99d97ca3df6b969433d7d156c_hud58105b44ca3d738c5259844df54d51d_98528_250x150_fill_box_smart1_3.png" 
+                        width="250" 
+                        height="150" 
+                        loading="lazy"
+                        alt="Featured image of post 从 Docker 到 Kubernetes：面向 Docker 用户的 K8s 从 0 到 1 教程"
+                        data-key="kubernetes-from-docker" 
+                        data-hash="md5-/dNJ&#43;Z2Xyj32uWlDPX0VbA==">
+                
+            </div>
+        
+
+        <div class="article-details">
+            <h2 class="article-title">从 Docker 到 Kubernetes：面向 Docker 用户的 K8s 从 0 到 1 教程</h2>
+        </div>
+    </a>
+</article>
+
+            
+                
+<article class="has-image">
+    <a href="/zh-cn/p/docker-k8s-openshift/">
+        
+        
+            <div class="article-image">
+                <img src="/zh-cn/p/docker-k8s-openshift/bg.8af52e85e313fce3e7315fb642d8953a_huc90e2dbd83968f0005f7aa5826d340ba_110572_250x150_fill_box_smart1_3.png" 
+                        width="250" 
+                        height="150" 
+                        loading="lazy"
+                        alt="Featured image of post Docker、Kubernetes、OpenShift 的关系、特点与区别"
+                        data-key="docker-k8s-openshift" 
+                        data-hash="md5-ivUuheMT/OPnMV&#43;2QtiVOg==">
+                
+            </div>
+        
+
+        <div class="article-details">
+            <h2 class="article-title">Docker、Kubernetes、OpenShift 的关系、特点与区别</h2>
+        </div>
+    </a>
+</article>
+
+            
+        </div>
+    </div>
+</aside>
+
+     
+    
+        
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+        2026 SymphonyW
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.26.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.js" defer></script><script type="text/javascript" src="/ts/custom.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+<script>
+window.MathJax = {
+  tex: {
+    
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  svg: {
+    fontCache: 'global'
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script><script type="module">
+  
+  const currentScheme = document.documentElement.getAttribute('data-scheme');
+  const isDark = currentScheme === 'dark';
+
+  import('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs').then(({ default: mermaid }) => {
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: isDark ? 'dark' : 'default',
+      securityLevel: 'loose',
+      fontFamily: 'inherit'
+    });
+
+    
+    const observer = new MutationObserver(() => {
+      const scheme = document.documentElement.getAttribute('data-scheme');
+      const dark = scheme === 'dark';
+      mermaid.initialize({ startOnLoad: false, theme: dark ? 'dark' : 'default', securityLevel: 'loose' });
+      document.querySelectorAll('.mermaid').forEach((el) => {
+        
+        el.removeAttribute('data-processed');
+        el.innerHTML = el.textContent;
+      });
+      mermaid.run({ querySelector: '.mermaid' });
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-scheme'] });
+  });
+</script>
+    </body>
+</html>

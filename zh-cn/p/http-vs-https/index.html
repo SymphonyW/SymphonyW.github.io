@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="zh-cn" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="从请求响应、明文传输、TLS 握手、证书校验、性能影响和迁移实践几个角度，系统梳理 HTTP 与 HTTPS 的区别。">
+<title>HTTP 和 HTTPS 的区别：从明文到加密，一篇讲清楚</title>
+
+<link rel='canonical' href='https://SymphonyW.github.io/zh-cn/p/http-vs-https/'>
+
+<link rel="stylesheet" href="/scss/style.min.4687047a1903756c84bf7a1cf7cbbf4e26bef4a42dd5bc620df47badaeed46c2.css"><meta property='og:title' content="HTTP 和 HTTPS 的区别：从明文到加密，一篇讲清楚">
+<meta property='og:description' content="从请求响应、明文传输、TLS 握手、证书校验、性能影响和迁移实践几个角度，系统梳理 HTTP 与 HTTPS 的区别。">
+<meta property='og:url' content='https://SymphonyW.github.io/zh-cn/p/http-vs-https/'>
+<meta property='og:site_name' content='SymphonyW'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='HTTP' /><meta property='article:tag' content='HTTPS' /><meta property='article:tag' content='Web' /><meta property='article:tag' content='Network' /><meta property='article:tag' content='Security' /><meta property='article:published_time' content='2026-08-10T21:40:29&#43;08:00'/><meta property='article:modified_time' content='2026-08-10T21:40:29&#43;08:00'/><meta property='og:image' content='https://SymphonyW.github.io/zh-cn/p/http-vs-https/bg.png' />
+<meta name="twitter:title" content="HTTP 和 HTTPS 的区别：从明文到加密，一篇讲清楚">
+<meta name="twitter:description" content="从请求响应、明文传输、TLS 握手、证书校验、性能影响和迁移实践几个角度，系统梳理 HTTP 与 HTTPS 的区别。"><meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content='https://SymphonyW.github.io/zh-cn/p/http-vs-https/bg.png' />
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/zh-cn/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu5ea07d2842502bdd7540f9cbc4b41b95_5278_300x0_resize_box_3.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">😁</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/zh-cn">SymphonyW</a></h1>
+            <h2 class="site-description">Welcome to my Blog.</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0'
+                        target="_blank"
+                        title="Bilibili"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.0.0-beta2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M488.6 104.1C505.3 122.2 513 143.8 511.9 169.8V372.2C511.5 398.6 502.7 420.3 485.4 437.3C468.2 454.3 446.3 463.2 419.9 464H92.02C65.57 463.2 43.81 454.2 26.74 436.8C9.682 419.4 .7667 396.5 0 368.2V169.8C.7667 143.8 9.682 122.2 26.74 104.1C43.81 87.75 65.57 78.77 92.02 78H121.4L96.05 52.19C90.3 46.46 87.42 39.19 87.42 30.4C87.42 21.6 90.3 14.34 96.05 8.603C101.8 2.868 109.1 0 117.9 0C126.7 0 134 2.868 139.8 8.603L213.1 78H301.1L375.6 8.603C381.7 2.868 389.2 0 398 0C406.8 0 414.1 2.868 419.9 8.603C425.6 14.34 428.5 21.6 428.5 30.4C428.5 39.19 425.6 46.46 419.9 52.19L394.6 78L423.9 78C450.3 78.77 471.9 87.75 488.6 104.1H488.6zM449.8 173.8C449.4 164.2 446.1 156.4 439.1 150.3C433.9 144.2 425.1 140.9 416.4 140.5H96.05C86.46 140.9 78.6 144.2 72.47 150.3C66.33 156.4 63.07 164.2 62.69 173.8V368.2C62.69 377.4 65.95 385.2 72.47 391.7C78.99 398.2 86.85 401.5 96.05 401.5H416.4C425.6 401.5 433.4 398.2 439.7 391.7C446 385.2 449.4 377.4 449.8 368.2L449.8 173.8zM185.5 216.5C191.8 222.8 195.2 230.6 195.6 239.7V273C195.2 282.2 191.9 289.9 185.8 296.2C179.6 302.5 171.8 305.7 162.2 305.7C152.6 305.7 144.7 302.5 138.6 296.2C132.5 289.9 129.2 282.2 128.8 273V239.7C129.2 230.6 132.6 222.8 138.9 216.5C145.2 210.2 152.1 206.9 162.2 206.5C171.4 206.9 179.2 210.2 185.5 216.5H185.5zM377 216.5C383.3 222.8 386.7 230.6 387.1 239.7V273C386.7 282.2 383.4 289.9 377.3 296.2C371.2 302.5 363.3 305.7 353.7 305.7C344.1 305.7 336.3 302.5 330.1 296.2C323.1 289.9 320.7 282.2 320.4 273V239.7C320.7 230.6 324.1 222.8 330.4 216.5C336.7 210.2 344.5 206.9 353.7 206.5C362.9 206.9 370.7 210.2 377 216.5H377z"/></svg>
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://github.com/SymphonyW'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/zh-cn/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/zh-cn/post/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>博客</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>归档</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/stats/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chart-bar" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="12" width="4" height="8" rx="1" />
+  <rect x="10" y="8" width="4" height="12" rx="1" />
+  <rect x="17" y="4" width="4" height="16" rx="1" />
+  <line x1="4" y1="20" x2="20" y2="20" />
+</svg>
+
+                
+                <span>写作记录</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/diary/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-event" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12z" />
+  <path d="M16 3v4" />
+  <path d="M8 3v4" />
+  <path d="M4 11h16" />
+  <path d="M8 15h2v2h-2z" />
+</svg>
+
+                
+                <span>日记</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>搜索</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>链接</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch" class="language-switcher">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <div class="language-switcher__tabs" aria-label="Language">
+                                <a class="language-switcher__tab "
+                                        href="/p/http-vs-https/"
+                                        >
+                                        English
+                                    </a>
+                                <a class="language-switcher__tab is-current"
+                                        href="/zh-cn/p/http-vs-https/"
+                                        aria-current="true">
+                                        中文
+                                    </a>
+                                
+                            </div>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#先看最直接的区别">先看最直接的区别</a></li>
+    <li><a href="#http-做了什么">HTTP 做了什么</a></li>
+    <li><a href="#明文传输为什么危险">明文传输为什么危险</a></li>
+    <li><a href="#https-加上的-tls-是什么">HTTPS 加上的 TLS 是什么</a></li>
+    <li><a href="#tls-握手大致怎么发生">TLS 握手大致怎么发生</a></li>
+    <li><a href="#证书到底证明了什么">证书到底证明了什么</a></li>
+    <li><a href="#http-和-https-的关键差异">HTTP 和 HTTPS 的关键差异</a></li>
+    <li><a href="#https-会不会更慢">HTTPS 会不会更慢</a></li>
+    <li><a href="#https-能保护什么保护不了什么">HTTPS 能保护什么，保护不了什么</a></li>
+    <li><a href="#从-http-迁移到-https">从 HTTP 迁移到 HTTPS</a></li>
+    <li><a href="#常见误区">常见误区</a></li>
+    <li><a href="#总结">总结</a></li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="has-image main-article">
+    <header class="article-header">
+        <div class="article-image">
+            <a href="/zh-cn/p/http-vs-https/">
+                <img src="/zh-cn/p/http-vs-https/bg_hu8dd6efac828c2bfe0c097d207340a4fb_45782_800x0_resize_box_3.png"
+                        srcset="/zh-cn/p/http-vs-https/bg_hu8dd6efac828c2bfe0c097d207340a4fb_45782_800x0_resize_box_3.png 800w, /zh-cn/p/http-vs-https/bg_hu8dd6efac828c2bfe0c097d207340a4fb_45782_1600x0_resize_box_3.png 1600w"
+                        width="800" 
+                        height="450" 
+                        loading="lazy"
+                        alt="Featured image of post HTTP 和 HTTPS 的区别：从明文到加密，一篇讲清楚" />
+                
+            </a>
+        </div>
+    
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/zh-cn/p/http-vs-https/">HTTP 和 HTTPS 的区别：从明文到加密，一篇讲清楚</a>
+        </h2>
+    
+        
+        <h3 class="article-subtitle">
+            从请求响应、明文传输、TLS 握手、证书校验、性能影响和迁移实践几个角度，系统梳理 HTTP 与 HTTPS 的区别。
+        </h3>
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published">2026-08-10 21:40</time>
+            </div>
+        
+
+        
+    </footer>
+    
+
+    
+        <footer class="article-translations">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+            <div>
+                
+                    <a href="https://SymphonyW.github.io/p/http-vs-https/" class="link">English</a>
+                
+            </div>
+        </footer>
+    
+</div>
+
+</header>
+
+    
+    <section class="article-tags">
+        
+            <a href="/zh-cn/tags/http/">HTTP</a>
+        
+            <a href="/zh-cn/tags/https/">HTTPS</a>
+        
+            <a href="/zh-cn/tags/web/">Web</a>
+        
+            <a href="/zh-cn/tags/network/">Network</a>
+        
+            <a href="/zh-cn/tags/security/">Security</a>
+        
+    </section>
+
+
+    <section class="article-content">
+    
+    
+    <h1 id="http-和-https-的区别从明文到加密一篇讲清楚">HTTP 和 HTTPS 的区别：从明文到加密，一篇讲清楚
+</h1><blockquote>
+<p>HTTP 和 HTTPS 的核心区别不是“能不能打开网页”，而是：<strong>网页数据在网络上传输时，是否有加密、身份认证和完整性保护。</strong></p>
+</blockquote>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="bg.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="bg.png" 
+             alt="HTTP 与 HTTPS 的整体区别" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">HTTP 与 HTTPS 的整体区别</span>
+    
+</div></p>
+<p>一句话先记住：</p>
+<blockquote>
+<p><strong>HTTPS = HTTP + TLS。</strong></p>
+</blockquote>
+<p>也就是说，HTTPS 并没有推翻 HTTP 的请求方法、状态码、Header、Cookie、缓存这些机制。它是在 HTTP 通信外面加了一层 TLS 安全通道，让浏览器和服务器先建立可信、加密的连接，然后再传 HTTP 数据。</p>
+<hr>
+<h2 id="先看最直接的区别">先看最直接的区别
+</h2><div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>对比项</th>
+<th>HTTP</th>
+<th>HTTPS</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>URL 前缀</td>
+<td><code>http://</code></td>
+<td><code>https://</code></td>
+</tr>
+<tr>
+<td>默认端口</td>
+<td>80</td>
+<td>443</td>
+</tr>
+<tr>
+<td>传输内容</td>
+<td>明文</td>
+<td>经过 TLS 加密</td>
+</tr>
+<tr>
+<td>身份认证</td>
+<td>无法证明服务器真实身份</td>
+<td>通过证书证明服务器身份</td>
+</tr>
+<tr>
+<td>完整性保护</td>
+<td>容易被中间人篡改</td>
+<td>篡改会被发现</td>
+</tr>
+<tr>
+<td>浏览器提示</td>
+<td>常显示“不安全”</td>
+<td>显示安全连接标识</td>
+</tr>
+<tr>
+<td>适合场景</td>
+<td>本地开发、临时内网测试</td>
+<td>生产网站、登录、支付、接口、后台系统</td>
+</tr>
+</tbody>
+</table></div>
+<p>很多初学者会把 HTTPS 理解成“高级版 HTTP”。这个说法不算错，但更准确的理解是：<strong>HTTP 负责表达网页请求和响应，TLS 负责保护这段通信过程。</strong></p>
+<hr>
+<h2 id="http-做了什么">HTTP 做了什么
+</h2><p>HTTP，全称是 HyperText Transfer Protocol，超文本传输协议。它定义了浏览器和服务器之间如何对话。</p>
+<p>例如你访问一个页面时，浏览器可能会发出这样的请求：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-http" data-lang="http"><span class="line"><span class="cl"><span class="nf">GET</span> <span class="nn">/articles/http-vs-https</span> <span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span>
+</span></span><span class="line"><span class="cl"><span class="n">Host</span><span class="o">:</span> <span class="l">example.com</span>
+</span></span><span class="line"><span class="cl"><span class="n">User-Agent</span><span class="o">:</span> <span class="l">Chrome</span>
+</span></span><span class="line"><span class="cl"><span class="n">Accept</span><span class="o">:</span> <span class="l">text/html</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>服务器再返回：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-http" data-lang="http"><span class="line"><span class="cl"><span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span> <span class="m">200</span> <span class="ne">OK</span>
+</span></span><span class="line"><span class="cl"><span class="n">Content-Type</span><span class="o">:</span> <span class="l">text/html</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="p">&lt;</span><span class="nt">html</span><span class="p">&gt;</span>
+</span></span><span class="line"><span class="cl">  <span class="p">&lt;</span><span class="nt">body</span><span class="p">&gt;</span>Hello HTTPS<span class="p">&lt;/</span><span class="nt">body</span><span class="p">&gt;</span>
+</span></span><span class="line"><span class="cl"><span class="p">&lt;/</span><span class="nt">html</span><span class="p">&gt;</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这套格式本身没有问题。HTTP 的价值在于简单、通用、可扩展，Web 上的请求方法、状态码、Header、Cookie、缓存控制，都是它的核心组成部分。</p>
+<p>问题在于：<strong>如果只使用 HTTP，这些内容会以明文形式经过网络。</strong></p>
+<hr>
+<h2 id="明文传输为什么危险">明文传输为什么危险
+</h2><p>假设你在咖啡店 Wi-Fi 下登录一个只支持 HTTP 的网站，你输入的用户名、Cookie、请求路径和响应内容，都可能被同一网络里的攻击者看到。如果攻击者进一步做中间人攻击，还可能把服务器返回给你的页面内容替换掉。</p>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="plain-vs-encrypted.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="plain-vs-encrypted.png" 
+             alt="HTTP 明文与 HTTPS 密文的区别" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">HTTP 明文与 HTTPS 密文的区别</span>
+    
+</div></p>
+<p>HTTP 明文带来的典型风险有三个：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>风险</th>
+<th>含义</th>
+<th>例子</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>窃听</td>
+<td>第三方可以读到传输内容</td>
+<td>看到登录表单、Cookie、接口返回</td>
+</tr>
+<tr>
+<td>篡改</td>
+<td>第三方可以修改传输内容</td>
+<td>注入广告、替换下载链接、改写脚本</td>
+</tr>
+<tr>
+<td>冒充</td>
+<td>用户无法确认对面是不是真服务器</td>
+<td>被引导到伪造服务器却不容易察觉</td>
+</tr>
+</tbody>
+</table></div>
+<p>所以，HTTP 最大的问题不是“协议设计得不好”，而是它默认不解决安全传输问题。</p>
+<hr>
+<h2 id="https-加上的-tls-是什么">HTTPS 加上的 TLS 是什么
+</h2><p>TLS，全称是 Transport Layer Security，传输层安全协议。HTTPS 使用 TLS 在浏览器和服务器之间建立安全通道。</p>
+<p>TLS 主要提供三件事：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>能力</th>
+<th>解决的问题</th>
+<th>可以怎么理解</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>加密</td>
+<td>防止第三方看懂内容</td>
+<td>即使抓到数据包，也只能看到密文</td>
+</tr>
+<tr>
+<td>身份认证</td>
+<td>防止连到假服务器</td>
+<td>浏览器会检查服务器证书是否可信</td>
+</tr>
+<tr>
+<td>完整性校验</td>
+<td>防止内容被偷偷改掉</td>
+<td>数据一旦被篡改，校验会失败</td>
+</tr>
+</tbody>
+</table></div>
+<p>因此，HTTPS 传的仍然是 HTTP 请求和响应，只是这些 HTTP 数据会先被 TLS 加密，再放到网络里传输。</p>
+<hr>
+<h2 id="tls-握手大致怎么发生">TLS 握手大致怎么发生
+</h2><p>在浏览器真正发送 HTTP 请求之前，HTTPS 会先进行 TLS 握手。握手的目的不是传业务数据，而是完成几件关键准备：</p>
+<ol>
+<li>双方确认使用哪个 TLS 版本和加密算法。</li>
+<li>浏览器验证服务器证书。</li>
+<li>浏览器和服务器协商出后续通信使用的会话密钥。</li>
+<li>握手完成后，HTTP 请求和响应都走加密通道。</li>
+</ol>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="tls-handshake.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="tls-handshake.png" 
+             alt="HTTPS 建连时 TLS 握手的简化流程" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">HTTPS 建连时 TLS 握手的简化流程</span>
+    
+</div></p>
+<p>可以把这个过程理解成：</p>
+<blockquote>
+<p>两个人先确认对方身份，再商量一个只有双方知道的临时密码。之后真正聊天时，所有内容都用这个临时密码加密。</p>
+</blockquote>
+<p>现代 HTTPS 通常使用 TLS 1.2 或 TLS 1.3。TLS 1.3 对握手流程做了简化，配合会话恢复、HTTP/2、HTTP/3 和 CDN，HTTPS 的性能成本已经远小于早期印象里的“很慢”。</p>
+<hr>
+<h2 id="证书到底证明了什么">证书到底证明了什么
+</h2><p>很多人看到浏览器地址栏里的安全标识，会下意识理解成“这个网站一定是好网站”。这其实是误解。</p>
+<p>HTTPS 证书主要证明的是：</p>
+<blockquote>
+<p>你当前连接到的服务器，确实拥有这个域名对应证书中的私钥，并且这个证书能沿着可信 CA 链被浏览器验证。</p>
+</blockquote>
+<p>它不保证网站内容一定真实、商家一定可靠、业务一定没有漏洞。钓鱼网站同样可以申请 HTTPS 证书，所以 HTTPS 只能说明“连接安全”，不能说明“网站本身可信”。</p>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="certificate-chain.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="certificate-chain.png" 
+             alt="HTTPS 证书信任链和浏览器校验过程" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">HTTPS 证书信任链和浏览器校验过程</span>
+    
+</div></p>
+<p>浏览器通常会检查这些内容：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>检查项</th>
+<th>为什么重要</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>域名是否匹配</td>
+<td><code>example.com</code> 的证书不能拿去冒充 <code>bank.com</code></td>
+</tr>
+<tr>
+<td>证书是否过期</td>
+<td>过期证书不应继续被信任</td>
+</tr>
+<tr>
+<td>签名链是否可信</td>
+<td>证书需要能追溯到浏览器信任的根 CA</td>
+</tr>
+<tr>
+<td>证书是否被吊销</td>
+<td>泄露或失效的证书应被拒绝</td>
+</tr>
+</tbody>
+</table></div>
+<p>通过这些检查后，浏览器才会继续完成 TLS 握手，并把连接标记为安全。</p>
+<hr>
+<h2 id="http-和-https-的关键差异">HTTP 和 HTTPS 的关键差异
+</h2><p>从开发和运维角度看，最值得关注的是下面这些差异。</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>维度</th>
+<th>HTTP</th>
+<th>HTTPS</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>安全性</td>
+<td>无加密、无认证、无完整性保护</td>
+<td>有加密、认证和完整性保护</td>
+</tr>
+<tr>
+<td>请求格式</td>
+<td>HTTP 方法、Header、Body</td>
+<td>逻辑上仍是 HTTP 方法、Header、Body</td>
+</tr>
+<tr>
+<td>传输层</td>
+<td>通常直接跑在 TCP 上</td>
+<td>HTTP 先进入 TLS，再跑在 TCP 或 QUIC 上</td>
+</tr>
+<tr>
+<td>证书</td>
+<td>不需要证书</td>
+<td>需要有效 TLS 证书</td>
+</tr>
+<tr>
+<td>端口</td>
+<td>默认 80</td>
+<td>默认 443</td>
+</tr>
+<tr>
+<td>SEO 和浏览器策略</td>
+<td>搜索和浏览器体验不友好</td>
+<td>更符合现代 Web 默认要求</td>
+</tr>
+<tr>
+<td>Web 能力</td>
+<td>一些能力受限</td>
+<td>Service Worker、地理位置、剪贴板等能力通常要求安全上下文</td>
+</tr>
+<tr>
+<td>迁移成本</td>
+<td>配置简单</td>
+<td>需要证书、跳转、混合内容修复和监控</td>
+</tr>
+</tbody>
+</table></div>
+<p>这里有一个容易忽略的点：<strong>HTTPS 不会改变 HTTP 的语义。</strong></p>
+<p><code>GET</code> 还是 <code>GET</code>，<code>POST</code> 还是 <code>POST</code>，<code>404</code> 还是 <code>404</code>，<code>Cookie</code> 还是 <code>Cookie</code>。它改变的是这些数据穿过网络时的保护方式。</p>
+<hr>
+<h2 id="https-会不会更慢">HTTPS 会不会更慢
+</h2><p>早期 HTTPS 的确会带来明显额外开销，因为 TLS 握手需要额外往返，还要做加解密。但今天不能简单地说“HTTPS 一定慢”。</p>
+<p>原因主要有几个：</p>
+<ol>
+<li><strong>TLS 1.3 减少了握手成本</strong>：建立连接需要的往返次数更少。</li>
+<li><strong>会话恢复可以复用安全参数</strong>：老用户再次访问时不必完整握手。</li>
+<li><strong>HTTP/2 和 HTTP/3 改善了传输效率</strong>：多路复用减少了大量小请求的阻塞。</li>
+<li><strong>硬件和软件加密性能已经很高</strong>：常见服务器处理 TLS 的成本通常不是主要瓶颈。</li>
+<li><strong>CDN 可以承担 TLS 终止</strong>：证书、握手和边缘节点优化可以由 CDN 处理。</li>
+</ol>
+<p>更实际的结论是：</p>
+<blockquote>
+<p>对现代生产网站来说，HTTPS 的安全收益远大于额外成本。性能优化应该建立在 HTTPS 之上，而不是为了省一点握手成本退回 HTTP。</p>
+</blockquote>
+<hr>
+<h2 id="https-能保护什么保护不了什么">HTTPS 能保护什么，保护不了什么
+</h2><p>HTTPS 很重要，但不要把它当成万能安全方案。</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>问题</th>
+<th>HTTPS 能否解决</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>第三方读取请求路径、Cookie、请求体</td>
+<td>能</td>
+<td>这些内容会被 TLS 加密</td>
+</tr>
+<tr>
+<td>第三方篡改页面、脚本、接口响应</td>
+<td>能</td>
+<td>篡改通常会导致校验失败</td>
+</tr>
+<tr>
+<td>证明服务器身份</td>
+<td>能</td>
+<td>前提是证书链和域名校验通过</td>
+</tr>
+<tr>
+<td>隐藏访问的网站 IP</td>
+<td>不能</td>
+<td>IP 层仍需要知道连接到哪里</td>
+</tr>
+<tr>
+<td>完全隐藏访问域名</td>
+<td>不一定</td>
+<td>DNS、SNI 等环节在不同配置下可能暴露域名信息</td>
+</tr>
+<tr>
+<td>防止网站自身泄露数据</td>
+<td>不能</td>
+<td>服务端漏洞、日志泄露、数据库泄露仍需单独治理</td>
+</tr>
+<tr>
+<td>防止用户访问钓鱼网站</td>
+<td>不能完全防止</td>
+<td>钓鱼网站也可以有 HTTPS 证书</td>
+</tr>
+</tbody>
+</table></div>
+<p>因此，HTTPS 是 Web 安全的地基，但不是整栋楼。登录鉴权、权限控制、输入校验、XSS 防护、CSRF 防护、日志脱敏、密钥管理，这些仍然要单独做好。</p>
+<hr>
+<h2 id="从-http-迁移到-https">从 HTTP 迁移到 HTTPS
+</h2><p>给网站加 HTTPS，不只是把证书装上去。生产环境里，最常见的问题反而出在跳转、混合内容和缓存策略上。</p>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="migration-checklist.png" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="migration-checklist.png" 
+             alt="从 HTTP 迁移到 HTTPS 的关键步骤" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">从 HTTP 迁移到 HTTPS 的关键步骤</span>
+    
+</div></p>
+<p>一个比较稳妥的迁移清单如下：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>要做什么</th>
+<th>常见坑</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>申请证书</td>
+<td>使用 Let&rsquo;s Encrypt、云厂商证书或企业 CA</td>
+<td>忘记配置自动续期</td>
+</tr>
+<tr>
+<td>配置 HTTPS 站点</td>
+<td>监听 443，并绑定证书和私钥</td>
+<td>证书链不完整</td>
+</tr>
+<tr>
+<td>HTTP 跳转 HTTPS</td>
+<td>80 端口统一 301 到 443</td>
+<td>跳转循环、代理头配置错误</td>
+</tr>
+<tr>
+<td>修复混合内容</td>
+<td>页面里的图片、脚本、接口都改成 HTTPS</td>
+<td>浏览器拦截 <code>http://</code> 脚本和接口</td>
+</tr>
+<tr>
+<td>设置 Cookie 属性</td>
+<td>登录 Cookie 加 <code>Secure</code>、<code>HttpOnly</code>、<code>SameSite</code></td>
+<td>HTTPS 下 Cookie 策略不一致</td>
+</tr>
+<tr>
+<td>谨慎开启 HSTS</td>
+<td>确认全站和子域名都支持 HTTPS 后再开启</td>
+<td>一旦配置过猛，回滚会很麻烦</td>
+</tr>
+<tr>
+<td>更新外部入口</td>
+<td>CDN、反向代理、站点地图、canonical、监控</td>
+<td>搜索引擎和监控还在访问旧地址</td>
+</tr>
+</tbody>
+</table></div>
+<p>Nginx 里一个非常简化的跳转配置类似这样：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-nginx" data-lang="nginx"><span class="line"><span class="cl"><span class="k">server</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="kn">listen</span> <span class="mi">80</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="kn">server_name</span> <span class="s">example.com</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="kn">return</span> <span class="mi">301</span> <span class="s">https://</span><span class="nv">$host$request_uri</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="k">server</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="kn">listen</span> <span class="mi">443</span> <span class="s">ssl</span> <span class="s">http2</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="kn">server_name</span> <span class="s">example.com</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="kn">ssl_certificate</span> <span class="s">/etc/nginx/certs/example.com/fullchain.pem</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="kn">ssl_certificate_key</span> <span class="s">/etc/nginx/certs/example.com/privkey.pem</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="kn">location</span> <span class="s">/</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="kn">proxy_pass</span> <span class="s">http://app</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>真实线上配置还要结合负载均衡、CDN 回源、证书续期、日志、监控、灰度和回滚策略一起看。</p>
+<hr>
+<h2 id="常见误区">常见误区
+</h2><p><strong>误区一：HTTPS 网站一定安全。</strong></p>
+<p>不对。HTTPS 只能说明连接被加密且证书校验通过，网站是否有漏洞、业务是否可信，是另一回事。</p>
+<p><strong>误区二：有 HTTPS 就不会泄露任何信息。</strong></p>
+<p>不对。HTTPS 保护的是应用层内容，但 IP 地址、流量大小、访问时间等元数据仍可能被观察到。域名是否暴露还取决于 DNS、SNI、ECH、代理等具体配置。</p>
+<p><strong>误区三：接口在内网就不用 HTTPS。</strong></p>
+<p>不一定。内网也可能有越权访问、旁路抓包、错误代理、日志泄露等风险。涉及账号、Token、用户数据、后台管理的接口，即使在内网也建议使用 HTTPS 或等价的传输层保护。</p>
+<p><strong>误区四：HTTPS 配好一次就结束。</strong></p>
+<p>不对。证书会过期，TLS 配置会老化，依赖的加密套件也可能不再推荐。证书续期、过期告警和安全扫描都应该纳入运维流程。</p>
+<hr>
+<h2 id="总结">总结
+</h2><p>HTTP 和 HTTPS 的关系可以用三句话收束：</p>
+<ol>
+<li><strong>HTTP 负责“怎么表达请求和响应”</strong>，例如方法、状态码、Header、Body。</li>
+<li><strong>HTTPS 负责“安全地传这些 HTTP 数据”</strong>，核心靠 TLS 提供加密、认证和完整性保护。</li>
+<li><strong>生产环境默认应该使用 HTTPS</strong>，HTTP 最多作为跳转入口，或者用于受控的本地开发和临时测试。</li>
+</ol>
+<p>所以，下次再看到 <code>http://</code> 和 <code>https://</code>，不要只把它们当成 URL 前缀的差异。真正的区别在于：你的数据是裸奔在网络里，还是走在一条经过身份校验和加密保护的通道里。</p>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/zh-cn/tags/http/">HTTP</a>
+        
+            <a href="/zh-cn/tags/https/">HTTPS</a>
+        
+            <a href="/zh-cn/tags/web/">Web</a>
+        
+            <a href="/zh-cn/tags/network/">Network</a>
+        
+            <a href="/zh-cn/tags/security/">Security</a>
+        
+    </section>
+
+
+    </footer>
+
+
+    
+</article>
+
+    
+
+    
+
+     
+    
+        
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+        2026 SymphonyW
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.26.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.js" defer></script><script type="text/javascript" src="/ts/custom.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+<script>
+window.MathJax = {
+  tex: {
+    
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  svg: {
+    fontCache: 'global'
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    </body>
+</html>
