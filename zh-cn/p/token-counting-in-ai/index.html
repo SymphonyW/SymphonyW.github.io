@@ -1,0 +1,1770 @@
+<!DOCTYPE html>
+<html lang="zh-cn" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="从 tokenizer、上下文窗口、输入输出 token、流式响应、工具调用、多模态计费到中转站用量记录，系统讲清楚 AI 服务为什么按 token 计费，以及平台如何统计用户消耗。">
+<title>Token 是怎么计算的：AI 厂商和中转站如何统计用量</title>
+
+<link rel='canonical' href='https://SymphonyW.github.io/zh-cn/p/token-counting-in-ai/'>
+
+<link rel="stylesheet" href="/scss/style.min.4687047a1903756c84bf7a1cf7cbbf4e26bef4a42dd5bc620df47badaeed46c2.css"><meta property='og:title' content="Token 是怎么计算的：AI 厂商和中转站如何统计用量">
+<meta property='og:description' content="从 tokenizer、上下文窗口、输入输出 token、流式响应、工具调用、多模态计费到中转站用量记录，系统讲清楚 AI 服务为什么按 token 计费，以及平台如何统计用户消耗。">
+<meta property='og:url' content='https://SymphonyW.github.io/zh-cn/p/token-counting-in-ai/'>
+<meta property='og:site_name' content='SymphonyW'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='AI' /><meta property='article:tag' content='LLM' /><meta property='article:tag' content='Token' /><meta property='article:tag' content='API' /><meta property='article:tag' content='Billing' /><meta property='article:published_time' content='2026-09-04T21:43:19&#43;08:00'/><meta property='article:modified_time' content='2026-09-04T21:43:19&#43;08:00'/><meta property='og:image' content='https://SymphonyW.github.io/zh-cn/p/token-counting-in-ai/bg.svg' />
+<meta name="twitter:title" content="Token 是怎么计算的：AI 厂商和中转站如何统计用量">
+<meta name="twitter:description" content="从 tokenizer、上下文窗口、输入输出 token、流式响应、工具调用、多模态计费到中转站用量记录，系统讲清楚 AI 服务为什么按 token 计费，以及平台如何统计用户消耗。"><meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content='https://SymphonyW.github.io/zh-cn/p/token-counting-in-ai/bg.svg' />
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/zh-cn/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu5ea07d2842502bdd7540f9cbc4b41b95_5278_300x0_resize_box_3.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">😁</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/zh-cn">SymphonyW</a></h1>
+            <h2 class="site-description">Welcome to my Blog.</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0'
+                        target="_blank"
+                        title="Bilibili"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.0.0-beta2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M488.6 104.1C505.3 122.2 513 143.8 511.9 169.8V372.2C511.5 398.6 502.7 420.3 485.4 437.3C468.2 454.3 446.3 463.2 419.9 464H92.02C65.57 463.2 43.81 454.2 26.74 436.8C9.682 419.4 .7667 396.5 0 368.2V169.8C.7667 143.8 9.682 122.2 26.74 104.1C43.81 87.75 65.57 78.77 92.02 78H121.4L96.05 52.19C90.3 46.46 87.42 39.19 87.42 30.4C87.42 21.6 90.3 14.34 96.05 8.603C101.8 2.868 109.1 0 117.9 0C126.7 0 134 2.868 139.8 8.603L213.1 78H301.1L375.6 8.603C381.7 2.868 389.2 0 398 0C406.8 0 414.1 2.868 419.9 8.603C425.6 14.34 428.5 21.6 428.5 30.4C428.5 39.19 425.6 46.46 419.9 52.19L394.6 78L423.9 78C450.3 78.77 471.9 87.75 488.6 104.1H488.6zM449.8 173.8C449.4 164.2 446.1 156.4 439.1 150.3C433.9 144.2 425.1 140.9 416.4 140.5H96.05C86.46 140.9 78.6 144.2 72.47 150.3C66.33 156.4 63.07 164.2 62.69 173.8V368.2C62.69 377.4 65.95 385.2 72.47 391.7C78.99 398.2 86.85 401.5 96.05 401.5H416.4C425.6 401.5 433.4 398.2 439.7 391.7C446 385.2 449.4 377.4 449.8 368.2L449.8 173.8zM185.5 216.5C191.8 222.8 195.2 230.6 195.6 239.7V273C195.2 282.2 191.9 289.9 185.8 296.2C179.6 302.5 171.8 305.7 162.2 305.7C152.6 305.7 144.7 302.5 138.6 296.2C132.5 289.9 129.2 282.2 128.8 273V239.7C129.2 230.6 132.6 222.8 138.9 216.5C145.2 210.2 152.1 206.9 162.2 206.5C171.4 206.9 179.2 210.2 185.5 216.5H185.5zM377 216.5C383.3 222.8 386.7 230.6 387.1 239.7V273C386.7 282.2 383.4 289.9 377.3 296.2C371.2 302.5 363.3 305.7 353.7 305.7C344.1 305.7 336.3 302.5 330.1 296.2C323.1 289.9 320.7 282.2 320.4 273V239.7C320.7 230.6 324.1 222.8 330.4 216.5C336.7 210.2 344.5 206.9 353.7 206.5C362.9 206.9 370.7 210.2 377 216.5H377z"/></svg>
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://github.com/SymphonyW'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/zh-cn/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>主页</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/zh-cn/post/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>博客</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>归档</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/stats/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chart-bar" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="12" width="4" height="8" rx="1" />
+  <rect x="10" y="8" width="4" height="12" rx="1" />
+  <rect x="17" y="4" width="4" height="16" rx="1" />
+  <line x1="4" y1="20" x2="20" y2="20" />
+</svg>
+
+                
+                <span>写作记录</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/diary/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-event" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12z" />
+  <path d="M16 3v4" />
+  <path d="M8 3v4" />
+  <path d="M4 11h16" />
+  <path d="M8 15h2v2h-2z" />
+</svg>
+
+                
+                <span>日记</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>搜索</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/zh-cn/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>链接</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch" class="language-switcher">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <div class="language-switcher__tabs" aria-label="Language">
+                                <a class="language-switcher__tab "
+                                        href="/p/token-counting-in-ai/"
+                                        >
+                                        English
+                                    </a>
+                                <a class="language-switcher__tab is-current"
+                                        href="/zh-cn/p/token-counting-in-ai/"
+                                        aria-current="true">
+                                        中文
+                                    </a>
+                                
+                            </div>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>暗色模式</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">目录</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#一token-到底是什么">一、Token 到底是什么</a></li>
+    <li><a href="#二为什么大模型要按-token-计费">二、为什么大模型要按 Token 计费</a></li>
+    <li><a href="#三一次请求里哪些内容会被计入-token">三、一次请求里哪些内容会被计入 Token</a></li>
+    <li><a href="#四厂商是怎么统计-token-的">四、厂商是怎么统计 Token 的</a></li>
+    <li><a href="#五流式输出怎么统计">五、流式输出怎么统计</a></li>
+    <li><a href="#六中转站是怎么统计用户用量的">六、中转站是怎么统计用户用量的</a>
+      <ol>
+        <li><a href="#1-请求前预估-token">1. 请求前：预估 Token</a></li>
+        <li><a href="#2-请求后读取-usage-并扣费">2. 请求后：读取 usage 并扣费</a></li>
+        <li><a href="#3-落库为什么要有用量流水">3. 落库：为什么要有用量流水</a></li>
+      </ol>
+    </li>
+    <li><a href="#七中转站为什么会和官方统计不一致">七、中转站为什么会和官方统计不一致</a></li>
+    <li><a href="#八上下文窗口和最大输出-token">八、上下文窗口和最大输出 Token</a></li>
+    <li><a href="#九缓存-token-是怎么回事">九、缓存 Token 是怎么回事</a></li>
+    <li><a href="#十不同任务的-token-消耗差异">十、不同任务的 Token 消耗差异</a></li>
+    <li><a href="#十一如何自己估算-token">十一、如何自己估算 Token</a></li>
+    <li><a href="#十二中转站计费系统的工程要点">十二、中转站计费系统的工程要点</a></li>
+    <li><a href="#十三怎么降低-token-成本">十三、怎么降低 Token 成本</a></li>
+    <li><a href="#总结">总结</a></li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="has-image main-article">
+    <header class="article-header">
+        <div class="article-image">
+            <a href="/zh-cn/p/token-counting-in-ai/">
+                
+                    <img src="/zh-cn/p/token-counting-in-ai/bg.svg" loading="lazy" alt="Featured image of post Token 是怎么计算的：AI 厂商和中转站如何统计用量" />
+                
+            </a>
+        </div>
+    
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/zh-cn/p/token-counting-in-ai/">Token 是怎么计算的：AI 厂商和中转站如何统计用量</a>
+        </h2>
+    
+        
+        <h3 class="article-subtitle">
+            从 tokenizer、上下文窗口、输入输出 token、流式响应、工具调用、多模态计费到中转站用量记录，系统讲清楚 AI 服务为什么按 token 计费，以及平台如何统计用户消耗。
+        </h3>
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published">2026-09-04 21:43</time>
+            </div>
+        
+
+        
+    </footer>
+    
+
+    
+        <footer class="article-translations">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+            <div>
+                
+                    <a href="https://SymphonyW.github.io/p/token-counting-in-ai/" class="link">English</a>
+                
+            </div>
+        </footer>
+    
+</div>
+
+</header>
+
+    
+    <section class="article-tags">
+        
+            <a href="/zh-cn/tags/ai/">AI</a>
+        
+            <a href="/zh-cn/tags/llm/">LLM</a>
+        
+            <a href="/zh-cn/tags/token/">Token</a>
+        
+            <a href="/zh-cn/tags/api/">API</a>
+        
+            <a href="/zh-cn/tags/billing/">Billing</a>
+        
+    </section>
+
+
+    <section class="article-content">
+    
+    
+    <h1 id="token-是怎么计算的ai-厂商和中转站如何统计用量">Token 是怎么计算的：AI 厂商和中转站如何统计用量
+</h1><blockquote>
+<p>用大模型 API 时，经常会看到 <code>prompt_tokens</code>、<code>completion_tokens</code>、<code>total_tokens</code> 这些字段。很多人第一反应是：“Token 是不是就是字数？”不是。<strong>Token 是模型真正处理文本时使用的基本编号单元，厂商和中转站的用量统计，本质上就是围绕这些编号单元做输入、输出、缓存、工具调用和账单记录。</strong></p>
+</blockquote>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="bg.svg" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="bg.svg" 
+             alt="Token 用量统计流程" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">Token 用量统计流程</span>
+    
+</div></p>
+<p>先给出一句话版本：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>问题</th>
+<th>简短答案</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Token 是什么</td>
+<td>模型 tokenizer 把文本切分后得到的编号单元</td>
+</tr>
+<tr>
+<td>Token 等于字数吗</td>
+<td>不等于。中文、英文、标点、空格、代码都会有不同切法</td>
+</tr>
+<tr>
+<td>厂商怎么统计</td>
+<td>请求进入模型前统计输入 token，生成时统计输出 token，结束后返回 usage</td>
+</tr>
+<tr>
+<td>中转站怎么统计</td>
+<td>优先读取上游厂商返回的 usage，同时自己预估、限额、落库、扣费</td>
+</tr>
+<tr>
+<td>为什么我本地算的不一样</td>
+<td>tokenizer 不同、隐藏模板、工具 schema、RAG 上下文、多模态、重试和缓存都会带来差异</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="一token-到底是什么">一、Token 到底是什么
+</h2><p>大模型并不是直接理解“字”或“词”。在进入模型前，文本会先经过一个叫 <strong>Tokenizer</strong> 的组件，被切成一串 token，然后每个 token 再映射成数字 ID。</p>
+<div class="mermaid">flowchart LR
+    A[原始文本] --> B[Tokenizer 切分]
+    B --> C[Token 序列]
+    C --> D[Token ID]
+    D --> E[模型推理]
+</div><p>比如用户输入：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">帮我写一个 Dockerfile
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>在 tokenizer 看来，它可能会被切成类似这样的片段：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">[&#34;帮&#34;, &#34;我&#34;, &#34;写&#34;, &#34;一个&#34;, &#34; Docker&#34;, &#34;file&#34;]
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这只是示意，不同模型的 tokenizer 结果可能完全不同。有的模型会把常见词切成一个 token，有的会把生僻字、特殊符号、空格、换行或代码符号切得更碎。</p>
+<p>因此：</p>
+<ul>
+<li><code>hello</code> 可能是 1 个 token；</li>
+<li><code>hello world</code> 可能是 2 到 3 个 token；</li>
+<li>一个中文词可能是 1 个 token，也可能被拆成多个 token；</li>
+<li>代码、JSON、Base64、日志堆栈通常比较费 token；</li>
+<li>空格、换行、标点也可能被计入 token。</li>
+</ul>
+<p>更准确地说，Token 是 <strong>“模型词表里的最小可识别片段”</strong>。模型每次生成回答，本质上也是一个 token 一个 token 地往外吐。</p>
+<h2 id="二为什么大模型要按-token-计费">二、为什么大模型要按 Token 计费
+</h2><p>因为大模型的主要成本和 token 数强相关：</p>
+<ol>
+<li>输入越长，模型要读的上下文越多；</li>
+<li>输出越长，模型要生成的步骤越多；</li>
+<li>上下文越长，显存、缓存和注意力计算压力越大；</li>
+<li>如果启用工具调用、多模态、长上下文、推理增强，成本结构还会更复杂。</li>
+</ol>
+<p>所以厂商通常不会简单按“请求次数”计费，而是按 token 计量。</p>
+<p>常见账单可以抽象成：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">费用 = 输入 token 数 * 输入单价
+</span></span><span class="line"><span class="cl">     + 输出 token 数 * 输出单价
+</span></span><span class="line"><span class="cl">     + 缓存 / 推理 / 图片 / 音频 / 工具等附加 token 成本
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>为什么输出 token 往往更贵？因为输出不是一次性算出来的，而是模型逐步生成。每生成一个新 token，都要基于已有上下文继续推理一次。输入阶段可以有缓存和批处理优化，输出阶段通常更受实时生成过程约束。</p>
+<h2 id="三一次请求里哪些内容会被计入-token">三、一次请求里哪些内容会被计入 Token
+</h2><p>很多人只会数用户输入的那句话，但真实 API 请求里远不止这些内容。</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>内容</th>
+<th>是否通常计入</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>用户消息</td>
+<td>是</td>
+<td>用户真正输入的问题</td>
+</tr>
+<tr>
+<td>系统提示词</td>
+<td>是</td>
+<td><code>system</code> 或平台预置角色设定</td>
+</tr>
+<tr>
+<td>开发者提示词</td>
+<td>是</td>
+<td>一些平台会额外注入规则或安全策略</td>
+</tr>
+<tr>
+<td>历史对话</td>
+<td>是</td>
+<td>多轮聊天时，前面的上下文也会重新进入模型</td>
+</tr>
+<tr>
+<td>RAG 检索片段</td>
+<td>是</td>
+<td>从知识库召回后拼进 prompt 的内容</td>
+</tr>
+<tr>
+<td>工具定义</td>
+<td>是</td>
+<td>Function calling / tool schema 往往很占 token</td>
+</tr>
+<tr>
+<td>工具调用结果</td>
+<td>是</td>
+<td>工具返回的 JSON、表格、日志也会进入后续上下文</td>
+</tr>
+<tr>
+<td>输出文本</td>
+<td>是</td>
+<td>模型生成的回答</td>
+</tr>
+<tr>
+<td>图片、音频、视频</td>
+<td>视模型而定</td>
+<td>通常会折算成专门的输入或输出计量单位</td>
+</tr>
+<tr>
+<td>缓存命中内容</td>
+<td>视厂商而定</td>
+<td>有的平台会单独返回 cached tokens，并按更低价格计费</td>
+</tr>
+</tbody>
+</table></div>
+<p>所以你看到的一次“简单提问”，在服务端可能是这样的：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">系统提示词
+</span></span><span class="line"><span class="cl">+ 平台安全规则
+</span></span><span class="line"><span class="cl">+ 历史对话
+</span></span><span class="line"><span class="cl">+ 用户当前问题
+</span></span><span class="line"><span class="cl">+ RAG 检索内容
+</span></span><span class="line"><span class="cl">+ 工具 schema
+</span></span><span class="line"><span class="cl">+ 输出格式约束
+</span></span><span class="line"><span class="cl">= 实际输入给模型的 prompt
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这也是为什么同样一句“帮我总结一下”，在不同应用里消耗 token 差异很大。聊天框、知识库问答、Agent、代码助手、联网搜索，它们背后拼进去的上下文不一样。</p>
+<h2 id="四厂商是怎么统计-token-的">四、厂商是怎么统计 Token 的
+</h2><p>AI 厂商统计 token，通常发生在模型服务的几个关键节点。</p>
+<div class="mermaid">sequenceDiagram
+    participant C as Client
+    participant G as API Gateway
+    participant T as Tokenizer
+    participant M as Model Server
+    participant B as Billing
+
+    C->>G: 发送请求
+    G->>G: 鉴权、限流、检查上下文长度
+    G->>T: 对输入消息做 tokenization
+    T-->>G: input token count
+    G->>M: 输入 token ID
+    M-->>G: 逐 token 生成输出
+    G->>G: 统计 output token count
+    G->>B: 写入 usage 和账单事件
+    G-->>C: 返回 response + usage
+</div><p>大致流程是：</p>
+<ol>
+<li><strong>请求进入网关</strong>：先鉴权，确认 API Key、组织、项目、余额、限速策略；</li>
+<li><strong>规范化请求</strong>：把 messages、tools、response format、多模态内容等转成模型内部格式；</li>
+<li><strong>输入计数</strong>：用该模型对应的 tokenizer 计算输入 token；</li>
+<li><strong>上下文检查</strong>：判断输入 token + 允许输出 token 是否超过模型上下文窗口；</li>
+<li><strong>模型生成</strong>：模型每生成一个 token，服务端就能记录输出 token；</li>
+<li><strong>结束汇总</strong>：生成完成、被 stop 截断、达到最大输出长度或发生错误后，汇总 usage；</li>
+<li><strong>账单落库</strong>：把模型、用户、请求 ID、token 数、价格、状态写入计费系统；</li>
+<li><strong>返回结果</strong>：API 响应里通常会带 usage 字段，供调用方记录。</li>
+</ol>
+<p>一个典型 usage 结构可能长这样：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;usage&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;prompt_tokens&#34;</span><span class="p">:</span> <span class="mi">1200</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;completion_tokens&#34;</span><span class="p">:</span> <span class="mi">350</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;total_tokens&#34;</span><span class="p">:</span> <span class="mi">1550</span>
+</span></span><span class="line"><span class="cl">  <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>更复杂的平台还可能拆得更细：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span><span class="lnt">9
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;usage&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;input_tokens&#34;</span><span class="p">:</span> <span class="mi">1200</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;output_tokens&#34;</span><span class="p">:</span> <span class="mi">350</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;cached_input_tokens&#34;</span><span class="p">:</span> <span class="mi">800</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;reasoning_tokens&#34;</span><span class="p">:</span> <span class="mi">120</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;image_input_tokens&#34;</span><span class="p">:</span> <span class="mi">240</span>
+</span></span><span class="line"><span class="cl">  <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>字段名和含义会随厂商变化，但底层逻辑类似：<strong>把模型实际处理过的输入和实际生成过的输出，折算成可计费单位。</strong></p>
+<h2 id="五流式输出怎么统计">五、流式输出怎么统计
+</h2><p>流式输出看起来像模型一边想一边发，其实服务端仍然知道自己生成了多少 token。</p>
+<p>普通非流式响应：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">模型生成完整回答 → 统计输出 token → 一次性返回 response + usage
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>流式响应：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">模型生成 token 1 → 发一个 chunk
+</span></span><span class="line"><span class="cl">模型生成 token 2 → 发一个 chunk
+</span></span><span class="line"><span class="cl">模型生成 token 3 → 发一个 chunk
+</span></span><span class="line"><span class="cl">...
+</span></span><span class="line"><span class="cl">模型结束 → 返回最终 usage 或由服务端内部记录
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>中转站处理流式请求时通常会做两件事：</p>
+<ol>
+<li>边转发 chunk 给客户端，保证用户体验；</li>
+<li>同时缓存或累积输出文本，等上游结束后记录用量。</li>
+</ol>
+<p>如果上游在最后一个 chunk 里返回 usage，中转站就直接使用它。如果上游不返回 usage，中转站可能会用 tokenizer 对完整输出再算一次，作为估算值。</p>
+<p>流式计费最容易出问题的地方是断连：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>场景</th>
+<th>通常怎么处理</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>用户主动停止生成</td>
+<td>已经生成的输出 token 仍可能计费</td>
+</tr>
+<tr>
+<td>客户端网络断开</td>
+<td>上游可能还生成了一小段，取决于中转站是否及时取消请求</td>
+</tr>
+<tr>
+<td>中转站转发失败</td>
+<td>要看上游是否已经成功处理，以及中转站的计费策略</td>
+</tr>
+<tr>
+<td>请求超时</td>
+<td>可能只有输入被处理，也可能已有部分输出</td>
+</tr>
+</tbody>
+</table></div>
+<p>因此严谨的中转站不会只根据“客户端收到了多少字”扣费，而会尽量以 <strong>上游 usage 或服务端实际生成记录</strong> 为准。</p>
+<h2 id="六中转站是怎么统计用户用量的">六、中转站是怎么统计用户用量的
+</h2><p>中转站可以理解成站在用户和上游模型厂商之间的 API 网关。它要做的不只是转发请求，还要做鉴权、限流、余额、计费、渠道选择和审计。</p>
+<div class="mermaid">flowchart TD
+    A[用户请求] --> B[中转站鉴权]
+    B --> C[余额和额度检查]
+    C --> D[预估输入 token]
+    D --> E[选择上游渠道]
+    E --> F[转发给模型厂商]
+    F --> G[读取上游 usage]
+    G --> H[按价格表计算成本]
+    H --> I[扣用户余额或额度]
+    I --> J[写入用量流水]
+    J --> K[返回结果给用户]
+</div><p>中转站一般会有三层统计：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>层级</th>
+<th>作用</th>
+<th>准确性</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>请求前预估</td>
+<td>判断是否超上下文、余额是否足够、是否限流</td>
+<td>估算</td>
+</tr>
+<tr>
+<td>请求后结算</td>
+<td>根据上游 usage 或本地 tokenizer 计算真实消耗</td>
+<td>更接近真实</td>
+</tr>
+<tr>
+<td>离线对账</td>
+<td>和上游账单、渠道日志、用户流水做一致性校验</td>
+<td>最终核对</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="1-请求前预估-token">1. 请求前：预估 Token
+</h3><p>请求还没发给上游时，中转站通常已经要做判断：</p>
+<ul>
+<li>这个请求会不会超过模型上下文窗口？</li>
+<li>用户余额够不够？</li>
+<li>是否超过每分钟 token 限额？</li>
+<li>是否命中某个模型或渠道的风控限制？</li>
+</ul>
+<p>这时它会用对应模型的 tokenizer 先估算输入 token：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-gdscript3" data-lang="gdscript3"><span class="line"><span class="cl"><span class="n">model</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">model</span>
+</span></span><span class="line"><span class="cl"><span class="n">tokenizer</span> <span class="o">=</span> <span class="n">tokenizer_registry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="n">normalized_prompt</span> <span class="o">=</span> <span class="n">render_messages</span><span class="p">(</span>
+</span></span><span class="line"><span class="cl">    <span class="n">system</span><span class="o">=</span><span class="n">request</span><span class="o">.</span><span class="n">system</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">messages</span><span class="o">=</span><span class="n">request</span><span class="o">.</span><span class="n">messages</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">tools</span><span class="o">=</span><span class="n">request</span><span class="o">.</span><span class="n">tools</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">response_format</span><span class="o">=</span><span class="n">request</span><span class="o">.</span><span class="n">response_format</span>
+</span></span><span class="line"><span class="cl"><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="n">input_tokens_estimated</span> <span class="o">=</span> <span class="n">tokenizer</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="n">normalized_prompt</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="k">if</span> <span class="n">input_tokens_estimated</span> <span class="o">+</span> <span class="n">request</span><span class="o">.</span><span class="n">max_output_tokens</span> <span class="o">&gt;</span> <span class="n">model</span><span class="o">.</span><span class="n">context_window</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">    <span class="n">reject</span><span class="p">(</span><span class="s2">&#34;context length exceeded&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="k">if</span> <span class="n">user</span><span class="o">.</span><span class="n">remaining_quota</span> <span class="o">&lt;</span> <span class="n">estimate_cost</span><span class="p">(</span><span class="n">input_tokens_estimated</span><span class="p">,</span> <span class="n">request</span><span class="o">.</span><span class="n">max_output_tokens</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">    <span class="n">reject</span><span class="p">(</span><span class="s2">&#34;insufficient quota&#34;</span><span class="p">)</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这里的 <code>render_messages</code> 很关键。真实模型不是只看用户输入的字符串，而是看消息角色、分隔符、工具定义、输出格式等拼接后的内部 prompt。中转站如果只数 <code>messages[-1].content</code>，一定会低估。</p>
+<h3 id="2-请求后读取-usage-并扣费">2. 请求后：读取 usage 并扣费
+</h3><p>请求完成后，中转站会优先使用上游厂商返回的 usage：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">response = upstream.call(request)
+</span></span><span class="line"><span class="cl">usage = normalize_usage(response.usage, provider, model)
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">cost = usage.input_tokens * price.input
+</span></span><span class="line"><span class="cl">     + usage.output_tokens * price.output
+</span></span><span class="line"><span class="cl">     + usage.cached_tokens * price.cached_input
+</span></span><span class="line"><span class="cl">     + usage.reasoning_tokens * price.reasoning
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">ledger.insert({
+</span></span><span class="line"><span class="cl">    request_id,
+</span></span><span class="line"><span class="cl">    user_id,
+</span></span><span class="line"><span class="cl">    provider,
+</span></span><span class="line"><span class="cl">    model,
+</span></span><span class="line"><span class="cl">    usage,
+</span></span><span class="line"><span class="cl">    cost,
+</span></span><span class="line"><span class="cl">    status: &#34;success&#34;
+</span></span><span class="line"><span class="cl">})
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">user.balance -= cost
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>为什么要优先用上游 usage？因为上游最清楚模型内部到底拼了什么、缓存命中了多少、输出生成了多少、特殊模态如何折算。中转站自己的 tokenizer 只能尽量接近，不能保证完全一致。</p>
+<h3 id="3-落库为什么要有用量流水">3. 落库：为什么要有用量流水
+</h3><p>一个成熟中转站不会只在用户表里减余额，还会写不可随意改动的流水记录。否则一旦用户质疑扣费，平台很难解释。</p>
+<p>一个简化的用量表可以这样设计：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-sql" data-lang="sql"><span class="line"><span class="cl"><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">ai_usage_ledger</span><span class="w"> </span><span class="p">(</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">id</span><span class="w"> </span><span class="nb">BIGINT</span><span class="w"> </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">request_id</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">64</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">user_id</span><span class="w"> </span><span class="nb">BIGINT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">provider</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">32</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">model</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">128</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">prompt_tokens</span><span class="w"> </span><span class="nb">INT</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">completion_tokens</span><span class="w"> </span><span class="nb">INT</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">cached_tokens</span><span class="w"> </span><span class="nb">INT</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">reasoning_tokens</span><span class="w"> </span><span class="nb">INT</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">total_tokens</span><span class="w"> </span><span class="nb">INT</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">upstream_cost</span><span class="w"> </span><span class="nb">DECIMAL</span><span class="p">(</span><span class="mi">18</span><span class="p">,</span><span class="w"> </span><span class="mi">8</span><span class="p">)</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">user_cost</span><span class="w"> </span><span class="nb">DECIMAL</span><span class="p">(</span><span class="mi">18</span><span class="p">,</span><span class="w"> </span><span class="mi">8</span><span class="p">)</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">status</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">32</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">created_at</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">);</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>关键字段：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>字段</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>request_id</code></td>
+<td>幂等和排查，避免重试导致重复扣费</td>
+</tr>
+<tr>
+<td><code>provider</code></td>
+<td>区分不同上游厂商</td>
+</tr>
+<tr>
+<td><code>model</code></td>
+<td>不同模型价格和 tokenizer 不同</td>
+</tr>
+<tr>
+<td><code>prompt_tokens</code></td>
+<td>输入 token</td>
+</tr>
+<tr>
+<td><code>completion_tokens</code></td>
+<td>输出 token</td>
+</tr>
+<tr>
+<td><code>cached_tokens</code></td>
+<td>缓存命中的输入 token</td>
+</tr>
+<tr>
+<td><code>reasoning_tokens</code></td>
+<td>推理类模型可能单独统计的内部输出</td>
+</tr>
+<tr>
+<td><code>upstream_cost</code></td>
+<td>中转站实际付给厂商的成本</td>
+</tr>
+<tr>
+<td><code>user_cost</code></td>
+<td>中转站按自己价格表向用户收取的费用</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td>成功、失败、取消、超时、部分输出等状态</td>
+</tr>
+</tbody>
+</table></div>
+<p>如果平台有余额系统，扣费还要做事务处理：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">begin transaction
+</span></span><span class="line"><span class="cl">  insert usage_ledger
+</span></span><span class="line"><span class="cl">  update user_balance set balance = balance - user_cost
+</span></span><span class="line"><span class="cl">  insert balance_change_log
+</span></span><span class="line"><span class="cl">commit
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这样才能保证“用量流水、余额变化、账单记录”三者对得上。</p>
+<h2 id="七中转站为什么会和官方统计不一致">七、中转站为什么会和官方统计不一致
+</h2><p>如果你自己写一个 token 计算器，经常会发现结果和官方 usage 对不上。原因主要有这些：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>原因</th>
+<th>为什么会导致差异</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>tokenizer 版本不同</td>
+<td>模型升级后词表或特殊 token 规则可能变了</td>
+</tr>
+<tr>
+<td>消息模板不同</td>
+<td>厂商内部会给 role、message、tool 加包装格式</td>
+</tr>
+<tr>
+<td>系统提示词不可见</td>
+<td>应用或中转站可能注入了用户看不到的 prompt</td>
+</tr>
+<tr>
+<td>历史上下文被带入</td>
+<td>多轮聊天会把旧消息一起计入输入</td>
+</tr>
+<tr>
+<td>工具 schema 很大</td>
+<td>一个复杂 JSON Schema 可能比用户问题还长</td>
+</tr>
+<tr>
+<td>RAG 召回内容多</td>
+<td>知识库片段会直接增加输入 token</td>
+</tr>
+<tr>
+<td>输出格式约束</td>
+<td>JSON mode、结构化输出、示例格式都会增加 prompt</td>
+</tr>
+<tr>
+<td>多模态折算</td>
+<td>图片、音频、视频通常不是按普通文本 token 简单计算</td>
+</tr>
+<tr>
+<td>缓存命中</td>
+<td>cached tokens 可能计入总量，但按不同价格结算</td>
+</tr>
+<tr>
+<td>请求重试</td>
+<td>上游失败重试可能产生额外成本，平台要定义是否转嫁</td>
+</tr>
+</tbody>
+</table></div>
+<p>所以中转站的合理做法是：</p>
+<ol>
+<li><strong>请求前用本地 tokenizer 预估</strong>，用于限额和上下文判断；</li>
+<li><strong>请求后以上游 usage 为准结算</strong>，尽量减少争议；</li>
+<li><strong>没有上游 usage 时再本地估算</strong>，并在账单里标记来源；</li>
+<li><strong>定期离线对账</strong>，比较中转站记录和上游账单差异。</li>
+</ol>
+<h2 id="八上下文窗口和最大输出-token">八、上下文窗口和最大输出 Token
+</h2><p>Token 统计不只影响费用，也影响请求能不能成功。</p>
+<p>每个模型都有上下文窗口，比如能处理 8K、32K、128K 或更长上下文。这个窗口通常要同时容纳输入和输出：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">输入 token + 最大输出 token &lt;= 模型上下文窗口
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>假设某模型上下文窗口是 8192：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th style="text-align:right">输入 token</th>
+<th style="text-align:right">设置最大输出</th>
+<th>是否安全</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:right">2000</td>
+<td style="text-align:right">1000</td>
+<td>安全</td>
+</tr>
+<tr>
+<td style="text-align:right">7000</td>
+<td style="text-align:right">1000</td>
+<td>接近上限</td>
+</tr>
+<tr>
+<td style="text-align:right">7900</td>
+<td style="text-align:right">1000</td>
+<td>可能被拒绝</td>
+</tr>
+<tr>
+<td style="text-align:right">8200</td>
+<td style="text-align:right">500</td>
+<td>输入本身已经超限</td>
+</tr>
+</tbody>
+</table></div>
+<p>很多“上下文超长”错误，不是用户当前问题太长，而是应用把历史对话、系统 prompt、RAG 内容和工具 schema 全塞进去了。</p>
+<p>中转站通常会在请求前做保护：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">available_output = model.context_window - estimated_input_tokens
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">if available_output &lt;= 0:
+</span></span><span class="line"><span class="cl">    reject(&#34;input too long&#34;)
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">max_output_tokens = min(request.max_output_tokens, available_output, platform_limit)
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这也是为什么有些平台会提示“请开启上下文压缩”或“减少知识库引用数量”。本质是在帮你节省输入 token。</p>
+<h2 id="九缓存-token-是怎么回事">九、缓存 Token 是怎么回事
+</h2><p>一些厂商会对重复前缀做上下文缓存。比如系统提示词、工具 schema、长文档前半部分每次都一样，那么服务端可以复用已经处理过的缓存，降低延迟和成本。</p>
+<p>抽象来看：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">请求 1:
+</span></span><span class="line"><span class="cl">长系统提示词 + 工具 schema + 用户问题 A
+</span></span><span class="line"><span class="cl">全部输入都需要正常处理
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">请求 2:
+</span></span><span class="line"><span class="cl">长系统提示词 + 工具 schema + 用户问题 B
+</span></span><span class="line"><span class="cl">前面相同部分可能命中缓存
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这类 usage 可能拆成：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>字段</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>input_tokens</code></td>
+<td>输入 token 总数</td>
+</tr>
+<tr>
+<td><code>cached_input_tokens</code></td>
+<td>输入中命中缓存的部分</td>
+</tr>
+<tr>
+<td><code>billable_input_tokens</code></td>
+<td>实际按普通输入价计费的部分，具体取决于厂商规则</td>
+</tr>
+</tbody>
+</table></div>
+<p>对中转站来说，缓存会让计费更复杂。它不能只看 <code>total_tokens</code> 乘一个固定单价，而要按厂商返回的细分字段计算。</p>
+<h2 id="十不同任务的-token-消耗差异">十、不同任务的 Token 消耗差异
+</h2><p>同一个模型，不同应用形态的 token 消耗会差很多。</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>场景</th>
+<th>Token 消耗特点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>普通问答</td>
+<td>用户输入短，输出长度决定主要成本</td>
+</tr>
+<tr>
+<td>长文总结</td>
+<td>输入很长，输出中等</td>
+</tr>
+<tr>
+<td>代码生成</td>
+<td>代码符号、缩进、上下文文件都比较费 token</td>
+</tr>
+<tr>
+<td>RAG 问答</td>
+<td>检索片段越多，输入 token 越高</td>
+</tr>
+<tr>
+<td>Agent 调工具</td>
+<td>工具定义和工具结果会反复进入上下文</td>
+</tr>
+<tr>
+<td>JSON 结构化输出</td>
+<td>schema、字段名、示例都会增加输入和输出</td>
+</tr>
+<tr>
+<td>Embedding</td>
+<td>通常只按输入文本 token 计量，没有 completion token</td>
+</tr>
+<tr>
+<td>图片理解</td>
+<td>图片会被折算成视觉输入 token 或类似单位</td>
+</tr>
+<tr>
+<td>语音转写 / 语音生成</td>
+<td>可能按音频时长、音频 token 或混合规则计费</td>
+</tr>
+</tbody>
+</table></div>
+<p>如果你在开发 AI 应用，最容易低估的是三类开销：</p>
+<ol>
+<li><strong>历史对话</strong>：用户只发一句话，但你把前 30 轮都带上了；</li>
+<li><strong>工具 schema</strong>：函数参数定义复杂，每次请求都要传；</li>
+<li><strong>RAG 内容</strong>：Top-K 设得太大，召回片段太长。</li>
+</ol>
+<p>优化 token 成本，通常不是把用户问题压短，而是控制这些“看不见的上下文”。</p>
+<h2 id="十一如何自己估算-token">十一、如何自己估算 Token
+</h2><p>如果你是应用开发者，至少要在请求前做一次本地估算，用来控制上下文和成本。</p>
+<p>最简单但不精确的方法：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">estimated_tokens = text.length / 3
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这只能做非常粗的 UI 提示。更靠谱的方法是使用模型对应的 tokenizer：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">tokenizer = get_tokenizer(model)
+</span></span><span class="line"><span class="cl">tokens = tokenizer.encode(rendered_prompt)
+</span></span><span class="line"><span class="cl">count = len(tokens)
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>但要记住：本地估算要尽量接近真实请求，而不是只数用户输入。</p>
+<p>应该计入：</p>
+<ul>
+<li>system prompt；</li>
+<li>developer prompt；</li>
+<li>历史 messages；</li>
+<li>RAG context；</li>
+<li>tool definitions；</li>
+<li>response format；</li>
+<li>当前用户问题。</li>
+</ul>
+<p>不应该只计入：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">count_tokens(user_message)
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>更合理的是：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-gdscript3" data-lang="gdscript3"><span class="line"><span class="cl"><span class="n">rendered_prompt</span> <span class="o">=</span> <span class="n">render_chat_request</span><span class="p">(</span>
+</span></span><span class="line"><span class="cl">    <span class="n">system_prompt</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">developer_prompt</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">history_messages</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">retrieved_context</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">tool_schemas</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">response_format</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">user_message</span>
+</span></span><span class="line"><span class="cl"><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="n">count_tokens</span><span class="p">(</span><span class="n">rendered_prompt</span><span class="p">,</span> <span class="n">model</span><span class="p">)</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>本地估算的目标不是做到和厂商 100% 一样，而是提前发现明显超限和明显超预算。</p>
+<h2 id="十二中转站计费系统的工程要点">十二、中转站计费系统的工程要点
+</h2><p>如果从工程实现角度看，一个可靠的中转站至少要有这些模块：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>模块</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>模型路由</td>
+<td>把用户请求路由到不同厂商、渠道或模型</td>
+</tr>
+<tr>
+<td>Token 预估器</td>
+<td>请求前计算输入 token 和最大可能成本</td>
+</tr>
+<tr>
+<td>Usage 归一化</td>
+<td>把不同厂商返回的 usage 统一成内部格式</td>
+</tr>
+<tr>
+<td>价格表</td>
+<td>维护模型输入、输出、缓存、多模态等单价</td>
+</tr>
+<tr>
+<td>账单流水</td>
+<td>记录每次请求的 token、费用、状态和 request_id</td>
+</tr>
+<tr>
+<td>余额系统</td>
+<td>做预扣、实扣、退款或额度扣减</td>
+</tr>
+<tr>
+<td>重试策略</td>
+<td>定义上游失败、超时、断流时是否继续扣费</td>
+</tr>
+<tr>
+<td>对账任务</td>
+<td>和上游账单做日级或小时级核对</td>
+</tr>
+<tr>
+<td>风控限流</td>
+<td>按用户、模型、IP、组织维度限制请求和 token</td>
+</tr>
+</tbody>
+</table></div>
+<p>一个常见请求链路可以写成：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">handle_request(req):
+</span></span><span class="line"><span class="cl">    user = authenticate(req.api_key)
+</span></span><span class="line"><span class="cl">    model = resolve_model(req.model)
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    estimated = estimate_usage(req, model)
+</span></span><span class="line"><span class="cl">    reserve_quota(user, estimated.max_cost)
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    try:
+</span></span><span class="line"><span class="cl">        upstream_resp = call_provider(req, model)
+</span></span><span class="line"><span class="cl">        actual_usage = normalize_usage(upstream_resp.usage)
+</span></span><span class="line"><span class="cl">        actual_cost = calculate_cost(actual_usage, model.price)
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        settle_quota(user, actual_cost)
+</span></span><span class="line"><span class="cl">        write_ledger(req.id, user.id, model, actual_usage, actual_cost, &#34;success&#34;)
+</span></span><span class="line"><span class="cl">        return upstream_resp
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    except ProviderError as err:
+</span></span><span class="line"><span class="cl">        release_or_settle_by_policy(user, req.id, err)
+</span></span><span class="line"><span class="cl">        write_ledger(req.id, user.id, model, estimated, 0, &#34;failed&#34;)
+</span></span><span class="line"><span class="cl">        raise
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这里有两个细节很关键：</p>
+<ul>
+<li><strong>预扣不等于实扣</strong>：请求前按最大可能输出预扣，结束后按真实 usage 结算，多退少补；</li>
+<li><strong>幂等不等于不重试</strong>：同一个 <code>request_id</code> 重复上报时不能重复扣费，但上游真实重试产生的成本也要能解释清楚。</li>
+</ul>
+<h2 id="十三怎么降低-token-成本">十三、怎么降低 Token 成本
+</h2><div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>方法</th>
+<th>原理</th>
+<th>风险</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>精简系统提示词</td>
+<td>减少每次固定输入</td>
+<td>规则太少可能影响输出稳定性</td>
+</tr>
+<tr>
+<td>压缩历史对话</td>
+<td>摘要替代完整历史</td>
+<td>摘要可能丢细节</td>
+</tr>
+<tr>
+<td>控制 RAG Top-K</td>
+<td>少塞无关片段</td>
+<td>召回不足会影响答案</td>
+</tr>
+<tr>
+<td>缩短工具 schema</td>
+<td>减少重复传入的结构定义</td>
+<td>过度简化会降低工具调用准确性</td>
+</tr>
+<tr>
+<td>设置合理最大输出</td>
+<td>避免模型无限写长</td>
+<td>可能截断答案</td>
+</tr>
+<tr>
+<td>使用缓存</td>
+<td>重复前缀命中缓存</td>
+<td>依赖厂商支持和请求结构稳定</td>
+</tr>
+<tr>
+<td>按任务选模型</td>
+<td>简单任务用低成本模型</td>
+<td>模型能力不足会带来返工</td>
+</tr>
+<tr>
+<td>日志里记录 usage</td>
+<td>找到最费 token 的链路</td>
+<td>注意隐私和数据合规</td>
+</tr>
+</tbody>
+</table></div>
+<p>实践中最有效的优化通常是这三个：</p>
+<ol>
+<li>不要无脑带全量历史；</li>
+<li>不要把过长的文档片段塞进 prompt；</li>
+<li>不要给简单任务使用过强、过贵、上下文过大的模型。</li>
+</ol>
+<h2 id="总结">总结
+</h2><p>Token 计算可以拆成三层理解：</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>层级</th>
+<th>关注点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>模型层</td>
+<td>tokenizer 如何把文本变成 token ID，模型如何逐 token 生成</td>
+</tr>
+<tr>
+<td>API 层</td>
+<td>输入、输出、工具、多模态、缓存如何汇总成 usage</td>
+</tr>
+<tr>
+<td>平台层</td>
+<td>中转站如何预估、限额、扣费、落库、对账和处理异常</td>
+</tr>
+</tbody>
+</table></div>
+<p>如果只记住一句话：</p>
+<blockquote>
+<p><strong>Token 不是字数，而是模型实际处理的上下文单位；厂商按模型真实处理量统计 usage，中转站则围绕 usage 做预估、转发、结算和审计。</strong></p>
+</blockquote>
+<p>对开发者来说，真正要养成的习惯是：不要只看用户输入的长度，而要看完整上下文。系统提示词、历史消息、RAG 片段、工具 schema、结构化输出约束，都会变成模型要处理的 token，也都会最终影响成本、延迟和上下文上限。</p>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/zh-cn/tags/ai/">AI</a>
+        
+            <a href="/zh-cn/tags/llm/">LLM</a>
+        
+            <a href="/zh-cn/tags/token/">Token</a>
+        
+            <a href="/zh-cn/tags/api/">API</a>
+        
+            <a href="/zh-cn/tags/billing/">Billing</a>
+        
+    </section>
+
+
+    </footer>
+
+
+    
+</article>
+
+    
+
+    
+
+<aside class="related-content--wrapper">
+    <h2 class="section-title">相关文章</h2>
+    <div class="related-content">
+        <div class="flex article-list--tile">
+            
+                
+<article class="has-image">
+    <a href="/zh-cn/p/rag-%E6%8A%80%E6%9C%AF%E5%85%A8%E6%99%AF%E8%AE%A9%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%BB%8E%E9%97%AD%E5%8D%B7%E8%80%83%E8%AF%95%E5%88%B0%E5%BC%80%E5%8D%B7%E8%80%83%E8%AF%95/">
+        
+        
+            <div class="article-image">
+                <img src="/zh-cn/p/rag-%E6%8A%80%E6%9C%AF%E5%85%A8%E6%99%AF%E8%AE%A9%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%BB%8E%E9%97%AD%E5%8D%B7%E8%80%83%E8%AF%95%E5%88%B0%E5%BC%80%E5%8D%B7%E8%80%83%E8%AF%95/bg.102e738fb4a4088f22d652143bb6dcfe_hue42602111cbdf43a7b55d02fb6f689c9_36783_250x150_fill_box_smart1_3.png" 
+                        width="250" 
+                        height="150" 
+                        loading="lazy"
+                        alt="Featured image of post RAG 技术全景：让大模型从&#34;闭卷考试&#34;到&#34;开卷考试&#34;"
+                        
+                        data-hash="md5-EC5zj7SkCI8i1lIUO7bc/g==">
+                
+            </div>
+        
+
+        <div class="article-details">
+            <h2 class="article-title">RAG 技术全景：让大模型从&#34;闭卷考试&#34;到&#34;开卷考试&#34;</h2>
+        </div>
+    </a>
+</article>
+
+            
+        </div>
+    </div>
+</aside>
+
+     
+    
+        
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+        2026 SymphonyW
+    </section>
+    
+    <section class="powerby">
+        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
+        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.26.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.js" defer></script><script type="text/javascript" src="/ts/custom.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+<script>
+window.MathJax = {
+  tex: {
+    
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  svg: {
+    fontCache: 'global'
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script><script type="module">
+  import('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs').then(({ default: mermaid }) => {
+    const diagrams = Array.from(document.querySelectorAll('.mermaid'));
+
+    diagrams.forEach((el) => {
+      el.dataset.mermaidSource = el.textContent.trim();
+    });
+
+    const renderMermaid = () => {
+      const scheme = document.documentElement.getAttribute('data-scheme');
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: scheme === 'dark' ? 'dark' : 'default',
+        securityLevel: 'loose',
+        fontFamily: 'inherit'
+      });
+
+      diagrams.forEach((el) => {
+        el.removeAttribute('data-processed');
+        el.textContent = el.dataset.mermaidSource;
+      });
+
+      return mermaid.run({ nodes: diagrams });
+    };
+
+    renderMermaid().catch((error) => console.error('Mermaid render failed:', error));
+
+    
+    const observer = new MutationObserver(() => {
+      renderMermaid().catch((error) => console.error('Mermaid render failed:', error));
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-scheme'] });
+  }).catch((error) => console.error('Mermaid failed to load:', error));
+</script>
+    </body>
+</html>

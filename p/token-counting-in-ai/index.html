@@ -1,0 +1,1621 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+    <head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="A practical explanation of tokenizers, context windows, input and output tokens, streaming usage, tool calls, multimodal billing, and how API proxy platforms estimate, settle, and audit token consumption.">
+<title>How Token Counting Works: How AI Providers and API Proxies Track Usage</title>
+
+<link rel='canonical' href='https://SymphonyW.github.io/p/token-counting-in-ai/'>
+
+<link rel="stylesheet" href="/scss/style.min.4687047a1903756c84bf7a1cf7cbbf4e26bef4a42dd5bc620df47badaeed46c2.css"><meta property='og:title' content="How Token Counting Works: How AI Providers and API Proxies Track Usage">
+<meta property='og:description' content="A practical explanation of tokenizers, context windows, input and output tokens, streaming usage, tool calls, multimodal billing, and how API proxy platforms estimate, settle, and audit token consumption.">
+<meta property='og:url' content='https://SymphonyW.github.io/p/token-counting-in-ai/'>
+<meta property='og:site_name' content='SymphonyW'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='AI' /><meta property='article:tag' content='LLM' /><meta property='article:tag' content='Token' /><meta property='article:tag' content='API' /><meta property='article:tag' content='Billing' /><meta property='article:published_time' content='2026-09-04T21:43:19&#43;08:00'/><meta property='article:modified_time' content='2026-09-04T21:43:19&#43;08:00'/><meta property='og:image' content='https://SymphonyW.github.io/p/token-counting-in-ai/bg.svg' />
+<meta name="twitter:title" content="How Token Counting Works: How AI Providers and API Proxies Track Usage">
+<meta name="twitter:description" content="A practical explanation of tokenizers, context windows, input and output tokens, streaming usage, tool calls, multimodal billing, and how API proxy platforms estimate, settle, and audit token consumption."><meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content='https://SymphonyW.github.io/p/token-counting-in-ai/bg.svg' />
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    </head>
+    <body class="
+    article-page
+    ">
+    <script>
+        (function() {
+            const colorSchemeKey = 'StackColorScheme';
+            if(!localStorage.getItem(colorSchemeKey)){
+                localStorage.setItem(colorSchemeKey, "auto");
+            }
+        })();
+    </script><script>
+    (function() {
+        const colorSchemeKey = 'StackColorScheme';
+        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
+        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
+
+        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+            
+
+            document.documentElement.dataset.scheme = 'dark';
+        } else {
+            document.documentElement.dataset.scheme = 'light';
+        }
+    })();
+</script>
+<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
+    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="Toggle Menu">
+        <span class="hamburger-box">
+            <span class="hamburger-inner"></span>
+        </span>
+    </button>
+
+    <header>
+        
+            
+            <figure class="site-avatar">
+                <a href="/">
+                
+                    
+                    
+                    
+                        
+                        <img src="/img/avatar_hu5ea07d2842502bdd7540f9cbc4b41b95_5278_300x0_resize_box_3.png" width="300"
+                            height="300" class="site-logo" loading="lazy" alt="Avatar">
+                    
+                
+                </a>
+                
+                    <span class="emoji">😁</span>
+                
+            </figure>
+            
+        
+        
+        <div class="site-meta">
+            <h1 class="site-name"><a href="/">SymphonyW</a></h1>
+            <h2 class="site-description">Welcome to my Blog.</h2>
+        </div>
+    </header><ol class="menu-social">
+            
+                <li>
+                    <a 
+                        href='https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0'
+                        target="_blank"
+                        title="Bilibili"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.0.0-beta2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M488.6 104.1C505.3 122.2 513 143.8 511.9 169.8V372.2C511.5 398.6 502.7 420.3 485.4 437.3C468.2 454.3 446.3 463.2 419.9 464H92.02C65.57 463.2 43.81 454.2 26.74 436.8C9.682 419.4 .7667 396.5 0 368.2V169.8C.7667 143.8 9.682 122.2 26.74 104.1C43.81 87.75 65.57 78.77 92.02 78H121.4L96.05 52.19C90.3 46.46 87.42 39.19 87.42 30.4C87.42 21.6 90.3 14.34 96.05 8.603C101.8 2.868 109.1 0 117.9 0C126.7 0 134 2.868 139.8 8.603L213.1 78H301.1L375.6 8.603C381.7 2.868 389.2 0 398 0C406.8 0 414.1 2.868 419.9 8.603C425.6 14.34 428.5 21.6 428.5 30.4C428.5 39.19 425.6 46.46 419.9 52.19L394.6 78L423.9 78C450.3 78.77 471.9 87.75 488.6 104.1H488.6zM449.8 173.8C449.4 164.2 446.1 156.4 439.1 150.3C433.9 144.2 425.1 140.9 416.4 140.5H96.05C86.46 140.9 78.6 144.2 72.47 150.3C66.33 156.4 63.07 164.2 62.69 173.8V368.2C62.69 377.4 65.95 385.2 72.47 391.7C78.99 398.2 86.85 401.5 96.05 401.5H416.4C425.6 401.5 433.4 398.2 439.7 391.7C446 385.2 449.4 377.4 449.8 368.2L449.8 173.8zM185.5 216.5C191.8 222.8 195.2 230.6 195.6 239.7V273C195.2 282.2 191.9 289.9 185.8 296.2C179.6 302.5 171.8 305.7 162.2 305.7C152.6 305.7 144.7 302.5 138.6 296.2C132.5 289.9 129.2 282.2 128.8 273V239.7C129.2 230.6 132.6 222.8 138.9 216.5C145.2 210.2 152.1 206.9 162.2 206.5C171.4 206.9 179.2 210.2 185.5 216.5H185.5zM377 216.5C383.3 222.8 386.7 230.6 387.1 239.7V273C386.7 282.2 383.4 289.9 377.3 296.2C371.2 302.5 363.3 305.7 353.7 305.7C344.1 305.7 336.3 302.5 330.1 296.2C323.1 289.9 320.7 282.2 320.4 273V239.7C320.7 230.6 324.1 222.8 330.4 216.5C336.7 210.2 344.5 206.9 353.7 206.5C362.9 206.9 370.7 210.2 377 216.5H377z"/></svg>
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://github.com/SymphonyW'
+                        target="_blank"
+                        title="GitHub"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+                <li>
+                    <a 
+                        href='https://twitter.com'
+                        target="_blank"
+                        title="Twitter"
+                        rel="me"
+                    >
+                        
+                        
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
+</svg>
+
+
+
+                        
+                    </a>
+                </li>
+            
+        </ol><ol class="menu" id="main-menu">
+        
+        
+        
+        <li >
+            <a href='/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <polyline points="5 12 3 12 12 3 21 12 19 12" />
+  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
+  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
+</svg>
+
+
+
+                
+                <span>Home</span>
+            </a>
+        </li>
+        
+        
+        <li  class='current' >
+            <a href='/post/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Blog</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/archives/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="4" width="18" height="4" rx="2" />
+  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
+  <line x1="10" y1="12" x2="14" y2="12" />
+</svg>
+
+
+
+                
+                <span>Archives</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/diary/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-event" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12z" />
+  <path d="M16 3v4" />
+  <path d="M8 3v4" />
+  <path d="M4 11h16" />
+  <path d="M8 15h2v2h-2z" />
+</svg>
+
+                
+                <span>Diary</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/stats/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chart-bar" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <rect x="3" y="12" width="4" height="8" rx="1" />
+  <rect x="10" y="8" width="4" height="12" rx="1" />
+  <rect x="17" y="4" width="4" height="16" rx="1" />
+  <line x1="4" y1="20" x2="20" y2="20" />
+</svg>
+
+                
+                <span>Stats</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/search/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+
+                
+                <span>Search</span>
+            </a>
+        </li>
+        
+        
+        <li >
+            <a href='/links/' >
+                
+                
+                
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
+  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
+</svg>
+
+
+
+                
+                <span>Links</span>
+            </a>
+        </li>
+        
+        <li class="menu-bottom-section">
+            <ol class="menu">
+                    
+                        <li id="i18n-switch" class="language-switcher">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+                            <div class="language-switcher__tabs" aria-label="Language">
+                                <a class="language-switcher__tab is-current"
+                                        href="/p/token-counting-in-ai/"
+                                        aria-current="true">
+                                        English
+                                    </a>
+                                <a class="language-switcher__tab "
+                                        href="/zh-cn/p/token-counting-in-ai/"
+                                        >
+                                        中文
+                                    </a>
+                                
+                            </div>
+                        </li>
+                    
+                
+
+                
+                    <li id="dark-mode-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="8" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="16" cy="12" r="2" />
+  <rect x="2" y="6" width="20" height="12" rx="6" />
+</svg>
+
+
+
+                        <span>Dark Mode</span>
+                    </li>
+                
+            </ol>
+        </li>
+    </ol>
+</aside>
+
+    <aside class="sidebar right-sidebar sticky">
+        
+            
+                
+    <section class="widget archives">
+        <div class="widget-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <line x1="5" y1="9" x2="19" y2="9" />
+  <line x1="5" y1="15" x2="19" y2="15" />
+  <line x1="11" y1="4" x2="7" y2="20" />
+  <line x1="17" y1="4" x2="13" y2="20" />
+</svg>
+
+
+
+        </div>
+        <h2 class="widget-title section-title">Table of contents</h2>
+        
+        <div class="widget--toc">
+            <nav id="TableOfContents">
+  <ol>
+    <li><a href="#1-what-a-token-is">1. What a token is</a></li>
+    <li><a href="#2-why-billing-is-token-based">2. Why billing is token-based</a></li>
+    <li><a href="#3-what-gets-counted-in-a-request">3. What gets counted in a request</a></li>
+    <li><a href="#4-how-providers-count-tokens">4. How providers count tokens</a></li>
+    <li><a href="#5-streaming-usage">5. Streaming usage</a></li>
+    <li><a href="#6-how-api-proxy-platforms-track-usage">6. How API proxy platforms track usage</a>
+      <ol>
+        <li><a href="#pre-request-estimate">Pre-request estimate</a></li>
+        <li><a href="#post-request-settlement">Post-request settlement</a></li>
+        <li><a href="#usage-ledger">Usage ledger</a></li>
+      </ol>
+    </li>
+    <li><a href="#7-why-proxy-counts-can-differ-from-official-counts">7. Why proxy counts can differ from official counts</a></li>
+    <li><a href="#8-context-windows-and-maximum-output">8. Context windows and maximum output</a></li>
+    <li><a href="#9-cached-tokens">9. Cached tokens</a></li>
+    <li><a href="#10-where-token-cost-grows">10. Where token cost grows</a></li>
+    <li><a href="#11-estimating-tokens-yourself">11. Estimating tokens yourself</a></li>
+    <li><a href="#12-engineering-notes-for-proxy-billing">12. Engineering notes for proxy billing</a></li>
+    <li><a href="#13-reducing-token-cost">13. Reducing token cost</a></li>
+    <li><a href="#summary">Summary</a></li>
+  </ol>
+</nav>
+        </div>
+    </section>
+
+            
+        
+    </aside>
+
+
+            <main class="main full-width">
+    <article class="has-image main-article">
+    <header class="article-header">
+        <div class="article-image">
+            <a href="/p/token-counting-in-ai/">
+                
+                    <img src="/p/token-counting-in-ai/bg.svg" loading="lazy" alt="Featured image of post How Token Counting Works: How AI Providers and API Proxies Track Usage" />
+                
+            </a>
+        </div>
+    
+
+    <div class="article-details">
+    
+
+    <div class="article-title-wrapper">
+        <h2 class="article-title">
+            <a href="/p/token-counting-in-ai/">How Token Counting Works: How AI Providers and API Proxies Track Usage</a>
+        </h2>
+    
+        
+        <h3 class="article-subtitle">
+            A practical explanation of tokenizers, context windows, input and output tokens, streaming usage, tool calls, multimodal billing, and how API proxy platforms estimate, settle, and audit token consumption.
+        </h3>
+        
+    </div>
+
+    
+    
+    
+    
+    <footer class="article-time">
+        
+            <div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
+  <circle cx="18" cy="18" r="4" />
+  <path d="M15 3v4" />
+  <path d="M7 3v4" />
+  <path d="M3 11h16" />
+  <path d="M18 16.496v1.504l1 1" />
+</svg>
+                <time class="article-time--published">2026-09-04 21:43</time>
+            </div>
+        
+
+        
+    </footer>
+    
+
+    
+        <footer class="article-translations">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+  <path d="M4 5h7" />
+  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
+  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
+  <path d="M12 20l4 -9l4 9" />
+  <path d="M19.1 18h-6.2" />
+</svg>
+
+
+
+            <div>
+                
+                    <a href="https://SymphonyW.github.io/zh-cn/p/token-counting-in-ai/" class="link">中文</a>
+                
+            </div>
+        </footer>
+    
+</div>
+
+</header>
+
+    
+    <section class="article-tags">
+        
+            <a href="/tags/ai/">AI</a>
+        
+            <a href="/tags/llm/">LLM</a>
+        
+            <a href="/tags/token/">Token</a>
+        
+            <a href="/tags/api/">API</a>
+        
+            <a href="/tags/billing/">Billing</a>
+        
+    </section>
+
+
+    <section class="article-content">
+    
+    
+    <h1 id="how-token-counting-works-how-ai-providers-and-api-proxies-track-usage">How Token Counting Works: How AI Providers and API Proxies Track Usage
+</h1><blockquote>
+<p>When using LLM APIs, you often see fields such as <code>prompt_tokens</code>, <code>completion_tokens</code>, and <code>total_tokens</code>. A token is not simply a word or character. <strong>It is the unit produced by the model&rsquo;s tokenizer, and provider billing is built around counting input, output, cached, tool, and multimodal units.</strong></p>
+</blockquote>
+<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
+    
+    <a href="bg.svg" 
+        
+       target="_blank" 
+       class="gallery-item"> <img src="bg.svg" 
+             alt="Token usage tracking flow" 
+             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+             
+    </a>
+    
+        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">Token usage tracking flow</span>
+    
+</div></p>
+<p>The short version:</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>Question</th>
+<th>Answer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>What is a token</td>
+<td>A unit produced when the tokenizer splits text</td>
+</tr>
+<tr>
+<td>Is it the same as word count</td>
+<td>No. Chinese, English, punctuation, whitespace, and code tokenize differently</td>
+</tr>
+<tr>
+<td>How providers count it</td>
+<td>They count input before inference, output during generation, then return usage</td>
+</tr>
+<tr>
+<td>How API proxies count it</td>
+<td>They estimate before forwarding, prefer upstream usage after completion, then settle billing</td>
+</tr>
+<tr>
+<td>Why local counts differ</td>
+<td>Tokenizer mismatch, hidden prompts, tool schemas, RAG context, multimodal inputs, retries, and caching</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="1-what-a-token-is">1. What a token is
+</h2><p>LLMs do not process raw text directly. Before inference, text goes through a <strong>tokenizer</strong>, which splits it into tokens and maps each token to a numeric ID.</p>
+<div class="mermaid">flowchart LR
+    A[Raw text] --> B[Tokenizer]
+    B --> C[Token sequence]
+    C --> D[Token IDs]
+    D --> E[Model inference]
+</div><p>For example:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">Write a Dockerfile for me
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>may be split into pieces such as:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">[&#34;Write&#34;, &#34; a&#34;, &#34; Docker&#34;, &#34;file&#34;, &#34; for&#34;, &#34; me&#34;]
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>This is only illustrative. Different models can tokenize the same text differently. Common words may be one token, rare characters may be split, and whitespace, punctuation, JSON, logs, and source code can all add tokens.</p>
+<p>The practical definition is: <strong>a token is the smallest vocabulary unit the model actually reads or generates.</strong></p>
+<h2 id="2-why-billing-is-token-based">2. Why billing is token-based
+</h2><p>LLM cost is strongly related to token count:</p>
+<ol>
+<li>longer inputs require more context processing;</li>
+<li>longer outputs require more generation steps;</li>
+<li>larger context windows increase memory and attention cost;</li>
+<li>tools, multimodal input, long context, caching, and reasoning models add more accounting dimensions.</li>
+</ol>
+<p>A simplified formula:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">cost = input_tokens * input_price
+</span></span><span class="line"><span class="cl">     + output_tokens * output_price
+</span></span><span class="line"><span class="cl">     + cached / reasoning / image / audio / tool-related token cost
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Output tokens are often priced higher because they are generated step by step. Each new token depends on the current context and previous generated tokens.</p>
+<h2 id="3-what-gets-counted-in-a-request">3. What gets counted in a request
+</h2><p>Real API requests usually contain more than the user&rsquo;s latest message.</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>Content</th>
+<th>Usually counted</th>
+<th>Note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>User message</td>
+<td>Yes</td>
+<td>The user&rsquo;s visible input</td>
+</tr>
+<tr>
+<td>System prompt</td>
+<td>Yes</td>
+<td>Role and behavior instructions</td>
+</tr>
+<tr>
+<td>Developer prompt</td>
+<td>Yes</td>
+<td>Platform or application rules</td>
+</tr>
+<tr>
+<td>Conversation history</td>
+<td>Yes</td>
+<td>Previous turns re-enter the context</td>
+</tr>
+<tr>
+<td>RAG snippets</td>
+<td>Yes</td>
+<td>Retrieved context is added to the prompt</td>
+</tr>
+<tr>
+<td>Tool definitions</td>
+<td>Yes</td>
+<td>Function schemas can be large</td>
+</tr>
+<tr>
+<td>Tool results</td>
+<td>Yes</td>
+<td>JSON, tables, and logs may enter later turns</td>
+</tr>
+<tr>
+<td>Output text</td>
+<td>Yes</td>
+<td>The model&rsquo;s generated answer</td>
+</tr>
+<tr>
+<td>Images, audio, video</td>
+<td>Depends on model</td>
+<td>Often converted into special billing units</td>
+</tr>
+<tr>
+<td>Cached content</td>
+<td>Depends on provider</td>
+<td>May be reported and priced separately</td>
+</tr>
+</tbody>
+</table></div>
+<p>A &ldquo;simple&rdquo; request may become:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">system prompt
+</span></span><span class="line"><span class="cl">+ platform safety rules
+</span></span><span class="line"><span class="cl">+ conversation history
+</span></span><span class="line"><span class="cl">+ current user message
+</span></span><span class="line"><span class="cl">+ RAG context
+</span></span><span class="line"><span class="cl">+ tool schemas
+</span></span><span class="line"><span class="cl">+ output format instructions
+</span></span><span class="line"><span class="cl">= actual model input
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>This is why the same user message can cost very different amounts in a chat app, RAG app, coding assistant, agent, or search-enabled assistant.</p>
+<h2 id="4-how-providers-count-tokens">4. How providers count tokens
+</h2><p>Provider-side usage counting usually happens across the gateway, tokenizer, model server, and billing system.</p>
+<div class="mermaid">sequenceDiagram
+    participant C as Client
+    participant G as API Gateway
+    participant T as Tokenizer
+    participant M as Model Server
+    participant B as Billing
+
+    C->>G: Send request
+    G->>G: Auth, rate limit, context check
+    G->>T: Tokenize input
+    T-->>G: Input token count
+    G->>M: Send token IDs
+    M-->>G: Generate output tokens
+    G->>G: Count output tokens
+    G->>B: Write usage and billing event
+    G-->>C: Return response and usage
+</div><p>Typical steps:</p>
+<ol>
+<li>authenticate API key, project, organization, quota, and rate limits;</li>
+<li>normalize messages, tools, response format, and multimodal inputs;</li>
+<li>count input tokens with the model&rsquo;s tokenizer;</li>
+<li>check context length;</li>
+<li>generate output and count generated tokens;</li>
+<li>summarize usage when generation stops, is truncated, or errors;</li>
+<li>write model, user, request ID, tokens, cost, and status into billing;</li>
+<li>return a response with usage metadata.</li>
+</ol>
+<p>A simple usage object may look like:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;usage&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;prompt_tokens&#34;</span><span class="p">:</span> <span class="mi">1200</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;completion_tokens&#34;</span><span class="p">:</span> <span class="mi">350</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;total_tokens&#34;</span><span class="p">:</span> <span class="mi">1550</span>
+</span></span><span class="line"><span class="cl">  <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>More detailed platforms may expose:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span><span class="lnt">9
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;usage&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;input_tokens&#34;</span><span class="p">:</span> <span class="mi">1200</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;output_tokens&#34;</span><span class="p">:</span> <span class="mi">350</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;cached_input_tokens&#34;</span><span class="p">:</span> <span class="mi">800</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;reasoning_tokens&#34;</span><span class="p">:</span> <span class="mi">120</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;image_input_tokens&#34;</span><span class="p">:</span> <span class="mi">240</span>
+</span></span><span class="line"><span class="cl">  <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Field names differ across providers, but the core idea is the same: <strong>bill the units the model actually processed and generated.</strong></p>
+<h2 id="5-streaming-usage">5. Streaming usage
+</h2><p>For non-streaming calls:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">generate full answer -&gt; count output tokens -&gt; return response + usage
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>For streaming calls:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">generate token 1 -&gt; send chunk
+</span></span><span class="line"><span class="cl">generate token 2 -&gt; send chunk
+</span></span><span class="line"><span class="cl">generate token 3 -&gt; send chunk
+</span></span><span class="line"><span class="cl">...
+</span></span><span class="line"><span class="cl">finish -&gt; return final usage or record it internally
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>An API proxy usually relays chunks while also accumulating the response. If the upstream provider returns usage in the final chunk, the proxy uses it. If not, it may re-tokenize the final output and estimate usage locally.</p>
+<p>Interrupted streams need careful handling:</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Typical treatment</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>User stops generation</td>
+<td>Already generated output tokens may still be billed</td>
+</tr>
+<tr>
+<td>Client disconnects</td>
+<td>Depends on whether the proxy cancels upstream quickly</td>
+</tr>
+<tr>
+<td>Proxy forwarding fails</td>
+<td>Depends on whether upstream already processed the request</td>
+</tr>
+<tr>
+<td>Timeout</td>
+<td>May include only input or partial output</td>
+</tr>
+</tbody>
+</table></div>
+<p>A serious proxy should not bill only by the characters received by the client. It should rely on upstream usage or server-side generation records when possible.</p>
+<h2 id="6-how-api-proxy-platforms-track-usage">6. How API proxy platforms track usage
+</h2><p>An API proxy sits between users and model providers. It forwards requests, but also manages authentication, quota, pricing, routing, retries, and audit records.</p>
+<div class="mermaid">flowchart TD
+    A[User request] --> B[Proxy auth]
+    B --> C[Quota and balance check]
+    C --> D[Estimate input tokens]
+    D --> E[Choose upstream provider]
+    E --> F[Forward request]
+    F --> G[Read upstream usage]
+    G --> H[Calculate cost]
+    H --> I[Deduct balance or quota]
+    I --> J[Write usage ledger]
+    J --> K[Return response]
+</div><p>There are usually three accounting layers:</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Purpose</th>
+<th>Accuracy</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Pre-request estimate</td>
+<td>Context check, balance check, rate limiting</td>
+<td>Estimate</td>
+</tr>
+<tr>
+<td>Post-request settlement</td>
+<td>Use upstream usage or local tokenizer result</td>
+<td>Closer to real usage</td>
+</tr>
+<tr>
+<td>Offline reconciliation</td>
+<td>Compare proxy records with provider invoices</td>
+<td>Final audit</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="pre-request-estimate">Pre-request estimate
+</h3><p>Before forwarding, the proxy needs to decide whether the request should be accepted.</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-gdscript3" data-lang="gdscript3"><span class="line"><span class="cl"><span class="n">model</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">model</span>
+</span></span><span class="line"><span class="cl"><span class="n">tokenizer</span> <span class="o">=</span> <span class="n">tokenizer_registry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="n">normalized_prompt</span> <span class="o">=</span> <span class="n">render_messages</span><span class="p">(</span>
+</span></span><span class="line"><span class="cl">    <span class="n">system</span><span class="o">=</span><span class="n">request</span><span class="o">.</span><span class="n">system</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">messages</span><span class="o">=</span><span class="n">request</span><span class="o">.</span><span class="n">messages</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">tools</span><span class="o">=</span><span class="n">request</span><span class="o">.</span><span class="n">tools</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">response_format</span><span class="o">=</span><span class="n">request</span><span class="o">.</span><span class="n">response_format</span>
+</span></span><span class="line"><span class="cl"><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="n">input_tokens_estimated</span> <span class="o">=</span> <span class="n">tokenizer</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="n">normalized_prompt</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="k">if</span> <span class="n">input_tokens_estimated</span> <span class="o">+</span> <span class="n">request</span><span class="o">.</span><span class="n">max_output_tokens</span> <span class="o">&gt;</span> <span class="n">model</span><span class="o">.</span><span class="n">context_window</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">    <span class="n">reject</span><span class="p">(</span><span class="s2">&#34;context length exceeded&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="k">if</span> <span class="n">user</span><span class="o">.</span><span class="n">remaining_quota</span> <span class="o">&lt;</span> <span class="n">estimate_cost</span><span class="p">(</span><span class="n">input_tokens_estimated</span><span class="p">,</span> <span class="n">request</span><span class="o">.</span><span class="n">max_output_tokens</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">    <span class="n">reject</span><span class="p">(</span><span class="s2">&#34;insufficient quota&#34;</span><span class="p">)</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>The <code>render_messages</code> step matters. Counting only the latest user message underestimates the request.</p>
+<h3 id="post-request-settlement">Post-request settlement
+</h3><p>After completion, the proxy should prefer provider usage:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">response = upstream.call(request)
+</span></span><span class="line"><span class="cl">usage = normalize_usage(response.usage, provider, model)
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">cost = usage.input_tokens * price.input
+</span></span><span class="line"><span class="cl">     + usage.output_tokens * price.output
+</span></span><span class="line"><span class="cl">     + usage.cached_tokens * price.cached_input
+</span></span><span class="line"><span class="cl">     + usage.reasoning_tokens * price.reasoning
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">ledger.insert({
+</span></span><span class="line"><span class="cl">    request_id,
+</span></span><span class="line"><span class="cl">    user_id,
+</span></span><span class="line"><span class="cl">    provider,
+</span></span><span class="line"><span class="cl">    model,
+</span></span><span class="line"><span class="cl">    usage,
+</span></span><span class="line"><span class="cl">    cost,
+</span></span><span class="line"><span class="cl">    status: &#34;success&#34;
+</span></span><span class="line"><span class="cl">})
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">user.balance -= cost
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Provider usage is more authoritative because the provider knows internal templates, cache hits, special modalities, and exact generated output.</p>
+<h3 id="usage-ledger">Usage ledger
+</h3><p>A mature proxy writes immutable usage records instead of only reducing a user balance.</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-sql" data-lang="sql"><span class="line"><span class="cl"><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">ai_usage_ledger</span><span class="w"> </span><span class="p">(</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">id</span><span class="w"> </span><span class="nb">BIGINT</span><span class="w"> </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">request_id</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">64</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">user_id</span><span class="w"> </span><span class="nb">BIGINT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">provider</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">32</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">model</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">128</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">prompt_tokens</span><span class="w"> </span><span class="nb">INT</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">completion_tokens</span><span class="w"> </span><span class="nb">INT</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">cached_tokens</span><span class="w"> </span><span class="nb">INT</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">reasoning_tokens</span><span class="w"> </span><span class="nb">INT</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">total_tokens</span><span class="w"> </span><span class="nb">INT</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">upstream_cost</span><span class="w"> </span><span class="nb">DECIMAL</span><span class="p">(</span><span class="mi">18</span><span class="p">,</span><span class="w"> </span><span class="mi">8</span><span class="p">)</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">user_cost</span><span class="w"> </span><span class="nb">DECIMAL</span><span class="p">(</span><span class="mi">18</span><span class="p">,</span><span class="w"> </span><span class="mi">8</span><span class="p">)</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">status</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">32</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="n">created_at</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">);</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>The ledger makes billing explainable: request ID, user, provider, model, token counts, upstream cost, user-facing cost, and status can all be audited.</p>
+<h2 id="7-why-proxy-counts-can-differ-from-official-counts">7. Why proxy counts can differ from official counts
+</h2><div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>Cause</th>
+<th>Why it differs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Tokenizer version mismatch</td>
+<td>Model tokenizer rules may differ or evolve</td>
+</tr>
+<tr>
+<td>Message template mismatch</td>
+<td>Providers wrap roles, tools, and messages internally</td>
+</tr>
+<tr>
+<td>Hidden system prompt</td>
+<td>Apps or proxies may inject invisible instructions</td>
+</tr>
+<tr>
+<td>Conversation history</td>
+<td>Old messages re-enter the input</td>
+</tr>
+<tr>
+<td>Large tool schemas</td>
+<td>JSON schemas can exceed the user prompt</td>
+</tr>
+<tr>
+<td>RAG context</td>
+<td>Retrieved chunks increase input tokens</td>
+</tr>
+<tr>
+<td>Structured output</td>
+<td>JSON schema and examples add prompt cost</td>
+</tr>
+<tr>
+<td>Multimodal conversion</td>
+<td>Images and audio are not simple text tokens</td>
+</tr>
+<tr>
+<td>Cache hits</td>
+<td>Cached tokens may have separate pricing</td>
+</tr>
+<tr>
+<td>Retries</td>
+<td>Failed upstream attempts may still create cost</td>
+</tr>
+</tbody>
+</table></div>
+<p>Reasonable proxy behavior:</p>
+<ol>
+<li>estimate locally before request;</li>
+<li>settle with upstream usage after request;</li>
+<li>estimate locally only when upstream usage is unavailable;</li>
+<li>reconcile proxy logs with upstream bills regularly.</li>
+</ol>
+<h2 id="8-context-windows-and-maximum-output">8. Context windows and maximum output
+</h2><p>Token counting also determines whether a request can fit into the model context window:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">input tokens + maximum output tokens &lt;= context window
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Example with an 8192-token context window:</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th style="text-align:right">Input tokens</th>
+<th style="text-align:right">Max output</th>
+<th>Safe</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:right">2000</td>
+<td style="text-align:right">1000</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td style="text-align:right">7000</td>
+<td style="text-align:right">1000</td>
+<td>Near the limit</td>
+</tr>
+<tr>
+<td style="text-align:right">7900</td>
+<td style="text-align:right">1000</td>
+<td>Likely rejected</td>
+</tr>
+<tr>
+<td style="text-align:right">8200</td>
+<td style="text-align:right">500</td>
+<td>Input already exceeds window</td>
+</tr>
+</tbody>
+</table></div>
+<p>Many context length errors are not caused by the latest user message. They come from history, system prompts, RAG snippets, tool schemas, and output constraints.</p>
+<h2 id="9-cached-tokens">9. Cached tokens
+</h2><p>Some providers cache repeated prompt prefixes. If the system prompt, tool schema, or a long document prefix is identical across requests, the provider may reuse processed context.</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">Request 1:
+</span></span><span class="line"><span class="cl">long system prompt + tool schema + user question A
+</span></span><span class="line"><span class="cl">all input processed normally
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">Request 2:
+</span></span><span class="line"><span class="cl">long system prompt + tool schema + user question B
+</span></span><span class="line"><span class="cl">the repeated prefix may hit cache
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Usage may include:</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>input_tokens</code></td>
+<td>Total input tokens</td>
+</tr>
+<tr>
+<td><code>cached_input_tokens</code></td>
+<td>Input tokens served from cache</td>
+</tr>
+<tr>
+<td><code>billable_input_tokens</code></td>
+<td>Tokens charged at normal input price, depending on provider rules</td>
+</tr>
+</tbody>
+</table></div>
+<p>For proxies, this means pricing cannot always be <code>total_tokens * one_price</code>. Detailed fields matter.</p>
+<h2 id="10-where-token-cost-grows">10. Where token cost grows
+</h2><div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Token pattern</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Simple Q&amp;A</td>
+<td>Short input, output dominates</td>
+</tr>
+<tr>
+<td>Long summarization</td>
+<td>Long input, medium output</td>
+</tr>
+<tr>
+<td>Code generation</td>
+<td>Code symbols, indentation, and file context add tokens</td>
+</tr>
+<tr>
+<td>RAG Q&amp;A</td>
+<td>More retrieved chunks means more input tokens</td>
+</tr>
+<tr>
+<td>Agent tool use</td>
+<td>Tool schemas and tool results repeatedly enter context</td>
+</tr>
+<tr>
+<td>Structured JSON output</td>
+<td>Schemas and field names add prompt and output tokens</td>
+</tr>
+<tr>
+<td>Embeddings</td>
+<td>Usually input-only usage</td>
+</tr>
+<tr>
+<td>Image understanding</td>
+<td>Images are converted to visual input units</td>
+</tr>
+<tr>
+<td>Speech tasks</td>
+<td>May use duration, audio tokens, or mixed billing</td>
+</tr>
+</tbody>
+</table></div>
+<p>The most commonly underestimated costs are history, tool schemas, and retrieved context.</p>
+<h2 id="11-estimating-tokens-yourself">11. Estimating tokens yourself
+</h2><p>A rough UI estimate may use:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">estimated_tokens = text.length / 3
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>But application-side controls should use a tokenizer compatible with the selected model:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">tokenizer = get_tokenizer(model)
+</span></span><span class="line"><span class="cl">tokens = tokenizer.encode(rendered_prompt)
+</span></span><span class="line"><span class="cl">count = len(tokens)
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Estimate the rendered prompt, not only the latest user message:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-gdscript3" data-lang="gdscript3"><span class="line"><span class="cl"><span class="n">rendered_prompt</span> <span class="o">=</span> <span class="n">render_chat_request</span><span class="p">(</span>
+</span></span><span class="line"><span class="cl">    <span class="n">system_prompt</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">developer_prompt</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">history_messages</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">retrieved_context</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">tool_schemas</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">response_format</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">user_message</span>
+</span></span><span class="line"><span class="cl"><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="n">count_tokens</span><span class="p">(</span><span class="n">rendered_prompt</span><span class="p">,</span> <span class="n">model</span><span class="p">)</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>The goal is not perfect agreement with the provider. The goal is to catch obvious context overflows and cost spikes early.</p>
+<h2 id="12-engineering-notes-for-proxy-billing">12. Engineering notes for proxy billing
+</h2><div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Model router</td>
+<td>Select provider, channel, and model</td>
+</tr>
+<tr>
+<td>Token estimator</td>
+<td>Pre-check input tokens and maximum cost</td>
+</tr>
+<tr>
+<td>Usage normalizer</td>
+<td>Convert provider-specific usage into internal fields</td>
+</tr>
+<tr>
+<td>Price table</td>
+<td>Store input, output, cached, and multimodal prices</td>
+</tr>
+<tr>
+<td>Usage ledger</td>
+<td>Record tokens, cost, status, and request ID</td>
+</tr>
+<tr>
+<td>Balance system</td>
+<td>Reserve, settle, refund, or deduct quota</td>
+</tr>
+<tr>
+<td>Retry policy</td>
+<td>Decide how failed and interrupted calls are charged</td>
+</tr>
+<tr>
+<td>Reconciliation job</td>
+<td>Compare internal ledger with provider invoices</td>
+</tr>
+<tr>
+<td>Rate limiting</td>
+<td>Limit requests and token usage by user, model, IP, or org</td>
+</tr>
+</tbody>
+</table></div>
+<p>Typical request handling:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">handle_request(req):
+</span></span><span class="line"><span class="cl">    user = authenticate(req.api_key)
+</span></span><span class="line"><span class="cl">    model = resolve_model(req.model)
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    estimated = estimate_usage(req, model)
+</span></span><span class="line"><span class="cl">    reserve_quota(user, estimated.max_cost)
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    try:
+</span></span><span class="line"><span class="cl">        upstream_resp = call_provider(req, model)
+</span></span><span class="line"><span class="cl">        actual_usage = normalize_usage(upstream_resp.usage)
+</span></span><span class="line"><span class="cl">        actual_cost = calculate_cost(actual_usage, model.price)
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        settle_quota(user, actual_cost)
+</span></span><span class="line"><span class="cl">        write_ledger(req.id, user.id, model, actual_usage, actual_cost, &#34;success&#34;)
+</span></span><span class="line"><span class="cl">        return upstream_resp
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    except ProviderError as err:
+</span></span><span class="line"><span class="cl">        release_or_settle_by_policy(user, req.id, err)
+</span></span><span class="line"><span class="cl">        write_ledger(req.id, user.id, model, estimated, 0, &#34;failed&#34;)
+</span></span><span class="line"><span class="cl">        raise
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Two details matter:</p>
+<ul>
+<li><strong>reservation is not settlement</strong>: reserve by worst-case output, settle by actual usage;</li>
+<li><strong>idempotency matters</strong>: repeated reporting for the same <code>request_id</code> must not double-charge the user.</li>
+</ul>
+<h2 id="13-reducing-token-cost">13. Reducing token cost
+</h2><div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Why it works</th>
+<th>Risk</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Shorten system prompts</td>
+<td>Reduces fixed input</td>
+<td>Too little instruction can hurt stability</td>
+</tr>
+<tr>
+<td>Compress history</td>
+<td>Replaces full turns with summaries</td>
+<td>Summaries may lose details</td>
+</tr>
+<tr>
+<td>Control RAG Top-K</td>
+<td>Adds fewer irrelevant chunks</td>
+<td>Recall may suffer</td>
+</tr>
+<tr>
+<td>Simplify tool schemas</td>
+<td>Reduces repeated schema cost</td>
+<td>Tool calls may become less precise</td>
+</tr>
+<tr>
+<td>Set output limits</td>
+<td>Prevents overly long completions</td>
+<td>Answers may be truncated</td>
+</tr>
+<tr>
+<td>Use caching</td>
+<td>Reuses stable prefixes</td>
+<td>Depends on provider support</td>
+</tr>
+<tr>
+<td>Choose model by task</td>
+<td>Simple tasks use cheaper models</td>
+<td>Lower quality may require retries</td>
+</tr>
+<tr>
+<td>Log usage</td>
+<td>Finds the most expensive paths</td>
+<td>Must respect privacy and compliance</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="summary">Summary
+</h2><p>Token counting has three layers:</p>
+<div class="table-wrapper"><table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Focus</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Model layer</td>
+<td>Tokenizer turns text into token IDs, then the model generates token by token</td>
+</tr>
+<tr>
+<td>API layer</td>
+<td>Input, output, tools, multimodal content, and cache are summarized as usage</td>
+</tr>
+<tr>
+<td>Platform layer</td>
+<td>Proxies estimate, limit, settle, audit, and reconcile usage</td>
+</tr>
+</tbody>
+</table></div>
+<p>The key idea:</p>
+<blockquote>
+<p><strong>A token is not a character count. It is the unit the model actually processes. Providers count real model usage; proxies estimate before forwarding, settle after receiving usage, and keep ledger records for billing and audit.</strong></p>
+</blockquote>
+<p>For application developers, the main habit is to measure the full rendered context. System prompts, history, RAG snippets, tool schemas, and structured output constraints all become tokens, and therefore affect cost, latency, and context limits.</p>
+
+</section>
+
+
+    <footer class="article-footer">
+    
+    <section class="article-tags">
+        
+            <a href="/tags/ai/">AI</a>
+        
+            <a href="/tags/llm/">LLM</a>
+        
+            <a href="/tags/token/">Token</a>
+        
+            <a href="/tags/api/">API</a>
+        
+            <a href="/tags/billing/">Billing</a>
+        
+    </section>
+
+
+    </footer>
+
+
+    
+</article>
+
+    
+
+    
+
+<aside class="related-content--wrapper">
+    <h2 class="section-title">Related content</h2>
+    <div class="related-content">
+        <div class="flex article-list--tile">
+            
+                
+<article class="has-image">
+    <a href="/p/rag-fully-explainedfrom-closed-book-to-open-book-llms/">
+        
+        
+            <div class="article-image">
+                <img src="/p/rag-fully-explainedfrom-closed-book-to-open-book-llms/bg.102e738fb4a4088f22d652143bb6dcfe_hue42602111cbdf43a7b55d02fb6f689c9_36783_250x150_fill_box_smart1_3.png" 
+                        width="250" 
+                        height="150" 
+                        loading="lazy"
+                        alt="Featured image of post RAG Fully Explained:From &#34;Closed-Book&#34; to &#34;Open-Book&#34; LLMs"
+                        
+                        data-hash="md5-EC5zj7SkCI8i1lIUO7bc/g==">
+                
+            </div>
+        
+
+        <div class="article-details">
+            <h2 class="article-title">RAG Fully Explained:From &#34;Closed-Book&#34; to &#34;Open-Book&#34; LLMs</h2>
+        </div>
+    </a>
+</article>
+
+            
+        </div>
+    </div>
+</aside>
+
+     
+    
+        
+    
+
+    <footer class="site-footer">
+    <section class="copyright">
+        &copy; 
+        
+        2026 SymphonyW
+    </section>
+    
+    <section class="powerby">
+        Built with <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> <br />
+        Theme <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.26.0">Stack</a></b> designed by <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a>
+    </section>
+</footer>
+
+
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+            </main>
+        </div>
+        <script 
+                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
+                
+                >
+            </script><script type="text/javascript" src="/ts/main.js" defer></script><script type="text/javascript" src="/ts/custom.js" defer></script>
+<script>
+    (function () {
+        const customFont = document.createElement('link');
+        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+
+        customFont.type = "text/css";
+        customFont.rel = "stylesheet";
+
+        document.head.appendChild(customFont);
+    }());
+</script>
+
+<script>
+window.MathJax = {
+  tex: {
+    
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  svg: {
+    fontCache: 'global'
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script><script type="module">
+  import('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs').then(({ default: mermaid }) => {
+    const diagrams = Array.from(document.querySelectorAll('.mermaid'));
+
+    diagrams.forEach((el) => {
+      el.dataset.mermaidSource = el.textContent.trim();
+    });
+
+    const renderMermaid = () => {
+      const scheme = document.documentElement.getAttribute('data-scheme');
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: scheme === 'dark' ? 'dark' : 'default',
+        securityLevel: 'loose',
+        fontFamily: 'inherit'
+      });
+
+      diagrams.forEach((el) => {
+        el.removeAttribute('data-processed');
+        el.textContent = el.dataset.mermaidSource;
+      });
+
+      return mermaid.run({ nodes: diagrams });
+    };
+
+    renderMermaid().catch((error) => console.error('Mermaid render failed:', error));
+
+    
+    const observer = new MutationObserver(() => {
+      renderMermaid().catch((error) => console.error('Mermaid render failed:', error));
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-scheme'] });
+  }).catch((error) => console.error('Mermaid failed to load:', error));
+</script>
+    </body>
+</html>
