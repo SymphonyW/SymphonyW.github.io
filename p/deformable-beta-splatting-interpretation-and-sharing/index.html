@@ -1,12 +1,21 @@
 <!DOCTYPE html>
 <html lang="en" dir="ltr">
-    <head><meta charset='utf-8'>
+<head>
+    <meta charset='utf-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Deformable Beta Splatting Interpretation and Sharing 本文根据本人对 Deformable Beta Splatting 论文的理解，结合论文中的实验结果和作者的分析，对该方法的核心创新、实验验证以及潜在的局限性进行了详细的解读与总结。同时也用于记录和分享该方法的核心思想和技术细节，方便后续的学习和参考。 成果展示：https://rongliu-leo.github.io/beta-splatting/ 论文链接：https://dl.acm.org/doi/epdf/10.1145/3721238.3730716 代码链接：https://github.com/RongLiu-Leo/beta-splatting.git 一、先搞懂：这篇论文到底在解决什么问题？ 1.1 前置知识：从NeRF到3DGS，实时3D渲染的演进 在讲DBS之前，我们先快速搞懂两个核心技术背景，不然所有原理都听不懂： NeRF（神经辐射场） NeRF用神经网络把整个3D场景“编码”进去，能生成照片级逼真的新视角画面，但有两个致命缺陷： 渲染速度极慢，生成一张图要大量神经网络计算，完全做不到实时； 隐式的场景表示，没法和游戏引擎、工业建模软件（偏好显式几何）兼容。 3DGS（3D高斯溅射） 3DGS彻底抛弃了神经网络，把3D场景拆成无数个3D高斯椭球（可以理解成3D空间里的一个个小光斑/小颜料点）。每个椭球自带位置、大小、旋转、不透明度、颜色等参数，直接把这些椭球“喷”（splatting/溅射）到2D屏幕上，就能完成渲染。 它的核心突破是：实现了3D场景的实时渲染，同时画质接近NeRF，瞬间成了3D渲染领域的顶流。 1.2 3DGS的致命短板：为什么实时了，效果还是不够好？ 3DGS虽然火，但它的渲染质量始终比不过顶级的NeRF方法，核心问题出在它的两个基础组件，还有配套的优化策略上，这也是DBS要解决的核心痛点： 3DGS的核心组件 致命缺陷 直观后果 高斯核（几何表示） 1. 无界+长尾：高斯函数理论上取值范围是无限的，离中心再远也有值，实时渲染必须硬编码截断，引入截断伪影； 2. 天生平滑：高斯函数是钟形曲线，本质就会让画面模糊 锐利边缘闪烁/破碎、平坦表面画糊、精细纹理丢失 低阶球谐函数SH（视点相关颜色编码） 1. 参数量爆炸：SH阶数越高，参数量按平方增长，实时渲染只能用低阶SH； 2. 只能表达平滑颜色变化，完全没法建模锐利的镜面高光 金属、玻璃、光滑塑料的反光糊成一片，没有真实质感 致密化/优化策略 3DGS和后续的3DGS-MCMC的增减点策略，完全和高斯核的数学特性绑定，换个核函数就用不了 想给3DGS换更好的核，却没有配套的优化方法，效果上不去 简单说：这篇论文的核心目标，就是给3DGS做一次“换心手术”——换掉有缺陷的高斯核和球谐函数，再配套一个通用的优化策略，实现画质更好、参数更少、渲染更快的全面突破。 二、DBS的核心解决方案：三大创新一次性讲透 DBS（可变形Beta溅射）的所有能力，都来自三个环环相扣的核心创新，我们逐个拆解得明明白白。 2.1 创新一：可变形Beta核——换掉高斯核，从根源解决几何模糊和伪影 DBS的第一个核心动作，就是用Beta核彻底替换了3DGS里的高斯核，从数学根源上解决了高斯核的所有缺陷。 2.1.1 Beta核是怎么来的？从Beta分布到Beta核函数 Beta核的灵感来自统计学里经典的Beta分布，它的核心特点是：天然定义在[0,1]的闭区间里，超过区间的地方值直接为0，完美解决高斯核的无界长尾问题。 原始Beta分布的公式是： $$f(x;\\alpha,\\beta) = \\frac{1}{B(\\alpha,\\beta)} x^{\\alpha-1} (1-x)^{\\beta-1}, \\quad x \\in [0,1]$$ $x$：到核中心的归一化距离，x=0是中心，x=1是核的边缘； $\\alpha、\\beta$：两个形状参数，控制分布的曲线形态； $B(\\alpha,\\beta)$：Beta归一化函数，用来让分布的积分和为1。 为了让Beta核有类似高斯的钟形，同时保证3D视图之间的平滑一致性，论文做了极简的优化： 把$\\alpha$固定为1，只保留$\\beta$作为形状控制参数； 去掉了归一化项，避免额外的计算开销。 最终得到了Beta核函数： $$B(x;\\beta) = (1-x)^\\beta, \\quad x \\in [0,1]$$">
 <title>Deformable Beta Splatting Interpretation and Sharing</title>
 
 <link rel='canonical' href='https://SymphonyW.github.io/p/deformable-beta-splatting-interpretation-and-sharing/'>
+<link rel="stylesheet" href="/scss/custom.min.2089e3e36594bc8705485d3fd8080ca77e480c60ce355a4a3eb92dbda6f784cc.css">
+<script>
+(() => {
+    let preference = 'auto';
+    try { preference = localStorage.getItem('StackColorScheme') || preference; } catch (_) {}
+    document.documentElement.dataset.scheme = preference === 'dark' || (preference === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+})();
+</script>
 
-<link rel="stylesheet" href="/scss/style.min.4687047a1903756c84bf7a1cf7cbbf4e26bef4a42dd5bc620df47badaeed46c2.css"><meta property='og:title' content="Deformable Beta Splatting Interpretation and Sharing">
+<meta property='og:title' content="Deformable Beta Splatting Interpretation and Sharing">
 <meta property='og:description' content="Deformable Beta Splatting Interpretation and Sharing 本文根据本人对 Deformable Beta Splatting 论文的理解，结合论文中的实验结果和作者的分析，对该方法的核心创新、实验验证以及潜在的局限性进行了详细的解读与总结。同时也用于记录和分享该方法的核心思想和技术细节，方便后续的学习和参考。 成果展示：https://rongliu-leo.github.io/beta-splatting/ 论文链接：https://dl.acm.org/doi/epdf/10.1145/3721238.3730716 代码链接：https://github.com/RongLiu-Leo/beta-splatting.git 一、先搞懂：这篇论文到底在解决什么问题？ 1.1 前置知识：从NeRF到3DGS，实时3D渲染的演进 在讲DBS之前，我们先快速搞懂两个核心技术背景，不然所有原理都听不懂： NeRF（神经辐射场） NeRF用神经网络把整个3D场景“编码”进去，能生成照片级逼真的新视角画面，但有两个致命缺陷： 渲染速度极慢，生成一张图要大量神经网络计算，完全做不到实时； 隐式的场景表示，没法和游戏引擎、工业建模软件（偏好显式几何）兼容。 3DGS（3D高斯溅射） 3DGS彻底抛弃了神经网络，把3D场景拆成无数个3D高斯椭球（可以理解成3D空间里的一个个小光斑/小颜料点）。每个椭球自带位置、大小、旋转、不透明度、颜色等参数，直接把这些椭球“喷”（splatting/溅射）到2D屏幕上，就能完成渲染。 它的核心突破是：实现了3D场景的实时渲染，同时画质接近NeRF，瞬间成了3D渲染领域的顶流。 1.2 3DGS的致命短板：为什么实时了，效果还是不够好？ 3DGS虽然火，但它的渲染质量始终比不过顶级的NeRF方法，核心问题出在它的两个基础组件，还有配套的优化策略上，这也是DBS要解决的核心痛点： 3DGS的核心组件 致命缺陷 直观后果 高斯核（几何表示） 1. 无界+长尾：高斯函数理论上取值范围是无限的，离中心再远也有值，实时渲染必须硬编码截断，引入截断伪影； 2. 天生平滑：高斯函数是钟形曲线，本质就会让画面模糊 锐利边缘闪烁/破碎、平坦表面画糊、精细纹理丢失 低阶球谐函数SH（视点相关颜色编码） 1. 参数量爆炸：SH阶数越高，参数量按平方增长，实时渲染只能用低阶SH； 2. 只能表达平滑颜色变化，完全没法建模锐利的镜面高光 金属、玻璃、光滑塑料的反光糊成一片，没有真实质感 致密化/优化策略 3DGS和后续的3DGS-MCMC的增减点策略，完全和高斯核的数学特性绑定，换个核函数就用不了 想给3DGS换更好的核，却没有配套的优化方法，效果上不去 简单说：这篇论文的核心目标，就是给3DGS做一次“换心手术”——换掉有缺陷的高斯核和球谐函数，再配套一个通用的优化策略，实现画质更好、参数更少、渲染更快的全面突破。 二、DBS的核心解决方案：三大创新一次性讲透 DBS（可变形Beta溅射）的所有能力，都来自三个环环相扣的核心创新，我们逐个拆解得明明白白。 2.1 创新一：可变形Beta核——换掉高斯核，从根源解决几何模糊和伪影 DBS的第一个核心动作，就是用Beta核彻底替换了3DGS里的高斯核，从数学根源上解决了高斯核的所有缺陷。 2.1.1 Beta核是怎么来的？从Beta分布到Beta核函数 Beta核的灵感来自统计学里经典的Beta分布，它的核心特点是：天然定义在[0,1]的闭区间里，超过区间的地方值直接为0，完美解决高斯核的无界长尾问题。 原始Beta分布的公式是： $$f(x;\\alpha,\\beta) = \\frac{1}{B(\\alpha,\\beta)} x^{\\alpha-1} (1-x)^{\\beta-1}, \\quad x \\in [0,1]$$ $x$：到核中心的归一化距离，x=0是中心，x=1是核的边缘； $\\alpha、\\beta$：两个形状参数，控制分布的曲线形态； $B(\\alpha,\\beta)$：Beta归一化函数，用来让分布的积分和为1。 为了让Beta核有类似高斯的钟形，同时保证3D视图之间的平滑一致性，论文做了极简的优化： 把$\\alpha$固定为1，只保留$\\beta$作为形状控制参数； 去掉了归一化项，避免额外的计算开销。 最终得到了Beta核函数： $$B(x;\\beta) = (1-x)^\\beta, \\quad x \\in [0,1]$$">
 <meta property='og:url' content='https://SymphonyW.github.io/p/deformable-beta-splatting-interpretation-and-sharing/'>
 <meta property='og:site_name' content='SymphonyW'>
@@ -16,340 +25,116 @@
     <meta name="twitter:image" content='https://SymphonyW.github.io/p/deformable-beta-splatting-interpretation-and-sharing/2026-03-26-13-06-47.png' />
     <link rel="shortcut icon" href="/favicon.ico" />
 
-    </head>
-    <body class="
-    article-page
-    ">
-    <script>
-        (function() {
-            const colorSchemeKey = 'StackColorScheme';
-            if(!localStorage.getItem(colorSchemeKey)){
-                localStorage.setItem(colorSchemeKey, "auto");
-            }
-        })();
-    </script><script>
-    (function() {
-        const colorSchemeKey = 'StackColorScheme';
-        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
-        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
-
-        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+    
+    <noscript><style>@media(max-width:760px){.site-header{position:static}.site-header__inner{height:auto;min-height:66px;flex-wrap:wrap}.site-nav{position:static;display:grid;order:3;flex-basis:100%;padding:8px 0 18px}.menu-toggle,.theme-toggle{display:none}}</style></noscript>
+</head>
+<body id="top" class="article-page">
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    
+<header class="site-header">
+    <div class="site-header__inner">
+        <a class="site-brand" href="/" aria-label="SymphonyW — Home">S<span>w.</span></a>
+        <nav class="site-nav" id="site-navigation" aria-label="Main navigation">
             
-
-            document.documentElement.dataset.scheme = 'dark';
-        } else {
-            document.documentElement.dataset.scheme = 'light';
-        }
-    })();
-</script>
-<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
-    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="Toggle Menu">
-        <span class="hamburger-box">
-            <span class="hamburger-inner"></span>
-        </span>
-    </button>
-
-    <header>
-        
             
-            <figure class="site-avatar">
-                <a href="/">
                 
                     
                     
+                    <a href="/">Home</a>
+                
+            
+                
                     
-                        
-                        <img src="/img/avatar_hu5ea07d2842502bdd7540f9cbc4b41b95_5278_300x0_resize_box_3.png" width="300"
-                            height="300" class="site-logo" loading="lazy" alt="Avatar">
                     
+                    <a href="/post/" aria-current="page">Blog</a>
                 
-                </a>
-                
-                    <span class="emoji">😁</span>
-                
-            </figure>
             
-        
-        
-        <div class="site-meta">
-            <h1 class="site-name"><a href="/">SymphonyW</a></h1>
-            <h2 class="site-description">Welcome to my Blog.</h2>
-        </div>
-    </header><ol class="menu-social">
+                
+                    
+                    
+                    <a href="/archives/">Archives</a>
+                
             
-                <li>
-                    <a 
-                        href='https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0'
-                        target="_blank"
-                        title="Bilibili"
-                        rel="me"
-                    >
-                        
-                        
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.0.0-beta2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M488.6 104.1C505.3 122.2 513 143.8 511.9 169.8V372.2C511.5 398.6 502.7 420.3 485.4 437.3C468.2 454.3 446.3 463.2 419.9 464H92.02C65.57 463.2 43.81 454.2 26.74 436.8C9.682 419.4 .7667 396.5 0 368.2V169.8C.7667 143.8 9.682 122.2 26.74 104.1C43.81 87.75 65.57 78.77 92.02 78H121.4L96.05 52.19C90.3 46.46 87.42 39.19 87.42 30.4C87.42 21.6 90.3 14.34 96.05 8.603C101.8 2.868 109.1 0 117.9 0C126.7 0 134 2.868 139.8 8.603L213.1 78H301.1L375.6 8.603C381.7 2.868 389.2 0 398 0C406.8 0 414.1 2.868 419.9 8.603C425.6 14.34 428.5 21.6 428.5 30.4C428.5 39.19 425.6 46.46 419.9 52.19L394.6 78L423.9 78C450.3 78.77 471.9 87.75 488.6 104.1H488.6zM449.8 173.8C449.4 164.2 446.1 156.4 439.1 150.3C433.9 144.2 425.1 140.9 416.4 140.5H96.05C86.46 140.9 78.6 144.2 72.47 150.3C66.33 156.4 63.07 164.2 62.69 173.8V368.2C62.69 377.4 65.95 385.2 72.47 391.7C78.99 398.2 86.85 401.5 96.05 401.5H416.4C425.6 401.5 433.4 398.2 439.7 391.7C446 385.2 449.4 377.4 449.8 368.2L449.8 173.8zM185.5 216.5C191.8 222.8 195.2 230.6 195.6 239.7V273C195.2 282.2 191.9 289.9 185.8 296.2C179.6 302.5 171.8 305.7 162.2 305.7C152.6 305.7 144.7 302.5 138.6 296.2C132.5 289.9 129.2 282.2 128.8 273V239.7C129.2 230.6 132.6 222.8 138.9 216.5C145.2 210.2 152.1 206.9 162.2 206.5C171.4 206.9 179.2 210.2 185.5 216.5H185.5zM377 216.5C383.3 222.8 386.7 230.6 387.1 239.7V273C386.7 282.2 383.4 289.9 377.3 296.2C371.2 302.5 363.3 305.7 353.7 305.7C344.1 305.7 336.3 302.5 330.1 296.2C323.1 289.9 320.7 282.2 320.4 273V239.7C320.7 230.6 324.1 222.8 330.4 216.5C336.7 210.2 344.5 206.9 353.7 206.5C362.9 206.9 370.7 210.2 377 216.5H377z"/></svg>
-                        
-                    </a>
-                </li>
+                
+                    
+                    
+                    <a href="/diary/">Diary</a>
+                
             
-                <li>
-                    <a 
-                        href='https://github.com/SymphonyW'
-                        target="_blank"
-                        title="GitHub"
-                        rel="me"
-                    >
-                        
-                        
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
-</svg>
-
-
-
-                        
-                    </a>
-                </li>
+                
+                    
+                    
+                    <a href="/stats/">Stats</a>
+                
             
-                <li>
-                    <a 
-                        href='https://twitter.com'
-                        target="_blank"
-                        title="Twitter"
-                        rel="me"
-                    >
-                        
-                        
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
-</svg>
-
-
-
-                        
-                    </a>
-                </li>
+                
             
-        </ol><ol class="menu" id="main-menu">
-        
-        
-        
-        <li >
-            <a href='/' >
                 
+                    
+                    
+                    <a href="/links/">Links</a>
                 
-                
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z"/>
-  <polyline points="5 12 3 12 12 3 21 12 19 12" />
-  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
-  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
-</svg>
-
-
-
-                
-                <span>Home</span>
-            </a>
-        </li>
-        
-        
-        <li  class='current' >
-            <a href='/post/' >
-                
-                
-                
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z"/>
-  <rect x="3" y="4" width="18" height="4" rx="2" />
-  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
-  <line x1="10" y1="12" x2="14" y2="12" />
-</svg>
-
-
-
-                
-                <span>Blog</span>
-            </a>
-        </li>
-        
-        
-        <li >
-            <a href='/archives/' >
-                
-                
-                
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z"/>
-  <rect x="3" y="4" width="18" height="4" rx="2" />
-  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
-  <line x1="10" y1="12" x2="14" y2="12" />
-</svg>
-
-
-
-                
-                <span>Archives</span>
-            </a>
-        </li>
-        
-        
-        <li >
-            <a href='/diary/' >
-                
-                
-                
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-event" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-  <path d="M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12z" />
-  <path d="M16 3v4" />
-  <path d="M8 3v4" />
-  <path d="M4 11h16" />
-  <path d="M8 15h2v2h-2z" />
-</svg>
-
-                
-                <span>Diary</span>
-            </a>
-        </li>
-        
-        
-        <li >
-            <a href='/stats/' >
-                
-                
-                
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chart-bar" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z"/>
-  <rect x="3" y="12" width="4" height="8" rx="1" />
-  <rect x="10" y="8" width="4" height="12" rx="1" />
-  <rect x="17" y="4" width="4" height="16" rx="1" />
-  <line x1="4" y1="20" x2="20" y2="20" />
-</svg>
-
-                
-                <span>Stats</span>
-            </a>
-        </li>
-        
-        
-        <li >
-            <a href='/search/' >
-                
-                
-                
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            
+        </nav>
+        <div class="header-tools">
+            
+                <a class="language-link" href="/zh-cn/p/deformable-beta-splatting-%E8%AE%BA%E6%96%87%E8%A7%A3%E8%AF%BB%E4%B8%8E%E5%88%86%E4%BA%AB/" lang="zh-cn" hreflang="zh-cn" aria-label="切换到中文">中</a>
+            
+            <button type="button" id="dark-mode-toggle" class="icon-button theme-toggle" aria-label="Toggle color theme" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><path d="M12 4.5a7.5 7.5 0 0 1 0 15z" fill="currentColor" stroke="none"/></svg></button>
+            <a class="icon-button search-link" href="/search/" aria-label="Search articles"><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
   <path stroke="none" d="M0 0h24v24H0z"/>
   <circle cx="10" cy="10" r="7" />
   <line x1="21" y1="21" x2="15" y2="15" />
 </svg>
 
 
-
-                
-                <span>Search</span>
-            </a>
-        </li>
-        
-        
-        <li >
-            <a href='/links/' >
-                
-                
-                
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z"/>
-  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
-  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
-</svg>
-
-
-
-                
-                <span>Links</span>
-            </a>
-        </li>
-        
-        <li class="menu-bottom-section">
-            <ol class="menu">
-                    
-                        <li id="i18n-switch" class="language-switcher">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-  <path d="M4 5h7" />
-  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
-  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
-  <path d="M12 20l4 -9l4 9" />
-  <path d="M19.1 18h-6.2" />
-</svg>
-
-
-
-                            <div class="language-switcher__tabs" aria-label="Language">
-                                <a class="language-switcher__tab is-current"
-                                        href="/p/deformable-beta-splatting-interpretation-and-sharing/"
-                                        aria-current="true">
-                                        English
-                                    </a>
-                                <a class="language-switcher__tab "
-                                        href="/zh-cn/p/deformable-beta-splatting-%E8%AE%BA%E6%96%87%E8%A7%A3%E8%AF%BB%E4%B8%8E%E5%88%86%E4%BA%AB/"
-                                        >
-                                        中文
-                                    </a>
-                                
-                            </div>
-                        </li>
-                    
-                
-
-                
-                    <li id="dark-mode-toggle">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z"/>
-  <circle cx="8" cy="12" r="2" />
-  <rect x="2" y="6" width="20" height="12" rx="6" />
-</svg>
-
-
-
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z"/>
-  <circle cx="16" cy="12" r="2" />
-  <rect x="2" y="6" width="20" height="12" rx="6" />
-</svg>
-
-
-
-                        <span>Dark Mode</span>
-                    </li>
-                
-            </ol>
-        </li>
-    </ol>
-</aside>
-
-    <aside class="sidebar right-sidebar sticky">
-        
-            
-                
-    <section class="widget archives">
-        <div class="widget-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z"/>
-  <line x1="5" y1="9" x2="19" y2="9" />
-  <line x1="5" y1="15" x2="19" y2="15" />
-  <line x1="11" y1="4" x2="7" y2="20" />
-  <line x1="17" y1="4" x2="13" y2="20" />
-</svg>
-
-
-
+</a>
+            <button class="icon-button menu-toggle" type="button" aria-expanded="false" aria-controls="site-navigation" aria-label="Open navigation"><span></span><span></span></button>
         </div>
-        <h2 class="widget-title section-title">Table of contents</h2>
+    </div>
+    <div class="reading-progress" aria-hidden="true"></div>
+</header>
+
+    <main id="main-content" class="site-main main" tabindex="-1">
         
-        <div class="widget--toc">
-            <nav id="TableOfContents">
+    <div class="reading-page">
+        <article class="main-article has-toc">
+    <header class="article-header">
+    <div class="article-wayfinding">
+        
+            <a href="/post/"><span aria-hidden="true">←</span> All writing</a>
+        
+        <span class="article-kind">Notes & observations</span>
+    </div>
+    <div class="article-details">
+    
+    <h1 class="article-title">Deformable Beta Splatting Interpretation and Sharing</h1>
+    
+    <div class="article-meta">
+        
+            <time datetime="2026-03-26T12:56:18&#43;08:00">March 26, 2026</time>
+            <span class="meta-divider" aria-hidden="true">/</span>
+            <span>3 min read</span>
+        
+        
+            <div class="article-translations"><a href="/zh-cn/p/deformable-beta-splatting-%E8%AE%BA%E6%96%87%E8%A7%A3%E8%AF%BB%E4%B8%8E%E5%88%86%E4%BA%AB/" hreflang="zh-cn" lang="zh-cn">阅读中文版 <span aria-hidden="true">↗</span></a></div>
+        
+    </div>
+</div>
+
+        <figure class="article-cover">
+            <img src="/p/deformable-beta-splatting-interpretation-and-sharing/2026-03-26-13-06-47.png" width="681" height="246" alt="Deformable Beta Splatting Interpretation and Sharing" fetchpriority="high">
+            
+        </figure>
+    
+</header>
+
+    <div class="reading-layout">
+        
+            <aside class="reading-margin" aria-label="Article contents">
+                <details class="article-toc" open>
+                    <summary><span>On this page</span><span class="toc-indicator" aria-hidden="true">+</span></summary>
+                    <nav id="TableOfContents">
   <ol>
     <li><a href="#一先搞懂这篇论文到底在解决什么问题">一、先搞懂：这篇论文到底在解决什么问题？</a>
       <ol>
@@ -406,101 +191,11 @@
     </li>
   </ol>
 </nav>
-        </div>
-    </section>
-
-            
+                </details>
+            </aside>
         
-    </aside>
-
-
-            <main class="main full-width">
-    <article class="has-image main-article">
-    <header class="article-header">
-        <div class="article-image">
-            <a href="/p/deformable-beta-splatting-interpretation-and-sharing/">
-                <img src="/p/deformable-beta-splatting-interpretation-and-sharing/2026-03-26-13-06-47_hu0e36b9496ef2d453f0198f2a9a85d6cd_74208_800x0_resize_box_3.png"
-                        srcset="/p/deformable-beta-splatting-interpretation-and-sharing/2026-03-26-13-06-47_hu0e36b9496ef2d453f0198f2a9a85d6cd_74208_800x0_resize_box_3.png 800w, /p/deformable-beta-splatting-interpretation-and-sharing/2026-03-26-13-06-47_hu0e36b9496ef2d453f0198f2a9a85d6cd_74208_1600x0_resize_box_3.png 1600w"
-                        width="800" 
-                        height="289" 
-                        loading="lazy"
-                        alt="Featured image of post Deformable Beta Splatting Interpretation and Sharing" />
-                
-            </a>
-        </div>
-    
-
-    <div class="article-details">
-    
-
-    <div class="article-title-wrapper">
-        <h2 class="article-title">
-            <a href="/p/deformable-beta-splatting-interpretation-and-sharing/">Deformable Beta Splatting Interpretation and Sharing</a>
-        </h2>
-    
-        
-    </div>
-
-    
-    
-    
-    
-    <footer class="article-time">
-        
-            <div>
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z"/>
-  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
-  <circle cx="18" cy="18" r="4" />
-  <path d="M15 3v4" />
-  <path d="M7 3v4" />
-  <path d="M3 11h16" />
-  <path d="M18 16.496v1.504l1 1" />
-</svg>
-                <time class="article-time--published">2026-03-26 12:56</time>
-            </div>
-        
-
-        
-    </footer>
-    
-
-    
-        <footer class="article-translations">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-  <path d="M4 5h7" />
-  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
-  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
-  <path d="M12 20l4 -9l4 9" />
-  <path d="M19.1 18h-6.2" />
-</svg>
-
-
-
-            <div>
-                
-                    <a href="https://SymphonyW.github.io/zh-cn/p/deformable-beta-splatting-%E8%AE%BA%E6%96%87%E8%A7%A3%E8%AF%BB%E4%B8%8E%E5%88%86%E4%BA%AB/" class="link">中文</a>
-                
-            </div>
-        </footer>
-    
-</div>
-
-</header>
-
-    
-    <section class="article-tags">
-        
-            <a href="/tags/paper-sharing/">Paper Sharing</a>
-        
-    </section>
-
-
-    <section class="article-content">
-    
-    
-    <h1 id="deformable-beta-splatting-interpretation-and-sharing">Deformable Beta Splatting Interpretation and Sharing
+        <div class="reading-body">
+            <div class="article-content"><h1 id="deformable-beta-splatting-interpretation-and-sharing">Deformable Beta Splatting Interpretation and Sharing
 </h1><p>本文根据本人对 Deformable Beta Splatting 论文的理解，结合论文中的实验结果和作者的分析，对该方法的核心创新、实验验证以及潜在的局限性进行了详细的解读与总结。同时也用于记录和分享该方法的核心思想和技术细节，方便后续的学习和参考。</p>
 <ul>
 <li>成果展示：<a class="link" href="https://rongliu-leo.github.io/beta-splatting/"  target="_blank" rel="noopener"
@@ -528,7 +223,7 @@ NeRF用神经网络把整个3D场景“编码”进去，能生成照片级逼�
 </ol>
 <h3 id="12-3dgs的致命短板为什么实时了效果还是不够好">1.2 3DGS的致命短板：为什么实时了，效果还是不够好？
 </h3><p>3DGS虽然火，但它的渲染质量始终比不过顶级的NeRF方法，核心问题出在它的两个基础组件，还有配套的优化策略上，这也是DBS要解决的核心痛点：</p>
-<div class="table-wrapper"><table>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
 <thead>
 <tr>
 <th>3DGS的核心组件</th>
@@ -554,18 +249,8 @@ NeRF用神经网络把整个3D场景“编码”进去，能生成照片级逼�
 </tr>
 </tbody>
 </table></div>
-<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
-    
-    <a href="2026-03-26-13-05-31.png" 
-        
-       target="_blank" 
-       class="gallery-item"> <img src="2026-03-26-13-05-31.png" 
-             alt="" 
-             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-             
-    </a>
-    
-</div></p>
+<p><a href="/p/deformable-beta-splatting-interpretation-and-sharing/2026-03-26-13-05-31.png" target="_blank" rel="noopener noreferrer"><img src="/p/deformable-beta-splatting-interpretation-and-sharing/2026-03-26-13-05-31.png" alt="" width="1091" height="247" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="441" data-flex-basis="1060px"></a>
+</p>
 <p>简单说：这篇论文的核心目标，就是给3DGS做一次“换心手术”——换掉有缺陷的高斯核和球谐函数，再配套一个通用的优化策略，实现<strong>画质更好、参数更少、渲染更快</strong>的全面突破。</p>
 <h2 id="二dbs的核心解决方案三大创新一次性讲透">二、DBS的核心解决方案：三大创新一次性讲透
 </h2><p>DBS（可变形Beta溅射）的所有能力，都来自三个环环相扣的核心创新，我们逐个拆解得明明白白。</p>
@@ -587,35 +272,15 @@ $$f(x;\alpha,\beta) = \frac{1}{B(\alpha,\beta)} x^{\alpha-1} (1-x)^{\beta-1}, \q
 </ol>
 <p>最终得到了<strong>Beta核函数</strong>：
 $$B(x;\beta) = (1-x)^\beta, \quad x \in [0,1]$$</p>
-<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
-    
-    <a href="2026-03-26-13-06-12.png" 
-        
-       target="_blank" 
-       class="gallery-item"> <img src="2026-03-26-13-06-12.png" 
-             alt="" 
-             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-             
-    </a>
-    
-</div></p>
+<p><a href="/p/deformable-beta-splatting-interpretation-and-sharing/2026-03-26-13-06-12.png" target="_blank" rel="noopener noreferrer"><img src="/p/deformable-beta-splatting-interpretation-and-sharing/2026-03-26-13-06-12.png" alt="" width="428" height="234" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="182" data-flex-basis="438px"></a>
+</p>
 <p>这个公式的通俗解读：</p>
 <ul>
 <li>完美的<strong>有界支撑</strong>：x只在[0,1]里有值，x&gt;1时函数值直接为0，再也不需要硬编码截断，彻底消除了截断伪影；</li>
 <li>极致的形状可控性：$\beta$的大小直接决定核的“尖/平”，$\beta$越大，核越尖；$\beta$越小，核越平。</li>
 </ul>
-<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
-    
-    <a href="2026-03-26-13-06-47.png" 
-        
-       target="_blank" 
-       class="gallery-item"> <img src="2026-03-26-13-06-47.png" 
-             alt="" 
-             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-             
-    </a>
-    
-</div></p>
+<p><a href="/p/deformable-beta-splatting-interpretation-and-sharing/2026-03-26-13-06-47.png" target="_blank" rel="noopener noreferrer"><img src="/p/deformable-beta-splatting-interpretation-and-sharing/2026-03-26-13-06-47.png" alt="" width="681" height="246" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="276" data-flex-basis="664px"></a>
+</p>
 <h4 id="212-关键优化beta核的重参数化让训练更稳定">2.1.2 关键优化：Beta核的重参数化，让训练更稳定
 </h4><p>直接优化$\beta$会有两个问题：</p>
 <ol>
@@ -642,23 +307,13 @@ $$\beta(b) = 4 \cdot e^b$$</p>
 <li><strong>当$b&gt;0$时</strong>：$\beta&gt;4$，核的形态非常尖锐，下降速度极快。
 适配场景：高频细节纹理，比如布料的纹路、树叶的边缘、细小的物体，能比高斯核捕捉到更精细的细节。</li>
 </ol>
-<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
-    
-    <a href="2026-03-26-13-13-34.png" 
-        
-       target="_blank" 
-       class="gallery-item"> <img src="2026-03-26-13-13-34.png" 
-             alt="" 
-             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-             
-    </a>
-    
-</div></p>
+<p><a href="/p/deformable-beta-splatting-interpretation-and-sharing/2026-03-26-13-13-34.png" target="_blank" rel="noopener noreferrer"><img src="/p/deformable-beta-splatting-interpretation-and-sharing/2026-03-26-13-13-34.png" alt="" width="441" height="241" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="182" data-flex-basis="439px"></a>
+</p>
 <h4 id="214-3d椭球beta基元把beta核用到3d场景里">2.1.4 3D椭球Beta基元：把Beta核用到3D场景里
 </h4><p>有了Beta核，论文定义了DBS里最基础的场景单元——<strong>3D椭球Beta基元</strong>，它的完整参数是：
 $$\mathcal{B} = {\mu, o, q, s, b, f}$$</p>
 <p>每个参数的通俗解释，和3DGS做了对比：</p>
-<div class="table-wrapper"><table>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
 <thead>
 <tr>
 <th>参数</th>
@@ -702,18 +357,8 @@ $$\mathcal{B} = {\mu, o, q, s, b, f}$$</p>
 <p>划重点：相比3DGS的高斯椭球，DBS只多了1个$b$参数，几乎没有增加计算开销，却实现了几何表达能力的质的飞跃。</p>
 <h3 id="22-创新二球面betasb换掉球谐函数精准拿捏镜面高光">2.2 创新二：球面Beta（SB）——换掉球谐函数，精准拿捏镜面高光
 </h3><p>解决了几何表示的问题，DBS的第二个核心创新，就是用<strong>球面Beta（SB）</strong> 替换了3DGS里的球谐函数SH，彻底解决了镜面高光画不出来的痛点。</p>
-<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
-    
-    <a href="2026-03-26-13-13-54.png" 
-        
-       target="_blank" 
-       class="gallery-item"> <img src="2026-03-26-13-13-54.png" 
-             alt="" 
-             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-             
-    </a>
-    
-</div></p>
+<p><a href="/p/deformable-beta-splatting-interpretation-and-sharing/2026-03-26-13-13-54.png" target="_blank" rel="noopener noreferrer"><img src="/p/deformable-beta-splatting-interpretation-and-sharing/2026-03-26-13-13-54.png" alt="" width="507" height="327" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="155" data-flex-basis="372px"></a>
+</p>
 <h4 id="221-先搞懂为什么球谐函数sh搞不定镜面高光">2.2.1 先搞懂：为什么球谐函数SH搞不定镜面高光？
 </h4><p>3DGS里的“视点相关颜色”，通俗说就是：你站在不同角度看同一个物体，看到的颜色、反光是不一样的（比如镜子换个角度，高光就变了）。3DGS用低阶SH编码这个效果，但有两个无解的问题：</p>
 <ol>
@@ -736,7 +381,7 @@ $$\mathcal{B} = {\mu, o, q, s, b, f}$$</p>
 </h4><p>球面Beta的最终公式是：
 $$c(V) = c_0 + \sum_{m \in M} \beta(1 - R_m \cdot V; b_m) c_m$$</p>
 <p>我们把每个参数拆解得明明白白：</p>
-<div class="table-wrapper"><table>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
 <thead>
 <tr>
 <th>参数</th>
@@ -798,18 +443,8 @@ $$c(V) = c_0 + \sum_{m \in M} \beta(1 - R_m \cdot V; b_m) c_m$$</p>
 </ul>
 <p><strong>致密化</strong>就是训练过程中，自动给细节多的地方“克隆/分裂”更多基元，给没用的基元“修剪”掉，让画面更清晰，同时不浪费算力。</p>
 <p>3DGS-MCMC把这个过程改成了马尔可夫链蒙特卡洛（MCMC）过程：把基元的不透明度当成概率，不透明度极低的“死亡”基元会被删掉，然后在不透明度高的基元附近“重生”新的基元，同时调整新基元的参数，保证克隆/重生后，画面效果和原来完全一致。</p>
-<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
-    
-    <a href="2026-03-26-13-14-07.png" 
-        
-       target="_blank" 
-       class="gallery-item"> <img src="2026-03-26-13-14-07.png" 
-             alt="" 
-             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-             
-    </a>
-    
-</div></p>
+<p><a href="/p/deformable-beta-splatting-interpretation-and-sharing/2026-03-26-13-14-07.png" target="_blank" rel="noopener noreferrer"><img src="/p/deformable-beta-splatting-interpretation-and-sharing/2026-03-26-13-14-07.png" alt="" width="370" height="216" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="171" data-flex-basis="411px"></a>
+</p>
 <p>但它的致命问题是：<strong>参数调整的公式，完全是根据高斯核的数学特性推导出来的，换个核函数就不成立了</strong>。</p>
 <h4 id="232-dbs的核心突破数学证明只调不透明度就能适配所有核">2.3.2 DBS的核心突破：数学证明“只调不透明度，就能适配所有核”
 </h4><p>论文用严谨的数学推导，证明了一个颠覆性的结论：<strong>只要基元的不透明度足够小，仅调整不透明度，就能保证克隆后的画面效果完全不变，和溅射核的类型没有任何关系</strong>。</p>
@@ -862,7 +497,7 @@ $$\mathcal{L} = \mathcal{L}<em>{RGB} + \lambda</em>{SSIM} \mathcal{L}_{DSSIM} + 
 <h2 id="三实验结果dbs到底有多强">三、实验结果：DBS到底有多强？
 </h2><p>论文在Mip-NeRF 360、Tanks&amp;Temples、Deep Blending等行业通用数据集上做了全面测试，结果可以用“全面碾压”来形容。</p>
 <h3 id="31-核心性能画质速度内存全面超越">3.1 核心性能：画质、速度、内存全面超越
-</h3><div class="table-wrapper"><table>
+</h3><div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
 <thead>
 <tr>
 <th>指标</th>
@@ -893,55 +528,15 @@ $$\mathcal{L} = \mathcal{L}<em>{RGB} + \lambda</em>{SSIM} \mathcal{L}_{DSSIM} + 
 </tr>
 </tbody>
 </table></div>
-<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
-    
-    <a href="2026-03-26-13-37-10.png" 
-        
-       target="_blank" 
-       class="gallery-item"> <img src="2026-03-26-13-37-10.png" 
-             alt="" 
-             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-             
-    </a>
-    
-</div></p>
-<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
-    
-    <a href="2026-03-26-13-37-55.png" 
-        
-       target="_blank" 
-       class="gallery-item"> <img src="2026-03-26-13-37-55.png" 
-             alt="" 
-             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-             
-    </a>
-    
-</div></p>
-<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
-    
-    <a href="2026-03-26-13-38-09.png" 
-        
-       target="_blank" 
-       class="gallery-item"> <img src="2026-03-26-13-38-09.png" 
-             alt="" 
-             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-             
-    </a>
-    
-</div></p>
+<p><a href="/p/deformable-beta-splatting-interpretation-and-sharing/2026-03-26-13-37-10.png" target="_blank" rel="noopener noreferrer"><img src="/p/deformable-beta-splatting-interpretation-and-sharing/2026-03-26-13-37-10.png" alt="" width="783" height="130" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="602" data-flex-basis="1445px"></a>
+</p>
+<p><a href="/p/deformable-beta-splatting-interpretation-and-sharing/2026-03-26-13-37-55.png" target="_blank" rel="noopener noreferrer"><img src="/p/deformable-beta-splatting-interpretation-and-sharing/2026-03-26-13-37-55.png" alt="" width="927" height="486" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="190" data-flex-basis="457px"></a>
+</p>
+<p><a href="/p/deformable-beta-splatting-interpretation-and-sharing/2026-03-26-13-38-09.png" target="_blank" rel="noopener noreferrer"><img src="/p/deformable-beta-splatting-interpretation-and-sharing/2026-03-26-13-38-09.png" alt="" width="833" height="257" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="324" data-flex-basis="777px"></a>
+</p>
 <h3 id="32-消融实验每个创新点都实打实起作用">3.2 消融实验：每个创新点都实打实起作用
-</h3><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
-    
-    <a href="2026-03-26-13-38-23.png" 
-        
-       target="_blank" 
-       class="gallery-item"> <img src="2026-03-26-13-38-23.png" 
-             alt="" 
-             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-             
-    </a>
-    
-</div>
+</h3><p><a href="/p/deformable-beta-splatting-interpretation-and-sharing/2026-03-26-13-38-23.png" target="_blank" rel="noopener noreferrer"><img src="/p/deformable-beta-splatting-interpretation-and-sharing/2026-03-26-13-38-23.png" alt="" width="1075" height="373" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="288" data-flex-basis="691px"></a>
+
 论文把三个创新点拆开测试，验证了每个部分的贡献：</p>
 <ol>
 <li>仅用Beta核替换高斯核，其他不变：PSNR就有明显提升，证明Beta核的几何表达能力远超高斯核；</li>
@@ -980,7 +575,7 @@ $$\mathcal{L} = \mathcal{L}<em>{RGB} + \lambda</em>{SSIM} \mathcal{L}_{DSSIM} + 
 <li>逆阿贝尔变换能生成有效的3D核。</li>
 </ol>
 <h3 id="附录b论文核心超参数">附录B：论文核心超参数
-</h3><div class="table-wrapper"><table>
+</h3><div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
 <thead>
 <tr>
 <th>超参数</th>
@@ -1029,47 +624,29 @@ $$\mathcal{L} = \mathcal{L}<em>{RGB} + \lambda</em>{SSIM} \mathcal{L}_{DSSIM} + 
 <h3 id="附录c压缩性能">附录C：压缩性能
 </h3><p>DBS训练后，通过统一的PNG压缩，能把模型大小再压缩5-6倍，且PSNR仅下降0.15dB，几乎没有画质损失。剪枝后的DBS-490K，经过简单压缩后仅10MB，就能达到原版3DGS的画质，极其适合移动端、AR/VR等轻量化场景。</p>
 
-</section>
+</div>
 
-
-    <footer class="article-footer">
+            <footer class="article-footer">
     
-    <section class="article-tags">
-        
-            <a href="/tags/paper-sharing/">Paper Sharing</a>
-        
-    </section>
+        <div class="article-tags" aria-label="Article tags"><span class="article-footer-label">Filed under</span><a href="/tags/paper-sharing/">Paper Sharing</a></div>
+    
+    
+    
+    <div class="article-endnote"><span>Thanks for reading.</span><a href="#top">Back to top <span aria-hidden="true">↑</span></a></div>
+</footer>
 
-
-    </footer>
-
-
+        </div>
+    </div>
     
 </article>
 
-    
+        <div class="reading-afterword">
+            
+            
 
-    
-
-     
-    
-        
-    
-
-    <footer class="site-footer">
-    <section class="copyright">
-        &copy; 
-        
-        2026 SymphonyW
-    </section>
-    
-    <section class="powerby">
-        Built with <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> <br />
-        Theme <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.26.0">Stack</a></b> designed by <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a>
-    </section>
-</footer>
-
-
+            
+        </div>
+    </div>
     
 <div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
 
@@ -1148,24 +725,22 @@ $$\mathcal{L} = \mathcal{L}<em>{RGB} + \lambda</em>{SSIM} \mathcal{L}_{DSSIM} + 
                 href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
             >
 
-            </main>
-        </div>
-        <script 
-                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
-                
-                >
-            </script><script type="text/javascript" src="/ts/main.js" defer></script><script type="text/javascript" src="/ts/custom.js" defer></script>
-<script>
-    (function () {
-        const customFont = document.createElement('link');
-        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+    </main>
+    
+<footer class="site-footer">
+    <div class="footer-top"><a class="footer-wordmark" href="/">Symphony<span>W</span></a><p>A place to think. A space to grow.</p><a href="#main-content" class="back-top">Back to top <span aria-hidden="true">↑</span></a></div>
+    <div class="footer-bottom"><span>© 2026 SymphonyW</span><nav aria-label="More links"><a href="/about/">About</a><a href="https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0" target="_blank" rel="noopener noreferrer me">Bilibili <span aria-hidden="true">↗</span></a><a href="https://github.com/SymphonyW" target="_blank" rel="noopener noreferrer me">GitHub <span aria-hidden="true">↗</span></a><a href="https://twitter.com" target="_blank" rel="noopener noreferrer me">Twitter <span aria-hidden="true">↗</span></a><a href="/index.xml">RSS ↗</a></nav><span class="footer-colophon">Built with Hugo · Always in progress</span></div>
+</footer>
 
-        customFont.type = "text/css";
-        customFont.rel = "stylesheet";
+    
 
-        document.head.appendChild(customFont);
-    }());
-</script>
+<script src="/ts/main.fafdc6fc356f126445b18bf98e9ce585b8429805280aaa2ec379851ce1af6525.js" defer></script>
+
+<script src="/ts/custom.5dc5916b044c5b2b094b202e6f4b4887b36dddcd5d501ad37e26108b2163d8d9.js" defer></script>
+
+
+
+
 
 <script>
 window.MathJax = {
@@ -1179,6 +754,7 @@ window.MathJax = {
   }
 };
 </script>
-<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-    </body>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
+
+</body>
 </html>

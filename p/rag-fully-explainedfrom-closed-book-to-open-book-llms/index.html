@@ -1,355 +1,140 @@
 <!DOCTYPE html>
 <html lang="en" dir="ltr">
-    <head><meta charset='utf-8'>
-<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="RAG 技术全景：让大模型从&quot;闭卷考试&quot;到&quot;开卷考试&quot; 大模型很强，但它会&quot;一本正经地胡说八道&quot;。RAG（Retrieval-Augmented Generation，检索增强生成）给大模型外挂了一个&quot;知识库&quot;，让它从闭卷考试变成开卷考试，回答既准又能溯源。本文用 6 张图带你完整搞懂 RAG。 一、先聊痛点：大模型的&quot;幻觉&quot;从哪来？ 你大概遇到过这样的场景：问 GPT 一个公司内部的政策问题，或者让它总结一份最新发布的财报，它信誓旦旦地给你一段听起来很专业的回答——但仔细一查，全是编的。 这就是大模型的幻觉（Hallucination）。它不是故意的，而是由其工作方式决定的：LLM 本质上是在做&quot;下一个 token 预测&quot;，它根据训练时记住的概率分布生成文本，分不清&quot;知道&quot;和&quot;不知道&quot;。 原生 LLM 在企业级场景下有四个硬伤： 知识截止：训练数据有截止日期，不知道今天发生的事 幻觉问题：没见过的知识就靠&quot;编&quot;，还很自信 领域知识不足：对企业内部文档、专业细分领域不熟悉 无法溯源：回答不知道来自哪里，没法核验 要解决这些问题，传统思路是微调（Fine-tuning）——用领域数据重新训练模型。但微调又贵又慢，而且知识一更新就得再来一遍。 RAG 给了另一条路：不重新训练模型，而是给它外挂一个可随时更新的知识库，回答时先去知识库里检索，再基于检索到的内容作答。 原生 LLM vs RAG：闭卷考试 vs 开卷考试 就像考试一样：原生 LLM 是闭卷考试，全凭记忆，记不清就编；RAG 是开卷考试，遇到不会的可以翻书，答案有据可循。 二、RAG 是什么：核心思想一句话 RAG = 检索（Retrieval）+ 增强（Augmentation）+ 生成（Generation） 在 LLM 生成回答之前，先从外部知识库中检索相关资料，把这些资料增强到 Prompt 里作为上下文，再让 LLM 基于这些上下文生成回答。 用一句话概括：RAG 让 LLM 从&quot;闭卷考试&quot;变成&quot;开卷考试&quot;。 它和微调的根本区别在于：微调把知识&quot;烧进&quot;模型权重里，RAG 把知识放在模型之外的数据库里，用的时候现查。这也决定了两者的适用边界——后面会详细对比。 三、RAG 工作流程：三阶段详解 RAG 工作流程：检索 → 增强 → 生成 RAG 的完整流程可以拆成离线建库和在线问答两大阶段。在线问答又分为检索、增强、生成三步。 3.1 离线阶段：把文档变成可检索的向量库 这一步是&quot;建图书馆&quot;的过程，通常一次性完成，知识更新时增量重建： 文档加载：读取 PDF、Word、HTML、Markdown 等原始文档 切分（Chunking）：把长文档切成小段。为什么不整篇存？因为检索时要找最相关的片段，整篇文档向量会&quot;稀释&quot;语义；而且 LLM 上下文有限，塞不下整篇 向量化（Embedding）：用嵌入模型把每段文本转成一个高维向量（通常 768~1536 维），语义相近的文本在向量空间里距离也近 存入向量数据库：把向量和原文一起存进去，建好索引，供后续快速检索 3.">
+<head>
+    <meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="RAG 技术全景：让大模型从&quot;闭卷考试&quot;到&quot;开卷考试&quot; 大模型很强，但它会&quot;一本正经地胡说八道&quot;。RAG（Retrieval-Augmented Generation，检索增强生成）给大模型外挂了一个&quot;知识库&quot;，让它从闭卷考试变成开卷考试，回答既准又能溯源。本文用 6 张图带你完整搞懂 RAG。 一、先聊痛点：大模型的&quot;幻觉&quot;从哪来？ 你大概遇到过这样的场景：问 GPT 一个公司内部的政策问题，或者让它总结一份最新发布的财报，它信誓旦旦地给你一段听起来很专业的回答——但仔细一查，全是编的。 这就是大模型的幻觉（Hallucination）。它不是故意的，而是由其工作方式决定的：LLM 本质上是在做&quot;下一个 token 预测&quot;，它根据训练时记住的概率分布生成文本，分不清&quot;知道&quot;和&quot;不知道&quot;。 原生 LLM 在企业级场景下有四个硬伤： 知识截止：训练数据有截止日期，不知道今天发生的事 幻觉问题：没见过的知识就靠&quot;编&quot;，还很自信 领域知识不足：对企业内部文档、专业细分领域不熟悉 无法溯源：回答不知道来自哪里，没法核验 要解决这些问题，传统思路是微调（Fine-tuning）——用领域数据重新训练模型。但微调又贵又慢，而且知识一更新就得再来一遍。 RAG 给了另一条路：不重新训练模型，而是给它外挂一个可随时更新的知识库，回答时先去知识库里检索，再基于检索到的内容作答。 就像考试一样：原生 LLM 是闭卷考试，全凭记忆，记不清就编；RAG 是开卷考试，遇到不会的可以翻书，答案有据可循。 二、RAG 是什么：核心思想一句话 RAG = 检索（Retrieval）+ 增强（Augmentation）+ 生成（Generation） 在 LLM 生成回答之前，先从外部知识库中检索相关资料，把这些资料增强到 Prompt 里作为上下文，再让 LLM 基于这些上下文生成回答。 用一句话概括：RAG 让 LLM 从&quot;闭卷考试&quot;变成&quot;开卷考试&quot;。 它和微调的根本区别在于：微调把知识&quot;烧进&quot;模型权重里，RAG 把知识放在模型之外的数据库里，用的时候现查。这也决定了两者的适用边界——后面会详细对比。 三、RAG 工作流程：三阶段详解 RAG 的完整流程可以拆成离线建库和在线问答两大阶段。在线问答又分为检索、增强、生成三步。 3.1 离线阶段：把文档变成可检索的向量库 这一步是&quot;建图书馆&quot;的过程，通常一次性完成，知识更新时增量重建： 文档加载：读取 PDF、Word、HTML、Markdown 等原始文档 切分（Chunking）：把长文档切成小段。为什么不整篇存？因为检索时要找最相关的片段，整篇文档向量会&quot;稀释&quot;语义；而且 LLM 上下文有限，塞不下整篇 向量化（Embedding）：用嵌入模型把每段文本转成一个高维向量（通常 768~1536 维），语义相近的文本在向量空间里距离也近 存入向量数据库：把向量和原文一起存进去，建好索引，供后续快速检索 3.2 在线阶段：检索 → 增强 → 生成 用户每一次提问，都会实时跑这三步：">
 <title>RAG Fully Explained:From &#34;Closed-Book&#34; to &#34;Open-Book&#34; LLMs</title>
 
 <link rel='canonical' href='https://SymphonyW.github.io/p/rag-fully-explainedfrom-closed-book-to-open-book-llms/'>
+<link rel="stylesheet" href="/scss/custom.min.2089e3e36594bc8705485d3fd8080ca77e480c60ce355a4a3eb92dbda6f784cc.css">
+<script>
+(() => {
+    let preference = 'auto';
+    try { preference = localStorage.getItem('StackColorScheme') || preference; } catch (_) {}
+    document.documentElement.dataset.scheme = preference === 'dark' || (preference === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+})();
+</script>
 
-<link rel="stylesheet" href="/scss/style.min.4687047a1903756c84bf7a1cf7cbbf4e26bef4a42dd5bc620df47badaeed46c2.css"><meta property='og:title' content="RAG Fully Explained:From \"Closed-Book\" to \"Open-Book\" LLMs">
-<meta property='og:description' content="RAG 技术全景：让大模型从&quot;闭卷考试&quot;到&quot;开卷考试&quot; 大模型很强，但它会&quot;一本正经地胡说八道&quot;。RAG（Retrieval-Augmented Generation，检索增强生成）给大模型外挂了一个&quot;知识库&quot;，让它从闭卷考试变成开卷考试，回答既准又能溯源。本文用 6 张图带你完整搞懂 RAG。 一、先聊痛点：大模型的&quot;幻觉&quot;从哪来？ 你大概遇到过这样的场景：问 GPT 一个公司内部的政策问题，或者让它总结一份最新发布的财报，它信誓旦旦地给你一段听起来很专业的回答——但仔细一查，全是编的。 这就是大模型的幻觉（Hallucination）。它不是故意的，而是由其工作方式决定的：LLM 本质上是在做&quot;下一个 token 预测&quot;，它根据训练时记住的概率分布生成文本，分不清&quot;知道&quot;和&quot;不知道&quot;。 原生 LLM 在企业级场景下有四个硬伤： 知识截止：训练数据有截止日期，不知道今天发生的事 幻觉问题：没见过的知识就靠&quot;编&quot;，还很自信 领域知识不足：对企业内部文档、专业细分领域不熟悉 无法溯源：回答不知道来自哪里，没法核验 要解决这些问题，传统思路是微调（Fine-tuning）——用领域数据重新训练模型。但微调又贵又慢，而且知识一更新就得再来一遍。 RAG 给了另一条路：不重新训练模型，而是给它外挂一个可随时更新的知识库，回答时先去知识库里检索，再基于检索到的内容作答。 原生 LLM vs RAG：闭卷考试 vs 开卷考试 就像考试一样：原生 LLM 是闭卷考试，全凭记忆，记不清就编；RAG 是开卷考试，遇到不会的可以翻书，答案有据可循。 二、RAG 是什么：核心思想一句话 RAG = 检索（Retrieval）+ 增强（Augmentation）+ 生成（Generation） 在 LLM 生成回答之前，先从外部知识库中检索相关资料，把这些资料增强到 Prompt 里作为上下文，再让 LLM 基于这些上下文生成回答。 用一句话概括：RAG 让 LLM 从&quot;闭卷考试&quot;变成&quot;开卷考试&quot;。 它和微调的根本区别在于：微调把知识&quot;烧进&quot;模型权重里，RAG 把知识放在模型之外的数据库里，用的时候现查。这也决定了两者的适用边界——后面会详细对比。 三、RAG 工作流程：三阶段详解 RAG 工作流程：检索 → 增强 → 生成 RAG 的完整流程可以拆成离线建库和在线问答两大阶段。在线问答又分为检索、增强、生成三步。 3.1 离线阶段：把文档变成可检索的向量库 这一步是&quot;建图书馆&quot;的过程，通常一次性完成，知识更新时增量重建： 文档加载：读取 PDF、Word、HTML、Markdown 等原始文档 切分（Chunking）：把长文档切成小段。为什么不整篇存？因为检索时要找最相关的片段，整篇文档向量会&quot;稀释&quot;语义；而且 LLM 上下文有限，塞不下整篇 向量化（Embedding）：用嵌入模型把每段文本转成一个高维向量（通常 768~1536 维），语义相近的文本在向量空间里距离也近 存入向量数据库：把向量和原文一起存进去，建好索引，供后续快速检索 3.">
+<meta property='og:title' content="RAG Fully Explained:From \"Closed-Book\" to \"Open-Book\" LLMs">
+<meta property='og:description' content="RAG 技术全景：让大模型从&quot;闭卷考试&quot;到&quot;开卷考试&quot; 大模型很强，但它会&quot;一本正经地胡说八道&quot;。RAG（Retrieval-Augmented Generation，检索增强生成）给大模型外挂了一个&quot;知识库&quot;，让它从闭卷考试变成开卷考试，回答既准又能溯源。本文用 6 张图带你完整搞懂 RAG。 一、先聊痛点：大模型的&quot;幻觉&quot;从哪来？ 你大概遇到过这样的场景：问 GPT 一个公司内部的政策问题，或者让它总结一份最新发布的财报，它信誓旦旦地给你一段听起来很专业的回答——但仔细一查，全是编的。 这就是大模型的幻觉（Hallucination）。它不是故意的，而是由其工作方式决定的：LLM 本质上是在做&quot;下一个 token 预测&quot;，它根据训练时记住的概率分布生成文本，分不清&quot;知道&quot;和&quot;不知道&quot;。 原生 LLM 在企业级场景下有四个硬伤： 知识截止：训练数据有截止日期，不知道今天发生的事 幻觉问题：没见过的知识就靠&quot;编&quot;，还很自信 领域知识不足：对企业内部文档、专业细分领域不熟悉 无法溯源：回答不知道来自哪里，没法核验 要解决这些问题，传统思路是微调（Fine-tuning）——用领域数据重新训练模型。但微调又贵又慢，而且知识一更新就得再来一遍。 RAG 给了另一条路：不重新训练模型，而是给它外挂一个可随时更新的知识库，回答时先去知识库里检索，再基于检索到的内容作答。 就像考试一样：原生 LLM 是闭卷考试，全凭记忆，记不清就编；RAG 是开卷考试，遇到不会的可以翻书，答案有据可循。 二、RAG 是什么：核心思想一句话 RAG = 检索（Retrieval）+ 增强（Augmentation）+ 生成（Generation） 在 LLM 生成回答之前，先从外部知识库中检索相关资料，把这些资料增强到 Prompt 里作为上下文，再让 LLM 基于这些上下文生成回答。 用一句话概括：RAG 让 LLM 从&quot;闭卷考试&quot;变成&quot;开卷考试&quot;。 它和微调的根本区别在于：微调把知识&quot;烧进&quot;模型权重里，RAG 把知识放在模型之外的数据库里，用的时候现查。这也决定了两者的适用边界——后面会详细对比。 三、RAG 工作流程：三阶段详解 RAG 的完整流程可以拆成离线建库和在线问答两大阶段。在线问答又分为检索、增强、生成三步。 3.1 离线阶段：把文档变成可检索的向量库 这一步是&quot;建图书馆&quot;的过程，通常一次性完成，知识更新时增量重建： 文档加载：读取 PDF、Word、HTML、Markdown 等原始文档 切分（Chunking）：把长文档切成小段。为什么不整篇存？因为检索时要找最相关的片段，整篇文档向量会&quot;稀释&quot;语义；而且 LLM 上下文有限，塞不下整篇 向量化（Embedding）：用嵌入模型把每段文本转成一个高维向量（通常 768~1536 维），语义相近的文本在向量空间里距离也近 存入向量数据库：把向量和原文一起存进去，建好索引，供后续快速检索 3.2 在线阶段：检索 → 增强 → 生成 用户每一次提问，都会实时跑这三步：">
 <meta property='og:url' content='https://SymphonyW.github.io/p/rag-fully-explainedfrom-closed-book-to-open-book-llms/'>
 <meta property='og:site_name' content='SymphonyW'>
 <meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='RAG' /><meta property='article:tag' content='LLM' /><meta property='article:tag' content='AI' /><meta property='article:tag' content='Vector Database' /><meta property='article:published_time' content='2026-07-08T15:00:00&#43;08:00'/><meta property='article:modified_time' content='2026-07-08T15:00:00&#43;08:00'/><meta property='og:image' content='https://SymphonyW.github.io/p/rag-fully-explainedfrom-closed-book-to-open-book-llms/bg.png' />
 <meta name="twitter:title" content="RAG Fully Explained:From \"Closed-Book\" to \"Open-Book\" LLMs">
-<meta name="twitter:description" content="RAG 技术全景：让大模型从&quot;闭卷考试&quot;到&quot;开卷考试&quot; 大模型很强，但它会&quot;一本正经地胡说八道&quot;。RAG（Retrieval-Augmented Generation，检索增强生成）给大模型外挂了一个&quot;知识库&quot;，让它从闭卷考试变成开卷考试，回答既准又能溯源。本文用 6 张图带你完整搞懂 RAG。 一、先聊痛点：大模型的&quot;幻觉&quot;从哪来？ 你大概遇到过这样的场景：问 GPT 一个公司内部的政策问题，或者让它总结一份最新发布的财报，它信誓旦旦地给你一段听起来很专业的回答——但仔细一查，全是编的。 这就是大模型的幻觉（Hallucination）。它不是故意的，而是由其工作方式决定的：LLM 本质上是在做&quot;下一个 token 预测&quot;，它根据训练时记住的概率分布生成文本，分不清&quot;知道&quot;和&quot;不知道&quot;。 原生 LLM 在企业级场景下有四个硬伤： 知识截止：训练数据有截止日期，不知道今天发生的事 幻觉问题：没见过的知识就靠&quot;编&quot;，还很自信 领域知识不足：对企业内部文档、专业细分领域不熟悉 无法溯源：回答不知道来自哪里，没法核验 要解决这些问题，传统思路是微调（Fine-tuning）——用领域数据重新训练模型。但微调又贵又慢，而且知识一更新就得再来一遍。 RAG 给了另一条路：不重新训练模型，而是给它外挂一个可随时更新的知识库，回答时先去知识库里检索，再基于检索到的内容作答。 原生 LLM vs RAG：闭卷考试 vs 开卷考试 就像考试一样：原生 LLM 是闭卷考试，全凭记忆，记不清就编；RAG 是开卷考试，遇到不会的可以翻书，答案有据可循。 二、RAG 是什么：核心思想一句话 RAG = 检索（Retrieval）+ 增强（Augmentation）+ 生成（Generation） 在 LLM 生成回答之前，先从外部知识库中检索相关资料，把这些资料增强到 Prompt 里作为上下文，再让 LLM 基于这些上下文生成回答。 用一句话概括：RAG 让 LLM 从&quot;闭卷考试&quot;变成&quot;开卷考试&quot;。 它和微调的根本区别在于：微调把知识&quot;烧进&quot;模型权重里，RAG 把知识放在模型之外的数据库里，用的时候现查。这也决定了两者的适用边界——后面会详细对比。 三、RAG 工作流程：三阶段详解 RAG 工作流程：检索 → 增强 → 生成 RAG 的完整流程可以拆成离线建库和在线问答两大阶段。在线问答又分为检索、增强、生成三步。 3.1 离线阶段：把文档变成可检索的向量库 这一步是&quot;建图书馆&quot;的过程，通常一次性完成，知识更新时增量重建： 文档加载：读取 PDF、Word、HTML、Markdown 等原始文档 切分（Chunking）：把长文档切成小段。为什么不整篇存？因为检索时要找最相关的片段，整篇文档向量会&quot;稀释&quot;语义；而且 LLM 上下文有限，塞不下整篇 向量化（Embedding）：用嵌入模型把每段文本转成一个高维向量（通常 768~1536 维），语义相近的文本在向量空间里距离也近 存入向量数据库：把向量和原文一起存进去，建好索引，供后续快速检索 3."><meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:description" content="RAG 技术全景：让大模型从&quot;闭卷考试&quot;到&quot;开卷考试&quot; 大模型很强，但它会&quot;一本正经地胡说八道&quot;。RAG（Retrieval-Augmented Generation，检索增强生成）给大模型外挂了一个&quot;知识库&quot;，让它从闭卷考试变成开卷考试，回答既准又能溯源。本文用 6 张图带你完整搞懂 RAG。 一、先聊痛点：大模型的&quot;幻觉&quot;从哪来？ 你大概遇到过这样的场景：问 GPT 一个公司内部的政策问题，或者让它总结一份最新发布的财报，它信誓旦旦地给你一段听起来很专业的回答——但仔细一查，全是编的。 这就是大模型的幻觉（Hallucination）。它不是故意的，而是由其工作方式决定的：LLM 本质上是在做&quot;下一个 token 预测&quot;，它根据训练时记住的概率分布生成文本，分不清&quot;知道&quot;和&quot;不知道&quot;。 原生 LLM 在企业级场景下有四个硬伤： 知识截止：训练数据有截止日期，不知道今天发生的事 幻觉问题：没见过的知识就靠&quot;编&quot;，还很自信 领域知识不足：对企业内部文档、专业细分领域不熟悉 无法溯源：回答不知道来自哪里，没法核验 要解决这些问题，传统思路是微调（Fine-tuning）——用领域数据重新训练模型。但微调又贵又慢，而且知识一更新就得再来一遍。 RAG 给了另一条路：不重新训练模型，而是给它外挂一个可随时更新的知识库，回答时先去知识库里检索，再基于检索到的内容作答。 就像考试一样：原生 LLM 是闭卷考试，全凭记忆，记不清就编；RAG 是开卷考试，遇到不会的可以翻书，答案有据可循。 二、RAG 是什么：核心思想一句话 RAG = 检索（Retrieval）+ 增强（Augmentation）+ 生成（Generation） 在 LLM 生成回答之前，先从外部知识库中检索相关资料，把这些资料增强到 Prompt 里作为上下文，再让 LLM 基于这些上下文生成回答。 用一句话概括：RAG 让 LLM 从&quot;闭卷考试&quot;变成&quot;开卷考试&quot;。 它和微调的根本区别在于：微调把知识&quot;烧进&quot;模型权重里，RAG 把知识放在模型之外的数据库里，用的时候现查。这也决定了两者的适用边界——后面会详细对比。 三、RAG 工作流程：三阶段详解 RAG 的完整流程可以拆成离线建库和在线问答两大阶段。在线问答又分为检索、增强、生成三步。 3.1 离线阶段：把文档变成可检索的向量库 这一步是&quot;建图书馆&quot;的过程，通常一次性完成，知识更新时增量重建： 文档加载：读取 PDF、Word、HTML、Markdown 等原始文档 切分（Chunking）：把长文档切成小段。为什么不整篇存？因为检索时要找最相关的片段，整篇文档向量会&quot;稀释&quot;语义；而且 LLM 上下文有限，塞不下整篇 向量化（Embedding）：用嵌入模型把每段文本转成一个高维向量（通常 768~1536 维），语义相近的文本在向量空间里距离也近 存入向量数据库：把向量和原文一起存进去，建好索引，供后续快速检索 3.2 在线阶段：检索 → 增强 → 生成 用户每一次提问，都会实时跑这三步："><meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:image" content='https://SymphonyW.github.io/p/rag-fully-explainedfrom-closed-book-to-open-book-llms/bg.png' />
     <link rel="shortcut icon" href="/favicon.ico" />
 
-    </head>
-    <body class="
-    article-page
-    ">
-    <script>
-        (function() {
-            const colorSchemeKey = 'StackColorScheme';
-            if(!localStorage.getItem(colorSchemeKey)){
-                localStorage.setItem(colorSchemeKey, "auto");
-            }
-        })();
-    </script><script>
-    (function() {
-        const colorSchemeKey = 'StackColorScheme';
-        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
-        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
-
-        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+    
+    <noscript><style>@media(max-width:760px){.site-header{position:static}.site-header__inner{height:auto;min-height:66px;flex-wrap:wrap}.site-nav{position:static;display:grid;order:3;flex-basis:100%;padding:8px 0 18px}.menu-toggle,.theme-toggle{display:none}}</style></noscript>
+</head>
+<body id="top" class="article-page">
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    
+<header class="site-header">
+    <div class="site-header__inner">
+        <a class="site-brand" href="/" aria-label="SymphonyW — Home">S<span>w.</span></a>
+        <nav class="site-nav" id="site-navigation" aria-label="Main navigation">
             
-
-            document.documentElement.dataset.scheme = 'dark';
-        } else {
-            document.documentElement.dataset.scheme = 'light';
-        }
-    })();
-</script>
-<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
-    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="Toggle Menu">
-        <span class="hamburger-box">
-            <span class="hamburger-inner"></span>
-        </span>
-    </button>
-
-    <header>
-        
             
-            <figure class="site-avatar">
-                <a href="/">
                 
                     
                     
+                    <a href="/">Home</a>
+                
+            
+                
                     
-                        
-                        <img src="/img/avatar_hu5ea07d2842502bdd7540f9cbc4b41b95_5278_300x0_resize_box_3.png" width="300"
-                            height="300" class="site-logo" loading="lazy" alt="Avatar">
                     
+                    <a href="/post/" aria-current="page">Blog</a>
                 
-                </a>
-                
-                    <span class="emoji">😁</span>
-                
-            </figure>
             
-        
-        
-        <div class="site-meta">
-            <h1 class="site-name"><a href="/">SymphonyW</a></h1>
-            <h2 class="site-description">Welcome to my Blog.</h2>
-        </div>
-    </header><ol class="menu-social">
+                
+                    
+                    
+                    <a href="/archives/">Archives</a>
+                
             
-                <li>
-                    <a 
-                        href='https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0'
-                        target="_blank"
-                        title="Bilibili"
-                        rel="me"
-                    >
-                        
-                        
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.0.0-beta2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M488.6 104.1C505.3 122.2 513 143.8 511.9 169.8V372.2C511.5 398.6 502.7 420.3 485.4 437.3C468.2 454.3 446.3 463.2 419.9 464H92.02C65.57 463.2 43.81 454.2 26.74 436.8C9.682 419.4 .7667 396.5 0 368.2V169.8C.7667 143.8 9.682 122.2 26.74 104.1C43.81 87.75 65.57 78.77 92.02 78H121.4L96.05 52.19C90.3 46.46 87.42 39.19 87.42 30.4C87.42 21.6 90.3 14.34 96.05 8.603C101.8 2.868 109.1 0 117.9 0C126.7 0 134 2.868 139.8 8.603L213.1 78H301.1L375.6 8.603C381.7 2.868 389.2 0 398 0C406.8 0 414.1 2.868 419.9 8.603C425.6 14.34 428.5 21.6 428.5 30.4C428.5 39.19 425.6 46.46 419.9 52.19L394.6 78L423.9 78C450.3 78.77 471.9 87.75 488.6 104.1H488.6zM449.8 173.8C449.4 164.2 446.1 156.4 439.1 150.3C433.9 144.2 425.1 140.9 416.4 140.5H96.05C86.46 140.9 78.6 144.2 72.47 150.3C66.33 156.4 63.07 164.2 62.69 173.8V368.2C62.69 377.4 65.95 385.2 72.47 391.7C78.99 398.2 86.85 401.5 96.05 401.5H416.4C425.6 401.5 433.4 398.2 439.7 391.7C446 385.2 449.4 377.4 449.8 368.2L449.8 173.8zM185.5 216.5C191.8 222.8 195.2 230.6 195.6 239.7V273C195.2 282.2 191.9 289.9 185.8 296.2C179.6 302.5 171.8 305.7 162.2 305.7C152.6 305.7 144.7 302.5 138.6 296.2C132.5 289.9 129.2 282.2 128.8 273V239.7C129.2 230.6 132.6 222.8 138.9 216.5C145.2 210.2 152.1 206.9 162.2 206.5C171.4 206.9 179.2 210.2 185.5 216.5H185.5zM377 216.5C383.3 222.8 386.7 230.6 387.1 239.7V273C386.7 282.2 383.4 289.9 377.3 296.2C371.2 302.5 363.3 305.7 353.7 305.7C344.1 305.7 336.3 302.5 330.1 296.2C323.1 289.9 320.7 282.2 320.4 273V239.7C320.7 230.6 324.1 222.8 330.4 216.5C336.7 210.2 344.5 206.9 353.7 206.5C362.9 206.9 370.7 210.2 377 216.5H377z"/></svg>
-                        
-                    </a>
-                </li>
+                
+                    
+                    
+                    <a href="/diary/">Diary</a>
+                
             
-                <li>
-                    <a 
-                        href='https://github.com/SymphonyW'
-                        target="_blank"
-                        title="GitHub"
-                        rel="me"
-                    >
-                        
-                        
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
-</svg>
-
-
-
-                        
-                    </a>
-                </li>
+                
+                    
+                    
+                    <a href="/stats/">Stats</a>
+                
             
-                <li>
-                    <a 
-                        href='https://twitter.com'
-                        target="_blank"
-                        title="Twitter"
-                        rel="me"
-                    >
-                        
-                        
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
-</svg>
-
-
-
-                        
-                    </a>
-                </li>
+                
             
-        </ol><ol class="menu" id="main-menu">
-        
-        
-        
-        <li >
-            <a href='/' >
                 
+                    
+                    
+                    <a href="/links/">Links</a>
                 
-                
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z"/>
-  <polyline points="5 12 3 12 12 3 21 12 19 12" />
-  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
-  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
-</svg>
-
-
-
-                
-                <span>Home</span>
-            </a>
-        </li>
-        
-        
-        <li  class='current' >
-            <a href='/post/' >
-                
-                
-                
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z"/>
-  <rect x="3" y="4" width="18" height="4" rx="2" />
-  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
-  <line x1="10" y1="12" x2="14" y2="12" />
-</svg>
-
-
-
-                
-                <span>Blog</span>
-            </a>
-        </li>
-        
-        
-        <li >
-            <a href='/archives/' >
-                
-                
-                
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z"/>
-  <rect x="3" y="4" width="18" height="4" rx="2" />
-  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
-  <line x1="10" y1="12" x2="14" y2="12" />
-</svg>
-
-
-
-                
-                <span>Archives</span>
-            </a>
-        </li>
-        
-        
-        <li >
-            <a href='/diary/' >
-                
-                
-                
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-event" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-  <path d="M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12z" />
-  <path d="M16 3v4" />
-  <path d="M8 3v4" />
-  <path d="M4 11h16" />
-  <path d="M8 15h2v2h-2z" />
-</svg>
-
-                
-                <span>Diary</span>
-            </a>
-        </li>
-        
-        
-        <li >
-            <a href='/stats/' >
-                
-                
-                
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chart-bar" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z"/>
-  <rect x="3" y="12" width="4" height="8" rx="1" />
-  <rect x="10" y="8" width="4" height="12" rx="1" />
-  <rect x="17" y="4" width="4" height="16" rx="1" />
-  <line x1="4" y1="20" x2="20" y2="20" />
-</svg>
-
-                
-                <span>Stats</span>
-            </a>
-        </li>
-        
-        
-        <li >
-            <a href='/search/' >
-                
-                
-                
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            
+        </nav>
+        <div class="header-tools">
+            
+                <a class="language-link" href="/zh-cn/p/rag-%E6%8A%80%E6%9C%AF%E5%85%A8%E6%99%AF%E8%AE%A9%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%BB%8E%E9%97%AD%E5%8D%B7%E8%80%83%E8%AF%95%E5%88%B0%E5%BC%80%E5%8D%B7%E8%80%83%E8%AF%95/" lang="zh-cn" hreflang="zh-cn" aria-label="切换到中文">中</a>
+            
+            <button type="button" id="dark-mode-toggle" class="icon-button theme-toggle" aria-label="Toggle color theme" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><path d="M12 4.5a7.5 7.5 0 0 1 0 15z" fill="currentColor" stroke="none"/></svg></button>
+            <a class="icon-button search-link" href="/search/" aria-label="Search articles"><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
   <path stroke="none" d="M0 0h24v24H0z"/>
   <circle cx="10" cy="10" r="7" />
   <line x1="21" y1="21" x2="15" y2="15" />
 </svg>
 
 
-
-                
-                <span>Search</span>
-            </a>
-        </li>
-        
-        
-        <li >
-            <a href='/links/' >
-                
-                
-                
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z"/>
-  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
-  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
-</svg>
-
-
-
-                
-                <span>Links</span>
-            </a>
-        </li>
-        
-        <li class="menu-bottom-section">
-            <ol class="menu">
-                    
-                        <li id="i18n-switch" class="language-switcher">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-  <path d="M4 5h7" />
-  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
-  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
-  <path d="M12 20l4 -9l4 9" />
-  <path d="M19.1 18h-6.2" />
-</svg>
-
-
-
-                            <div class="language-switcher__tabs" aria-label="Language">
-                                <a class="language-switcher__tab is-current"
-                                        href="/p/rag-fully-explainedfrom-closed-book-to-open-book-llms/"
-                                        aria-current="true">
-                                        English
-                                    </a>
-                                <a class="language-switcher__tab "
-                                        href="/zh-cn/p/rag-%E6%8A%80%E6%9C%AF%E5%85%A8%E6%99%AF%E8%AE%A9%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%BB%8E%E9%97%AD%E5%8D%B7%E8%80%83%E8%AF%95%E5%88%B0%E5%BC%80%E5%8D%B7%E8%80%83%E8%AF%95/"
-                                        >
-                                        中文
-                                    </a>
-                                
-                            </div>
-                        </li>
-                    
-                
-
-                
-                    <li id="dark-mode-toggle">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z"/>
-  <circle cx="8" cy="12" r="2" />
-  <rect x="2" y="6" width="20" height="12" rx="6" />
-</svg>
-
-
-
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z"/>
-  <circle cx="16" cy="12" r="2" />
-  <rect x="2" y="6" width="20" height="12" rx="6" />
-</svg>
-
-
-
-                        <span>Dark Mode</span>
-                    </li>
-                
-            </ol>
-        </li>
-    </ol>
-</aside>
-
-    <aside class="sidebar right-sidebar sticky">
-        
-            
-                
-    <section class="widget archives">
-        <div class="widget-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z"/>
-  <line x1="5" y1="9" x2="19" y2="9" />
-  <line x1="5" y1="15" x2="19" y2="15" />
-  <line x1="11" y1="4" x2="7" y2="20" />
-  <line x1="17" y1="4" x2="13" y2="20" />
-</svg>
-
-
-
+</a>
+            <button class="icon-button menu-toggle" type="button" aria-expanded="false" aria-controls="site-navigation" aria-label="Open navigation"><span></span><span></span></button>
         </div>
-        <h2 class="widget-title section-title">Table of contents</h2>
+    </div>
+    <div class="reading-progress" aria-hidden="true"></div>
+</header>
+
+    <main id="main-content" class="site-main main" tabindex="-1">
         
-        <div class="widget--toc">
-            <nav id="TableOfContents">
+    <div class="reading-page">
+        <article class="main-article has-toc">
+    <header class="article-header">
+    <div class="article-wayfinding">
+        
+            <a href="/post/"><span aria-hidden="true">←</span> All writing</a>
+        
+        <span class="article-kind">Notes & observations</span>
+    </div>
+    <div class="article-details">
+    
+    <h1 class="article-title">RAG Fully Explained:From &#34;Closed-Book&#34; to &#34;Open-Book&#34; LLMs</h1>
+    
+    <div class="article-meta">
+        
+            <time datetime="2026-07-08T15:00:00&#43;08:00">July 08, 2026</time>
+            <span class="meta-divider" aria-hidden="true">/</span>
+            <span>3 min read</span>
+        
+        
+            <div class="article-translations"><a href="/zh-cn/p/rag-%E6%8A%80%E6%9C%AF%E5%85%A8%E6%99%AF%E8%AE%A9%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%BB%8E%E9%97%AD%E5%8D%B7%E8%80%83%E8%AF%95%E5%88%B0%E5%BC%80%E5%8D%B7%E8%80%83%E8%AF%95/" hreflang="zh-cn" lang="zh-cn">阅读中文版 <span aria-hidden="true">↗</span></a></div>
+        
+    </div>
+</div>
+
+        <figure class="article-cover">
+            <img src="/p/rag-fully-explainedfrom-closed-book-to-open-book-llms/bg.png" width="952" height="626" alt="RAG Fully Explained:From &#34;Closed-Book&#34; to &#34;Open-Book&#34; LLMs" fetchpriority="high">
+            
+        </figure>
+    
+</header>
+
+    <div class="reading-layout">
+        
+            <aside class="reading-margin" aria-label="Article contents">
+                <details class="article-toc" open>
+                    <summary><span>On this page</span><span class="toc-indicator" aria-hidden="true">+</span></summary>
+                    <nav id="TableOfContents">
   <ol>
     <li><a href="#一先聊痛点大模型的幻觉从哪来">一、先聊痛点：大模型的&quot;幻觉&quot;从哪来？</a></li>
     <li><a href="#二rag-是什么核心思想一句话">二、RAG 是什么：核心思想一句话</a></li>
@@ -376,107 +161,11 @@
     <li><a href="#总结">总结</a></li>
   </ol>
 </nav>
-        </div>
-    </section>
-
-            
+                </details>
+            </aside>
         
-    </aside>
-
-
-            <main class="main full-width">
-    <article class="has-image main-article">
-    <header class="article-header">
-        <div class="article-image">
-            <a href="/p/rag-fully-explainedfrom-closed-book-to-open-book-llms/">
-                <img src="/p/rag-fully-explainedfrom-closed-book-to-open-book-llms/bg_hue42602111cbdf43a7b55d02fb6f689c9_36783_800x0_resize_box_3.png"
-                        srcset="/p/rag-fully-explainedfrom-closed-book-to-open-book-llms/bg_hue42602111cbdf43a7b55d02fb6f689c9_36783_800x0_resize_box_3.png 800w, /p/rag-fully-explainedfrom-closed-book-to-open-book-llms/bg_hue42602111cbdf43a7b55d02fb6f689c9_36783_1600x0_resize_box_3.png 1600w"
-                        width="800" 
-                        height="526" 
-                        loading="lazy"
-                        alt="Featured image of post RAG Fully Explained:From &#34;Closed-Book&#34; to &#34;Open-Book&#34; LLMs" />
-                
-            </a>
-        </div>
-    
-
-    <div class="article-details">
-    
-
-    <div class="article-title-wrapper">
-        <h2 class="article-title">
-            <a href="/p/rag-fully-explainedfrom-closed-book-to-open-book-llms/">RAG Fully Explained:From &#34;Closed-Book&#34; to &#34;Open-Book&#34; LLMs</a>
-        </h2>
-    
-        
-    </div>
-
-    
-    
-    
-    
-    <footer class="article-time">
-        
-            <div>
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z"/>
-  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
-  <circle cx="18" cy="18" r="4" />
-  <path d="M15 3v4" />
-  <path d="M7 3v4" />
-  <path d="M3 11h16" />
-  <path d="M18 16.496v1.504l1 1" />
-</svg>
-                <time class="article-time--published">2026-07-08 15:00</time>
-            </div>
-        
-
-        
-    </footer>
-    
-
-    
-        <footer class="article-translations">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-  <path d="M4 5h7" />
-  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
-  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
-  <path d="M12 20l4 -9l4 9" />
-  <path d="M19.1 18h-6.2" />
-</svg>
-
-
-
-            <div>
-                
-                    <a href="https://SymphonyW.github.io/zh-cn/p/rag-%E6%8A%80%E6%9C%AF%E5%85%A8%E6%99%AF%E8%AE%A9%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%BB%8E%E9%97%AD%E5%8D%B7%E8%80%83%E8%AF%95%E5%88%B0%E5%BC%80%E5%8D%B7%E8%80%83%E8%AF%95/" class="link">中文</a>
-                
-            </div>
-        </footer>
-    
-</div>
-
-</header>
-
-    
-    <section class="article-tags">
-        
-            <a href="/tags/rag/">RAG</a>
-        
-            <a href="/tags/llm/">LLM</a>
-        
-            <a href="/tags/ai/">AI</a>
-        
-            <a href="/tags/vector-database/">Vector Database</a>
-        
-    </section>
-
-
-    <section class="article-content">
-    
-    
-    <h1 id="rag-技术全景让大模型从闭卷考试到开卷考试">RAG 技术全景：让大模型从&quot;闭卷考试&quot;到&quot;开卷考试&quot;
+        <div class="reading-body">
+            <div class="article-content"><h1 id="rag-技术全景让大模型从闭卷考试到开卷考试">RAG 技术全景：让大模型从&quot;闭卷考试&quot;到&quot;开卷考试&quot;
 </h1><blockquote>
 <p>大模型很强，但它会&quot;一本正经地胡说八道&quot;。RAG（Retrieval-Augmented Generation，检索增强生成）给大模型外挂了一个&quot;知识库&quot;，让它从闭卷考试变成开卷考试，回答既准又能溯源。本文用 6 张图带你完整搞懂 RAG。</p>
 </blockquote>
@@ -493,20 +182,8 @@
 </ol>
 <p>要解决这些问题，传统思路是<strong>微调（Fine-tuning）</strong>——用领域数据重新训练模型。但微调又贵又慢，而且知识一更新就得再来一遍。</p>
 <p>RAG 给了另一条路：<strong>不重新训练模型，而是给它外挂一个可随时更新的知识库，回答时先去知识库里检索，再基于检索到的内容作答。</strong></p>
-<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
-    
-    <a href="llm-vs-rag.svg" 
-        
-       target="_blank" 
-       class="gallery-item"> <img src="llm-vs-rag.svg" 
-             alt="原生 LLM vs RAG：闭卷考试 vs 开卷考试" 
-             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-             
-    </a>
-    
-        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">原生 LLM vs RAG：闭卷考试 vs 开卷考试</span>
-    
-</div></p>
+<p><a href="/p/rag-fully-explainedfrom-closed-book-to-open-book-llms/llm-vs-rag.svg" target="_blank" rel="noopener noreferrer"><img src="/p/rag-fully-explainedfrom-closed-book-to-open-book-llms/llm-vs-rag.svg" alt="原生 LLM vs RAG：闭卷考试 vs 开卷考试" loading="lazy" decoding="async"></a>
+</p>
 <p>就像考试一样：原生 LLM 是闭卷考试，全凭记忆，记不清就编；RAG 是开卷考试，遇到不会的可以翻书，答案有据可循。</p>
 <hr>
 <h2 id="二rag-是什么核心思想一句话">二、RAG 是什么：核心思想一句话
@@ -518,20 +195,8 @@
 <p>它和微调的根本区别在于：微调把知识&quot;烧进&quot;模型权重里，RAG 把知识放在模型之外的数据库里，用的时候现查。这也决定了两者的适用边界——后面会详细对比。</p>
 <hr>
 <h2 id="三rag-工作流程三阶段详解">三、RAG 工作流程：三阶段详解
-</h2><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
-    
-    <a href="rag-overview.svg" 
-        
-       target="_blank" 
-       class="gallery-item"> <img src="rag-overview.svg" 
-             alt="RAG 工作流程：检索 → 增强 → 生成" 
-             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-             
-    </a>
-    
-        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">RAG 工作流程：检索 → 增强 → 生成</span>
-    
-</div></p>
+</h2><p><a href="/p/rag-fully-explainedfrom-closed-book-to-open-book-llms/rag-overview.svg" target="_blank" rel="noopener noreferrer"><img src="/p/rag-fully-explainedfrom-closed-book-to-open-book-llms/rag-overview.svg" alt="RAG 工作流程：检索 → 增强 → 生成" loading="lazy" decoding="async"></a>
+</p>
 <p>RAG 的完整流程可以拆成<strong>离线建库</strong>和<strong>在线问答</strong>两大阶段。在线问答又分为检索、增强、生成三步。</p>
 <h3 id="31-离线阶段把文档变成可检索的向量库">3.1 离线阶段：把文档变成可检索的向量库
 </h3><p>这一步是&quot;建图书馆&quot;的过程，通常一次性完成，知识更新时增量重建：</p>
@@ -586,20 +251,8 @@
 </ul>
 <hr>
 <h2 id="四完整架构图">四、完整架构图
-</h2><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
-    
-    <a href="rag-architecture.svg" 
-        
-       target="_blank" 
-       class="gallery-item"> <img src="rag-architecture.svg" 
-             alt="RAG 完整架构：离线建库 &#43; 在线问答" 
-             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-             
-    </a>
-    
-        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">RAG 完整架构：离线建库 &#43; 在线问答</span>
-    
-</div></p>
+</h2><p><a href="/p/rag-fully-explainedfrom-closed-book-to-open-book-llms/rag-architecture.svg" target="_blank" rel="noopener noreferrer"><img src="/p/rag-fully-explainedfrom-closed-book-to-open-book-llms/rag-architecture.svg" alt="RAG 完整架构：离线建库 &#43; 在线问答" loading="lazy" decoding="async"></a>
+</p>
 <p>这张图把离线和在线两条流水线放在了一起。注意几个关键点：</p>
 <ul>
 <li><strong>Embedding 模型必须一致</strong>：离线建库用哪个模型，在线检索时也要用同一个，否则向量空间不兼容</li>
@@ -609,7 +262,7 @@
 <hr>
 <h2 id="五核心组件选型">五、核心组件选型
 </h2><p>RAG 系统由四个核心组件构成，选型直接影响效果：</p>
-<div class="table-wrapper"><table>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
 <thead>
 <tr>
 <th>组件</th>
@@ -649,20 +302,8 @@
 <hr>
 <h2 id="六进阶技术从能用到好用">六、进阶技术：从&quot;能用&quot;到&quot;好用&quot;
 </h2><p>朴素 RAG（一次向量检索 + 拼 Prompt）能跑通，但效果往往一般。真正生产级的 RAG 通常会在四个方向上做增强：</p>
-<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
-    
-    <a href="advanced-rag.svg" 
-        
-       target="_blank" 
-       class="gallery-item"> <img src="advanced-rag.svg" 
-             alt="RAG 进阶技术矩阵" 
-             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-             
-    </a>
-    
-        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">RAG 进阶技术矩阵</span>
-    
-</div></p>
+<p><a href="/p/rag-fully-explainedfrom-closed-book-to-open-book-llms/advanced-rag.svg" target="_blank" rel="noopener noreferrer"><img src="/p/rag-fully-explainedfrom-closed-book-to-open-book-llms/advanced-rag.svg" alt="RAG 进阶技术矩阵" loading="lazy" decoding="async"></a>
+</p>
 <h3 id="61-query-改写让问题更适合检索">6.1 Query 改写（让问题更适合检索）
 </h3><p>用户的问题往往是口语化、模糊的，直接拿去检索效果差。常见技巧：</p>
 <ul>
@@ -672,20 +313,8 @@
 <li><strong>Step-back Prompting</strong>：先抽象出上位概念再检索，比如&quot;2024 年诺贝尔物理学奖得主&quot;先退到&quot;诺贝尔物理学奖近年得主&quot;</li>
 </ul>
 <h3 id="62-混合检索--rerank多路召回精排提纯">6.2 混合检索 + Rerank（多路召回，精排提纯）
-</h3><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
-    
-    <a href="retrieval-detail.svg" 
-        
-       target="_blank" 
-       class="gallery-item"> <img src="retrieval-detail.svg" 
-             alt="混合检索 &#43; 重排：提升召回质量" 
-             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-             
-    </a>
-    
-        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">混合检索 &#43; 重排：提升召回质量</span>
-    
-</div></p>
+</h3><p><a href="/p/rag-fully-explainedfrom-closed-book-to-open-book-llms/retrieval-detail.svg" target="_blank" rel="noopener noreferrer"><img src="/p/rag-fully-explainedfrom-closed-book-to-open-book-llms/retrieval-detail.svg" alt="混合检索 &#43; 重排：提升召回质量" loading="lazy" decoding="async"></a>
+</p>
 <p>单靠向量检索有个问题：它擅长语义匹配，但对<strong>专有名词、产品型号、人名</strong>这种精确字面匹配反而不如传统检索。所以生产系统通常用<strong>混合检索</strong>：</p>
 <ul>
 <li><strong>向量检索</strong>（语义）+ <strong>BM25 关键词检索</strong>（字面）并行召回</li>
@@ -714,20 +343,8 @@
 <p>好处是省 token、降延迟，坏处是需要训练模型学会这些判断（或用 prompt 模拟），实现复杂度高。</p>
 <hr>
 <h2 id="七方案对比rag-vs-微调-vs-长上下文">七、方案对比：RAG vs 微调 vs 长上下文
-</h2><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
-    
-    <a href="solution-comparison.svg" 
-        
-       target="_blank" 
-       class="gallery-item"> <img src="solution-comparison.svg" 
-             alt="四种知识注入方案横向对比" 
-             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-             
-    </a>
-    
-        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">四种知识注入方案横向对比</span>
-    
-</div></p>
+</h2><p><a href="/p/rag-fully-explainedfrom-closed-book-to-open-book-llms/solution-comparison.svg" target="_blank" rel="noopener noreferrer"><img src="/p/rag-fully-explainedfrom-closed-book-to-open-book-llms/solution-comparison.svg" alt="四种知识注入方案横向对比" loading="lazy" decoding="async"></a>
+</p>
 <p>随着模型上下文窗口越来越长（Claude 200K、Gemini 1M、GPT-4o 128K），有人质疑 RAG 是不是过时了——直接把所有文档塞进上下文不就行了？</p>
 <p>实际并非如此，三者各有定位：</p>
 <ul>
@@ -832,7 +449,7 @@
 <hr>
 <h2 id="九常见挑战与优化方向">九、常见挑战与优化方向
 </h2><p>实际落地 RAG，踩坑往往不在模型，而在检索。下面是常见问题对应的优化手段：</p>
-<div class="table-wrapper"><table>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
 <thead>
 <tr>
 <th>症状</th>
@@ -903,153 +520,40 @@
 <p>随着模型上下文窗口变长、多模态能力增强，RAG 的形态还在演进（比如多模态 RAG、Agentic RAG），但&quot;外挂知识库&quot;这个核心思想短期内不会过时——毕竟，开卷考试永远比背书更可靠。</p>
 <p>如果你对其中某个环节（比如向量数据库选型、Embedding 微调、GraphRAG 实现）想深入，欢迎在评论区交流。</p>
 
-</section>
+</div>
 
-
-    <footer class="article-footer">
+            <footer class="article-footer">
     
-    <section class="article-tags">
-        
-            <a href="/tags/rag/">RAG</a>
-        
-            <a href="/tags/llm/">LLM</a>
-        
-            <a href="/tags/ai/">AI</a>
-        
-            <a href="/tags/vector-database/">Vector Database</a>
-        
-    </section>
+        <div class="article-tags" aria-label="Article tags"><span class="article-footer-label">Filed under</span><a href="/tags/rag/">RAG</a><a href="/tags/llm/">LLM</a><a href="/tags/ai/">AI</a><a href="/tags/vector-database/">Vector Database</a></div>
+    
+    
+    
+    <div class="article-endnote"><span>Thanks for reading.</span><a href="#top">Back to top <span aria-hidden="true">↑</span></a></div>
+</footer>
 
-
-    </footer>
-
-
+        </div>
+    </div>
     
 </article>
 
-    
-
-    
-
-<aside class="related-content--wrapper">
-    <h2 class="section-title">Related content</h2>
-    <div class="related-content">
-        <div class="flex article-list--tile">
+        <div class="reading-afterword">
             
-                
-<article class="has-image">
-    <a href="/p/classic-interview-questionhow-exactly-should-you-set-rag-retrieval-top-k/">
-        
-        
-            <div class="article-image">
-                <img src="/p/classic-interview-questionhow-exactly-should-you-set-rag-retrieval-top-k/bg.ba0e4d5311424eaae4d946105e223381_huf0a9a86dfd251dead7c2b6a80382f7be_722874_250x150_fill_box_smart1_3.png" 
-                        width="250" 
-                        height="150" 
-                        loading="lazy"
-                        alt="Featured image of post Classic interview question:How exactly should you set RAG retrieval top-k?"
-                        
-                        data-hash="md5-ug5NUxFCTqrk2UYQXiIzgQ==">
-                
-            </div>
-        
-
-        <div class="article-details">
-            <h2 class="article-title">Classic interview question:How exactly should you set RAG retrieval top-k?</h2>
-        </div>
-    </a>
-</article>
-
             
-                
-<article class="has-image">
-    <a href="/p/token-counting-in-ai/">
+    <aside class="reading-related">
+        <div class="reading-section-heading"><span class="article-footer-label">Keep reading</span><span aria-hidden="true">↘</span></div>
         
+            <a class="reading-related-link" href="/p/classic-interview-questionhow-exactly-should-you-set-rag-retrieval-top-k/"><span class="related-number">01</span><span class="related-title">Classic interview question:How exactly should you set RAG retrieval top-k?</span><time datetime="2026-07-08">2026.07.08</time><span class="related-arrow" aria-hidden="true">↗</span></a>
         
-            <div class="article-image">
-                
-                    <img src="/p/token-counting-in-ai/bg.svg" loading="lazy" data-key="token-counting-in-ai" data-hash="/p/token-counting-in-ai/bg.svg"/>
-                
-            </div>
+            <a class="reading-related-link" href="/p/token-counting-in-ai/"><span class="related-number">02</span><span class="related-title">How Token Counting Works: How AI Providers and API Proxies Track Usage</span><time datetime="2026-09-04">2026.09.04</time><span class="related-arrow" aria-hidden="true">↗</span></a>
         
+            <a class="reading-related-link" href="/p/vector-databases-vs.-traditional-databases/"><span class="related-number">03</span><span class="related-title">Vector Databases vs. Traditional Databases</span><time datetime="2026-07-13">2026.07.13</time><span class="related-arrow" aria-hidden="true">↗</span></a>
+        
+    </aside>
 
-        <div class="article-details">
-            <h2 class="article-title">How Token Counting Works: How AI Providers and API Proxies Track Usage</h2>
-        </div>
-    </a>
-</article>
-
-            
-                
-<article class="has-image">
-    <a href="/p/vector-databases-vs.-traditional-databases/">
-        
-        
-            <div class="article-image">
-                <img src="/p/vector-databases-vs.-traditional-databases/bg.90457eacaa648546d3ff3875faa1a9cd_hu040920c01aa01bd4e2daf37dcdbf48b8_1226831_250x150_fill_box_smart1_3.png" 
-                        width="250" 
-                        height="150" 
-                        loading="lazy"
-                        alt="Featured image of post Vector Databases vs. Traditional Databases"
-                        
-                        data-hash="md5-kEV&#43;rKpkhUbT/zh1&#43;qGpzQ==">
-                
-            </div>
-        
-
-        <div class="article-details">
-            <h2 class="article-title">Vector Databases vs. Traditional Databases</h2>
-        </div>
-    </a>
-</article>
-
-            
-                
-<article class="has-image">
-    <a href="/p/about-the-timing-of-fine-tuning/">
-        
-        
-            <div class="article-image">
-                <img src="/p/about-the-timing-of-fine-tuning/bg.48afc902de8c5e34722b7464827942ec_hu9eaef27a7b96b0e72ec0e87a62ab9db9_1653935_250x150_fill_box_smart1_3.png" 
-                        width="250" 
-                        height="150" 
-                        loading="lazy"
-                        alt="Featured image of post About the timing of fine-tuning"
-                        
-                        data-hash="md5-SK/JAt6MXjRyK3RkgnlC7A==">
-                
-            </div>
-        
-
-        <div class="article-details">
-            <h2 class="article-title">About the timing of fine-tuning</h2>
-        </div>
-    </a>
-</article>
 
             
         </div>
     </div>
-</aside>
-
-     
-    
-        
-    
-
-    <footer class="site-footer">
-    <section class="copyright">
-        &copy; 
-        
-        2026 SymphonyW
-    </section>
-    
-    <section class="powerby">
-        Built with <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> <br />
-        Theme <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.26.0">Stack</a></b> designed by <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a>
-    </section>
-</footer>
-
-
     
 <div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
 
@@ -1128,24 +632,22 @@
                 href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
             >
 
-            </main>
-        </div>
-        <script 
-                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
-                
-                >
-            </script><script type="text/javascript" src="/ts/main.js" defer></script><script type="text/javascript" src="/ts/custom.js" defer></script>
-<script>
-    (function () {
-        const customFont = document.createElement('link');
-        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+    </main>
+    
+<footer class="site-footer">
+    <div class="footer-top"><a class="footer-wordmark" href="/">Symphony<span>W</span></a><p>A place to think. A space to grow.</p><a href="#main-content" class="back-top">Back to top <span aria-hidden="true">↑</span></a></div>
+    <div class="footer-bottom"><span>© 2026 SymphonyW</span><nav aria-label="More links"><a href="/about/">About</a><a href="https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0" target="_blank" rel="noopener noreferrer me">Bilibili <span aria-hidden="true">↗</span></a><a href="https://github.com/SymphonyW" target="_blank" rel="noopener noreferrer me">GitHub <span aria-hidden="true">↗</span></a><a href="https://twitter.com" target="_blank" rel="noopener noreferrer me">Twitter <span aria-hidden="true">↗</span></a><a href="/index.xml">RSS ↗</a></nav><span class="footer-colophon">Built with Hugo · Always in progress</span></div>
+</footer>
 
-        customFont.type = "text/css";
-        customFont.rel = "stylesheet";
+    
 
-        document.head.appendChild(customFont);
-    }());
-</script>
+<script src="/ts/main.fafdc6fc356f126445b18bf98e9ce585b8429805280aaa2ec379851ce1af6525.js" defer></script>
+
+<script src="/ts/custom.5dc5916b044c5b2b094b202e6f4b4887b36dddcd5d501ad37e26108b2163d8d9.js" defer></script>
+
+
+
+
 
 <script>
 window.MathJax = {
@@ -1159,6 +661,7 @@ window.MathJax = {
   }
 };
 </script>
-<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-    </body>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
+
+</body>
 </html>

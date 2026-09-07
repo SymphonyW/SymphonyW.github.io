@@ -1,12 +1,21 @@
 <!DOCTYPE html>
 <html lang="zh-cn" dir="ltr">
-    <head><meta charset='utf-8'>
+<head>
+    <meta charset='utf-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="net 包是 Go 语言标准库中网络编程的核心基石，它提供了跨平台的网络 I/O 抽象，支持 TCP/IP、UDP、域名解析、Unix 域套接字等几乎所有主流网络协议。无论是构建简单的客户端 / 服务端，还是开发复杂的分布式系统，net 包都是最底层的支撑工具。 本文档将从基础到高级，全面解析 net 包的核心功能，针对常用功能进行详细展开，并提供可直接运行的实战代码示例。 1. 包概述 net 包的设计理念是统一接口，分层抽象： 高层接口：Dial、Listen、Accept 等通用函数，屏蔽底层协议差异 中层接口：Conn、Listener、PacketConn 等接口，定义通用的读写、监听行为 底层实现：针对 TCP、UDP、IP、Unix 等不同协议的具体实现，提供协议特有的配置能力 大多数场景下，开发者只需要使用高层接口即可完成开发；而在需要精细控制网络行为的场景下，可以深入到底层实现进行调优。 2. 核心基础类型 网络编程的第一步是处理地址，net 包提供了多种地址类型来适配不同的协议。 2.1 IP 地址（IP 类型） IP 类型是一个字节切片，用于表示 IPv4 或 IPv6 地址，它提供了一系列方法来判断地址的属性。 1 type IP []byte 核心方法与示例 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 package main import ( &#34;fmt&#34; &#34;net&#34; ) func main() { // 1.">
 <title>关于 Go 标准库 net 包和 TChannel 包的深入解析</title>
 
 <link rel='canonical' href='https://SymphonyW.github.io/zh-cn/p/%E5%85%B3%E4%BA%8E-go-%E6%A0%87%E5%87%86%E5%BA%93-net-%E5%8C%85%E5%92%8C-tchannel-%E5%8C%85%E7%9A%84%E6%B7%B1%E5%85%A5%E8%A7%A3%E6%9E%90/'>
+<link rel="stylesheet" href="/scss/custom.min.2089e3e36594bc8705485d3fd8080ca77e480c60ce355a4a3eb92dbda6f784cc.css">
+<script>
+(() => {
+    let preference = 'auto';
+    try { preference = localStorage.getItem('StackColorScheme') || preference; } catch (_) {}
+    document.documentElement.dataset.scheme = preference === 'dark' || (preference === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+})();
+</script>
 
-<link rel="stylesheet" href="/scss/style.min.4687047a1903756c84bf7a1cf7cbbf4e26bef4a42dd5bc620df47badaeed46c2.css"><meta property='og:title' content="关于 Go 标准库 net 包和 TChannel 包的深入解析">
+<meta property='og:title' content="关于 Go 标准库 net 包和 TChannel 包的深入解析">
 <meta property='og:description' content="net 包是 Go 语言标准库中网络编程的核心基石，它提供了跨平台的网络 I/O 抽象，支持 TCP/IP、UDP、域名解析、Unix 域套接字等几乎所有主流网络协议。无论是构建简单的客户端 / 服务端，还是开发复杂的分布式系统，net 包都是最底层的支撑工具。 本文档将从基础到高级，全面解析 net 包的核心功能，针对常用功能进行详细展开，并提供可直接运行的实战代码示例。 1. 包概述 net 包的设计理念是统一接口，分层抽象： 高层接口：Dial、Listen、Accept 等通用函数，屏蔽底层协议差异 中层接口：Conn、Listener、PacketConn 等接口，定义通用的读写、监听行为 底层实现：针对 TCP、UDP、IP、Unix 等不同协议的具体实现，提供协议特有的配置能力 大多数场景下，开发者只需要使用高层接口即可完成开发；而在需要精细控制网络行为的场景下，可以深入到底层实现进行调优。 2. 核心基础类型 网络编程的第一步是处理地址，net 包提供了多种地址类型来适配不同的协议。 2.1 IP 地址（IP 类型） IP 类型是一个字节切片，用于表示 IPv4 或 IPv6 地址，它提供了一系列方法来判断地址的属性。 1 type IP []byte 核心方法与示例 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 package main import ( &#34;fmt&#34; &#34;net&#34; ) func main() { // 1.">
 <meta property='og:url' content='https://SymphonyW.github.io/zh-cn/p/%E5%85%B3%E4%BA%8E-go-%E6%A0%87%E5%87%86%E5%BA%93-net-%E5%8C%85%E5%92%8C-tchannel-%E5%8C%85%E7%9A%84%E6%B7%B1%E5%85%A5%E8%A7%A3%E6%9E%90/'>
 <meta property='og:site_name' content='SymphonyW'>
@@ -16,340 +25,116 @@
     <meta name="twitter:image" content='https://SymphonyW.github.io/zh-cn/p/%E5%85%B3%E4%BA%8E-go-%E6%A0%87%E5%87%86%E5%BA%93-net-%E5%8C%85%E5%92%8C-tchannel-%E5%8C%85%E7%9A%84%E6%B7%B1%E5%85%A5%E8%A7%A3%E6%9E%90/bg.png' />
     <link rel="shortcut icon" href="/favicon.ico" />
 
-    </head>
-    <body class="
-    article-page
-    ">
-    <script>
-        (function() {
-            const colorSchemeKey = 'StackColorScheme';
-            if(!localStorage.getItem(colorSchemeKey)){
-                localStorage.setItem(colorSchemeKey, "auto");
-            }
-        })();
-    </script><script>
-    (function() {
-        const colorSchemeKey = 'StackColorScheme';
-        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
-        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
-
-        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+    
+    <noscript><style>@media(max-width:760px){.site-header{position:static}.site-header__inner{height:auto;min-height:66px;flex-wrap:wrap}.site-nav{position:static;display:grid;order:3;flex-basis:100%;padding:8px 0 18px}.menu-toggle,.theme-toggle{display:none}}</style></noscript>
+</head>
+<body id="top" class="article-page">
+    <a class="skip-link" href="#main-content">跳至正文</a>
+    
+<header class="site-header">
+    <div class="site-header__inner">
+        <a class="site-brand" href="/zh-cn/" aria-label="SymphonyW — 主页">S<span>w.</span></a>
+        <nav class="site-nav" id="site-navigation" aria-label="主导航">
             
-
-            document.documentElement.dataset.scheme = 'dark';
-        } else {
-            document.documentElement.dataset.scheme = 'light';
-        }
-    })();
-</script>
-<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
-    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
-        <span class="hamburger-box">
-            <span class="hamburger-inner"></span>
-        </span>
-    </button>
-
-    <header>
-        
             
-            <figure class="site-avatar">
-                <a href="/zh-cn/">
                 
                     
                     
+                    <a href="/zh-cn/">主页</a>
+                
+            
+                
                     
-                        
-                        <img src="/img/avatar_hu5ea07d2842502bdd7540f9cbc4b41b95_5278_300x0_resize_box_3.png" width="300"
-                            height="300" class="site-logo" loading="lazy" alt="Avatar">
                     
+                    <a href="/zh-cn/post/" aria-current="page">博客</a>
                 
-                </a>
-                
-                    <span class="emoji">😁</span>
-                
-            </figure>
             
-        
-        
-        <div class="site-meta">
-            <h1 class="site-name"><a href="/zh-cn">SymphonyW</a></h1>
-            <h2 class="site-description">Welcome to my Blog.</h2>
-        </div>
-    </header><ol class="menu-social">
+                
+                    
+                    
+                    <a href="/zh-cn/archives/">归档</a>
+                
             
-                <li>
-                    <a 
-                        href='https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0'
-                        target="_blank"
-                        title="Bilibili"
-                        rel="me"
-                    >
-                        
-                        
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.0.0-beta2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M488.6 104.1C505.3 122.2 513 143.8 511.9 169.8V372.2C511.5 398.6 502.7 420.3 485.4 437.3C468.2 454.3 446.3 463.2 419.9 464H92.02C65.57 463.2 43.81 454.2 26.74 436.8C9.682 419.4 .7667 396.5 0 368.2V169.8C.7667 143.8 9.682 122.2 26.74 104.1C43.81 87.75 65.57 78.77 92.02 78H121.4L96.05 52.19C90.3 46.46 87.42 39.19 87.42 30.4C87.42 21.6 90.3 14.34 96.05 8.603C101.8 2.868 109.1 0 117.9 0C126.7 0 134 2.868 139.8 8.603L213.1 78H301.1L375.6 8.603C381.7 2.868 389.2 0 398 0C406.8 0 414.1 2.868 419.9 8.603C425.6 14.34 428.5 21.6 428.5 30.4C428.5 39.19 425.6 46.46 419.9 52.19L394.6 78L423.9 78C450.3 78.77 471.9 87.75 488.6 104.1H488.6zM449.8 173.8C449.4 164.2 446.1 156.4 439.1 150.3C433.9 144.2 425.1 140.9 416.4 140.5H96.05C86.46 140.9 78.6 144.2 72.47 150.3C66.33 156.4 63.07 164.2 62.69 173.8V368.2C62.69 377.4 65.95 385.2 72.47 391.7C78.99 398.2 86.85 401.5 96.05 401.5H416.4C425.6 401.5 433.4 398.2 439.7 391.7C446 385.2 449.4 377.4 449.8 368.2L449.8 173.8zM185.5 216.5C191.8 222.8 195.2 230.6 195.6 239.7V273C195.2 282.2 191.9 289.9 185.8 296.2C179.6 302.5 171.8 305.7 162.2 305.7C152.6 305.7 144.7 302.5 138.6 296.2C132.5 289.9 129.2 282.2 128.8 273V239.7C129.2 230.6 132.6 222.8 138.9 216.5C145.2 210.2 152.1 206.9 162.2 206.5C171.4 206.9 179.2 210.2 185.5 216.5H185.5zM377 216.5C383.3 222.8 386.7 230.6 387.1 239.7V273C386.7 282.2 383.4 289.9 377.3 296.2C371.2 302.5 363.3 305.7 353.7 305.7C344.1 305.7 336.3 302.5 330.1 296.2C323.1 289.9 320.7 282.2 320.4 273V239.7C320.7 230.6 324.1 222.8 330.4 216.5C336.7 210.2 344.5 206.9 353.7 206.5C362.9 206.9 370.7 210.2 377 216.5H377z"/></svg>
-                        
-                    </a>
-                </li>
+                
+                    
+                    
+                    <a href="/zh-cn/stats/">写作记录</a>
+                
             
-                <li>
-                    <a 
-                        href='https://github.com/SymphonyW'
-                        target="_blank"
-                        title="GitHub"
-                        rel="me"
-                    >
-                        
-                        
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
-</svg>
-
-
-
-                        
-                    </a>
-                </li>
+                
+                    
+                    
+                    <a href="/zh-cn/diary/">日记</a>
+                
             
-                <li>
-                    <a 
-                        href='https://twitter.com'
-                        target="_blank"
-                        title="Twitter"
-                        rel="me"
-                    >
-                        
-                        
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
-</svg>
-
-
-
-                        
-                    </a>
-                </li>
+                
             
-        </ol><ol class="menu" id="main-menu">
-        
-        
-        
-        <li >
-            <a href='/zh-cn/' >
                 
+                    
+                    
+                    <a href="/zh-cn/links/">链接</a>
                 
-                
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z"/>
-  <polyline points="5 12 3 12 12 3 21 12 19 12" />
-  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
-  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
-</svg>
-
-
-
-                
-                <span>主页</span>
-            </a>
-        </li>
-        
-        
-        <li  class='current' >
-            <a href='/zh-cn/post/' >
-                
-                
-                
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z"/>
-  <rect x="3" y="4" width="18" height="4" rx="2" />
-  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
-  <line x1="10" y1="12" x2="14" y2="12" />
-</svg>
-
-
-
-                
-                <span>博客</span>
-            </a>
-        </li>
-        
-        
-        <li >
-            <a href='/zh-cn/archives/' >
-                
-                
-                
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z"/>
-  <rect x="3" y="4" width="18" height="4" rx="2" />
-  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
-  <line x1="10" y1="12" x2="14" y2="12" />
-</svg>
-
-
-
-                
-                <span>归档</span>
-            </a>
-        </li>
-        
-        
-        <li >
-            <a href='/zh-cn/stats/' >
-                
-                
-                
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chart-bar" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z"/>
-  <rect x="3" y="12" width="4" height="8" rx="1" />
-  <rect x="10" y="8" width="4" height="12" rx="1" />
-  <rect x="17" y="4" width="4" height="16" rx="1" />
-  <line x1="4" y1="20" x2="20" y2="20" />
-</svg>
-
-                
-                <span>写作记录</span>
-            </a>
-        </li>
-        
-        
-        <li >
-            <a href='/zh-cn/diary/' >
-                
-                
-                
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-event" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-  <path d="M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12z" />
-  <path d="M16 3v4" />
-  <path d="M8 3v4" />
-  <path d="M4 11h16" />
-  <path d="M8 15h2v2h-2z" />
-</svg>
-
-                
-                <span>日记</span>
-            </a>
-        </li>
-        
-        
-        <li >
-            <a href='/zh-cn/search/' >
-                
-                
-                
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            
+        </nav>
+        <div class="header-tools">
+            
+                <a class="language-link" href="/p/a-deep-dive-into-gos-standard-library-net-package-and-tchannel-package/" lang="en" hreflang="en" aria-label="Switch to English">EN</a>
+            
+            <button type="button" id="dark-mode-toggle" class="icon-button theme-toggle" aria-label="切换明暗主题" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><path d="M12 4.5a7.5 7.5 0 0 1 0 15z" fill="currentColor" stroke="none"/></svg></button>
+            <a class="icon-button search-link" href="/zh-cn/search/" aria-label="搜索文章"><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
   <path stroke="none" d="M0 0h24v24H0z"/>
   <circle cx="10" cy="10" r="7" />
   <line x1="21" y1="21" x2="15" y2="15" />
 </svg>
 
 
-
-                
-                <span>搜索</span>
-            </a>
-        </li>
-        
-        
-        <li >
-            <a href='/zh-cn/links/' >
-                
-                
-                
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z"/>
-  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
-  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
-</svg>
-
-
-
-                
-                <span>链接</span>
-            </a>
-        </li>
-        
-        <li class="menu-bottom-section">
-            <ol class="menu">
-                    
-                        <li id="i18n-switch" class="language-switcher">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-  <path d="M4 5h7" />
-  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
-  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
-  <path d="M12 20l4 -9l4 9" />
-  <path d="M19.1 18h-6.2" />
-</svg>
-
-
-
-                            <div class="language-switcher__tabs" aria-label="Language">
-                                <a class="language-switcher__tab "
-                                        href="/p/a-deep-dive-into-gos-standard-library-net-package-and-tchannel-package/"
-                                        >
-                                        English
-                                    </a>
-                                <a class="language-switcher__tab is-current"
-                                        href="/zh-cn/p/%E5%85%B3%E4%BA%8E-go-%E6%A0%87%E5%87%86%E5%BA%93-net-%E5%8C%85%E5%92%8C-tchannel-%E5%8C%85%E7%9A%84%E6%B7%B1%E5%85%A5%E8%A7%A3%E6%9E%90/"
-                                        aria-current="true">
-                                        中文
-                                    </a>
-                                
-                            </div>
-                        </li>
-                    
-                
-
-                
-                    <li id="dark-mode-toggle">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z"/>
-  <circle cx="8" cy="12" r="2" />
-  <rect x="2" y="6" width="20" height="12" rx="6" />
-</svg>
-
-
-
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z"/>
-  <circle cx="16" cy="12" r="2" />
-  <rect x="2" y="6" width="20" height="12" rx="6" />
-</svg>
-
-
-
-                        <span>暗色模式</span>
-                    </li>
-                
-            </ol>
-        </li>
-    </ol>
-</aside>
-
-    <aside class="sidebar right-sidebar sticky">
-        
-            
-                
-    <section class="widget archives">
-        <div class="widget-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z"/>
-  <line x1="5" y1="9" x2="19" y2="9" />
-  <line x1="5" y1="15" x2="19" y2="15" />
-  <line x1="11" y1="4" x2="7" y2="20" />
-  <line x1="17" y1="4" x2="13" y2="20" />
-</svg>
-
-
-
+</a>
+            <button class="icon-button menu-toggle" type="button" aria-expanded="false" aria-controls="site-navigation" aria-label="展开导航"><span></span><span></span></button>
         </div>
-        <h2 class="widget-title section-title">目录</h2>
+    </div>
+    <div class="reading-progress" aria-hidden="true"></div>
+</header>
+
+    <main id="main-content" class="site-main main" tabindex="-1">
         
-        <div class="widget--toc">
-            <nav id="TableOfContents">
+    <div class="reading-page">
+        <article class="main-article has-toc">
+    <header class="article-header">
+    <div class="article-wayfinding">
+        
+            <a href="/zh-cn/post/"><span aria-hidden="true">←</span> 全部文章</a>
+        
+        <span class="article-kind">笔记与思考</span>
+    </div>
+    <div class="article-details">
+    
+    <h1 class="article-title">关于 Go 标准库 net 包和 TChannel 包的深入解析</h1>
+    
+    <div class="article-meta">
+        
+            <time datetime="2026-04-09T11:26:03&#43;08:00">2026 年 04 月 09 日</time>
+            <span class="meta-divider" aria-hidden="true">/</span>
+            <span>约 16 分钟</span>
+        
+        
+            <div class="article-translations"><a href="/p/a-deep-dive-into-gos-standard-library-net-package-and-tchannel-package/" hreflang="en" lang="en">Read in English <span aria-hidden="true">↗</span></a></div>
+        
+    </div>
+</div>
+
+        <figure class="article-cover">
+            <img src="/zh-cn/p/%E5%85%B3%E4%BA%8E-go-%E6%A0%87%E5%87%86%E5%BA%93-net-%E5%8C%85%E5%92%8C-tchannel-%E5%8C%85%E7%9A%84%E6%B7%B1%E5%85%A5%E8%A7%A3%E6%9E%90/bg.png" width="665" height="375" alt="关于 Go 标准库 net 包和 TChannel 包的深入解析" fetchpriority="high">
+            
+        </figure>
+    
+</header>
+
+    <div class="reading-layout">
+        
+            <aside class="reading-margin" aria-label="文章目录">
+                <details class="article-toc" open>
+                    <summary><span>本文目录</span><span class="toc-indicator" aria-hidden="true">+</span></summary>
+                    <nav id="TableOfContents">
   <ol>
     <li><a href="#1-包概述">1. 包概述</a></li>
     <li><a href="#2-核心基础类型">2. 核心基础类型</a>
@@ -437,105 +222,11 @@
     <li><a href="#12-避坑指南">12. 避坑指南</a></li>
   </ol>
 </nav>
-        </div>
-    </section>
-
-            
+                </details>
+            </aside>
         
-    </aside>
-
-
-            <main class="main full-width">
-    <article class="has-image main-article">
-    <header class="article-header">
-        <div class="article-image">
-            <a href="/zh-cn/p/%E5%85%B3%E4%BA%8E-go-%E6%A0%87%E5%87%86%E5%BA%93-net-%E5%8C%85%E5%92%8C-tchannel-%E5%8C%85%E7%9A%84%E6%B7%B1%E5%85%A5%E8%A7%A3%E6%9E%90/">
-                <img src="/zh-cn/p/%E5%85%B3%E4%BA%8E-go-%E6%A0%87%E5%87%86%E5%BA%93-net-%E5%8C%85%E5%92%8C-tchannel-%E5%8C%85%E7%9A%84%E6%B7%B1%E5%85%A5%E8%A7%A3%E6%9E%90/bg_hud2c9d2319f96f85ed0fe27de6d391fce_42068_800x0_resize_box_3.png"
-                        srcset="/zh-cn/p/%E5%85%B3%E4%BA%8E-go-%E6%A0%87%E5%87%86%E5%BA%93-net-%E5%8C%85%E5%92%8C-tchannel-%E5%8C%85%E7%9A%84%E6%B7%B1%E5%85%A5%E8%A7%A3%E6%9E%90/bg_hud2c9d2319f96f85ed0fe27de6d391fce_42068_800x0_resize_box_3.png 800w, /zh-cn/p/%E5%85%B3%E4%BA%8E-go-%E6%A0%87%E5%87%86%E5%BA%93-net-%E5%8C%85%E5%92%8C-tchannel-%E5%8C%85%E7%9A%84%E6%B7%B1%E5%85%A5%E8%A7%A3%E6%9E%90/bg_hud2c9d2319f96f85ed0fe27de6d391fce_42068_1600x0_resize_box_3.png 1600w"
-                        width="800" 
-                        height="451" 
-                        loading="lazy"
-                        alt="Featured image of post 关于 Go 标准库 net 包和 TChannel 包的深入解析" />
-                
-            </a>
-        </div>
-    
-
-    <div class="article-details">
-    
-
-    <div class="article-title-wrapper">
-        <h2 class="article-title">
-            <a href="/zh-cn/p/%E5%85%B3%E4%BA%8E-go-%E6%A0%87%E5%87%86%E5%BA%93-net-%E5%8C%85%E5%92%8C-tchannel-%E5%8C%85%E7%9A%84%E6%B7%B1%E5%85%A5%E8%A7%A3%E6%9E%90/">关于 Go 标准库 net 包和 TChannel 包的深入解析</a>
-        </h2>
-    
-        
-    </div>
-
-    
-    
-    
-    
-    <footer class="article-time">
-        
-            <div>
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z"/>
-  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
-  <circle cx="18" cy="18" r="4" />
-  <path d="M15 3v4" />
-  <path d="M7 3v4" />
-  <path d="M3 11h16" />
-  <path d="M18 16.496v1.504l1 1" />
-</svg>
-                <time class="article-time--published">2026-04-09 11:26</time>
-            </div>
-        
-
-        
-    </footer>
-    
-
-    
-        <footer class="article-translations">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-  <path d="M4 5h7" />
-  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
-  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
-  <path d="M12 20l4 -9l4 9" />
-  <path d="M19.1 18h-6.2" />
-</svg>
-
-
-
-            <div>
-                
-                    <a href="https://SymphonyW.github.io/p/a-deep-dive-into-gos-standard-library-net-package-and-tchannel-package/" class="link">English</a>
-                
-            </div>
-        </footer>
-    
-</div>
-
-</header>
-
-    
-    <section class="article-tags">
-        
-            <a href="/zh-cn/tags/go/">Go</a>
-        
-            <a href="/zh-cn/tags/networking/">Networking</a>
-        
-            <a href="/zh-cn/tags/backend/">Backend</a>
-        
-    </section>
-
-
-    <section class="article-content">
-    
-    
-    <p><code>net</code> 包是 Go 语言标准库中网络编程的核心基石，它提供了跨平台的网络 I/O 抽象，支持 TCP/IP、UDP、域名解析、Unix 域套接字等几乎所有主流网络协议。无论是构建简单的客户端 / 服务端，还是开发复杂的分布式系统，<code>net</code> 包都是最底层的支撑工具。</p>
+        <div class="reading-body">
+            <div class="article-content"><p><code>net</code> 包是 Go 语言标准库中网络编程的核心基石，它提供了跨平台的网络 I/O 抽象，支持 TCP/IP、UDP、域名解析、Unix 域套接字等几乎所有主流网络协议。无论是构建简单的客户端 / 服务端，还是开发复杂的分布式系统，<code>net</code> 包都是最底层的支撑工具。</p>
 <p>本文档将从基础到高级，全面解析 <code>net</code> 包的核心功能，针对常用功能进行详细展开，并提供可直接运行的实战代码示例。</p>
 <hr>
 <h2 id="1-包概述">1. 包概述
@@ -634,18 +325,8 @@
 </span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="p">}</span>
 </span></span></code></pre></td></tr></table>
 </div>
-</div><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
-    
-    <a href="2026-04-11-14-21-01.png" 
-        
-       target="_blank" 
-       class="gallery-item"> <img src="2026-04-11-14-21-01.png" 
-             alt="" 
-             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-             
-    </a>
-    
-</div></p>
+</div><p><a href="/zh-cn/p/%E5%85%B3%E4%BA%8E-go-%E6%A0%87%E5%87%86%E5%BA%93-net-%E5%8C%85%E5%92%8C-tchannel-%E5%8C%85%E7%9A%84%E6%B7%B1%E5%85%A5%E8%A7%A3%E6%9E%90/2026-04-11-14-21-01.png" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/%E5%85%B3%E4%BA%8E-go-%E6%A0%87%E5%87%86%E5%BA%93-net-%E5%8C%85%E5%92%8C-tchannel-%E5%8C%85%E7%9A%84%E6%B7%B1%E5%85%A5%E8%A7%A3%E6%9E%90/2026-04-11-14-21-01.png" alt="" width="495" height="136" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="363" data-flex-basis="873px"></a>
+</p>
 <h3 id="22-ip-网段ipnet-类型">2.2 IP 网段（<code>IPNet</code> 类型）
 </h3><p><code>IPNet</code> 用于表示一个 IP 网段，常用于判断某个 IP 是否属于某个子网，这在防火墙、路由匹配等场景中非常常用。</p>
 <h4 id="核心方法与示例-1">核心方法与示例
@@ -707,18 +388,8 @@
 </span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="p">}</span>
 </span></span></code></pre></td></tr></table>
 </div>
-</div><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
-    
-    <a href="2026-04-11-14-34-05.png" 
-        
-       target="_blank" 
-       class="gallery-item"> <img src="2026-04-11-14-34-05.png" 
-             alt="" 
-             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-             
-    </a>
-    
-</div></p>
+</div><p><a href="/zh-cn/p/%E5%85%B3%E4%BA%8E-go-%E6%A0%87%E5%87%86%E5%BA%93-net-%E5%8C%85%E5%92%8C-tchannel-%E5%8C%85%E7%9A%84%E6%B7%B1%E5%85%A5%E8%A7%A3%E6%9E%90/2026-04-11-14-34-05.png" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/%E5%85%B3%E4%BA%8E-go-%E6%A0%87%E5%87%86%E5%BA%93-net-%E5%8C%85%E5%92%8C-tchannel-%E5%8C%85%E7%9A%84%E6%B7%B1%E5%85%A5%E8%A7%A3%E6%9E%90/2026-04-11-14-34-05.png" alt="" width="497" height="110" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="451" data-flex-basis="1084px"></a>
+</p>
 <h3 id="23-传输层地址tcpaddrudpaddr">2.3 传输层地址（TCPAddr/UDPAddr）
 </h3><p>TCP 和 UDP 地址都包含 IP 和端口两部分，用于标识网络中的一个端点。</p>
 <h4 id="地址解析示例">地址解析示例
@@ -778,18 +449,8 @@
 </span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="p">}</span>
 </span></span></code></pre></td></tr></table>
 </div>
-</div><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
-    
-    <a href="2026-04-11-14-56-43.png" 
-        
-       target="_blank" 
-       class="gallery-item"> <img src="2026-04-11-14-56-43.png" 
-             alt="" 
-             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-             
-    </a>
-    
-</div></p>
+</div><p><a href="/zh-cn/p/%E5%85%B3%E4%BA%8E-go-%E6%A0%87%E5%87%86%E5%BA%93-net-%E5%8C%85%E5%92%8C-tchannel-%E5%8C%85%E7%9A%84%E6%B7%B1%E5%85%A5%E8%A7%A3%E6%9E%90/2026-04-11-14-56-43.png" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/%E5%85%B3%E4%BA%8E-go-%E6%A0%87%E5%87%86%E5%BA%93-net-%E5%8C%85%E5%92%8C-tchannel-%E5%8C%85%E7%9A%84%E6%B7%B1%E5%85%A5%E8%A7%A3%E6%9E%90/2026-04-11-14-56-43.png" alt="" width="552" height="64" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="862" data-flex-basis="2070px"></a>
+</p>
 <h3 id="24-地址处理工具函数">2.4 地址处理工具函数
 </h3><p>处理 <code>host:port</code> 格式的地址时，<code>JoinHostPort</code> 和 <code>SplitHostPort</code> 是最常用的工具，它们能正确处理 IPv6 地址的括号格式。</p>
 <div class="highlight"><div class="chroma">
@@ -1092,18 +753,8 @@
 </span></span></code></pre></td></tr></table>
 </div>
 </div><p>如此即可实现一个简单的 TCP 客户端，能够向服务端发送消息并接收响应。</p>
-<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
-    
-    <a href="2026-04-11-16-06-00.png" 
-        
-       target="_blank" 
-       class="gallery-item"> <img src="2026-04-11-16-06-00.png" 
-             alt="" 
-             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-             
-    </a>
-    
-</div></p>
+<p><a href="/zh-cn/p/%E5%85%B3%E4%BA%8E-go-%E6%A0%87%E5%87%86%E5%BA%93-net-%E5%8C%85%E5%92%8C-tchannel-%E5%8C%85%E7%9A%84%E6%B7%B1%E5%85%A5%E8%A7%A3%E6%9E%90/2026-04-11-16-06-00.png" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/%E5%85%B3%E4%BA%8E-go-%E6%A0%87%E5%87%86%E5%BA%93-net-%E5%8C%85%E5%92%8C-tchannel-%E5%8C%85%E7%9A%84%E6%B7%B1%E5%85%A5%E8%A7%A3%E6%9E%90/2026-04-11-16-06-00.png" alt="" width="826" height="275" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="300" data-flex-basis="720px"></a>
+</p>
 <h3 id="33-tcp-连接高级配置">3.3 TCP 连接高级配置
 </h3><p><code>TCPConn</code> 提供了一系列方法来调整 TCP 协议的参数，以适配不同的业务场景。</p>
 <h4 id="331-禁用-nagle-算法setnodelay">3.3.1 禁用 Nagle 算法（<code>SetNoDelay</code>）
@@ -1411,18 +1062,8 @@
 </span></span></code></pre></td></tr></table>
 </div>
 </div><p>如此即可实现一个简单的 UDP 客户端，能够向服务端发送消息并接收响应。</p>
-<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
-    
-    <a href="2026-04-11-17-20-51.png" 
-        
-       target="_blank" 
-       class="gallery-item"> <img src="2026-04-11-17-20-51.png" 
-             alt="" 
-             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-             
-    </a>
-    
-</div></p>
+<p><a href="/zh-cn/p/%E5%85%B3%E4%BA%8E-go-%E6%A0%87%E5%87%86%E5%BA%93-net-%E5%8C%85%E5%92%8C-tchannel-%E5%8C%85%E7%9A%84%E6%B7%B1%E5%85%A5%E8%A7%A3%E6%9E%90/2026-04-11-17-20-51.png" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/%E5%85%B3%E4%BA%8E-go-%E6%A0%87%E5%87%86%E5%BA%93-net-%E5%8C%85%E5%92%8C-tchannel-%E5%8C%85%E7%9A%84%E6%B7%B1%E5%85%A5%E8%A7%A3%E6%9E%90/2026-04-11-17-20-51.png" alt="" width="822" height="165" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="498" data-flex-basis="1195px"></a>
+</p>
 <h3 id="43-实战udp-心跳检测">4.3 实战：UDP 心跳检测
 </h3><p>UDP 非常适合做心跳检测，因为它轻量、无连接开销。</p>
 <div class="highlight"><div class="chroma">
@@ -1506,18 +1147,8 @@
 </span></span></code></pre></td></tr></table>
 </div>
 </div><p>如图所示，UDP 心跳检测可以快速判断服务端的存活状态，适用于分布式系统中的健康检查和服务发现。</p>
-<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
-    
-    <a href="2026-04-11-17-22-59.png" 
-        
-       target="_blank" 
-       class="gallery-item"> <img src="2026-04-11-17-22-59.png" 
-             alt="" 
-             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-             
-    </a>
-    
-</div></p>
+<p><a href="/zh-cn/p/%E5%85%B3%E4%BA%8E-go-%E6%A0%87%E5%87%86%E5%BA%93-net-%E5%8C%85%E5%92%8C-tchannel-%E5%8C%85%E7%9A%84%E6%B7%B1%E5%85%A5%E8%A7%A3%E6%9E%90/2026-04-11-17-22-59.png" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/%E5%85%B3%E4%BA%8E-go-%E6%A0%87%E5%87%86%E5%BA%93-net-%E5%8C%85%E5%92%8C-tchannel-%E5%8C%85%E7%9A%84%E6%B7%B1%E5%85%A5%E8%A7%A3%E6%9E%90/2026-04-11-17-22-59.png" alt="" width="831" height="293" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="283" data-flex-basis="680px"></a>
+</p>
 <hr>
 <h2 id="5-dns-域名解析">5. DNS 域名解析
 </h2><p><code>net</code> 包提供了完整的 DNS 解析能力，从基础的域名转 IP，到高级的 MX、SRV、TXT 记录查询。</p>
@@ -1589,18 +1220,8 @@
 </span></span></code></pre></td></tr></table>
 </div>
 </div><p>解析结果如下图所示：</p>
-<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
-    
-    <a href="2026-04-11-20-25-47.png" 
-        
-       target="_blank" 
-       class="gallery-item"> <img src="2026-04-11-20-25-47.png" 
-             alt="" 
-             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-             
-    </a>
-    
-</div></p>
+<p><a href="/zh-cn/p/%E5%85%B3%E4%BA%8E-go-%E6%A0%87%E5%87%86%E5%BA%93-net-%E5%8C%85%E5%92%8C-tchannel-%E5%8C%85%E7%9A%84%E6%B7%B1%E5%85%A5%E8%A7%A3%E6%9E%90/2026-04-11-20-25-47.png" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/%E5%85%B3%E4%BA%8E-go-%E6%A0%87%E5%87%86%E5%BA%93-net-%E5%8C%85%E5%92%8C-tchannel-%E5%8C%85%E7%9A%84%E6%B7%B1%E5%85%A5%E8%A7%A3%E6%9E%90/2026-04-11-20-25-47.png" alt="" width="536" height="93" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="576" data-flex-basis="1383px"></a>
+</p>
 <h3 id="52-高级-dns-记录查询">5.2 高级 DNS 记录查询
 </h3><div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
@@ -1695,18 +1316,8 @@
 </span></span></code></pre></td></tr></table>
 </div>
 </div><p>查询结果如下图所示：</p>
-<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
-    
-    <a href="2026-04-11-20-41-25.png" 
-        
-       target="_blank" 
-       class="gallery-item"> <img src="2026-04-11-20-41-25.png" 
-             alt="" 
-             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-             
-    </a>
-    
-</div></p>
+<p><a href="/zh-cn/p/%E5%85%B3%E4%BA%8E-go-%E6%A0%87%E5%87%86%E5%BA%93-net-%E5%8C%85%E5%92%8C-tchannel-%E5%8C%85%E7%9A%84%E6%B7%B1%E5%85%A5%E8%A7%A3%E6%9E%90/2026-04-11-20-41-25.png" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/%E5%85%B3%E4%BA%8E-go-%E6%A0%87%E5%87%86%E5%BA%93-net-%E5%8C%85%E5%92%8C-tchannel-%E5%8C%85%E7%9A%84%E6%B7%B1%E5%85%A5%E8%A7%A3%E6%9E%90/2026-04-11-20-41-25.png" alt="" width="670" height="351" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="190" data-flex-basis="458px"></a>
+</p>
 <h3 id="53-自定义-dns-解析器">5.3 自定义 DNS 解析器
 </h3><p>默认情况下，<code>net</code> 包使用系统的 DNS 配置，但我们可以自定义 DNS 服务器，比如使用 Google DNS 或 Cloudflare DNS。</p>
 <div class="highlight"><div class="chroma">
@@ -1792,35 +1403,15 @@
 </span></span></code></pre></td></tr></table>
 </div>
 </div><p>解析结果如下图所示：</p>
-<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
-    
-    <a href="2026-04-11-20-42-45.png" 
-        
-       target="_blank" 
-       class="gallery-item"> <img src="2026-04-11-20-42-45.png" 
-             alt="" 
-             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-             
-    </a>
-    
-</div></p>
+<p><a href="/zh-cn/p/%E5%85%B3%E4%BA%8E-go-%E6%A0%87%E5%87%86%E5%BA%93-net-%E5%8C%85%E5%92%8C-tchannel-%E5%8C%85%E7%9A%84%E6%B7%B1%E5%85%A5%E8%A7%A3%E6%9E%90/2026-04-11-20-42-45.png" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/%E5%85%B3%E4%BA%8E-go-%E6%A0%87%E5%87%86%E5%BA%93-net-%E5%8C%85%E5%92%8C-tchannel-%E5%8C%85%E7%9A%84%E6%B7%B1%E5%85%A5%E8%A7%A3%E6%9E%90/2026-04-11-20-42-45.png" alt="" width="579" height="41" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="1412" data-flex-basis="3389px"></a>
+</p>
 <hr>
 <h2 id="6-错误处理与超时控制">6. 错误处理与超时控制
 </h2><p>网络编程中，错误处理和超时控制是保证服务稳定性的关键。</p>
 <h3 id="61-网络错误类型neterror">6.1 网络错误类型（<code>net.Error</code>）
 </h3><p><code>net</code> 包的所有网络错误都实现了 <code>net.Error</code> 接口，它提供了 <code>Timeout()</code> 和 <code>Temporary()</code> 方法来区分错误类型。</p>
-<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
-    
-    <a href="2026-04-11-20-47-12.png" 
-        
-       target="_blank" 
-       class="gallery-item"> <img src="2026-04-11-20-47-12.png" 
-             alt="" 
-             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-             
-    </a>
-    
-</div></p>
+<p><a href="/zh-cn/p/%E5%85%B3%E4%BA%8E-go-%E6%A0%87%E5%87%86%E5%BA%93-net-%E5%8C%85%E5%92%8C-tchannel-%E5%8C%85%E7%9A%84%E6%B7%B1%E5%85%A5%E8%A7%A3%E6%9E%90/2026-04-11-20-47-12.png" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/%E5%85%B3%E4%BA%8E-go-%E6%A0%87%E5%87%86%E5%BA%93-net-%E5%8C%85%E5%92%8C-tchannel-%E5%8C%85%E7%9A%84%E6%B7%B1%E5%85%A5%E8%A7%A3%E6%9E%90/2026-04-11-20-47-12.png" alt="" width="805" height="247" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="325" data-flex-basis="782px"></a>
+</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
 <pre tabindex="0" class="chroma"><code><span class="lnt"> 1
@@ -1873,18 +1464,8 @@
 </span></span><span class="line"><span class="cl"><span class="p">}</span>
 </span></span></code></pre></td></tr></table>
 </div>
-</div><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
-    
-    <a href="2026-04-11-20-51-50.png" 
-        
-       target="_blank" 
-       class="gallery-item"> <img src="2026-04-11-20-51-50.png" 
-             alt="" 
-             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-             
-    </a>
-    
-</div></p>
+</div><p><a href="/zh-cn/p/%E5%85%B3%E4%BA%8E-go-%E6%A0%87%E5%87%86%E5%BA%93-net-%E5%8C%85%E5%92%8C-tchannel-%E5%8C%85%E7%9A%84%E6%B7%B1%E5%85%A5%E8%A7%A3%E6%9E%90/2026-04-11-20-51-50.png" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/%E5%85%B3%E4%BA%8E-go-%E6%A0%87%E5%87%86%E5%BA%93-net-%E5%8C%85%E5%92%8C-tchannel-%E5%8C%85%E7%9A%84%E6%B7%B1%E5%85%A5%E8%A7%A3%E6%9E%90/2026-04-11-20-51-50.png" alt="" width="569" height="83" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="685" data-flex-basis="1645px"></a>
+</p>
 <p>之所以 <code>Timeout()</code> 和 <code>Temporary()</code> 都返回 <code>true</code>，是因为在这个场景下，连接超时被认为是一个临时错误，可能是网络状况不佳导致的，重试可能会成功。</p>
 <h3 id="62-超时控制详解">6.2 超时控制详解
 </h3><p><code>net</code> 包提供了多层级的超时控制：</p>
@@ -2027,31 +1608,11 @@
 </span></span></code></pre></td></tr></table>
 </div>
 </div><p>如果连不上会得到以下输出：</p>
-<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
-    
-    <a href="2026-04-11-21-18-53.png" 
-        
-       target="_blank" 
-       class="gallery-item"> <img src="2026-04-11-21-18-53.png" 
-             alt="" 
-             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-             
-    </a>
-    
-</div></p>
+<p><a href="/zh-cn/p/%E5%85%B3%E4%BA%8E-go-%E6%A0%87%E5%87%86%E5%BA%93-net-%E5%8C%85%E5%92%8C-tchannel-%E5%8C%85%E7%9A%84%E6%B7%B1%E5%85%A5%E8%A7%A3%E6%9E%90/2026-04-11-21-18-53.png" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/%E5%85%B3%E4%BA%8E-go-%E6%A0%87%E5%87%86%E5%BA%93-net-%E5%8C%85%E5%92%8C-tchannel-%E5%8C%85%E7%9A%84%E6%B7%B1%E5%85%A5%E8%A7%A3%E6%9E%90/2026-04-11-21-18-53.png" alt="" width="598" height="40" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="1495" data-flex-basis="3588px"></a>
+</p>
 <p>如果连接成功会得到以下输出：</p>
-<p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
-    
-    <a href="2026-04-11-21-19-18.png" 
-        
-       target="_blank" 
-       class="gallery-item"> <img src="2026-04-11-21-19-18.png" 
-             alt="" 
-             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-             
-    </a>
-    
-</div></p>
+<p><a href="/zh-cn/p/%E5%85%B3%E4%BA%8E-go-%E6%A0%87%E5%87%86%E5%BA%93-net-%E5%8C%85%E5%92%8C-tchannel-%E5%8C%85%E7%9A%84%E6%B7%B1%E5%85%A5%E8%A7%A3%E6%9E%90/2026-04-11-21-19-18.png" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/%E5%85%B3%E4%BA%8E-go-%E6%A0%87%E5%87%86%E5%BA%93-net-%E5%8C%85%E5%92%8C-tchannel-%E5%8C%85%E7%9A%84%E6%B7%B1%E5%85%A5%E8%A7%A3%E6%9E%90/2026-04-11-21-19-18.png" alt="" width="570" height="41" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="1390" data-flex-basis="3336px"></a>
+</p>
 <hr>
 <h2 id="8-unix-域套接字本地进程间通信">8. Unix 域套接字（本地进程间通信）
 </h2><p>Unix 域套接字是用于<strong>同一主机</strong>上进程间通信的机制，比 TCP 更快，不需要经过网络协议栈，延迟更低。</p>
@@ -2815,156 +2376,40 @@
 <hr>
 <p>通过以上内容，你已经基本掌握了 Go <code>net</code> 包的核心用法，从基础的 TCP/UDP 通信，到高级的 DNS 解析、ICMP 实现，都可以基于此进行开发。无论是构建简单的网络工具，还是开发复杂的分布式系统，<code>net</code> 包都是你不可或缺的利器。希望这份文档能帮助你更好地理解和使用 Go 的网络编程能力！</p>
 
-</section>
+</div>
 
-
-    <footer class="article-footer">
+            <footer class="article-footer">
     
-    <section class="article-tags">
-        
-            <a href="/zh-cn/tags/go/">Go</a>
-        
-            <a href="/zh-cn/tags/networking/">Networking</a>
-        
-            <a href="/zh-cn/tags/backend/">Backend</a>
-        
-    </section>
+        <div class="article-tags" aria-label="文章标签"><span class="article-footer-label">相关主题</span><a href="/zh-cn/tags/go/">Go</a><a href="/zh-cn/tags/networking/">Networking</a><a href="/zh-cn/tags/backend/">Backend</a></div>
+    
+    
+    
+    <div class="article-endnote"><span>感谢读到这里。</span><a href="#top">回到开头 <span aria-hidden="true">↑</span></a></div>
+</footer>
 
-
-    </footer>
-
-
+        </div>
+    </div>
     
 </article>
 
-    
-
-    
-
-<aside class="related-content--wrapper">
-    <h2 class="section-title">相关文章</h2>
-    <div class="related-content">
-        <div class="flex article-list--tile">
+        <div class="reading-afterword">
             
-                
-<article class="has-image">
-    <a href="/zh-cn/p/gin-%E6%A1%86%E6%9E%B6%E9%9B%B6%E5%9F%BA%E7%A1%80%E6%95%99%E7%A8%8B%E4%BB%8E%E5%85%A5%E9%97%A8%E5%88%B0%E5%AE%9E%E6%88%98/">
-        
-        
-            <div class="article-image">
-                <img src="/zh-cn/p/gin-%E6%A1%86%E6%9E%B6%E9%9B%B6%E5%9F%BA%E7%A1%80%E6%95%99%E7%A8%8B%E4%BB%8E%E5%85%A5%E9%97%A8%E5%88%B0%E5%AE%9E%E6%88%98/bg.c71186e857e0801eeb8b4a1753555eab_hu5449cab291767717f92f7f206b968cb8_129011_250x150_fill_box_smart1_3.png" 
-                        width="250" 
-                        height="150" 
-                        loading="lazy"
-                        alt="Featured image of post Gin 框架零基础教程：从入门到实战"
-                        
-                        data-hash="md5-xxGG6FfggB7ri0oXU1Veqw==">
-                
-            </div>
-        
-
-        <div class="article-details">
-            <h2 class="article-title">Gin 框架零基础教程：从入门到实战</h2>
-        </div>
-    </a>
-</article>
-
             
-                
-<article class="has-image">
-    <a href="/zh-cn/p/rabbitmq%E9%9B%B6%E5%9F%BA%E7%A1%80%E6%95%99%E7%A8%8Bgo%E7%89%88/">
+    <aside class="reading-related">
+        <div class="reading-section-heading"><span class="article-footer-label">延伸阅读</span><span aria-hidden="true">↘</span></div>
         
+            <a class="reading-related-link" href="/zh-cn/p/gin-%E6%A1%86%E6%9E%B6%E9%9B%B6%E5%9F%BA%E7%A1%80%E6%95%99%E7%A8%8B%E4%BB%8E%E5%85%A5%E9%97%A8%E5%88%B0%E5%AE%9E%E6%88%98/"><span class="related-number">01</span><span class="related-title">Gin 框架零基础教程：从入门到实战</span><time datetime="2026-04-12">2026.04.12</time><span class="related-arrow" aria-hidden="true">↗</span></a>
         
-            <div class="article-image">
-                <img src="/zh-cn/p/rabbitmq%E9%9B%B6%E5%9F%BA%E7%A1%80%E6%95%99%E7%A8%8Bgo%E7%89%88/bg.aa7b08f2e9814c8b548884d21df461d3_hu41401bf8185e9f421d4d959178368b99_22805_250x150_fill_box_smart1_3.png" 
-                        width="250" 
-                        height="150" 
-                        loading="lazy"
-                        alt="Featured image of post RabbitMQ零基础教程（Go版）"
-                        
-                        data-hash="md5-qnsI8umBTItUiITSHfRh0w==">
-                
-            </div>
+            <a class="reading-related-link" href="/zh-cn/p/rabbitmq%E9%9B%B6%E5%9F%BA%E7%A1%80%E6%95%99%E7%A8%8Bgo%E7%89%88/"><span class="related-number">02</span><span class="related-title">RabbitMQ零基础教程（Go版）</span><time datetime="2026-03-30">2026.03.30</time><span class="related-arrow" aria-hidden="true">↗</span></a>
         
+            <a class="reading-related-link" href="/zh-cn/p/go-grpc-%E6%95%99%E7%A8%8B/"><span class="related-number">03</span><span class="related-title">Go gRPC 教程</span><time datetime="2026-03-26">2026.03.26</time><span class="related-arrow" aria-hidden="true">↗</span></a>
+        
+    </aside>
 
-        <div class="article-details">
-            <h2 class="article-title">RabbitMQ零基础教程（Go版）</h2>
-        </div>
-    </a>
-</article>
-
-            
-                
-<article class="has-image">
-    <a href="/zh-cn/p/go-grpc-%E6%95%99%E7%A8%8B/">
-        
-        
-            <div class="article-image">
-                <img src="/zh-cn/p/go-grpc-%E6%95%99%E7%A8%8B/gRPC.138bb366df92818f7d214b12a05678fa_huadf229ea97dbdfb85023caea1b9e4d2a_97686_250x150_fill_box_smart1_3.png" 
-                        width="250" 
-                        height="150" 
-                        loading="lazy"
-                        alt="Featured image of post Go gRPC 教程"
-                        
-                        data-hash="md5-E4uzZt&#43;SgY99IUsSoFZ4&#43;g==">
-                
-            </div>
-        
-
-        <div class="article-details">
-            <h2 class="article-title">Go gRPC 教程</h2>
-        </div>
-    </a>
-</article>
-
-            
-                
-<article class="has-image">
-    <a href="/zh-cn/p/golang%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/">
-        
-        
-            <div class="article-image">
-                <img src="/zh-cn/p/golang%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/bg.093de2266f30bd1633d23278e80daa9f_hud2c9d2319f96f85ed0fe27de6d391fce_42068_250x150_fill_box_smart1_3.png" 
-                        width="250" 
-                        height="150" 
-                        loading="lazy"
-                        alt="Featured image of post Golang学习笔记"
-                        
-                        data-hash="md5-CT3iJm8wvRYz0jJ46A2qnw==">
-                
-            </div>
-        
-
-        <div class="article-details">
-            <h2 class="article-title">Golang学习笔记</h2>
-        </div>
-    </a>
-</article>
 
             
         </div>
     </div>
-</aside>
-
-     
-    
-        
-    
-
-    <footer class="site-footer">
-    <section class="copyright">
-        &copy; 
-        
-        2026 SymphonyW
-    </section>
-    
-    <section class="powerby">
-        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
-        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.26.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
-    </section>
-</footer>
-
-
     
 <div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
 
@@ -3043,24 +2488,22 @@
                 href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
             >
 
-            </main>
-        </div>
-        <script 
-                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
-                
-                >
-            </script><script type="text/javascript" src="/ts/main.js" defer></script><script type="text/javascript" src="/ts/custom.js" defer></script>
-<script>
-    (function () {
-        const customFont = document.createElement('link');
-        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+    </main>
+    
+<footer class="site-footer">
+    <div class="footer-top"><a class="footer-wordmark" href="/zh-cn/">Symphony<span>W</span></a><p>认真记录，自由生长。</p><a href="#main-content" class="back-top">回到顶部 <span aria-hidden="true">↑</span></a></div>
+    <div class="footer-bottom"><span>© 2026 SymphonyW</span><nav aria-label="更多链接"><a href="/zh-cn/about/">关于</a><a href="https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0" target="_blank" rel="noopener noreferrer me">Bilibili <span aria-hidden="true">↗</span></a><a href="https://github.com/SymphonyW" target="_blank" rel="noopener noreferrer me">GitHub <span aria-hidden="true">↗</span></a><a href="https://twitter.com" target="_blank" rel="noopener noreferrer me">Twitter <span aria-hidden="true">↗</span></a><a href="/zh-cn/index.xml">RSS ↗</a></nav><span class="footer-colophon">由 Hugo 构建 · 持续书写</span></div>
+</footer>
 
-        customFont.type = "text/css";
-        customFont.rel = "stylesheet";
+    
 
-        document.head.appendChild(customFont);
-    }());
-</script>
+<script src="/ts/main.fafdc6fc356f126445b18bf98e9ce585b8429805280aaa2ec379851ce1af6525.js" defer></script>
+
+<script src="/ts/custom.5dc5916b044c5b2b094b202e6f4b4887b36dddcd5d501ad37e26108b2163d8d9.js" defer></script>
+
+
+
+
 
 <script>
 window.MathJax = {
@@ -3074,6 +2517,7 @@ window.MathJax = {
   }
 };
 </script>
-<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-    </body>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
+
+</body>
 </html>

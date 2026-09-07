@@ -1,12 +1,21 @@
 <!DOCTYPE html>
 <html lang="zh-cn" dir="ltr">
-    <head><meta charset='utf-8'>
+<head>
+    <meta charset='utf-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="从特征匹配、对极几何、三角化、PnP 到 Bundle Adjustment，系统理解 SfM 如何把无序图像变成相机轨迹和稀疏点云。">
 <title>SfM 原理详解：从多张照片恢复三维结构</title>
 
 <link rel='canonical' href='https://SymphonyW.github.io/zh-cn/p/sfm-principle/'>
+<link rel="stylesheet" href="/scss/custom.min.2089e3e36594bc8705485d3fd8080ca77e480c60ce355a4a3eb92dbda6f784cc.css">
+<script>
+(() => {
+    let preference = 'auto';
+    try { preference = localStorage.getItem('StackColorScheme') || preference; } catch (_) {}
+    document.documentElement.dataset.scheme = preference === 'dark' || (preference === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+})();
+</script>
 
-<link rel="stylesheet" href="/scss/style.min.4687047a1903756c84bf7a1cf7cbbf4e26bef4a42dd5bc620df47badaeed46c2.css"><meta property='og:title' content="SfM 原理详解：从多张照片恢复三维结构">
+<meta property='og:title' content="SfM 原理详解：从多张照片恢复三维结构">
 <meta property='og:description' content="从特征匹配、对极几何、三角化、PnP 到 Bundle Adjustment，系统理解 SfM 如何把无序图像变成相机轨迹和稀疏点云。">
 <meta property='og:url' content='https://SymphonyW.github.io/zh-cn/p/sfm-principle/'>
 <meta property='og:site_name' content='SymphonyW'>
@@ -16,340 +25,117 @@
     <meta name="twitter:image" content='https://SymphonyW.github.io/zh-cn/p/sfm-principle/bg.svg' />
     <link rel="shortcut icon" href="/favicon.ico" />
 
-    </head>
-    <body class="
-    article-page
-    ">
-    <script>
-        (function() {
-            const colorSchemeKey = 'StackColorScheme';
-            if(!localStorage.getItem(colorSchemeKey)){
-                localStorage.setItem(colorSchemeKey, "auto");
-            }
-        })();
-    </script><script>
-    (function() {
-        const colorSchemeKey = 'StackColorScheme';
-        const colorSchemeItem = localStorage.getItem(colorSchemeKey);
-        const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches === true;
-
-        if (colorSchemeItem == 'dark' || colorSchemeItem === 'auto' && supportDarkMode) {
+    
+    <noscript><style>@media(max-width:760px){.site-header{position:static}.site-header__inner{height:auto;min-height:66px;flex-wrap:wrap}.site-nav{position:static;display:grid;order:3;flex-basis:100%;padding:8px 0 18px}.menu-toggle,.theme-toggle{display:none}}</style></noscript>
+</head>
+<body id="top" class="article-page">
+    <a class="skip-link" href="#main-content">跳至正文</a>
+    
+<header class="site-header">
+    <div class="site-header__inner">
+        <a class="site-brand" href="/zh-cn/" aria-label="SymphonyW — 主页">S<span>w.</span></a>
+        <nav class="site-nav" id="site-navigation" aria-label="主导航">
             
-
-            document.documentElement.dataset.scheme = 'dark';
-        } else {
-            document.documentElement.dataset.scheme = 'light';
-        }
-    })();
-</script>
-<div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky ">
-    <button class="hamburger hamburger--spin" type="button" id="toggle-menu" aria-label="切换菜单">
-        <span class="hamburger-box">
-            <span class="hamburger-inner"></span>
-        </span>
-    </button>
-
-    <header>
-        
             
-            <figure class="site-avatar">
-                <a href="/zh-cn/">
                 
                     
                     
+                    <a href="/zh-cn/">主页</a>
+                
+            
+                
                     
-                        
-                        <img src="/img/avatar_hu5ea07d2842502bdd7540f9cbc4b41b95_5278_300x0_resize_box_3.png" width="300"
-                            height="300" class="site-logo" loading="lazy" alt="Avatar">
                     
+                    <a href="/zh-cn/post/" aria-current="page">博客</a>
                 
-                </a>
-                
-                    <span class="emoji">😁</span>
-                
-            </figure>
             
-        
-        
-        <div class="site-meta">
-            <h1 class="site-name"><a href="/zh-cn">SymphonyW</a></h1>
-            <h2 class="site-description">Welcome to my Blog.</h2>
-        </div>
-    </header><ol class="menu-social">
+                
+                    
+                    
+                    <a href="/zh-cn/archives/">归档</a>
+                
             
-                <li>
-                    <a 
-                        href='https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0'
-                        target="_blank"
-                        title="Bilibili"
-                        rel="me"
-                    >
-                        
-                        
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.0.0-beta2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) --><path d="M488.6 104.1C505.3 122.2 513 143.8 511.9 169.8V372.2C511.5 398.6 502.7 420.3 485.4 437.3C468.2 454.3 446.3 463.2 419.9 464H92.02C65.57 463.2 43.81 454.2 26.74 436.8C9.682 419.4 .7667 396.5 0 368.2V169.8C.7667 143.8 9.682 122.2 26.74 104.1C43.81 87.75 65.57 78.77 92.02 78H121.4L96.05 52.19C90.3 46.46 87.42 39.19 87.42 30.4C87.42 21.6 90.3 14.34 96.05 8.603C101.8 2.868 109.1 0 117.9 0C126.7 0 134 2.868 139.8 8.603L213.1 78H301.1L375.6 8.603C381.7 2.868 389.2 0 398 0C406.8 0 414.1 2.868 419.9 8.603C425.6 14.34 428.5 21.6 428.5 30.4C428.5 39.19 425.6 46.46 419.9 52.19L394.6 78L423.9 78C450.3 78.77 471.9 87.75 488.6 104.1H488.6zM449.8 173.8C449.4 164.2 446.1 156.4 439.1 150.3C433.9 144.2 425.1 140.9 416.4 140.5H96.05C86.46 140.9 78.6 144.2 72.47 150.3C66.33 156.4 63.07 164.2 62.69 173.8V368.2C62.69 377.4 65.95 385.2 72.47 391.7C78.99 398.2 86.85 401.5 96.05 401.5H416.4C425.6 401.5 433.4 398.2 439.7 391.7C446 385.2 449.4 377.4 449.8 368.2L449.8 173.8zM185.5 216.5C191.8 222.8 195.2 230.6 195.6 239.7V273C195.2 282.2 191.9 289.9 185.8 296.2C179.6 302.5 171.8 305.7 162.2 305.7C152.6 305.7 144.7 302.5 138.6 296.2C132.5 289.9 129.2 282.2 128.8 273V239.7C129.2 230.6 132.6 222.8 138.9 216.5C145.2 210.2 152.1 206.9 162.2 206.5C171.4 206.9 179.2 210.2 185.5 216.5H185.5zM377 216.5C383.3 222.8 386.7 230.6 387.1 239.7V273C386.7 282.2 383.4 289.9 377.3 296.2C371.2 302.5 363.3 305.7 353.7 305.7C344.1 305.7 336.3 302.5 330.1 296.2C323.1 289.9 320.7 282.2 320.4 273V239.7C320.7 230.6 324.1 222.8 330.4 216.5C336.7 210.2 344.5 206.9 353.7 206.5C362.9 206.9 370.7 210.2 377 216.5H377z"/></svg>
-                        
-                    </a>
-                </li>
+                
+                    
+                    
+                    <a href="/zh-cn/stats/">写作记录</a>
+                
             
-                <li>
-                    <a 
-                        href='https://github.com/SymphonyW'
-                        target="_blank"
-                        title="GitHub"
-                        rel="me"
-                    >
-                        
-                        
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-  <path d="M9 19c-4.3 1.4 -4.3 -2.5 -6 -3m12 5v-3.5c0 -1 .1 -1.4 -.5 -2c2.8 -.3 5.5 -1.4 5.5 -6a4.6 4.6 0 0 0 -1.3 -3.2a4.2 4.2 0 0 0 -.1 -3.2s-1.1 -.3 -3.5 1.3a12.3 12.3 0 0 0 -6.2 0c-2.4 -1.6 -3.5 -1.3 -3.5 -1.3a4.2 4.2 0 0 0 -.1 3.2a4.6 4.6 0 0 0 -1.3 3.2c0 4.6 2.7 5.7 5.5 6c-.6 .6 -.6 1.2 -.5 2v3.5" />
-</svg>
-
-
-
-                        
-                    </a>
-                </li>
+                
+                    
+                    
+                    <a href="/zh-cn/diary/">日记</a>
+                
             
-                <li>
-                    <a 
-                        href='https://twitter.com'
-                        target="_blank"
-                        title="Twitter"
-                        rel="me"
-                    >
-                        
-                        
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-  <path d="M22 4.01c-1 .49 -1.98 .689 -3 .99c-1.121 -1.265 -2.783 -1.335 -4.38 -.737s-2.643 2.06 -2.62 3.737v1c-3.245 .083 -6.135 -1.395 -8 -4c0 0 -4.182 7.433 4 11c-1.872 1.247 -3.739 2.088 -6 2c3.308 1.803 6.913 2.423 10.034 1.517c3.58 -1.04 6.522 -3.723 7.651 -7.742a13.84 13.84 0 0 0 .497 -3.753c-.002 -.249 1.51 -2.772 1.818 -4.013z" />
-</svg>
-
-
-
-                        
-                    </a>
-                </li>
+                
             
-        </ol><ol class="menu" id="main-menu">
-        
-        
-        
-        <li >
-            <a href='/zh-cn/' >
                 
+                    
+                    
+                    <a href="/zh-cn/links/">链接</a>
                 
-                
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z"/>
-  <polyline points="5 12 3 12 12 3 21 12 19 12" />
-  <path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7" />
-  <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6" />
-</svg>
-
-
-
-                
-                <span>主页</span>
-            </a>
-        </li>
-        
-        
-        <li  class='current' >
-            <a href='/zh-cn/post/' >
-                
-                
-                
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z"/>
-  <rect x="3" y="4" width="18" height="4" rx="2" />
-  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
-  <line x1="10" y1="12" x2="14" y2="12" />
-</svg>
-
-
-
-                
-                <span>博客</span>
-            </a>
-        </li>
-        
-        
-        <li >
-            <a href='/zh-cn/archives/' >
-                
-                
-                
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z"/>
-  <rect x="3" y="4" width="18" height="4" rx="2" />
-  <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10" />
-  <line x1="10" y1="12" x2="14" y2="12" />
-</svg>
-
-
-
-                
-                <span>归档</span>
-            </a>
-        </li>
-        
-        
-        <li >
-            <a href='/zh-cn/stats/' >
-                
-                
-                
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chart-bar" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z"/>
-  <rect x="3" y="12" width="4" height="8" rx="1" />
-  <rect x="10" y="8" width="4" height="12" rx="1" />
-  <rect x="17" y="4" width="4" height="16" rx="1" />
-  <line x1="4" y1="20" x2="20" y2="20" />
-</svg>
-
-                
-                <span>写作记录</span>
-            </a>
-        </li>
-        
-        
-        <li >
-            <a href='/zh-cn/diary/' >
-                
-                
-                
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-event" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-  <path d="M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12z" />
-  <path d="M16 3v4" />
-  <path d="M8 3v4" />
-  <path d="M4 11h16" />
-  <path d="M8 15h2v2h-2z" />
-</svg>
-
-                
-                <span>日记</span>
-            </a>
-        </li>
-        
-        
-        <li >
-            <a href='/zh-cn/search/' >
-                
-                
-                
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            
+        </nav>
+        <div class="header-tools">
+            
+                <a class="language-link" href="/p/sfm-principle/" lang="en" hreflang="en" aria-label="Switch to English">EN</a>
+            
+            <button type="button" id="dark-mode-toggle" class="icon-button theme-toggle" aria-label="切换明暗主题" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><path d="M12 4.5a7.5 7.5 0 0 1 0 15z" fill="currentColor" stroke="none"/></svg></button>
+            <a class="icon-button search-link" href="/zh-cn/search/" aria-label="搜索文章"><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
   <path stroke="none" d="M0 0h24v24H0z"/>
   <circle cx="10" cy="10" r="7" />
   <line x1="21" y1="21" x2="15" y2="15" />
 </svg>
 
 
-
-                
-                <span>搜索</span>
-            </a>
-        </li>
-        
-        
-        <li >
-            <a href='/zh-cn/links/' >
-                
-                
-                
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z"/>
-  <path d="M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5" />
-  <path d="M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5" />
-</svg>
-
-
-
-                
-                <span>链接</span>
-            </a>
-        </li>
-        
-        <li class="menu-bottom-section">
-            <ol class="menu">
-                    
-                        <li id="i18n-switch" class="language-switcher">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-  <path d="M4 5h7" />
-  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
-  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
-  <path d="M12 20l4 -9l4 9" />
-  <path d="M19.1 18h-6.2" />
-</svg>
-
-
-
-                            <div class="language-switcher__tabs" aria-label="Language">
-                                <a class="language-switcher__tab "
-                                        href="/p/sfm-principle/"
-                                        >
-                                        English
-                                    </a>
-                                <a class="language-switcher__tab is-current"
-                                        href="/zh-cn/p/sfm-principle/"
-                                        aria-current="true">
-                                        中文
-                                    </a>
-                                
-                            </div>
-                        </li>
-                    
-                
-
-                
-                    <li id="dark-mode-toggle">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z"/>
-  <circle cx="8" cy="12" r="2" />
-  <rect x="2" y="6" width="20" height="12" rx="6" />
-</svg>
-
-
-
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z"/>
-  <circle cx="16" cy="12" r="2" />
-  <rect x="2" y="6" width="20" height="12" rx="6" />
-</svg>
-
-
-
-                        <span>暗色模式</span>
-                    </li>
-                
-            </ol>
-        </li>
-    </ol>
-</aside>
-
-    <aside class="sidebar right-sidebar sticky">
-        
-            
-                
-    <section class="widget archives">
-        <div class="widget-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z"/>
-  <line x1="5" y1="9" x2="19" y2="9" />
-  <line x1="5" y1="15" x2="19" y2="15" />
-  <line x1="11" y1="4" x2="7" y2="20" />
-  <line x1="17" y1="4" x2="13" y2="20" />
-</svg>
-
-
-
+</a>
+            <button class="icon-button menu-toggle" type="button" aria-expanded="false" aria-controls="site-navigation" aria-label="展开导航"><span></span><span></span></button>
         </div>
-        <h2 class="widget-title section-title">目录</h2>
+    </div>
+    <div class="reading-progress" aria-hidden="true"></div>
+</header>
+
+    <main id="main-content" class="site-main main" tabindex="-1">
         
-        <div class="widget--toc">
-            <nav id="TableOfContents">
+    <div class="reading-page">
+        <article class="main-article has-toc">
+    <header class="article-header">
+    <div class="article-wayfinding">
+        
+            <a href="/zh-cn/post/"><span aria-hidden="true">←</span> 全部文章</a>
+        
+        <span class="article-kind">笔记与思考</span>
+    </div>
+    <div class="article-details">
+    
+    <h1 class="article-title">SfM 原理详解：从多张照片恢复三维结构</h1>
+    <p class="article-subtitle">从特征匹配、对极几何、三角化、PnP 到 Bundle Adjustment，系统理解 SfM 如何把无序图像变成相机轨迹和稀疏点云。</p>
+    <div class="article-meta">
+        
+            <time datetime="2026-07-16T21:46:40&#43;08:00">2026 年 07 月 16 日</time>
+            <span class="meta-divider" aria-hidden="true">/</span>
+            <span>约 2 分钟</span>
+        
+        
+            <div class="article-translations"><a href="/p/sfm-principle/" hreflang="en" lang="en">Read in English <span aria-hidden="true">↗</span></a></div>
+        
+    </div>
+</div>
+
+        <figure class="article-cover">
+            
+                <img src="/zh-cn/p/sfm-principle/bg.svg" alt="SfM 原理详解：从多张照片恢复三维结构" fetchpriority="high">
+            
+        </figure>
+    
+</header>
+
+    <div class="reading-layout">
+        
+            <aside class="reading-margin" aria-label="文章目录">
+                <details class="article-toc" open>
+                    <summary><span>本文目录</span><span class="toc-indicator" aria-hidden="true">+</span></summary>
+                    <nav id="TableOfContents">
   <ol>
     <li><a href="#目录">目录</a></li>
     <li><a href="#一sfm-到底在求什么">一、SfM 到底在求什么</a></li>
@@ -369,105 +155,11 @@
     <li><a href="#九总结">九、总结</a></li>
   </ol>
 </nav>
-        </div>
-    </section>
-
-            
+                </details>
+            </aside>
         
-    </aside>
-
-
-            <main class="main full-width">
-    <article class="has-image main-article">
-    <header class="article-header">
-        <div class="article-image">
-            <a href="/zh-cn/p/sfm-principle/">
-                
-                    <img src="/zh-cn/p/sfm-principle/bg.svg" loading="lazy" alt="Featured image of post SfM 原理详解：从多张照片恢复三维结构" />
-                
-            </a>
-        </div>
-    
-
-    <div class="article-details">
-    
-
-    <div class="article-title-wrapper">
-        <h2 class="article-title">
-            <a href="/zh-cn/p/sfm-principle/">SfM 原理详解：从多张照片恢复三维结构</a>
-        </h2>
-    
-        
-        <h3 class="article-subtitle">
-            从特征匹配、对极几何、三角化、PnP 到 Bundle Adjustment，系统理解 SfM 如何把无序图像变成相机轨迹和稀疏点云。
-        </h3>
-        
-    </div>
-
-    
-    
-    
-    
-    <footer class="article-time">
-        
-            <div>
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z"/>
-  <path d="M11.795 21h-6.795a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4" />
-  <circle cx="18" cy="18" r="4" />
-  <path d="M15 3v4" />
-  <path d="M7 3v4" />
-  <path d="M3 11h16" />
-  <path d="M18 16.496v1.504l1 1" />
-</svg>
-                <time class="article-time--published">2026-07-16 21:46</time>
-            </div>
-        
-
-        
-    </footer>
-    
-
-    
-        <footer class="article-translations">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-language" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-  <path d="M4 5h7" />
-  <path d="M9 3v2c0 4.418 -2.239 8 -5 8" />
-  <path d="M5 9c-.003 2.144 2.952 3.908 6.7 4" />
-  <path d="M12 20l4 -9l4 9" />
-  <path d="M19.1 18h-6.2" />
-</svg>
-
-
-
-            <div>
-                
-                    <a href="https://SymphonyW.github.io/p/sfm-principle/" class="link">English</a>
-                
-            </div>
-        </footer>
-    
-</div>
-
-</header>
-
-    
-    <section class="article-tags">
-        
-            <a href="/zh-cn/tags/sfm/">SfM</a>
-        
-            <a href="/zh-cn/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E8%A7%86%E8%A7%89/">计算机视觉</a>
-        
-            <a href="/zh-cn/tags/%E4%B8%89%E7%BB%B4%E9%87%8D%E5%BB%BA/">三维重建</a>
-        
-    </section>
-
-
-    <section class="article-content">
-    
-    
-    <h1 id="sfm-原理详解从多张照片恢复三维结构">SfM 原理详解：从多张照片恢复三维结构
+        <div class="reading-body">
+            <div class="article-content"><h1 id="sfm-原理详解从多张照片恢复三维结构">SfM 原理详解：从多张照片恢复三维结构
 </h1><blockquote>
 <p>SfM（Structure from Motion，运动恢复结构）解决的问题很朴素：<strong>只给一组从不同位置拍摄的照片，能不能同时恢复相机的运动轨迹和场景的三维结构？</strong><br>
 答案是可以，但它靠的不是“AI 猜形状”，而是一整套严密的多视图几何。</p>
@@ -493,7 +185,7 @@
 <li><strong>Motion</strong>：相机拍每张照片时在哪里、朝向哪里。</li>
 </ul>
 <p>输入通常是一组有重叠视野的图片，输出则是相机参数和稀疏点云。</p>
-<div class="table-wrapper"><table>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
 <thead>
 <tr>
 <th>项目</th>
@@ -532,20 +224,8 @@
 <p>最核心的一句话是：<strong>SfM 通过同名点约束，把“二维像素坐标”反推出“三维点 + 相机位姿”。</strong></p>
 <hr>
 <h2 id="二整体流程">二、整体流程
-</h2><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
-    
-    <a href="sfm-pipeline.svg" 
-        
-       target="_blank" 
-       class="gallery-item"> <img src="sfm-pipeline.svg" 
-             alt="SfM 整体流水线：从图像输入到稀疏重建" 
-             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-             
-    </a>
-    
-        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">SfM 整体流水线：从图像输入到稀疏重建</span>
-    
-</div></p>
+</h2><p><a href="/zh-cn/p/sfm-principle/sfm-pipeline.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/sfm-principle/sfm-pipeline.svg" alt="SfM 整体流水线：从图像输入到稀疏重建" loading="lazy" decoding="async"></a>
+</p>
 <p>一条典型的 SfM 流水线可以拆成 6 步：</p>
 <ol>
 <li><strong>特征提取</strong>：在每张图里找稳定的局部特征点，例如角点、纹理块、边缘交汇处。</li>
@@ -558,20 +238,8 @@
 <p>这条流水线有一个重要特点：<strong>SfM 先追求几何一致性，而不是追求稠密表面。</strong> 因此它输出的点云通常是稀疏的，但相机位姿很有价值。</p>
 <hr>
 <h2 id="三特征与匹配">三、特征与匹配
-</h2><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
-    
-    <a href="feature-matching.svg" 
-        
-       target="_blank" 
-       class="gallery-item"> <img src="feature-matching.svg" 
-             alt="特征匹配：在不同照片中找同一个三维点的投影" 
-             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-             
-    </a>
-    
-        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">特征匹配：在不同照片中找同一个三维点的投影</span>
-    
-</div></p>
+</h2><p><a href="/zh-cn/p/sfm-principle/feature-matching.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/sfm-principle/feature-matching.svg" alt="特征匹配：在不同照片中找同一个三维点的投影" loading="lazy" decoding="async"></a>
+</p>
 <p>SfM 的第一步不是直接估计三维，而是先回答一个更基础的问题：<strong>照片 A 里的这个点，和照片 B 里的哪个点是同一个真实空间点？</strong></p>
 <p>这通常靠局部特征完成。一个特征点包含两部分：</p>
 <ul>
@@ -580,7 +248,7 @@
 </ul>
 <p>常见特征包括 SIFT、SURF、ORB、AKAZE 等。经典 SfM 系统很喜欢 SIFT，因为它对尺度、旋转、光照变化相对稳定；实时或移动端系统则常用 ORB 这类更快的二进制特征。</p>
 <p>匹配时最直观的方法是：对图像 A 的每个描述子，在图像 B 中找距离最近的描述子。但这会产生很多误匹配，所以还需要过滤：</p>
-<div class="table-wrapper"><table>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
 <thead>
 <tr>
 <th>过滤策略</th>
@@ -605,20 +273,8 @@
 <p>如果匹配阶段错得太多，后面的几何估计会全部崩掉。所以很多 SfM 工程问题，本质上都是“匹配图不够好”的问题。</p>
 <hr>
 <h2 id="四对极几何">四、对极几何
-</h2><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
-    
-    <a href="epipolar-geometry.svg" 
-        
-       target="_blank" 
-       class="gallery-item"> <img src="epipolar-geometry.svg" 
-             alt="对极几何：一个点在另一张图中只能落在对应的对极线上" 
-             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-             
-    </a>
-    
-        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">对极几何：一个点在另一张图中只能落在对应的对极线上</span>
-    
-</div></p>
+</h2><p><a href="/zh-cn/p/sfm-principle/epipolar-geometry.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/sfm-principle/epipolar-geometry.svg" alt="对极几何：一个点在另一张图中只能落在对应的对极线上" loading="lazy" decoding="async"></a>
+</p>
 <p>有了两张图片之间的匹配点后，SfM 会估计它们之间的相对几何关系。这里最核心的是<strong>对极约束</strong>：</p>
 <p>$$
 x_2^\top F x_1 = 0
@@ -641,20 +297,8 @@ $$</p>
 <p>这一步的意义很大：它把“看起来像”的特征匹配，变成了“几何上说得通”的匹配。</p>
 <hr>
 <h2 id="五三角化">五、三角化
-</h2><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
-    
-    <a href="triangulation.svg" 
-        
-       target="_blank" 
-       class="gallery-item"> <img src="triangulation.svg" 
-             alt="三角化：两条视线在空间中交会，恢复三维点" 
-             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-             
-    </a>
-    
-        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">三角化：两条视线在空间中交会，恢复三维点</span>
-    
-</div></p>
+</h2><p><a href="/zh-cn/p/sfm-principle/triangulation.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/sfm-principle/triangulation.svg" alt="三角化：两条视线在空间中交会，恢复三维点" loading="lazy" decoding="async"></a>
+</p>
 <p>当两台相机的相对位姿已知，并且知道同一个点在两张图中的像素位置，就可以把两条观测射线反投影到三维空间。理想情况下，两条射线会在真实三维点处相交。</p>
 <p>但真实世界不理想：</p>
 <ul>
@@ -677,23 +321,11 @@ $$</p>
 <p>这也是为什么拍摄 SfM 数据时，不能只原地转圈拍。原地旋转能估计相机朝向，但几乎没有平移基线，很难稳定恢复深度。</p>
 <hr>
 <h2 id="六增量式重建">六、增量式重建
-</h2><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
-    
-    <a href="incremental-sfm.svg" 
-        
-       target="_blank" 
-       class="gallery-item"> <img src="incremental-sfm.svg" 
-             alt="增量式 SfM：初始化一对图像，然后反复注册新相机、三角化新点、BA 优化" 
-             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-             
-    </a>
-    
-        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">增量式 SfM：初始化一对图像，然后反复注册新相机、三角化新点、BA 优化</span>
-    
-</div></p>
+</h2><p><a href="/zh-cn/p/sfm-principle/incremental-sfm.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/sfm-principle/incremental-sfm.svg" alt="增量式 SfM：初始化一对图像，然后反复注册新相机、三角化新点、BA 优化" loading="lazy" decoding="async"></a>
+</p>
 <p>工程上最常见的是<strong>增量式 SfM</strong>。它不是一次性把所有照片全部解出来，而是先找一对靠谱的种子图像，再逐步扩张。</p>
 <p>典型循环如下：</p>
-<div class="table-wrapper"><table>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
 <thead>
 <tr>
 <th>阶段</th>
@@ -741,20 +373,8 @@ $$</p>
 <p>PnP 是增量式 SfM 能“接上新照片”的关键。只要一张新图能和已有点云建立足够多的 2D-3D 对应，就可以估计它的相机位姿，再继续扩展重建。</p>
 <hr>
 <h2 id="七bundle-adjustment">七、Bundle Adjustment
-</h2><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
-    
-    <a href="bundle-adjustment.svg" 
-        
-       target="_blank" 
-       class="gallery-item"> <img src="bundle-adjustment.svg" 
-             alt="Bundle Adjustment：同时优化相机位姿和三维点，让重投影误差最小" 
-             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-             
-    </a>
-    
-        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">Bundle Adjustment：同时优化相机位姿和三维点，让重投影误差最小</span>
-    
-</div></p>
+</h2><p><a href="/zh-cn/p/sfm-principle/bundle-adjustment.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/sfm-principle/bundle-adjustment.svg" alt="Bundle Adjustment：同时优化相机位姿和三维点，让重投影误差最小" loading="lazy" decoding="async"></a>
+</p>
 <p>前面的步骤会不断累积误差：匹配有误差、相机位姿有误差、三角化有误差。Bundle Adjustment（BA）就是 SfM 的全局校准器。</p>
 <p>它的目标是最小化所有观测的重投影误差：</p>
 <p>$$
@@ -774,20 +394,8 @@ $$</p>
 <p>没有 BA 的 SfM 往往会出现“局部看起来对，整体慢慢弯掉”的问题；有 BA 后，整个重建会被全局观测一起拉回更一致的位置。</p>
 <hr>
 <h2 id="八尺度失败场景与下游任务">八、尺度、失败场景与下游任务
-</h2><p><div class="post-image-container" style="margin: 15px auto; text-align: center; width: 85%;">
-    
-    <a href="sfm-output.svg" 
-        
-       target="_blank" 
-       class="gallery-item"> <img src="sfm-output.svg" 
-             alt="SfM 的输出：相机位姿和稀疏点云，通常作为 MVS、NeRF、3DGS 的输入" 
-             style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-             
-    </a>
-    
-        <span style="display: block; margin-top: 10px; color: #666; font-size: 0.9em;">SfM 的输出：相机位姿和稀疏点云，通常作为 MVS、NeRF、3DGS 的输入</span>
-    
-</div></p>
+</h2><p><a href="/zh-cn/p/sfm-principle/sfm-output.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/sfm-principle/sfm-output.svg" alt="SfM 的输出：相机位姿和稀疏点云，通常作为 MVS、NeRF、3DGS 的输入" loading="lazy" decoding="async"></a>
+</p>
 <h3 id="81-尺度不确定性">8.1 尺度不确定性
 </h3><p>单目 SfM 最大的限制是<strong>没有绝对尺度</strong>。如果所有相机平移和所有三维点坐标同时放大 10 倍，投影到图像上的像素位置不会变。</p>
 <p>因此 SfM 输出的模型只能确定“相对形状”。要恢复真实尺度，需要额外信息，例如：</p>
@@ -799,7 +407,7 @@ $$</p>
 <li>人工指定两点距离。</li>
 </ul>
 <h3 id="82-常见失败场景">8.2 常见失败场景
-</h3><div class="table-wrapper"><table>
+</h3><div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
 <thead>
 <tr>
 <th>场景</th>
@@ -872,27 +480,20 @@ $$</p>
 </ol>
 <p>理解了 SfM，再看 COLMAP、MVS、NeRF、3DGS 这些系统时，很多流程都会突然清晰起来：它们并不是孤立的技术，而是建立在同一套多视图几何地基之上。</p>
 
-</section>
+</div>
 
-
-    <footer class="article-footer">
+            <footer class="article-footer">
     
-    <section class="article-tags">
-        
-            <a href="/zh-cn/tags/sfm/">SfM</a>
-        
-            <a href="/zh-cn/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E8%A7%86%E8%A7%89/">计算机视觉</a>
-        
-            <a href="/zh-cn/tags/%E4%B8%89%E7%BB%B4%E9%87%8D%E5%BB%BA/">三维重建</a>
-        
-    </section>
-
-
-    </footer>
-
-
+        <div class="article-tags" aria-label="文章标签"><span class="article-footer-label">相关主题</span><a href="/zh-cn/tags/sfm/">SfM</a><a href="/zh-cn/tags/%E8%AE%A1%E7%AE%97%E6%9C%BA%E8%A7%86%E8%A7%89/">计算机视觉</a><a href="/zh-cn/tags/%E4%B8%89%E7%BB%B4%E9%87%8D%E5%BB%BA/">三维重建</a></div>
     
-        <link 
+    
+    
+    <div class="article-endnote"><span>感谢读到这里。</span><a href="#top">回到开头 <span aria-hidden="true">↑</span></a></div>
+</footer>
+
+        </div>
+    </div>
+    <link 
                 rel="stylesheet" 
                 href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
             ><script 
@@ -915,32 +516,15 @@ $$</p>
             ignoredClasses: ["gist"]
         });})
 </script>
-    
 </article>
 
-    
+        <div class="reading-afterword">
+            
+            
 
-    
-
-     
-    
-        
-    
-
-    <footer class="site-footer">
-    <section class="copyright">
-        &copy; 
-        
-        2026 SymphonyW
-    </section>
-    
-    <section class="powerby">
-        使用 <a href="https://gohugo.io/" target="_blank" rel="noopener">Hugo</a> 构建 <br />
-        主题 <b><a href="https://github.com/CaiJimmy/hugo-theme-stack" target="_blank" rel="noopener" data-version="3.26.0">Stack</a></b> 由 <a href="https://jimmycai.com" target="_blank" rel="noopener">Jimmy</a> 设计
-    </section>
-</footer>
-
-
+            
+        </div>
+    </div>
     
 <div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
 
@@ -1019,24 +603,22 @@ $$</p>
                 href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
             >
 
-            </main>
-        </div>
-        <script 
-                src="https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js"integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z&#43;KMkF24hUW8WePSA9HM="crossorigin="anonymous"
-                
-                >
-            </script><script type="text/javascript" src="/ts/main.js" defer></script><script type="text/javascript" src="/ts/custom.js" defer></script>
-<script>
-    (function () {
-        const customFont = document.createElement('link');
-        customFont.href = "https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap";
+    </main>
+    
+<footer class="site-footer">
+    <div class="footer-top"><a class="footer-wordmark" href="/zh-cn/">Symphony<span>W</span></a><p>认真记录，自由生长。</p><a href="#main-content" class="back-top">回到顶部 <span aria-hidden="true">↑</span></a></div>
+    <div class="footer-bottom"><span>© 2026 SymphonyW</span><nav aria-label="更多链接"><a href="/zh-cn/about/">关于</a><a href="https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0" target="_blank" rel="noopener noreferrer me">Bilibili <span aria-hidden="true">↗</span></a><a href="https://github.com/SymphonyW" target="_blank" rel="noopener noreferrer me">GitHub <span aria-hidden="true">↗</span></a><a href="https://twitter.com" target="_blank" rel="noopener noreferrer me">Twitter <span aria-hidden="true">↗</span></a><a href="/zh-cn/index.xml">RSS ↗</a></nav><span class="footer-colophon">由 Hugo 构建 · 持续书写</span></div>
+</footer>
 
-        customFont.type = "text/css";
-        customFont.rel = "stylesheet";
+    
 
-        document.head.appendChild(customFont);
-    }());
-</script>
+<script src="/ts/main.fafdc6fc356f126445b18bf98e9ce585b8429805280aaa2ec379851ce1af6525.js" defer></script>
+
+<script src="/ts/custom.5dc5916b044c5b2b094b202e6f4b4887b36dddcd5d501ad37e26108b2163d8d9.js" defer></script>
+
+
+
+
 
 <script>
 window.MathJax = {
@@ -1050,6 +632,7 @@ window.MathJax = {
   }
 };
 </script>
-<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-    </body>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
+
+</body>
 </html>
