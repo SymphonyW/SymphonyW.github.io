@@ -6,7 +6,7 @@
 <title>Redis基础学习文档</title>
 
 <link rel='canonical' href='https://SymphonyW.github.io/zh-cn/p/redis%E5%9F%BA%E7%A1%80%E5%AD%A6%E4%B9%A0%E6%96%87%E6%A1%A3/'>
-<link rel="stylesheet" href="/scss/custom.min.f0d295cb912bff9c7c8005ab805929870a3bb1a00b396ea5f0d01ff92e41f381.css">
+<link rel="stylesheet" href="/scss/custom.min.e982ec7c8ef21cce5e79c6ff95aeec8d047dffa7fe9b7b42d528b7fd1a8cf3fa.css">
 <script>
 (() => {
     let preference = 'auto';
@@ -18,7 +18,7 @@
 <meta property='og:title' content="Redis基础学习文档">
 <meta property='og:description' content="Redis基础学习文档 基础篇 Redis数据结构介绍 Redis是一个key-value的数据库，key一般是String类型，value的类型多种多样： 我们可以在官网（https://redis.io/commands）查看不同的命令用法。同时我们也可以在命令行通过help指令来查找命令。 Redis的通用命令 通用命令是部分数据类型的，都可以使用的命令，常见的有： KEYS：查看符合模板的所有key。模糊查询的效率不高，又因为Redis是单线程的，所以不建议在生产环境设备上使用 DEL：删除一个或多个指定的key EXISTS：检查一个或多个key是否存在 EXPIRE：为一个key设置有效期（过期时间），单位为秒，有效期到期时，key会被自动删除 TTL：查看一个key的剩余有效期，单位为秒 注意：当一个key设置了过期时间后，如果在过期时间到期之前再次设置了过期时间，那么原来的过期时间会被覆盖掉，新的过期时间会重新计算。并且过期后TTL命令会返回-2，表示key不存在了；如果一个key没有设置过期时间，那么TTL命令会返回-1，表示这个key是永久有效的。 String类型 String类型是Redis中最基本的数据类型，key和value都是字符串类型。不过根据字符串的格式不同，String类型又可以分为以下几种： 普通字符串：普通的字符串类型，可以存储任何文本数据，最大长度为512MB。 数字字符串：可以存储整数或浮点数，可以进行数学运算和自增操作。 二进制字符串：可以存储二进制数据，如图片、音频等非文本数据。 JSON字符串：可以存储JSON格式的数据，可以方便地进行数据交换和存储复杂的数据结构。 不管是哪种格式，底层都是字节数组形式存储，只不过是编码方式不同。字符串类型的最大空间不能超过512MB，如果超过了这个限制，Redis会返回错误。 String类型的常用命令有： SET：设置一个key的值，如果key已经存在，则覆盖原来的值 GET：获取一个key的值，如果key不存在，则返回nil MSET：同时设置多个key的值 MGET：同时获取多个key的值 INCR：将一个key的值加1，如果key不存在，则先将其设置 INCRBY：将一个key的值加上指定的整数，如果key不存在，则先将其设置。也可以实现自减的效果。 INCRBYFLOAT：将一个key的值加上指定的浮点数，如果key不存在，则先将其设置 DECR：将一个key的值减1，如果key不存在，则先将其设置 DECRBY：将一个key的值减去指定的整数，如果key不存在，则先将其设置 SETNX：只有当key不存在时才设置key的值，如果key已经存在，则不做任何操作 SETEX：设置一个key的值，并为key设置过期时间，单位为秒 PSETEX：设置一个key的值，并为key设置过期时间，单位为毫秒 KEY的层级结构 Redis的key是一个字符串，可以包含任何字符，包括空格和特殊字符。为了方便管理和组织key，Redis没有提供真正的层级结构，但我们可以通过在key中使用分隔符（如冒号:）来模拟层级结构。 例如，我们有一个项目叫heima，有user和product两种不同类型的数据，我们可以这样定义key： user相关的key：heima:user:1、heima:user:2、heima:user:3等 product相关的key：heima:product:1、heima:product:2、heima:product:3等 如果value是一个对象，例如一个user对象，我们可以将其序列化成JSON字符串存储在Redis中，这样就可以方便地进行数据交换和存储复杂的数据结构。 Hash类型 Hash类型，也叫散列，其value是一个无序字典，类似于C++中的unordered_map。Hash类型的key是一个字符串，而value是一个包含多个field和value的字典。每个field都是一个字符串，每个value也是一个字符串。主要特征有： Hash类型的元素是无序的，不能通过索引访问 Hash类型的元素是唯一的，不能重复 Hash类型的元素可以在字典中添加或删除 查询速度快，适合于需要频繁查询的场景，例如用户信息、商品信息等。 Hash类型的常用命令有： HSET key field value：设置hash表key中field的值为value，如果key不存在，则创建一个新的hash表；如果field已经存在，则覆盖原来的值 HGET key field：获取hash表key中field的值，如果key不存在或field不存在，则返回nil HMSET key field1 value1 field2 value2 ...：同时设置hash表key中多个field的值，如果key不存在，则创建一个新的hash表；如果field已经存在，则覆盖原来的值 HMGET key field1 field2 ...：同时获取hash表key中多个field的值，如果key不存在或field不存在，则返回nil HGETALL key：获取hash表key中所有field和value的值，如果key不存在，则返回nil HKEYS key：获取hash表key中所有field的值，如果key不存在，则返回nil HVALS key：获取hash表key中所有value的值，如果key不存在，则返回nil HDEL key field1 field2 .">
 <meta property='og:url' content='https://SymphonyW.github.io/zh-cn/p/redis%E5%9F%BA%E7%A1%80%E5%AD%A6%E4%B9%A0%E6%96%87%E6%A1%A3/'>
-<meta property='og:site_name' content='SymphonyW'>
+<meta property='og:site_name' content='Snow'>
 <meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='Redis' /><meta property='article:tag' content='Backend' /><meta property='article:published_time' content='2026-03-24T17:05:27&#43;08:00'/><meta property='article:modified_time' content='2026-03-24T17:05:27&#43;08:00'/><meta property='og:image' content='https://SymphonyW.github.io/zh-cn/p/redis%E5%9F%BA%E7%A1%80%E5%AD%A6%E4%B9%A0%E6%96%87%E6%A1%A3/bg.png' />
 <meta name="twitter:title" content="Redis基础学习文档">
 <meta name="twitter:description" content="Redis基础学习文档 基础篇 Redis数据结构介绍 Redis是一个key-value的数据库，key一般是String类型，value的类型多种多样： 我们可以在官网（https://redis.io/commands）查看不同的命令用法。同时我们也可以在命令行通过help指令来查找命令。 Redis的通用命令 通用命令是部分数据类型的，都可以使用的命令，常见的有： KEYS：查看符合模板的所有key。模糊查询的效率不高，又因为Redis是单线程的，所以不建议在生产环境设备上使用 DEL：删除一个或多个指定的key EXISTS：检查一个或多个key是否存在 EXPIRE：为一个key设置有效期（过期时间），单位为秒，有效期到期时，key会被自动删除 TTL：查看一个key的剩余有效期，单位为秒 注意：当一个key设置了过期时间后，如果在过期时间到期之前再次设置了过期时间，那么原来的过期时间会被覆盖掉，新的过期时间会重新计算。并且过期后TTL命令会返回-2，表示key不存在了；如果一个key没有设置过期时间，那么TTL命令会返回-1，表示这个key是永久有效的。 String类型 String类型是Redis中最基本的数据类型，key和value都是字符串类型。不过根据字符串的格式不同，String类型又可以分为以下几种： 普通字符串：普通的字符串类型，可以存储任何文本数据，最大长度为512MB。 数字字符串：可以存储整数或浮点数，可以进行数学运算和自增操作。 二进制字符串：可以存储二进制数据，如图片、音频等非文本数据。 JSON字符串：可以存储JSON格式的数据，可以方便地进行数据交换和存储复杂的数据结构。 不管是哪种格式，底层都是字节数组形式存储，只不过是编码方式不同。字符串类型的最大空间不能超过512MB，如果超过了这个限制，Redis会返回错误。 String类型的常用命令有： SET：设置一个key的值，如果key已经存在，则覆盖原来的值 GET：获取一个key的值，如果key不存在，则返回nil MSET：同时设置多个key的值 MGET：同时获取多个key的值 INCR：将一个key的值加1，如果key不存在，则先将其设置 INCRBY：将一个key的值加上指定的整数，如果key不存在，则先将其设置。也可以实现自减的效果。 INCRBYFLOAT：将一个key的值加上指定的浮点数，如果key不存在，则先将其设置 DECR：将一个key的值减1，如果key不存在，则先将其设置 DECRBY：将一个key的值减去指定的整数，如果key不存在，则先将其设置 SETNX：只有当key不存在时才设置key的值，如果key已经存在，则不做任何操作 SETEX：设置一个key的值，并为key设置过期时间，单位为秒 PSETEX：设置一个key的值，并为key设置过期时间，单位为毫秒 KEY的层级结构 Redis的key是一个字符串，可以包含任何字符，包括空格和特殊字符。为了方便管理和组织key，Redis没有提供真正的层级结构，但我们可以通过在key中使用分隔符（如冒号:）来模拟层级结构。 例如，我们有一个项目叫heima，有user和product两种不同类型的数据，我们可以这样定义key： user相关的key：heima:user:1、heima:user:2、heima:user:3等 product相关的key：heima:product:1、heima:product:2、heima:product:3等 如果value是一个对象，例如一个user对象，我们可以将其序列化成JSON字符串存储在Redis中，这样就可以方便地进行数据交换和存储复杂的数据结构。 Hash类型 Hash类型，也叫散列，其value是一个无序字典，类似于C++中的unordered_map。Hash类型的key是一个字符串，而value是一个包含多个field和value的字典。每个field都是一个字符串，每个value也是一个字符串。主要特征有： Hash类型的元素是无序的，不能通过索引访问 Hash类型的元素是唯一的，不能重复 Hash类型的元素可以在字典中添加或删除 查询速度快，适合于需要频繁查询的场景，例如用户信息、商品信息等。 Hash类型的常用命令有： HSET key field value：设置hash表key中field的值为value，如果key不存在，则创建一个新的hash表；如果field已经存在，则覆盖原来的值 HGET key field：获取hash表key中field的值，如果key不存在或field不存在，则返回nil HMSET key field1 value1 field2 value2 ...：同时设置hash表key中多个field的值，如果key不存在，则创建一个新的hash表；如果field已经存在，则覆盖原来的值 HMGET key field1 field2 ...：同时获取hash表key中多个field的值，如果key不存在或field不存在，则返回nil HGETALL key：获取hash表key中所有field和value的值，如果key不存在，则返回nil HKEYS key：获取hash表key中所有field的值，如果key不存在，则返回nil HVALS key：获取hash表key中所有value的值，如果key不存在，则返回nil HDEL key field1 field2 ."><meta name="twitter:card" content="summary_large_image">
@@ -33,7 +33,7 @@
     
 <header class="site-header">
     <div class="site-header__inner">
-        <a class="site-brand" href="/zh-cn/" aria-label="SymphonyW — 主页">S<span>w.</span></a>
+        <a class="site-brand" href="/zh-cn/" aria-label="Snow — 主页">S<span>now.</span></a>
         <nav class="site-nav" id="site-navigation" aria-label="主导航">
             
             
@@ -569,15 +569,15 @@
     </main>
     
 <footer class="site-footer">
-    <div class="footer-top"><a class="footer-wordmark" href="/zh-cn/">Symphony<span>W</span></a><p>认真记录，自由生长。</p><a href="#main-content" class="back-top">回到顶部 <span aria-hidden="true">↑</span></a></div>
-    <div class="footer-bottom"><span>© 2026 SymphonyW</span><nav aria-label="更多链接"><a href="/zh-cn/about/">关于</a><a href="https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0" target="_blank" rel="noopener noreferrer me">Bilibili <span aria-hidden="true">↗</span></a><a href="https://github.com/SymphonyW" target="_blank" rel="noopener noreferrer me">GitHub <span aria-hidden="true">↗</span></a><a href="https://twitter.com" target="_blank" rel="noopener noreferrer me">Twitter <span aria-hidden="true">↗</span></a><a href="/zh-cn/index.xml">RSS ↗</a></nav><span class="footer-colophon">由 Hugo 构建 · 持续书写</span></div>
+    <div class="footer-top"><a class="footer-wordmark" href="/zh-cn/" aria-label="Snow">Sno<span>w</span></a><p>认真记录，自由生长。</p><a href="#main-content" class="back-top">回到顶部 <span aria-hidden="true">↑</span></a></div>
+    <div class="footer-bottom"><span>© 2026 Snow</span><nav aria-label="更多链接"><a href="/zh-cn/about/">关于</a><a href="https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0" target="_blank" rel="noopener noreferrer me">Bilibili <span aria-hidden="true">↗</span></a><a href="https://github.com/SymphonyW" target="_blank" rel="noopener noreferrer me">GitHub <span aria-hidden="true">↗</span></a><a href="https://twitter.com" target="_blank" rel="noopener noreferrer me">Twitter <span aria-hidden="true">↗</span></a><a href="/zh-cn/index.xml">RSS ↗</a></nav><span class="footer-colophon">由 Hugo 构建 · 持续书写</span></div>
 </footer>
 
     
 
 <script src="/ts/main.c86029ddb4aad8364879723acaf7efcd526e724d2381088d445aaf6f3ab1bfdf.js" defer></script>
 
-<script src="/ts/custom.5dc5916b044c5b2b094b202e6f4b4887b36dddcd5d501ad37e26108b2163d8d9.js" defer></script>
+<script src="/ts/custom.a8b39d595a55fdc71591eb22b59cf37b9a80b9c88eb360ef18d951d3a0c487fb.js" defer></script>
 
 
 

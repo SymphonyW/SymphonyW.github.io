@@ -6,7 +6,7 @@
 <title>Classic interview question:How exactly should you set RAG retrieval top-k?</title>
 
 <link rel='canonical' href='https://SymphonyW.github.io/p/classic-interview-questionhow-exactly-should-you-set-rag-retrieval-top-k/'>
-<link rel="stylesheet" href="/scss/custom.min.f0d295cb912bff9c7c8005ab805929870a3bb1a00b396ea5f0d01ff92e41f381.css">
+<link rel="stylesheet" href="/scss/custom.min.e982ec7c8ef21cce5e79c6ff95aeec8d047dffa7fe9b7b42d528b7fd1a8cf3fa.css">
 <script>
 (() => {
     let preference = 'auto';
@@ -18,7 +18,7 @@
 <meta property='og:title' content="Classic interview question:How exactly should you set RAG retrieval top-k?">
 <meta property='og:description' content="经典面试题：RAG 检索 top-k 到底怎么设？ 面试官问：&ldquo;你们 RAG 系统的 top-k 是怎么设的？&rdquo; 你如果只回答一句&quot;看情况&quot;，那基本就和 offer 说再见了。top-k 这个看似简单的参数，背后考的是你对完整 RAG 链路的理解深度。本文参考「小哲讲 agent 面试」的拆解思路，把这个高频面试题一次讲透。 一、为什么 top-k 是必考题？ 在 RAG（Retrieval-Augmented Generation）系统中，top-k 决定从向量数据库里召回多少条文档片段喂给大模型。它看起来只是 search_kwargs={&quot;k&quot;: 4} 这么一个参数，但它同时牵动四件事： 维度 top-k 的影响 召回率（Recall） k 太小 → 漏掉真正相关的片段 噪声（Noise） k 太大 → 召回一堆无关片段干扰生成 成本（Cost） k 越大 → Prompt 越长 → token 费用越高、延迟越高 生成质量（Quality） 噪声片段会让 LLM &ldquo;迷失在中间&rdquo;，答非所问 也就是说，top-k 是召回、噪声、成本、质量四个目标的交汇点。面试官真正想听的不是&quot;我设成了 5&quot;，而是&quot;我为什么这样设，背后是什么链路思维&quot;。 二、top-k 设小了：幻觉的温床 很多人凭直觉认为&quot;检索结果越靠前越相关，取 Top-1 不就行了？&quot;——这是第一个坑。 问题在于：排名第一 ≠ 信息完整。 举个真实场景：用户问&quot;公司请假流程是什么？&quot;，向量库里有一份《员工手册》第 3 章详细写了请假流程，但因为切分（chunking）策略，这段内容被切成两半： 片段 A（排名第 1）：&quot;……请假需提前在 OA 系统提交申请，由直属主管审批。&quot; 片段 B（排名第 2）：&ldquo;超过 3 天的请假需提供医院证明，并报 HR 备案。&rdquo; 如果你只取 Top-1，LLM 拿到的上下文只有&quot;提交申请 + 主管审批&quot;这一半，它大概率会编造&ldquo;3 天以上需要什么材料&rdquo;——因为用户问到了，它必须给出回答，但又没看到完整信息。这就是典型的幻觉：模型不是在撒谎，而是被不完整的上下文逼着&quot;脑补&quot;。">
 <meta property='og:url' content='https://SymphonyW.github.io/p/classic-interview-questionhow-exactly-should-you-set-rag-retrieval-top-k/'>
-<meta property='og:site_name' content='SymphonyW'>
+<meta property='og:site_name' content='Snow'>
 <meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='RAG' /><meta property='article:tag' content='LLM' /><meta property='article:tag' content='Interview' /><meta property='article:tag' content='RAG' /><meta property='article:published_time' content='2026-07-08T22:05:00&#43;08:00'/><meta property='article:modified_time' content='2026-07-08T22:05:00&#43;08:00'/><meta property='og:image' content='https://SymphonyW.github.io/p/classic-interview-questionhow-exactly-should-you-set-rag-retrieval-top-k/bg.png' />
 <meta name="twitter:title" content="Classic interview question:How exactly should you set RAG retrieval top-k?">
 <meta name="twitter:description" content="经典面试题：RAG 检索 top-k 到底怎么设？ 面试官问：&ldquo;你们 RAG 系统的 top-k 是怎么设的？&rdquo; 你如果只回答一句&quot;看情况&quot;，那基本就和 offer 说再见了。top-k 这个看似简单的参数，背后考的是你对完整 RAG 链路的理解深度。本文参考「小哲讲 agent 面试」的拆解思路，把这个高频面试题一次讲透。 一、为什么 top-k 是必考题？ 在 RAG（Retrieval-Augmented Generation）系统中，top-k 决定从向量数据库里召回多少条文档片段喂给大模型。它看起来只是 search_kwargs={&quot;k&quot;: 4} 这么一个参数，但它同时牵动四件事： 维度 top-k 的影响 召回率（Recall） k 太小 → 漏掉真正相关的片段 噪声（Noise） k 太大 → 召回一堆无关片段干扰生成 成本（Cost） k 越大 → Prompt 越长 → token 费用越高、延迟越高 生成质量（Quality） 噪声片段会让 LLM &ldquo;迷失在中间&rdquo;，答非所问 也就是说，top-k 是召回、噪声、成本、质量四个目标的交汇点。面试官真正想听的不是&quot;我设成了 5&quot;，而是&quot;我为什么这样设，背后是什么链路思维&quot;。 二、top-k 设小了：幻觉的温床 很多人凭直觉认为&quot;检索结果越靠前越相关，取 Top-1 不就行了？&quot;——这是第一个坑。 问题在于：排名第一 ≠ 信息完整。 举个真实场景：用户问&quot;公司请假流程是什么？&quot;，向量库里有一份《员工手册》第 3 章详细写了请假流程，但因为切分（chunking）策略，这段内容被切成两半： 片段 A（排名第 1）：&quot;……请假需提前在 OA 系统提交申请，由直属主管审批。&quot; 片段 B（排名第 2）：&ldquo;超过 3 天的请假需提供医院证明，并报 HR 备案。&rdquo; 如果你只取 Top-1，LLM 拿到的上下文只有&quot;提交申请 + 主管审批&quot;这一半，它大概率会编造&ldquo;3 天以上需要什么材料&rdquo;——因为用户问到了，它必须给出回答，但又没看到完整信息。这就是典型的幻觉：模型不是在撒谎，而是被不完整的上下文逼着&quot;脑补&quot;。"><meta name="twitter:card" content="summary_large_image">
@@ -33,7 +33,7 @@
     
 <header class="site-header">
     <div class="site-header__inner">
-        <a class="site-brand" href="/" aria-label="SymphonyW — Home">S<span>w.</span></a>
+        <a class="site-brand" href="/" aria-label="Snow — Home">S<span>now.</span></a>
         <nav class="site-nav" id="site-navigation" aria-label="Main navigation">
             
             
@@ -556,15 +556,15 @@
     </main>
     
 <footer class="site-footer">
-    <div class="footer-top"><a class="footer-wordmark" href="/">Symphony<span>W</span></a><p>A place to think. A space to grow.</p><a href="#main-content" class="back-top">Back to top <span aria-hidden="true">↑</span></a></div>
-    <div class="footer-bottom"><span>© 2026 SymphonyW</span><nav aria-label="More links"><a href="/about/">About</a><a href="https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0" target="_blank" rel="noopener noreferrer me">Bilibili <span aria-hidden="true">↗</span></a><a href="https://github.com/SymphonyW" target="_blank" rel="noopener noreferrer me">GitHub <span aria-hidden="true">↗</span></a><a href="https://twitter.com" target="_blank" rel="noopener noreferrer me">Twitter <span aria-hidden="true">↗</span></a><a href="/index.xml">RSS ↗</a></nav><span class="footer-colophon">Built with Hugo · Always in progress</span></div>
+    <div class="footer-top"><a class="footer-wordmark" href="/" aria-label="Snow">Sno<span>w</span></a><p>A place to think. A space to grow.</p><a href="#main-content" class="back-top">Back to top <span aria-hidden="true">↑</span></a></div>
+    <div class="footer-bottom"><span>© 2026 Snow</span><nav aria-label="More links"><a href="/about/">About</a><a href="https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0" target="_blank" rel="noopener noreferrer me">Bilibili <span aria-hidden="true">↗</span></a><a href="https://github.com/SymphonyW" target="_blank" rel="noopener noreferrer me">GitHub <span aria-hidden="true">↗</span></a><a href="https://twitter.com" target="_blank" rel="noopener noreferrer me">Twitter <span aria-hidden="true">↗</span></a><a href="/index.xml">RSS ↗</a></nav><span class="footer-colophon">Built with Hugo · Always in progress</span></div>
 </footer>
 
     
 
 <script src="/ts/main.c86029ddb4aad8364879723acaf7efcd526e724d2381088d445aaf6f3ab1bfdf.js" defer></script>
 
-<script src="/ts/custom.5dc5916b044c5b2b094b202e6f4b4887b36dddcd5d501ad37e26108b2163d8d9.js" defer></script>
+<script src="/ts/custom.a8b39d595a55fdc71591eb22b59cf37b9a80b9c88eb360ef18d951d3a0c487fb.js" defer></script>
 
 
 
