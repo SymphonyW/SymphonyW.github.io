@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="从 Transformer 自注意力、Prefill/Decode、缓存张量形状、显存公式到工程优化，系统讲清楚 KV Cache 的工作方式，以及为什么旧 Query 没有缓存价值。">
+<title>KV Cache 深入理解：为什么只存 K/V，不存 Q</title>
+
+<link rel='canonical' href='https://SymphonyW.github.io/p/kv-cache/'>
+<link rel="stylesheet" href="/scss/custom.min.bf7995e62147d50e1276b97e61d2c8120b52dfef9e32fbaed4e22d2affbd1b2b.css">
+<script>
+(() => {
+    let preference = 'auto';
+    try { preference = localStorage.getItem('StackColorScheme') || preference; } catch (_) {}
+    document.documentElement.dataset.scheme = preference === 'dark' || (preference === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+})();
+</script>
+
+<meta property='og:title' content="KV Cache 深入理解：为什么只存 K/V，不存 Q">
+<meta property='og:description' content="从 Transformer 自注意力、Prefill/Decode、缓存张量形状、显存公式到工程优化，系统讲清楚 KV Cache 的工作方式，以及为什么旧 Query 没有缓存价值。">
+<meta property='og:url' content='https://SymphonyW.github.io/p/kv-cache/'>
+<meta property='og:site_name' content='Snow'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='AI' /><meta property='article:tag' content='LLM' /><meta property='article:tag' content='Transformer' /><meta property='article:tag' content='Inference' /><meta property='article:published_time' content='2026-09-18T21:35:00&#43;08:00'/><meta property='article:modified_time' content='2026-09-18T21:35:00&#43;08:00'/><meta property='og:image' content='https://SymphonyW.github.io/p/kv-cache/bg.svg' />
+<meta name="twitter:title" content="KV Cache 深入理解：为什么只存 K/V，不存 Q">
+<meta name="twitter:description" content="从 Transformer 自注意力、Prefill/Decode、缓存张量形状、显存公式到工程优化，系统讲清楚 KV Cache 的工作方式，以及为什么旧 Query 没有缓存价值。"><meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content='https://SymphonyW.github.io/p/kv-cache/bg.svg' />
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    
+    <noscript><style>@media(max-width:760px){.site-header{position:static}.site-header__inner{height:auto;min-height:66px;flex-wrap:wrap}.site-nav{position:static;display:grid;order:3;flex-basis:100%;padding:8px 0 18px}.menu-toggle,.theme-toggle{display:none}}</style></noscript>
+</head>
+<body id="top" class="article-page">
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    
+<header class="site-header">
+    <div class="site-header__inner">
+        <a class="site-brand" href="/" aria-label="Snow — Home">S<span>now.</span></a>
+        <nav class="site-nav" id="site-navigation" aria-label="Main navigation">
+            
+            
+                
+                    
+                    
+                    <a href="/">Home</a>
+                
+            
+                
+                    
+                    
+                    <a href="/post/" aria-current="page">Blog</a>
+                
+            
+                
+                    
+                    
+                    <a href="/archives/">Archives</a>
+                
+            
+                
+                    
+                    
+                    <a href="/diary/">Diary</a>
+                
+            
+                
+                    
+                    
+                    <a href="/stats/">Stats</a>
+                
+            
+                
+            
+                
+                    
+                    
+                    <a href="/links/">Links</a>
+                
+            
+        </nav>
+        <div class="header-tools">
+            
+                <a class="language-link" href="/zh-cn/p/kv-cache/" lang="zh-cn" hreflang="zh-cn" aria-label="切换到中文">中</a>
+            
+            <button type="button" id="dark-mode-toggle" class="icon-button theme-toggle" aria-label="Toggle color theme" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><path d="M12 4.5a7.5 7.5 0 0 1 0 15z" fill="currentColor" stroke="none"/></svg></button>
+            <a class="icon-button search-link" href="/search/" aria-label="Search articles"><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+</a>
+            <button class="icon-button menu-toggle" type="button" aria-expanded="false" aria-controls="site-navigation" aria-label="Open navigation"><span></span><span></span></button>
+        </div>
+    </div>
+    <div class="reading-progress" aria-hidden="true"></div>
+</header>
+
+    <main id="main-content" class="site-main main" tabindex="-1">
+        
+    <div class="reading-page">
+        <article class="main-article has-toc">
+    <header class="article-header">
+    <div class="article-wayfinding">
+        
+            <a href="/post/"><span aria-hidden="true">←</span> All writing</a>
+        
+        <span class="article-kind">Notes & observations</span>
+    </div>
+    <div class="article-details">
+    
+    <h1 class="article-title">KV Cache 深入理解：为什么只存 K/V，不存 Q</h1>
+    <p class="article-subtitle">从 Transformer 自注意力、Prefill/Decode、缓存张量形状、显存公式到工程优化，系统讲清楚 KV Cache 的工作方式，以及为什么旧 Query 没有缓存价值。</p>
+    <div class="article-meta">
+        
+            <time datetime="2026-09-18T21:35:00&#43;08:00">September 18, 2026</time>
+            <span class="meta-divider" aria-hidden="true">/</span>
+            <span>4 min read</span>
+        
+        
+            <div class="article-translations"><a href="/zh-cn/p/kv-cache/" hreflang="zh-cn" lang="zh-cn">阅读中文版 <span aria-hidden="true">↗</span></a></div>
+        
+    </div>
+</div>
+
+</header>
+
+    <div class="reading-layout">
+        
+            <aside class="reading-margin" aria-label="Article contents">
+                <details class="article-toc" open>
+                    <summary><span>On this page</span><span class="toc-indicator" aria-hidden="true">+</span></summary>
+                    <nav id="TableOfContents">
+  <ol>
+    <li><a href="#一把-attention-看成一次查表">一、把 Attention 看成一次“查表”</a></li>
+    <li><a href="#二prefill-与-decode缓存到底发生在哪">二、Prefill 与 Decode：缓存到底发生在哪</a></li>
+    <li><a href="#三为什么只存-kv不存-q">三、为什么只存 K/V，不存 Q</a>
+      <ol>
+        <li><a href="#如果存-q能不能少算一点">如果存 Q，能不能少算一点？</a></li>
+        <li><a href="#旧-attention-分数要不要缓存">旧 attention 分数要不要缓存？</a></li>
+        <li><a href="#训练时为什么好像会保存-q">训练时为什么好像会保存 Q？</a></li>
+      </ol>
+    </li>
+    <li><a href="#四kv-cache-换来的代价">四、KV Cache 换来的代价</a></li>
+    <li><a href="#五工程实践里还要注意什么">五、工程实践里还要注意什么</a></li>
+  </ol>
+</nav>
+                </details>
+            </aside>
+        
+        <div class="reading-body">
+            <div class="article-content"><h1 id="kv-cache-深入理解为什么只存-kv不存-q">KV Cache 深入理解：为什么只存 K/V，不存 Q
+</h1><blockquote>
+<p>KV Cache 是大模型推理里最重要的加速手段之一。它的名字里只有 K 和 V，没有 Q，不是命名偷懒，而是由自回归解码的计算结构决定的：<strong>未来 token 会反复读取过去 token 的 Key 和 Value，却不会再读取过去 token 的 Query。</strong></p>
+</blockquote>
+<p><a href="/p/kv-cache/bg.svg" target="_blank" rel="noopener noreferrer"><img src="/p/kv-cache/bg.svg" alt="KV Cache 封面" loading="lazy" decoding="async"></a>
+</p>
+<p>先把结论放在前面：</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>对象</th>
+<th>在注意力里的角色</th>
+<th style="text-align:right">未来 token 还会用吗</th>
+<th style="text-align:right">是否适合长期缓存</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Query <code>Q</code></td>
+<td>当前 token 发出的“读请求”</td>
+<td style="text-align:right">否</td>
+<td style="text-align:right">否</td>
+</tr>
+<tr>
+<td>Key <code>K</code></td>
+<td>历史 token 暴露出的“地址/索引”</td>
+<td style="text-align:right">是</td>
+<td style="text-align:right">是</td>
+</tr>
+<tr>
+<td>Value <code>V</code></td>
+<td>历史 token 暴露出的“内容/信息”</td>
+<td style="text-align:right">是</td>
+<td style="text-align:right">是</td>
+</tr>
+<tr>
+<td>Attention score</td>
+<td>当前 Query 与历史 Key 的匹配结果</td>
+<td style="text-align:right">通常否</td>
+<td style="text-align:right">否</td>
+</tr>
+</tbody>
+</table></div>
+<p>如果只记一句话：<strong>Q 是读者，K/V 是被读的记忆。读者每一步都会换，记忆会被后面的读者反复读取。</strong></p>
+<h2 id="一把-attention-看成一次查表">一、把 Attention 看成一次“查表”
+</h2><p>Transformer 里的自注意力通常写成：</p>
+<p>$$
+Q = XW_Q,\quad K = XW_K,\quad V = XW_V
+$$</p>
+<p>$$
+\text{Attention}(Q,K,V)=\text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V
+$$</p>
+<p>这个公式看起来像矩阵乘法，但从直觉上可以拆成三件事：</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>名字</th>
+<th>更像什么</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Q</code> Query</td>
+<td>查询语句</td>
+<td>“我现在想找什么信息？”</td>
+</tr>
+<tr>
+<td><code>K</code> Key</td>
+<td>索引地址</td>
+<td>“我这里有什么特征，可以被谁匹配到？”</td>
+</tr>
+<tr>
+<td><code>V</code> Value</td>
+<td>实际内容</td>
+<td>“如果你匹配到了我，真正拿走的是这些信息。”</td>
+</tr>
+</tbody>
+</table></div>
+<p><a href="/p/kv-cache/attention-cache.svg" target="_blank" rel="noopener noreferrer"><img src="/p/kv-cache/attention-cache.svg" alt="把 Attention 看成查表" loading="lazy" decoding="async"></a>
+</p>
+<p>在普通的全序列计算中，<code>Q/K/V</code> 都来自同一段输入序列 <code>X</code>。但在自回归生成里，时间方向非常关键：模型已经生成了前面的 token，现在只需要生成下一个 token。</p>
+<p>假设当前正在生成第 <code>t</code> 个 token，在某一层 decoder self-attention 中真正需要的是：</p>
+<p>$$
+\text{Attention}(q_t,K_{\le t},V_{\le t})
+=\text{softmax}\left(\frac{q_tK_{\le t}^T}{\sqrt{d_k}}\right)V_{\le t}
+$$</p>
+<p>注意这个公式里只有 <strong>当前的 <code>q_t</code></strong> 和 <strong>历史到当前的 <code>K/V</code></strong>。它并没有用到 <code>q_1, q_2, ..., q_{t-1}</code>。</p>
+<p>这就是 KV Cache 的根。</p>
+<h2 id="二prefill-与-decode缓存到底发生在哪">二、Prefill 与 Decode：缓存到底发生在哪
+</h2><p>大模型生成通常可以分成两个阶段：</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>阶段</th>
+<th style="text-align:right">输入规模</th>
+<th>主要工作</th>
+<th>KV Cache 的状态</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Prefill</td>
+<td style="text-align:right">整个 prompt</td>
+<td>一次性处理用户输入、系统提示词、历史上下文</td>
+<td>建立初始 <code>K/V</code></td>
+</tr>
+<tr>
+<td>Decode</td>
+<td style="text-align:right">每次 1 个新 token</td>
+<td>用新 token 继续生成下一个 token</td>
+<td>每步追加新的 <code>K/V</code></td>
+</tr>
+</tbody>
+</table></div>
+<p><a href="/p/kv-cache/qkv-lifecycle.svg" target="_blank" rel="noopener noreferrer"><img src="/p/kv-cache/qkv-lifecycle.svg" alt="Prefill 与 Decode" loading="lazy" decoding="async"></a>
+</p>
+<p>在 Prefill 阶段，模型要把 prompt 里的所有 token 都跑一遍。比如 prompt 长度是 <code>n</code>，每一层都会产生：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">K_cache[layer] = [k1, k2, ..., kn]
+</span></span><span class="line"><span class="cl">V_cache[layer] = [v1, v2, ..., vn]
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>然后进入 Decode 阶段。每生成一个新 token，模型并不会把从 <code>x1</code> 到 <code>xt</code> 的整段上下文重新计算一遍，而是只处理最新 token：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">new token -&gt; 当前层 hidden state
+</span></span><span class="line"><span class="cl">          -&gt; q_new, k_new, v_new
+</span></span><span class="line"><span class="cl">          -&gt; q_new 读取已有 K_cache / V_cache
+</span></span><span class="line"><span class="cl">          -&gt; k_new, v_new 追加进缓存
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>用伪代码看会更清楚：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl"># prefill
+</span></span><span class="line"><span class="cl">for layer in layers:
+</span></span><span class="line"><span class="cl">    q, k, v = project(prompt_hidden_states)
+</span></span><span class="line"><span class="cl">    K_cache[layer] = k
+</span></span><span class="line"><span class="cl">    V_cache[layer] = v
+</span></span><span class="line"><span class="cl">    hidden_states = attention(q, K_cache[layer], V_cache[layer])
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"># decode: 每次只处理一个新 token
+</span></span><span class="line"><span class="cl">for step in generation:
+</span></span><span class="line"><span class="cl">    x = embedding(last_token)
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    for layer in layers:
+</span></span><span class="line"><span class="cl">        q_new, k_new, v_new = project(x)
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        K_cache[layer].append(k_new)
+</span></span><span class="line"><span class="cl">        V_cache[layer].append(v_new)
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        x = attention(q_new, K_cache[layer], V_cache[layer])
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    last_token = sample(lm_head(x))
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这里有一个容易忽略的细节：<strong>KV Cache 是每一层都有一份，不是整个模型共享一份。</strong> 因为每一层的 hidden state 不同，投影出来的 <code>K/V</code> 也不同。</p>
+<p>常见张量形状可以写成：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">K_cache[layer]: [batch, kv_heads, seq_len, head_dim]
+</span></span><span class="line"><span class="cl">V_cache[layer]: [batch, kv_heads, seq_len, head_dim]
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>如果是普通多头注意力（MHA），<code>kv_heads</code> 通常等于 query heads；如果是 MQA/GQA，<code>kv_heads</code> 会少很多，这是现代大模型降低 KV Cache 显存压力的重要技巧。</p>
+<h2 id="三为什么只存-kv不存-q">三、为什么只存 K/V，不存 Q
+</h2><p>这个问题是理解 KV Cache 的核心。直觉答案是：<strong>旧 Q 用完就没了；旧 K/V 会被未来反复访问。</strong></p>
+<p><a href="/p/kv-cache/why-not-cache-q.svg" target="_blank" rel="noopener noreferrer"><img src="/p/kv-cache/why-not-cache-q.svg" alt="为什么不缓存 Q" loading="lazy" decoding="async"></a>
+</p>
+<p>更严谨一点，可以从四个角度看。</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>角度</th>
+<th>为什么旧 Q 没必要存</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>公式</td>
+<td>生成第 <code>t</code> 个 token 时用的是 <code>q_t K_{\le t}^T</code>，旧的 <code>q_i</code> 不在公式里</td>
+</tr>
+<tr>
+<td>因果方向</td>
+<td>未来 token 只能拿自己的 Query 去看过去的 Key，不能反过来让过去的 Query 查询未来</td>
+</tr>
+<tr>
+<td>复用价值</td>
+<td><code>k_i/v_i</code> 会被 <code>q_{i+1}, q_{i+2}, ...</code> 多次读取；<code>q_i</code> 只服务于第 <code>i</code> 行 attention</td>
+</tr>
+<tr>
+<td>显存收益</td>
+<td>存 Q 会增加大量显存，却几乎不减少 decode 计算</td>
+</tr>
+</tbody>
+</table></div>
+<p>可以把第 <code>i</code> 个 token 的三样东西拆开看：</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>token <code>i</code> 产生的东西</th>
+<th>第 <code>i</code> 步怎么用</th>
+<th>第 <code>i+1</code> 步以后怎么用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>q_i</code></td>
+<td>用它查询 <code>K_{\le i}</code>，生成当前 token 的注意力输出</td>
+<td>不再需要</td>
+</tr>
+<tr>
+<td><code>k_i</code></td>
+<td>被 <code>q_i</code> 匹配，也成为缓存的一部分</td>
+<td>会被未来每个 <code>q_j</code> 匹配</td>
+</tr>
+<tr>
+<td><code>v_i</code></td>
+<td>被当前注意力加权求和</td>
+<td>会被未来每个注意力分布加权求和</td>
+</tr>
+</tbody>
+</table></div>
+<p>再换一种说法：<code>q_i</code> 描述的是“第 <code>i</code> 个位置想问什么”，这个问题只对第 <code>i</code> 个位置有意义。到了第 <code>j</code> 个位置，模型关心的是“第 <code>j</code> 个位置想问什么”，也就是 <code>q_j</code>，而不是 <code>q_i</code>。</p>
+<h3 id="如果存-q能不能少算一点">如果存 Q，能不能少算一点？
+</h3><p>通常不能。</p>
+<p>Decode 时新 token 的 <code>q_new</code> 必须根据当前层的 hidden state 现场算出来。这个 hidden state 又来自前面层的输出，而前面层的输出依赖当前 token、位置编码、残差、MLP、LayerNorm 以及上一层 attention 结果。换句话说，未来的 Query 在未来 token 出现之前根本不存在。</p>
+<p>缓存旧 Query 最多能避免“重新计算旧位置的 Query”。但 KV Cache 的设计本来就已经不重新计算旧位置了：decode 阶段只跑新 token，旧位置不会再进前向计算图。于是旧 Query 没有可节省的计算。</p>
+<h3 id="旧-attention-分数要不要缓存">旧 attention 分数要不要缓存？
+</h3><p>也通常不缓存。</p>
+<p>第 <code>t</code> 步真正需要的是新的一行分数：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">score_t = q_t · [k1, k2, ..., kt]^T
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>旧分数 <code>score_1, score_2, ..., score_{t-1}</code> 描述的是旧 Query 如何看旧 Key。它们不能替代 <code>q_t</code> 对历史 Key 的新匹配。把所有 attention score 都存下来，显存会从线性增长变成更接近平方增长，收益却很小。</p>
+<h3 id="训练时为什么好像会保存-q">训练时为什么好像会保存 Q？
+</h3><p>训练和推理要分开看。</p>
+<p>训练阶段为了反向传播，框架可能会临时保留 <code>Q/K/V</code>、attention score、softmax 结果、MLP 激活等中间量，或者用 activation checkpointing 在反向时重算。那是为了求梯度，不是为了自回归生成加速。</p>
+<p>推理阶段没有反向传播，目标是尽快生成下一个 token。因此长期留下来的只有未来还会被读到的东西：<code>K/V</code>。</p>
+<h2 id="四kv-cache-换来的代价">四、KV Cache 换来的代价
+</h2><p>KV Cache 的本质是用显存换时间。它显著减少重复计算，但显存会随着上下文长度线性增长。</p>
+<p><a href="/p/kv-cache/memory-cost.svg" target="_blank" rel="noopener noreferrer"><img src="/p/kv-cache/memory-cost.svg" alt="KV Cache 显存成本" loading="lazy" decoding="async"></a>
+</p>
+<p>常见估算公式是：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">KV cache bytes
+</span></span><span class="line"><span class="cl">≈ 2 × layers × batch × seq_len × kv_heads × head_dim × bytes_per_elem
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>其中前面的 <code>2</code> 表示 <code>K</code> 和 <code>V</code> 两份缓存。</p>
+<p>举个近似例子，假设模型有：</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>参数</th>
+<th style="text-align:right">数值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>层数 <code>layers</code></td>
+<td style="text-align:right">32</td>
+</tr>
+<tr>
+<td>query heads</td>
+<td style="text-align:right">32</td>
+</tr>
+<tr>
+<td><code>head_dim</code></td>
+<td style="text-align:right">128</td>
+</tr>
+<tr>
+<td>数据类型</td>
+<td style="text-align:right">FP16 / BF16，2 bytes</td>
+</tr>
+</tbody>
+</table></div>
+<p>如果是普通 MHA，<code>kv_heads = 32</code>：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">每 token KV cache
+</span></span><span class="line"><span class="cl">≈ 2 × 32 × 32 × 128 × 2 bytes
+</span></span><span class="line"><span class="cl">= 524288 bytes
+</span></span><span class="line"><span class="cl">≈ 512 KiB
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>如果是 GQA，假设 <code>kv_heads = 8</code>：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">每 token KV cache
+</span></span><span class="line"><span class="cl">≈ 2 × 32 × 8 × 128 × 2 bytes
+</span></span><span class="line"><span class="cl">= 131072 bytes
+</span></span><span class="line"><span class="cl">≈ 128 KiB
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>所以同样 8192 token 的上下文，单请求 KV Cache 可能就是：</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>注意力结构</th>
+<th style="text-align:right">每 token 约占</th>
+<th style="text-align:right">8192 token 约占</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MHA，32 个 KV heads</td>
+<td style="text-align:right">512 KiB</td>
+<td style="text-align:right">4 GiB</td>
+</tr>
+<tr>
+<td>GQA，8 个 KV heads</td>
+<td style="text-align:right">128 KiB</td>
+<td style="text-align:right">1 GiB</td>
+</tr>
+</tbody>
+</table></div>
+<p>这还只是 batch size = 1 的估算。服务端如果要同时处理很多请求，KV Cache 很快就会成为吞吐瓶颈。</p>
+<p>现在再看“不存 Q”的显存意义：</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>架构</th>
+<th>如果额外缓存 Q，会发生什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MHA：<code>q_heads = kv_heads</code></td>
+<td>在原本 K+V 两份之外再加一份 Q，缓存大约增加 50%</td>
+</tr>
+<tr>
+<td>GQA/MQA：<code>q_heads &gt; kv_heads</code></td>
+<td>Q 的头数比 KV 多，额外缓存 Q 可能比现有 KV Cache 还大</td>
+</tr>
+</tbody>
+</table></div>
+<p>也就是说，缓存 Q 不只是“多存一点”，在 GQA/MQA 模型里可能是非常昂贵的浪费。</p>
+<h2 id="五工程实践里还要注意什么">五、工程实践里还要注意什么
+</h2><p>KV Cache 听起来简单，真正服务化时会牵出不少工程问题：</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>问题</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Prefix Cache</td>
+<td>如果很多请求共享同一段系统提示词，可以复用这段前缀的 K/V</td>
+</tr>
+<tr>
+<td>PagedAttention</td>
+<td>把 KV Cache 切成页管理，减少长短请求混批时的显存碎片</td>
+</tr>
+<tr>
+<td>Sliding Window</td>
+<td>只保留最近窗口内的 K/V，适合局部注意力模型</td>
+</tr>
+<tr>
+<td>KV Quantization</td>
+<td>把 KV Cache 量化到更低 bit，降低显存与带宽压力</td>
+</tr>
+<tr>
+<td>Beam Search</td>
+<td>多个 beam 共享前缀时要正确复制、重排或引用缓存</td>
+</tr>
+<tr>
+<td>RoPE 位置</td>
+<td>缓存的 K 通常已经带有位置信息，复用前缀时必须保证 position offset 一致</td>
+</tr>
+</tbody>
+</table></div>
+<p>KV Cache 不会改变模型的理论输出，它只是避免重复计算。实际工程里如果使用低精度缓存、不同 attention kernel、不同 batch 合并策略，可能会有极小的数值差异，但原理上它是等价优化。</p>
+<p>它也不是万能加速器：</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>场景</th>
+<th>KV Cache 的作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Prefill 很长</td>
+<td>仍然要处理完整 prompt，KV Cache 不能消除 prefill 成本</td>
+</tr>
+<tr>
+<td>Decode 很长</td>
+<td>很有用，因为每步都能复用历史 K/V</td>
+</tr>
+<tr>
+<td>上下文非常长</td>
+<td>计算变少，但显存和显存带宽压力变大</td>
+</tr>
+<tr>
+<td>请求很多且长度不一</td>
+<td>需要分页缓存、连续批处理、调度器配合</td>
+</tr>
+</tbody>
+</table></div>
+<p>最后用一张小表把核心逻辑收住：</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>问题</th>
+<th>答案</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>KV Cache 缓存的是什么</td>
+<td>每一层历史 token 的 Key 和 Value</td>
+</tr>
+<tr>
+<td>为什么能加速</td>
+<td>Decode 阶段不再重复计算旧 token 的 K/V 和旧位置输出</td>
+</tr>
+<tr>
+<td>为什么不存 Q</td>
+<td>旧 Query 只用于旧位置的 attention，不会被未来 token 读取</td>
+</tr>
+<tr>
+<td>代价是什么</td>
+<td>显存随层数、序列长度、batch、KV head 数线性增长</td>
+</tr>
+<tr>
+<td>主要优化方向</td>
+<td>GQA/MQA、PagedAttention、Prefix Cache、KV 量化、窗口注意力</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>一句话总结：KV Cache 的名字不是偶然。K/V 是上下文留给未来的可读记忆；Q 是当前 token 临时发出的读取动作。动作结束就结束了，记忆才需要留下来。</strong></p>
+
+</div>
+
+            <footer class="article-footer">
+    
+        <div class="article-tags" aria-label="Article tags"><span class="article-footer-label">Filed under</span><a href="/tags/ai/">AI</a><a href="/tags/llm/">LLM</a><a href="/tags/transformer/">Transformer</a><a href="/tags/inference/">Inference</a></div>
+    
+    
+    
+    <div class="article-endnote"><span>Thanks for reading.</span><a href="#top">Back to top <span aria-hidden="true">↑</span></a></div>
+</footer>
+
+        </div>
+    </div>
+    <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        renderMathInElement(document.body, {
+            delimiters: [
+                { left: "$$", right: "$$", display: true },
+                { left: "$", right: "$", display: false },
+                { left: "\\(", right: "\\)", display: false },
+                { left: "\\[", right: "\\]", display: true }
+            ],
+            ignoredClasses: ["gist"]
+        });})
+</script>
+</article>
+
+        <div class="reading-afterword">
+            
+            
+    <aside class="reading-related">
+        <div class="reading-section-heading"><span class="article-footer-label">Keep reading</span><span aria-hidden="true">↘</span></div>
+        
+            <a class="reading-related-link" href="/p/token-counting-in-ai/"><span class="related-number">01</span><span class="related-title">How Token Counting Works: How AI Providers and API Proxies Track Usage</span><time datetime="2026-09-04">2026.09.04</time><span class="related-arrow" aria-hidden="true">↗</span></a>
+        
+            <a class="reading-related-link" href="/p/rag-fully-explainedfrom-closed-book-to-open-book-llms/"><span class="related-number">02</span><span class="related-title">RAG Fully Explained:From &#34;Closed-Book&#34; to &#34;Open-Book&#34; LLMs</span><time datetime="2026-07-08">2026.07.08</time><span class="related-arrow" aria-hidden="true">↗</span></a>
+        
+    </aside>
+
+
+            
+        </div>
+    </div>
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+    </main>
+    
+<footer class="site-footer">
+    <div class="footer-top"><a class="footer-wordmark" href="/" aria-label="Snow">Sno<span>w</span></a><p>A place to think. A space to grow.</p><a href="#main-content" class="back-top">Back to top <span aria-hidden="true">↑</span></a></div>
+    <div class="footer-bottom"><span>© 2026 Snow</span><nav aria-label="More links"><a href="/about/">About</a><a href="https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0" target="_blank" rel="noopener noreferrer me">Bilibili <span aria-hidden="true">↗</span></a><a href="https://github.com/SymphonyW" target="_blank" rel="noopener noreferrer me">GitHub <span aria-hidden="true">↗</span></a><a href="https://twitter.com" target="_blank" rel="noopener noreferrer me">Twitter <span aria-hidden="true">↗</span></a><a href="/index.xml">RSS ↗</a></nav><span class="footer-colophon">Built with Hugo · Always in progress</span></div>
+</footer>
+
+    
+
+<script src="/ts/main.c86029ddb4aad8364879723acaf7efcd526e724d2381088d445aaf6f3ab1bfdf.js" defer></script>
+
+<script src="/ts/custom.6c99a7b037ac7e2bde801fbad26b9c20b3b18707868c164174142870ef3bc309.js" defer></script>
+
+
+
+
+
+<script>
+window.MathJax = {
+  tex: {
+    
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  svg: {
+    fontCache: 'global'
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
+
+</body>
+</html>

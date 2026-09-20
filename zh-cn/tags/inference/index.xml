@@ -1,0 +1,514 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+    <channel>
+        <title>Inference on Snow</title>
+        <link>https://SymphonyW.github.io/zh-cn/tags/inference/</link>
+        <description>Recent content in Inference on Snow</description>
+        <generator>Hugo -- gohugo.io</generator>
+        <language>zh-cn</language>
+        <copyright>Snow</copyright>
+        <lastBuildDate>Fri, 18 Sep 2026 21:35:00 +0800</lastBuildDate><atom:link href="https://SymphonyW.github.io/zh-cn/tags/inference/index.xml" rel="self" type="application/rss+xml" /><item>
+        <title>KV Cache 深入理解：为什么只存 K/V，不存 Q</title>
+        <link>https://SymphonyW.github.io/zh-cn/p/kv-cache/</link>
+        <pubDate>Fri, 18 Sep 2026 21:35:00 +0800</pubDate>
+        
+        <guid>https://SymphonyW.github.io/zh-cn/p/kv-cache/</guid>
+        <description>&lt;img src="https://SymphonyW.github.io/zh-cn/p/kv-cache/bg.svg" alt="Featured image of post KV Cache 深入理解：为什么只存 K/V，不存 Q" /&gt;&lt;h1 id=&#34;kv-cache-深入理解为什么只存-kv不存-q&#34;&gt;KV Cache 深入理解：为什么只存 K/V，不存 Q
+&lt;/h1&gt;&lt;blockquote&gt;
+&lt;p&gt;KV Cache 是大模型推理里最重要的加速手段之一。它的名字里只有 K 和 V，没有 Q，不是命名偷懒，而是由自回归解码的计算结构决定的：&lt;strong&gt;未来 token 会反复读取过去 token 的 Key 和 Value，却不会再读取过去 token 的 Query。&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/kv-cache/bg.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/kv-cache/bg.svg&#34; alt=&#34;KV Cache 封面&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;p&gt;先把结论放在前面：&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;对象&lt;/th&gt;
+&lt;th&gt;在注意力里的角色&lt;/th&gt;
+&lt;th style=&#34;text-align:right&#34;&gt;未来 token 还会用吗&lt;/th&gt;
+&lt;th style=&#34;text-align:right&#34;&gt;是否适合长期缓存&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;Query &lt;code&gt;Q&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;当前 token 发出的“读请求”&lt;/td&gt;
+&lt;td style=&#34;text-align:right&#34;&gt;否&lt;/td&gt;
+&lt;td style=&#34;text-align:right&#34;&gt;否&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Key &lt;code&gt;K&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;历史 token 暴露出的“地址/索引”&lt;/td&gt;
+&lt;td style=&#34;text-align:right&#34;&gt;是&lt;/td&gt;
+&lt;td style=&#34;text-align:right&#34;&gt;是&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Value &lt;code&gt;V&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;历史 token 暴露出的“内容/信息”&lt;/td&gt;
+&lt;td style=&#34;text-align:right&#34;&gt;是&lt;/td&gt;
+&lt;td style=&#34;text-align:right&#34;&gt;是&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Attention score&lt;/td&gt;
+&lt;td&gt;当前 Query 与历史 Key 的匹配结果&lt;/td&gt;
+&lt;td style=&#34;text-align:right&#34;&gt;通常否&lt;/td&gt;
+&lt;td style=&#34;text-align:right&#34;&gt;否&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;如果只记一句话：&lt;strong&gt;Q 是读者，K/V 是被读的记忆。读者每一步都会换，记忆会被后面的读者反复读取。&lt;/strong&gt;&lt;/p&gt;
+&lt;h2 id=&#34;一把-attention-看成一次查表&#34;&gt;一、把 Attention 看成一次“查表”
+&lt;/h2&gt;&lt;p&gt;Transformer 里的自注意力通常写成：&lt;/p&gt;
+&lt;p&gt;$$
+Q = XW_Q,\quad K = XW_K,\quad V = XW_V
+$$&lt;/p&gt;
+&lt;p&gt;$$
+\text{Attention}(Q,K,V)=\text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V
+$$&lt;/p&gt;
+&lt;p&gt;这个公式看起来像矩阵乘法，但从直觉上可以拆成三件事：&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;名字&lt;/th&gt;
+&lt;th&gt;更像什么&lt;/th&gt;
+&lt;th&gt;含义&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;Q&lt;/code&gt; Query&lt;/td&gt;
+&lt;td&gt;查询语句&lt;/td&gt;
+&lt;td&gt;“我现在想找什么信息？”&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;K&lt;/code&gt; Key&lt;/td&gt;
+&lt;td&gt;索引地址&lt;/td&gt;
+&lt;td&gt;“我这里有什么特征，可以被谁匹配到？”&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;V&lt;/code&gt; Value&lt;/td&gt;
+&lt;td&gt;实际内容&lt;/td&gt;
+&lt;td&gt;“如果你匹配到了我，真正拿走的是这些信息。”&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/kv-cache/attention-cache.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/kv-cache/attention-cache.svg&#34; alt=&#34;把 Attention 看成查表&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;p&gt;在普通的全序列计算中，&lt;code&gt;Q/K/V&lt;/code&gt; 都来自同一段输入序列 &lt;code&gt;X&lt;/code&gt;。但在自回归生成里，时间方向非常关键：模型已经生成了前面的 token，现在只需要生成下一个 token。&lt;/p&gt;
+&lt;p&gt;假设当前正在生成第 &lt;code&gt;t&lt;/code&gt; 个 token，在某一层 decoder self-attention 中真正需要的是：&lt;/p&gt;
+&lt;p&gt;$$
+\text{Attention}(q_t,K_{\le t},V_{\le t})
+=\text{softmax}\left(\frac{q_tK_{\le t}^T}{\sqrt{d_k}}\right)V_{\le t}
+$$&lt;/p&gt;
+&lt;p&gt;注意这个公式里只有 &lt;strong&gt;当前的 &lt;code&gt;q_t&lt;/code&gt;&lt;/strong&gt; 和 &lt;strong&gt;历史到当前的 &lt;code&gt;K/V&lt;/code&gt;&lt;/strong&gt;。它并没有用到 &lt;code&gt;q_1, q_2, ..., q_{t-1}&lt;/code&gt;。&lt;/p&gt;
+&lt;p&gt;这就是 KV Cache 的根。&lt;/p&gt;
+&lt;h2 id=&#34;二prefill-与-decode缓存到底发生在哪&#34;&gt;二、Prefill 与 Decode：缓存到底发生在哪
+&lt;/h2&gt;&lt;p&gt;大模型生成通常可以分成两个阶段：&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;阶段&lt;/th&gt;
+&lt;th style=&#34;text-align:right&#34;&gt;输入规模&lt;/th&gt;
+&lt;th&gt;主要工作&lt;/th&gt;
+&lt;th&gt;KV Cache 的状态&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;Prefill&lt;/td&gt;
+&lt;td style=&#34;text-align:right&#34;&gt;整个 prompt&lt;/td&gt;
+&lt;td&gt;一次性处理用户输入、系统提示词、历史上下文&lt;/td&gt;
+&lt;td&gt;建立初始 &lt;code&gt;K/V&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Decode&lt;/td&gt;
+&lt;td style=&#34;text-align:right&#34;&gt;每次 1 个新 token&lt;/td&gt;
+&lt;td&gt;用新 token 继续生成下一个 token&lt;/td&gt;
+&lt;td&gt;每步追加新的 &lt;code&gt;K/V&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/kv-cache/qkv-lifecycle.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/kv-cache/qkv-lifecycle.svg&#34; alt=&#34;Prefill 与 Decode&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;p&gt;在 Prefill 阶段，模型要把 prompt 里的所有 token 都跑一遍。比如 prompt 长度是 &lt;code&gt;n&lt;/code&gt;，每一层都会产生：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;K_cache[layer] = [k1, k2, ..., kn]
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;V_cache[layer] = [v1, v2, ..., vn]
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;然后进入 Decode 阶段。每生成一个新 token，模型并不会把从 &lt;code&gt;x1&lt;/code&gt; 到 &lt;code&gt;xt&lt;/code&gt; 的整段上下文重新计算一遍，而是只处理最新 token：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;new token -&amp;gt; 当前层 hidden state
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;          -&amp;gt; q_new, k_new, v_new
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;          -&amp;gt; q_new 读取已有 K_cache / V_cache
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;          -&amp;gt; k_new, v_new 追加进缓存
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;用伪代码看会更清楚：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;12
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;13
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;14
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;15
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;16
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;17
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;18
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;19
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;20
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-fallback&#34; data-lang=&#34;fallback&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;# prefill
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;for layer in layers:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    q, k, v = project(prompt_hidden_states)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    K_cache[layer] = k
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    V_cache[layer] = v
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    hidden_states = attention(q, K_cache[layer], V_cache[layer])
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;# decode: 每次只处理一个新 token
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;for step in generation:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    x = embedding(last_token)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    for layer in layers:
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        q_new, k_new, v_new = project(x)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        K_cache[layer].append(k_new)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        V_cache[layer].append(v_new)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        x = attention(q_new, K_cache[layer], V_cache[layer])
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    last_token = sample(lm_head(x))
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;这里有一个容易忽略的细节：&lt;strong&gt;KV Cache 是每一层都有一份，不是整个模型共享一份。&lt;/strong&gt; 因为每一层的 hidden state 不同，投影出来的 &lt;code&gt;K/V&lt;/code&gt; 也不同。&lt;/p&gt;
+&lt;p&gt;常见张量形状可以写成：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;K_cache[layer]: [batch, kv_heads, seq_len, head_dim]
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;V_cache[layer]: [batch, kv_heads, seq_len, head_dim]
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;如果是普通多头注意力（MHA），&lt;code&gt;kv_heads&lt;/code&gt; 通常等于 query heads；如果是 MQA/GQA，&lt;code&gt;kv_heads&lt;/code&gt; 会少很多，这是现代大模型降低 KV Cache 显存压力的重要技巧。&lt;/p&gt;
+&lt;h2 id=&#34;三为什么只存-kv不存-q&#34;&gt;三、为什么只存 K/V，不存 Q
+&lt;/h2&gt;&lt;p&gt;这个问题是理解 KV Cache 的核心。直觉答案是：&lt;strong&gt;旧 Q 用完就没了；旧 K/V 会被未来反复访问。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/kv-cache/why-not-cache-q.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/kv-cache/why-not-cache-q.svg&#34; alt=&#34;为什么不缓存 Q&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;p&gt;更严谨一点，可以从四个角度看。&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;角度&lt;/th&gt;
+&lt;th&gt;为什么旧 Q 没必要存&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;公式&lt;/td&gt;
+&lt;td&gt;生成第 &lt;code&gt;t&lt;/code&gt; 个 token 时用的是 &lt;code&gt;q_t K_{\le t}^T&lt;/code&gt;，旧的 &lt;code&gt;q_i&lt;/code&gt; 不在公式里&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;因果方向&lt;/td&gt;
+&lt;td&gt;未来 token 只能拿自己的 Query 去看过去的 Key，不能反过来让过去的 Query 查询未来&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;复用价值&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;k_i/v_i&lt;/code&gt; 会被 &lt;code&gt;q_{i+1}, q_{i+2}, ...&lt;/code&gt; 多次读取；&lt;code&gt;q_i&lt;/code&gt; 只服务于第 &lt;code&gt;i&lt;/code&gt; 行 attention&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;显存收益&lt;/td&gt;
+&lt;td&gt;存 Q 会增加大量显存，却几乎不减少 decode 计算&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;可以把第 &lt;code&gt;i&lt;/code&gt; 个 token 的三样东西拆开看：&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;token &lt;code&gt;i&lt;/code&gt; 产生的东西&lt;/th&gt;
+&lt;th&gt;第 &lt;code&gt;i&lt;/code&gt; 步怎么用&lt;/th&gt;
+&lt;th&gt;第 &lt;code&gt;i+1&lt;/code&gt; 步以后怎么用&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;q_i&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;用它查询 &lt;code&gt;K_{\le i}&lt;/code&gt;，生成当前 token 的注意力输出&lt;/td&gt;
+&lt;td&gt;不再需要&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;k_i&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;被 &lt;code&gt;q_i&lt;/code&gt; 匹配，也成为缓存的一部分&lt;/td&gt;
+&lt;td&gt;会被未来每个 &lt;code&gt;q_j&lt;/code&gt; 匹配&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;v_i&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;被当前注意力加权求和&lt;/td&gt;
+&lt;td&gt;会被未来每个注意力分布加权求和&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;再换一种说法：&lt;code&gt;q_i&lt;/code&gt; 描述的是“第 &lt;code&gt;i&lt;/code&gt; 个位置想问什么”，这个问题只对第 &lt;code&gt;i&lt;/code&gt; 个位置有意义。到了第 &lt;code&gt;j&lt;/code&gt; 个位置，模型关心的是“第 &lt;code&gt;j&lt;/code&gt; 个位置想问什么”，也就是 &lt;code&gt;q_j&lt;/code&gt;，而不是 &lt;code&gt;q_i&lt;/code&gt;。&lt;/p&gt;
+&lt;h3 id=&#34;如果存-q能不能少算一点&#34;&gt;如果存 Q，能不能少算一点？
+&lt;/h3&gt;&lt;p&gt;通常不能。&lt;/p&gt;
+&lt;p&gt;Decode 时新 token 的 &lt;code&gt;q_new&lt;/code&gt; 必须根据当前层的 hidden state 现场算出来。这个 hidden state 又来自前面层的输出，而前面层的输出依赖当前 token、位置编码、残差、MLP、LayerNorm 以及上一层 attention 结果。换句话说，未来的 Query 在未来 token 出现之前根本不存在。&lt;/p&gt;
+&lt;p&gt;缓存旧 Query 最多能避免“重新计算旧位置的 Query”。但 KV Cache 的设计本来就已经不重新计算旧位置了：decode 阶段只跑新 token，旧位置不会再进前向计算图。于是旧 Query 没有可节省的计算。&lt;/p&gt;
+&lt;h3 id=&#34;旧-attention-分数要不要缓存&#34;&gt;旧 attention 分数要不要缓存？
+&lt;/h3&gt;&lt;p&gt;也通常不缓存。&lt;/p&gt;
+&lt;p&gt;第 &lt;code&gt;t&lt;/code&gt; 步真正需要的是新的一行分数：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;score_t = q_t · [k1, k2, ..., kt]^T
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;旧分数 &lt;code&gt;score_1, score_2, ..., score_{t-1}&lt;/code&gt; 描述的是旧 Query 如何看旧 Key。它们不能替代 &lt;code&gt;q_t&lt;/code&gt; 对历史 Key 的新匹配。把所有 attention score 都存下来，显存会从线性增长变成更接近平方增长，收益却很小。&lt;/p&gt;
+&lt;h3 id=&#34;训练时为什么好像会保存-q&#34;&gt;训练时为什么好像会保存 Q？
+&lt;/h3&gt;&lt;p&gt;训练和推理要分开看。&lt;/p&gt;
+&lt;p&gt;训练阶段为了反向传播，框架可能会临时保留 &lt;code&gt;Q/K/V&lt;/code&gt;、attention score、softmax 结果、MLP 激活等中间量，或者用 activation checkpointing 在反向时重算。那是为了求梯度，不是为了自回归生成加速。&lt;/p&gt;
+&lt;p&gt;推理阶段没有反向传播，目标是尽快生成下一个 token。因此长期留下来的只有未来还会被读到的东西：&lt;code&gt;K/V&lt;/code&gt;。&lt;/p&gt;
+&lt;h2 id=&#34;四kv-cache-换来的代价&#34;&gt;四、KV Cache 换来的代价
+&lt;/h2&gt;&lt;p&gt;KV Cache 的本质是用显存换时间。它显著减少重复计算，但显存会随着上下文长度线性增长。&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/kv-cache/memory-cost.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/kv-cache/memory-cost.svg&#34; alt=&#34;KV Cache 显存成本&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;p&gt;常见估算公式是：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;KV cache bytes
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;≈ 2 × layers × batch × seq_len × kv_heads × head_dim × bytes_per_elem
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;其中前面的 &lt;code&gt;2&lt;/code&gt; 表示 &lt;code&gt;K&lt;/code&gt; 和 &lt;code&gt;V&lt;/code&gt; 两份缓存。&lt;/p&gt;
+&lt;p&gt;举个近似例子，假设模型有：&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;参数&lt;/th&gt;
+&lt;th style=&#34;text-align:right&#34;&gt;数值&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;层数 &lt;code&gt;layers&lt;/code&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:right&#34;&gt;32&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;query heads&lt;/td&gt;
+&lt;td style=&#34;text-align:right&#34;&gt;32&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;head_dim&lt;/code&gt;&lt;/td&gt;
+&lt;td style=&#34;text-align:right&#34;&gt;128&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;数据类型&lt;/td&gt;
+&lt;td style=&#34;text-align:right&#34;&gt;FP16 / BF16，2 bytes&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;如果是普通 MHA，&lt;code&gt;kv_heads = 32&lt;/code&gt;：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;每 token KV cache
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;≈ 2 × 32 × 32 × 128 × 2 bytes
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;= 524288 bytes
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;≈ 512 KiB
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;如果是 GQA，假设 &lt;code&gt;kv_heads = 8&lt;/code&gt;：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;每 token KV cache
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;≈ 2 × 32 × 8 × 128 × 2 bytes
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;= 131072 bytes
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;≈ 128 KiB
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;所以同样 8192 token 的上下文，单请求 KV Cache 可能就是：&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;注意力结构&lt;/th&gt;
+&lt;th style=&#34;text-align:right&#34;&gt;每 token 约占&lt;/th&gt;
+&lt;th style=&#34;text-align:right&#34;&gt;8192 token 约占&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;MHA，32 个 KV heads&lt;/td&gt;
+&lt;td style=&#34;text-align:right&#34;&gt;512 KiB&lt;/td&gt;
+&lt;td style=&#34;text-align:right&#34;&gt;4 GiB&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;GQA，8 个 KV heads&lt;/td&gt;
+&lt;td style=&#34;text-align:right&#34;&gt;128 KiB&lt;/td&gt;
+&lt;td style=&#34;text-align:right&#34;&gt;1 GiB&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;这还只是 batch size = 1 的估算。服务端如果要同时处理很多请求，KV Cache 很快就会成为吞吐瓶颈。&lt;/p&gt;
+&lt;p&gt;现在再看“不存 Q”的显存意义：&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;架构&lt;/th&gt;
+&lt;th&gt;如果额外缓存 Q，会发生什么&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;MHA：&lt;code&gt;q_heads = kv_heads&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;在原本 K+V 两份之外再加一份 Q，缓存大约增加 50%&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;GQA/MQA：&lt;code&gt;q_heads &amp;gt; kv_heads&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;Q 的头数比 KV 多，额外缓存 Q 可能比现有 KV Cache 还大&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;也就是说，缓存 Q 不只是“多存一点”，在 GQA/MQA 模型里可能是非常昂贵的浪费。&lt;/p&gt;
+&lt;h2 id=&#34;五工程实践里还要注意什么&#34;&gt;五、工程实践里还要注意什么
+&lt;/h2&gt;&lt;p&gt;KV Cache 听起来简单，真正服务化时会牵出不少工程问题：&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;问题&lt;/th&gt;
+&lt;th&gt;说明&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;Prefix Cache&lt;/td&gt;
+&lt;td&gt;如果很多请求共享同一段系统提示词，可以复用这段前缀的 K/V&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;PagedAttention&lt;/td&gt;
+&lt;td&gt;把 KV Cache 切成页管理，减少长短请求混批时的显存碎片&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Sliding Window&lt;/td&gt;
+&lt;td&gt;只保留最近窗口内的 K/V，适合局部注意力模型&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;KV Quantization&lt;/td&gt;
+&lt;td&gt;把 KV Cache 量化到更低 bit，降低显存与带宽压力&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Beam Search&lt;/td&gt;
+&lt;td&gt;多个 beam 共享前缀时要正确复制、重排或引用缓存&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;RoPE 位置&lt;/td&gt;
+&lt;td&gt;缓存的 K 通常已经带有位置信息，复用前缀时必须保证 position offset 一致&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;KV Cache 不会改变模型的理论输出，它只是避免重复计算。实际工程里如果使用低精度缓存、不同 attention kernel、不同 batch 合并策略，可能会有极小的数值差异，但原理上它是等价优化。&lt;/p&gt;
+&lt;p&gt;它也不是万能加速器：&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;场景&lt;/th&gt;
+&lt;th&gt;KV Cache 的作用&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;Prefill 很长&lt;/td&gt;
+&lt;td&gt;仍然要处理完整 prompt，KV Cache 不能消除 prefill 成本&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Decode 很长&lt;/td&gt;
+&lt;td&gt;很有用，因为每步都能复用历史 K/V&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;上下文非常长&lt;/td&gt;
+&lt;td&gt;计算变少，但显存和显存带宽压力变大&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;请求很多且长度不一&lt;/td&gt;
+&lt;td&gt;需要分页缓存、连续批处理、调度器配合&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;最后用一张小表把核心逻辑收住：&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;问题&lt;/th&gt;
+&lt;th&gt;答案&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;KV Cache 缓存的是什么&lt;/td&gt;
+&lt;td&gt;每一层历史 token 的 Key 和 Value&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;为什么能加速&lt;/td&gt;
+&lt;td&gt;Decode 阶段不再重复计算旧 token 的 K/V 和旧位置输出&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;为什么不存 Q&lt;/td&gt;
+&lt;td&gt;旧 Query 只用于旧位置的 attention，不会被未来 token 读取&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;代价是什么&lt;/td&gt;
+&lt;td&gt;显存随层数、序列长度、batch、KV head 数线性增长&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;主要优化方向&lt;/td&gt;
+&lt;td&gt;GQA/MQA、PagedAttention、Prefix Cache、KV 量化、窗口注意力&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;strong&gt;一句话总结：KV Cache 的名字不是偶然。K/V 是上下文留给未来的可读记忆；Q 是当前 token 临时发出的读取动作。动作结束就结束了，记忆才需要留下来。&lt;/strong&gt;&lt;/p&gt;
+</description>
+        </item>
+        
+    </channel>
+</rss>
