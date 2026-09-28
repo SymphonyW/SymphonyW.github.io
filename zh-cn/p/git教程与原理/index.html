@@ -245,7 +245,11 @@
         <li><a href="#git-cherry-pick拣选提交">git cherry-pick：拣选提交</a></li>
         <li><a href="#git-rebase变基优雅的合并">git rebase：变基，优雅的合并</a></li>
         <li><a href="#git-tag版本标签">git tag：版本标签</a></li>
-        <li><a href="#gitignore忽略文件">.gitignore：忽略文件</a></li>
+        <li><a href="#gitignore忽略文件">.gitignore：忽略文件</a>
+          <ol>
+            <li><a href="#已经提交过的文件怎么彻底忽略掉">已经提交过的文件，怎么彻底忽略掉？</a></li>
+          </ol>
+        </li>
       </ol>
     </li>
     <li><a href="#避坑宝典git-万能后悔药">避坑宝典：Git 万能后悔药</a>
@@ -1250,6 +1254,104 @@
 </div><blockquote>
 <p>注意：如果文件已经被 add 过了，再写进 .gitignore 是无效的，需要先执行 <code>git rm --cached 文件名</code> 把它从暂存区删掉。</p>
 </blockquote>
+<h4 id="已经提交过的文件怎么彻底忽略掉">已经提交过的文件，怎么彻底忽略掉？
+</h4><p><code>.gitignore</code> 只对<strong>未被 Git 追踪的文件</strong>生效。如果一个文件已经被 <code>git add</code> 或 <code>git commit</code> 过，它已经进入了 Git 的追踪列表，后面再把它写进 <code>.gitignore</code>，Git 仍然会继续关注它的变化。</p>
+<p>正确做法是：<strong>先写忽略规则，再把文件从 Git 追踪列表里移除，最后提交这次移除记录。</strong></p>
+<h5 id="1-先把文件写进-gitignore">1. 先把文件写进 <code>.gitignore</code>
+</h5><p>例如不想再提交本地配置、日志目录、构建产物：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span><span class="lnt">9
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl"># 本地配置
+</span></span><span class="line"><span class="cl">config.local.yaml
+</span></span><span class="line"><span class="cl">.env
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"># 日志目录
+</span></span><span class="line"><span class="cl">logs/
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"># 构建产物
+</span></span><span class="line"><span class="cl">dist/
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h5 id="2-从-git-追踪列表中移除但保留本地文件">2. 从 Git 追踪列表中移除，但保留本地文件
+</h5><p>如果是单个文件：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">git rm --cached config.local.yaml
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>如果是整个目录：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">git rm -r --cached logs/
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这里的 <code>--cached</code> 很关键：它表示<strong>只从 Git 暂存区 / 追踪列表里删除，不删除你电脑上的真实文件</strong>。</p>
+<h5 id="3-提交这次修改">3. 提交这次修改
+</h5><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">git add .gitignore
+</span></span><span class="line"><span class="cl">git commit -m <span class="s2">&#34;停止追踪本地配置和日志文件&#34;</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>提交后，这些文件就不会再出现在普通的 <code>git status</code> 里了。可以用下面命令确认某个文件是否真的被忽略：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">git check-ignore -v config.local.yaml
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>如果能看到匹配到的 <code>.gitignore</code> 规则，说明忽略已经生效。</p>
+<h5 id="4-如果想按-gitignore-重新清理所有已追踪文件">4. 如果想按 <code>.gitignore</code> 重新清理所有已追踪文件
+</h5><p>有时项目早期把 <code>node_modules/</code>、<code>dist/</code>、日志、IDE 配置全都提交过了，一个个删太麻烦，可以这样做：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="c1"># 先从 Git 追踪列表里移除所有文件</span>
+</span></span><span class="line"><span class="cl">git rm -r --cached .
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># 再按 .gitignore 规则重新加入应该被追踪的文件</span>
+</span></span><span class="line"><span class="cl">git add .
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># 提交清理结果</span>
+</span></span><span class="line"><span class="cl">git commit -m <span class="s2">&#34;按 gitignore 规则清理已追踪文件&#34;</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这招很好用，但一定要先 <code>git status</code> 检查结果，确认没有把应该保留的文件误移出版本控制。</p>
+<blockquote>
+<p>⚠️ 注意：这一步只是让文件“以后不再被追踪”，并不会从历史提交里抹掉它。如果你曾经把密码、Token、私钥提交进仓库，要立刻更换密钥，并使用 <code>git filter-repo</code> 或 BFG 这类工具清理历史记录，再和团队同步处理。</p>
+</blockquote>
 <hr>
 <h2 id="避坑宝典git-万能后悔药">避坑宝典：Git 万能后悔药
 </h2><h3 id="新手最常踩的-8-个坑">新手最常踩的 8 个坑
@@ -1846,6 +1948,7 @@ Git 本质是一个内容寻址的键值数据库，核心是四大对象：Blob
     
 
 <script src="/ts/main.c86029ddb4aad8364879723acaf7efcd526e724d2381088d445aaf6f3ab1bfdf.js" defer></script>
+
 
 <script src="/ts/custom.6c99a7b037ac7e2bde801fbad26b9c20b3b18707868c164174142870ef3bc309.js" defer></script>
 

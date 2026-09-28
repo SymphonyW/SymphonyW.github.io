@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="基于视频《互联网架构就这？1个故事讲清楚》整理并扩展，按业务压力、技术解法和架构代价梳理互联网系统从单机到微服务、云原生的完整演进路径。">
+<title>互联网架构演进：从单机到云原生，一篇讲清楚</title>
+
+<link rel='canonical' href='https://SymphonyW.github.io/p/internet-architecture-evolution/'>
+<link rel="stylesheet" href="/scss/custom.min.bf7995e62147d50e1276b97e61d2c8120b52dfef9e32fbaed4e22d2affbd1b2b.css">
+<script>
+(() => {
+    let preference = 'auto';
+    try { preference = localStorage.getItem('StackColorScheme') || preference; } catch (_) {}
+    document.documentElement.dataset.scheme = preference === 'dark' || (preference === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+})();
+</script>
+
+<meta property='og:title' content="互联网架构演进：从单机到云原生，一篇讲清楚">
+<meta property='og:description' content="基于视频《互联网架构就这？1个故事讲清楚》整理并扩展，按业务压力、技术解法和架构代价梳理互联网系统从单机到微服务、云原生的完整演进路径。">
+<meta property='og:url' content='https://SymphonyW.github.io/p/internet-architecture-evolution/'>
+<meta property='og:site_name' content='Snow'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='架构' /><meta property='article:tag' content='高并发' /><meta property='article:tag' content='后端' /><meta property='article:tag' content='云原生' /><meta property='article:tag' content='微服务' /><meta property='article:published_time' content='2026-09-28T20:17:30&#43;08:00'/><meta property='article:modified_time' content='2026-09-28T20:17:30&#43;08:00'/><meta property='og:image' content='https://SymphonyW.github.io/p/internet-architecture-evolution/bg.svg' />
+<meta name="twitter:title" content="互联网架构演进：从单机到云原生，一篇讲清楚">
+<meta name="twitter:description" content="基于视频《互联网架构就这？1个故事讲清楚》整理并扩展，按业务压力、技术解法和架构代价梳理互联网系统从单机到微服务、云原生的完整演进路径。"><meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content='https://SymphonyW.github.io/p/internet-architecture-evolution/bg.svg' />
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    
+    <noscript><style>@media(max-width:760px){.site-header{position:static}.site-header__inner{height:auto;min-height:66px;flex-wrap:wrap}.site-nav{position:static;display:grid;order:3;flex-basis:100%;padding:8px 0 18px}.menu-toggle,.theme-toggle{display:none}}</style></noscript>
+</head>
+<body id="top" class="article-page">
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    
+<header class="site-header">
+    <div class="site-header__inner">
+        <a class="site-brand" href="/" aria-label="Snow — Home">S<span>now.</span></a>
+        <nav class="site-nav" id="site-navigation" aria-label="Main navigation">
+            
+            
+                
+                    
+                    
+                    <a href="/">Home</a>
+                
+            
+                
+                    
+                    
+                    <a href="/post/" aria-current="page">Blog</a>
+                
+            
+                
+                    
+                    
+                    <a href="/archives/">Archives</a>
+                
+            
+                
+                    
+                    
+                    <a href="/diary/">Diary</a>
+                
+            
+                
+                    
+                    
+                    <a href="/stats/">Stats</a>
+                
+            
+                
+            
+                
+                    
+                    
+                    <a href="/links/">Links</a>
+                
+            
+        </nav>
+        <div class="header-tools">
+            
+                <a class="language-link" href="/zh-cn/p/internet-architecture-evolution/" lang="zh-cn" hreflang="zh-cn" aria-label="切换到中文">中</a>
+            
+            <button type="button" id="dark-mode-toggle" class="icon-button theme-toggle" aria-label="Toggle color theme" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><path d="M12 4.5a7.5 7.5 0 0 1 0 15z" fill="currentColor" stroke="none"/></svg></button>
+            <a class="icon-button search-link" href="/search/" aria-label="Search articles"><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+</a>
+            <button class="icon-button menu-toggle" type="button" aria-expanded="false" aria-controls="site-navigation" aria-label="Open navigation"><span></span><span></span></button>
+        </div>
+    </div>
+    <div class="reading-progress" aria-hidden="true"></div>
+</header>
+
+    <main id="main-content" class="site-main main" tabindex="-1">
+        
+    <div class="reading-page">
+        <article class="main-article has-toc">
+    <header class="article-header">
+    <div class="article-wayfinding">
+        
+            <a href="/post/"><span aria-hidden="true">←</span> All writing</a>
+        
+        <span class="article-kind">Notes & observations</span>
+    </div>
+    <div class="article-details">
+    
+    <h1 class="article-title">互联网架构演进：从单机到云原生，一篇讲清楚</h1>
+    <p class="article-subtitle">基于视频《互联网架构就这？1个故事讲清楚》整理并扩展，按业务压力、技术解法和架构代价梳理互联网系统从单机到微服务、云原生的完整演进路径。</p>
+    <div class="article-meta">
+        
+            <time datetime="2026-09-28T20:17:30&#43;08:00">September 28, 2026</time>
+            <span class="meta-divider" aria-hidden="true">/</span>
+            <span>2 min read</span>
+        
+        
+            <div class="article-translations"><a href="/zh-cn/p/internet-architecture-evolution/" hreflang="zh-cn" lang="zh-cn">阅读中文版 <span aria-hidden="true">↗</span></a></div>
+        
+    </div>
+</div>
+
+</header>
+
+    <div class="reading-layout">
+        
+            <aside class="reading-margin" aria-label="Article contents">
+                <details class="article-toc" open>
+                    <summary><span>On this page</span><span class="toc-indicator" aria-hidden="true">+</span></summary>
+                    <nav id="TableOfContents">
+  <ol>
+    <li><a href="#核心脉络">核心脉络</a></li>
+    <li><a href="#数据层怎么长大">数据层怎么长大</a></li>
+    <li><a href="#从单体到服务化">从单体到服务化</a></li>
+    <li><a href="#云原生解决的是交付问题">云原生解决的是交付问题</a></li>
+    <li><a href="#常见误区">常见误区</a></li>
+    <li><a href="#总结">总结</a></li>
+    <li><a href="#参考资料">参考资料</a></li>
+  </ol>
+</nav>
+                </details>
+            </aside>
+        
+        <div class="reading-body">
+            <div class="article-content"><h1 id="互联网架构演进从单机到云原生一篇讲清楚">互联网架构演进：从单机到云原生，一篇讲清楚
+</h1><blockquote>
+<p>这篇文章基于视频《互联网架构就这？1个故事讲清楚》整理，并加入了一些工程化解释。它不是逐字稿，而是把视频里最有价值的那条线拎出来：<strong>架构不是一开始设计出来的，而是业务规模一步步逼出来的。</strong></p>
+</blockquote>
+
+
+
+
+
+
+    
+
+
+<div class="video-wrapper">
+    <iframe src="https://player.bilibili.com/player.html?as_wide=1&amp;high_quality=1&amp;page=1&bvid=BV1M15Q6eEhL"
+            scrolling="no"
+            frameborder="no"
+            framespacing="0"
+            allowfullscreen="true"
+    >
+    </iframe>
+</div>
+
+<p><a href="/p/internet-architecture-evolution/bg.svg" target="_blank" rel="noopener noreferrer"><img src="/p/internet-architecture-evolution/bg.svg" alt="互联网架构演进封面" loading="lazy" decoding="async"></a>
+</p>
+<p>很多人学架构时会被一堆名词砸晕：负载均衡、读写分离、缓存、分库分表、RPC、注册中心、消息队列、微服务、Kubernetes……如果只背概念，很容易知道“有什么”，却不知道“为什么会出现”。</p>
+<p>更好的理解方式是：把一个网站想象成从 0 开始长大。每次流量变大、数据变多、团队变大，原来的方案就会暴露一个瓶颈。于是架构升级一步，解决一个主要矛盾，同时引入新的复杂度。</p>
+<p><a href="/p/internet-architecture-evolution/evolution-roadmap.svg" target="_blank" rel="noopener noreferrer"><img src="/p/internet-architecture-evolution/evolution-roadmap.svg" alt="从单机到云原生的演进路线图" loading="lazy" decoding="async"></a>
+</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>当时最痛的问题</th>
+<th>典型解法</th>
+<th>新代价</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>单机架构</td>
+<td>先把业务跑起来</td>
+<td>应用、数据库、文件都放一台机器</td>
+<td>扩展能力弱，单点明显</td>
+</tr>
+<tr>
+<td>应用与数据分离</td>
+<td>应用和数据库抢资源</td>
+<td>独立应用服务器与数据库服务器</td>
+<td>多一层网络调用</td>
+</tr>
+<tr>
+<td>应用集群</td>
+<td>单台应用扛不住并发</td>
+<td>Nginx / HAProxy + 多应用节点</td>
+<td>Session、部署一致性要处理</td>
+</tr>
+<tr>
+<td>数据库读写分离</td>
+<td>大量读请求压垮主库</td>
+<td>主库写、从库读</td>
+<td>主从延迟和读一致性问题</td>
+</tr>
+<tr>
+<td>多级缓存</td>
+<td>热点数据反复打到数据库</td>
+<td>浏览器缓存、本地缓存、Redis、CDN</td>
+<td>缓存穿透、击穿、雪崩、失效策略</td>
+</tr>
+<tr>
+<td>分库分表</td>
+<td>单库单表容量和写入到顶</td>
+<td>垂直拆库、水平分表</td>
+<td>跨库查询、分布式事务、全局 ID</td>
+</tr>
+<tr>
+<td>CDN 与反向代理</td>
+<td>跨地域访问慢，后端暴露风险高</td>
+<td>CDN、Nginx、WAF、SSL 卸载</td>
+<td>缓存刷新和边缘一致性</td>
+</tr>
+<tr>
+<td>搜索与 NoSQL</td>
+<td>SQL 不适合全文检索和多变结构</td>
+<td>Elasticsearch、MongoDB、HBase 等</td>
+<td>多存储同步和数据口径管理</td>
+</tr>
+<tr>
+<td>分布式服务</td>
+<td>单体越来越难维护和发布</td>
+<td>RPC、注册中心、消息队列</td>
+<td>服务治理、链路排障、最终一致性</td>
+</tr>
+<tr>
+<td>微服务</td>
+<td>服务继续膨胀，交付节奏不一致</td>
+<td>网关、熔断、限流、追踪、配置中心</td>
+<td>运维复杂度显著上升</td>
+</tr>
+<tr>
+<td>容器化与云原生</td>
+<td>服务太多，人工部署不可控</td>
+<td>Docker、Kubernetes、CI/CD、云平台</td>
+<td>平台建设和学习成本</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="核心脉络">核心脉络
+</h2><p>架构演进最重要的不是“用了多少技术”，而是每一步都要回答三个问题：</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>问题</th>
+<th>解释</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>当前瓶颈在哪里？</td>
+<td>是 CPU 不够、数据库扛不住、网络太远，还是团队协作卡住了</td>
+</tr>
+<tr>
+<td>引入什么组件解决？</td>
+<td>负载均衡、缓存、分片、异步消息、服务拆分，各有适用边界</td>
+</tr>
+<tr>
+<td>付出的代价是什么？</td>
+<td>性能通常是用复杂度换来的，不能只看收益</td>
+</tr>
+</tbody>
+</table></div>
+<p>单机时代的价值是快。一个小网站、一个后台系统、一个 MVP，最开始完全可以用一台机器跑应用和数据库。这个阶段追求的是低成本验证，而不是提前把 Kubernetes、服务网格、消息队列全搬进来。<strong>能用简单方案解决的问题，就不要过早分布式。</strong></p>
+<p>当流量变大，最先撞到的是资源竞争：应用在吃 CPU 和内存，数据库在吃磁盘 I/O 和缓存，两者混在一台机器上互相拖累。把应用和数据库拆到不同机器，是第一次非常自然的升级。</p>
+<p>接下来，应用层通常比数据库层更容易横向扩容。多加几台应用服务器，再用 Nginx 或 HAProxy 做负载均衡，请求就能被分摊出去。这里会遇到第一个“分布式味道”的问题：用户 Session 不能只放在某台应用机器上，否则用户下一次请求被转发到另一台机器时就可能丢状态。</p>
+<p><a href="/p/internet-architecture-evolution/traffic-path.svg" target="_blank" rel="noopener noreferrer"><img src="/p/internet-architecture-evolution/traffic-path.svg" alt="典型读请求链路：从用户到缓存再到数据库" loading="lazy" decoding="async"></a>
+</p>
+<p>读流量继续增长后，数据库会成为核心瓶颈。多数互联网业务是读多写少，比如浏览商品、看文章、查资料、刷列表。于是主库负责写，从库负责读，读请求可以横向扩展。但这也意味着主从复制存在延迟：刚写完的数据，马上读从库时可能还没同步过去。</p>
+<p>缓存是下一次大提速。浏览器缓存减少重复下载，CDN 把静态资源放到离用户更近的边缘节点，本地缓存减少进程外调用，Redis 这类分布式缓存挡住大部分热点读请求。缓存的本质是用空间换时间，但它不是免费午餐：缓存失效、脏数据、热点 Key、穿透和雪崩都需要设计。</p>
+<hr>
+<h2 id="数据层怎么长大">数据层怎么长大
+</h2><p>数据库的演进可以单独看成一条线：从一台主库，到主从复制，再到分片，再到多种存储协作。</p>
+<p><a href="/p/internet-architecture-evolution/data-scale.svg" target="_blank" rel="noopener noreferrer"><img src="/p/internet-architecture-evolution/data-scale.svg" alt="数据层扩展：主从、分片与专用存储" loading="lazy" decoding="async"></a>
+</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>数据问题</th>
+<th>常见方案</th>
+<th>适合场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>读多写少</td>
+<td>主从复制、读写分离</td>
+<td>商品详情、文章详情、资料页</td>
+</tr>
+<tr>
+<td>热点读</td>
+<td>Redis / 本地缓存 / CDN</td>
+<td>首页、榜单、用户基础信息</td>
+</tr>
+<tr>
+<td>单表太大</td>
+<td>水平分表</td>
+<td>订单、消息、日志、流水</td>
+</tr>
+<tr>
+<td>业务边界清晰</td>
+<td>垂直分库</td>
+<td>用户库、商品库、订单库、支付库</td>
+</tr>
+<tr>
+<td>全文检索</td>
+<td>Elasticsearch</td>
+<td>商品搜索、站内搜索、日志检索</td>
+</tr>
+<tr>
+<td>灵活结构</td>
+<td>MongoDB / 文档库</td>
+<td>内容、配置、埋点、可变属性</td>
+</tr>
+<tr>
+<td>海量写入</td>
+<td>HBase / Cassandra / 时序库</td>
+<td>监控、IoT、行为日志</td>
+</tr>
+</tbody>
+</table></div>
+<p>分库分表不是“数据库优化的高级形态”，而是单库单表确实扛不住后的手段。它能把数据分散出去，也会带来跨库 Join 难、跨分片事务难、分页统计难、扩容迁移难等问题。</p>
+<p>一个比较稳妥的经验是：先优化索引、SQL、缓存和读写分离；只有当数据量、写入量或单表维护成本真的压上来，再进入分库分表。架构升级要被证据推动，而不是被焦虑推动。</p>
+<hr>
+<h2 id="从单体到服务化">从单体到服务化
+</h2><p>当系统功能越来越多，单体应用会从“简单”慢慢变成“沉重”。所有模块共用一套代码、一套数据库、一条发布流水线，一个小功能也要跟整个系统一起上线。团队变大后，代码冲突、发布排队、故障影响面都会变得很难受。</p>
+<p>服务化的第一步是按业务边界拆开：用户服务、商品服务、订单服务、支付服务、库存服务、推荐服务。拆开之后，每个服务可以独立开发、独立部署、独立扩容。</p>
+<p><a href="/p/internet-architecture-evolution/service-governance.svg" target="_blank" rel="noopener noreferrer"><img src="/p/internet-architecture-evolution/service-governance.svg" alt="微服务治理：网关、注册中心、消息队列与可观测性" loading="lazy" decoding="async"></a>
+</p>
+<p>但服务拆开后，新的问题马上出现：</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>新问题</th>
+<th>需要的能力</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>服务地址动态变化</td>
+<td>注册中心与服务发现</td>
+</tr>
+<tr>
+<td>服务之间要高效调用</td>
+<td>RPC / HTTP API / gRPC</td>
+</tr>
+<tr>
+<td>下游故障会拖垮上游</td>
+<td>超时、重试、熔断、降级</td>
+</tr>
+<tr>
+<td>高峰写入冲击核心链路</td>
+<td>消息队列削峰填谷</td>
+</tr>
+<tr>
+<td>一个请求跨很多服务</td>
+<td>链路追踪、日志聚合、指标监控</td>
+</tr>
+<tr>
+<td>对外入口越来越乱</td>
+<td>API 网关、认证、限流、路由</td>
+</tr>
+</tbody>
+</table></div>
+<p>消息队列是服务化里非常关键的一块。它把同步调用变成异步事件，让订单创建、库存扣减、积分发放、短信通知、搜索索引更新等动作不必全部堵在一个请求里完成。代价是系统从“立即一致”变成“最终一致”，业务上要能接受中间状态。</p>
+<p>微服务不是单体的反面，也不是架构的终点。它适合业务边界稳定、团队规模较大、部署节奏不同、局部扩容需求明显的系统。如果项目还小，团队也小，强行微服务反而会把工程复杂度提前引爆。</p>
+<hr>
+<h2 id="云原生解决的是交付问题">云原生解决的是交付问题
+</h2><p>当服务数量来到几十、上百个，真正痛苦的往往不只是代码，而是交付和运维：环境不一致、发布步骤多、机器资源浪费、扩容靠人工、故障恢复慢。</p>
+<p>Docker 先把应用和依赖打成标准镜像，解决“在我机器上能跑”的问题。Kubernetes 再把镜像调度到集群里，通过声明式配置维持期望状态：副本少了就补，节点挂了就迁，版本升级按策略滚动。</p>
+<p><a href="/p/internet-architecture-evolution/cloud-native-delivery.svg" target="_blank" rel="noopener noreferrer"><img src="/p/internet-architecture-evolution/cloud-native-delivery.svg" alt="云原生交付链路：从代码到镜像再到集群" loading="lazy" decoding="async"></a>
+</p>
+<p>这时架构的关注点从“单个服务怎么写”扩展到“整个平台怎么运行”：</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>能力</th>
+<th>云原生里的对应组件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>构建与发布</td>
+<td>CI/CD、镜像仓库、GitOps</td>
+</tr>
+<tr>
+<td>运行与调度</td>
+<td>Docker、containerd、Kubernetes</td>
+</tr>
+<tr>
+<td>配置与密钥</td>
+<td>ConfigMap、Secret、配置中心</td>
+</tr>
+<tr>
+<td>弹性伸缩</td>
+<td>HPA、自动扩缩容、弹性云资源</td>
+</tr>
+<tr>
+<td>故障恢复</td>
+<td>健康检查、自愈、滚动回滚</td>
+</tr>
+<tr>
+<td>可观测性</td>
+<td>Metrics、Logs、Tracing、告警</td>
+</tr>
+</tbody>
+</table></div>
+<p>云原生并不是“把应用放进容器”这么简单。它更像是一套围绕自动化交付、弹性扩缩容和故障自愈建立起来的平台能力。</p>
+<hr>
+<h2 id="常见误区">常见误区
+</h2><div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>误区</th>
+<th>更合理的理解</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>一上来就微服务才高级</td>
+<td>小系统先单体，等边界和压力清楚后再拆</td>
+</tr>
+<tr>
+<td>上了 Redis 就不会慢</td>
+<td>缓存命中率、淘汰策略、热点 Key 和回源保护同样重要</td>
+</tr>
+<tr>
+<td>分库分表能解决所有数据库问题</td>
+<td>它解决容量和吞吐，也会制造查询、事务、迁移复杂度</td>
+</tr>
+<tr>
+<td>MQ 能保证绝对一致</td>
+<td>MQ 更多是解耦和削峰，常见结果是最终一致</td>
+</tr>
+<tr>
+<td>Kubernetes 会自动让系统高可用</td>
+<td>K8s 提供平台能力，应用本身仍要处理超时、重试、状态和容量</td>
+</tr>
+<tr>
+<td>架构越复杂越厉害</td>
+<td>好架构是在当前约束下足够简单、足够可靠、可继续演进</td>
+</tr>
+</tbody>
+</table></div>
+<p>最后可以用一张“什么时候升级”的表来压轴：</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>你看到的现象</th>
+<th>优先考虑</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>单机 CPU / 内存 / I/O 长期打满</td>
+<td>应用与数据库分离，或垂直扩容</td>
+</tr>
+<tr>
+<td>应用层 QPS 扛不住</td>
+<td>应用集群 + 负载均衡</td>
+</tr>
+<tr>
+<td>数据库读压力高</td>
+<td>索引优化、读写分离、缓存</td>
+</tr>
+<tr>
+<td>热点数据重复查询</td>
+<td>多级缓存、CDN</td>
+</tr>
+<tr>
+<td>单表过大、写入变慢</td>
+<td>分库分表、冷热分离</td>
+</tr>
+<tr>
+<td>搜索体验差</td>
+<td>Elasticsearch 等搜索引擎</td>
+</tr>
+<tr>
+<td>单体发布慢、团队互相阻塞</td>
+<td>按业务边界服务化</td>
+</tr>
+<tr>
+<td>服务太多、部署混乱</td>
+<td>容器化、Kubernetes、CI/CD</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="总结">总结
+</h2><p>互联网架构演进不是一条炫技路线，而是一条不断处理主要矛盾的路线：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">先跑起来
+</span></span><span class="line"><span class="cl">  -&gt; 扛住更多请求
+</span></span><span class="line"><span class="cl">  -&gt; 保护数据库
+</span></span><span class="line"><span class="cl">  -&gt; 拆开数据与业务边界
+</span></span><span class="line"><span class="cl">  -&gt; 让服务独立交付
+</span></span><span class="line"><span class="cl">  -&gt; 让平台自动化运行
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>如果只记一句话：<strong>架构升级的本质，是在业务增长带来的新瓶颈面前，用可接受的复杂度换取性能、可用性、可扩展性和交付效率。</strong></p>
+<p>真正好的架构师，不是把所有热门技术都塞进系统里，而是知道此刻最应该解决哪个问题，也知道每个方案会带来什么代价。</p>
+<hr>
+<h2 id="参考资料">参考资料
+</h2><ul>
+<li>原视频：<a class="link" href="https://www.bilibili.com/video/BV1M15Q6eEhL/"  target="_blank" rel="noopener"
+    >互联网架构就这？1个故事讲清楚</a></li>
+<li>辅助整理：<a class="link" href="https://jishuzhan.net/article/2060519174396522497"  target="_blank" rel="noopener"
+    >互联网架构演进精读：从单机到云原生</a></li>
+<li>B 站视频嵌入使用本站已有 <code>bilibili</code> shortcode；本文配图为基于内容重新绘制的本地 SVG。</li>
+</ul>
+
+</div>
+
+            <footer class="article-footer">
+    
+        <div class="article-tags" aria-label="Article tags"><span class="article-footer-label">Filed under</span><a href="/tags/%E6%9E%B6%E6%9E%84/">架构</a><a href="/tags/%E9%AB%98%E5%B9%B6%E5%8F%91/">高并发</a><a href="/tags/%E5%90%8E%E7%AB%AF/">后端</a><a href="/tags/%E4%BA%91%E5%8E%9F%E7%94%9F/">云原生</a><a href="/tags/%E5%BE%AE%E6%9C%8D%E5%8A%A1/">微服务</a></div>
+    
+    
+    
+    <div class="article-endnote"><span>Thanks for reading.</span><a href="#top">Back to top <span aria-hidden="true">↑</span></a></div>
+</footer>
+
+        </div>
+    </div>
+    
+</article>
+
+        <div class="reading-afterword">
+            
+            
+
+            
+        </div>
+    </div>
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+    </main>
+    
+<footer class="site-footer">
+    <div class="footer-top"><a class="footer-wordmark" href="/" aria-label="Snow">Sno<span>w</span></a><p>A place to think. A space to grow.</p><a href="#main-content" class="back-top">Back to top <span aria-hidden="true">↑</span></a></div>
+    <div class="footer-bottom"><span>© 2026 Snow</span><nav aria-label="More links"><a href="/about/">About</a><a href="https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0" target="_blank" rel="noopener noreferrer me">Bilibili <span aria-hidden="true">↗</span></a><a href="https://github.com/SymphonyW" target="_blank" rel="noopener noreferrer me">GitHub <span aria-hidden="true">↗</span></a><a href="https://twitter.com" target="_blank" rel="noopener noreferrer me">Twitter <span aria-hidden="true">↗</span></a><a href="/index.xml">RSS ↗</a></nav><span class="footer-colophon">Built with Hugo · Always in progress</span></div>
+</footer>
+
+    
+
+<script src="/ts/main.c86029ddb4aad8364879723acaf7efcd526e724d2381088d445aaf6f3ab1bfdf.js" defer></script>
+
+
+<script src="/ts/custom.6c99a7b037ac7e2bde801fbad26b9c20b3b18707868c164174142870ef3bc309.js" defer></script>
+
+
+
+
+
+<script>
+window.MathJax = {
+  tex: {
+    
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  svg: {
+    fontCache: 'global'
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
+
+</body>
+</html>
