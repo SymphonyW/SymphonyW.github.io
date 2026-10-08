@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="zh-cn" dir="ltr">
+<head>
+    <meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="一篇讲透 FastGPT 定位、RAG 检索、可视化工作流、私有部署、API 接入、生产调优与选型边界的实战指南。">
+<title>FastGPT 深度指南：RAG、工作流与私有部署</title>
+
+<link rel='canonical' href='https://SymphonyW.github.io/zh-cn/p/fastgpt-guide/'>
+<link rel="stylesheet" href="/scss/custom.min.bf7995e62147d50e1276b97e61d2c8120b52dfef9e32fbaed4e22d2affbd1b2b.css">
+<script>
+(() => {
+    let preference = 'auto';
+    try { preference = localStorage.getItem('StackColorScheme') || preference; } catch (_) {}
+    document.documentElement.dataset.scheme = preference === 'dark' || (preference === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+})();
+</script>
+
+<meta property='og:title' content="FastGPT 深度指南：RAG、工作流与私有部署">
+<meta property='og:description' content="一篇讲透 FastGPT 定位、RAG 检索、可视化工作流、私有部署、API 接入、生产调优与选型边界的实战指南。">
+<meta property='og:url' content='https://SymphonyW.github.io/zh-cn/p/fastgpt-guide/'>
+<meta property='og:site_name' content='Snow'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='FastGPT' /><meta property='article:tag' content='RAG' /><meta property='article:tag' content='AI Agent' /><meta property='article:tag' content='LLM' /><meta property='article:tag' content='开源项目' /><meta property='article:published_time' content='2026-10-08T00:00:00&#43;08:00'/><meta property='article:modified_time' content='2026-10-08T00:00:00&#43;08:00'/><meta property='og:image' content='https://SymphonyW.github.io/zh-cn/p/fastgpt-guide/bg.png' />
+<meta name="twitter:title" content="FastGPT 深度指南：RAG、工作流与私有部署">
+<meta name="twitter:description" content="一篇讲透 FastGPT 定位、RAG 检索、可视化工作流、私有部署、API 接入、生产调优与选型边界的实战指南。"><meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content='https://SymphonyW.github.io/zh-cn/p/fastgpt-guide/bg.png' />
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    
+    <noscript><style>@media(max-width:760px){.site-header{position:static}.site-header__inner{height:auto;min-height:66px;flex-wrap:wrap}.site-nav{position:static;display:grid;order:3;flex-basis:100%;padding:8px 0 18px}.menu-toggle,.theme-toggle{display:none}}</style></noscript>
+</head>
+<body id="top" class="article-page">
+    <a class="skip-link" href="#main-content">跳至正文</a>
+    
+<header class="site-header">
+    <div class="site-header__inner">
+        <a class="site-brand" href="/zh-cn/" aria-label="Snow — 主页">S<span>now.</span></a>
+        <nav class="site-nav" id="site-navigation" aria-label="主导航">
+            
+            
+                
+                    
+                    
+                    <a href="/zh-cn/">主页</a>
+                
+            
+                
+                    
+                    
+                    <a href="/zh-cn/post/" aria-current="page">博客</a>
+                
+            
+                
+                    
+                    
+                    <a href="/zh-cn/archives/">归档</a>
+                
+            
+                
+                    
+                    
+                    <a href="/zh-cn/stats/">写作记录</a>
+                
+            
+                
+                    
+                    
+                    <a href="/zh-cn/diary/">日记</a>
+                
+            
+                
+            
+                
+                    
+                    
+                    <a href="/zh-cn/links/">链接</a>
+                
+            
+        </nav>
+        <div class="header-tools">
+            
+                <a class="language-link" href="/p/fastgpt-guide/" lang="en" hreflang="en" aria-label="Switch to English">EN</a>
+            
+            <button type="button" id="dark-mode-toggle" class="icon-button theme-toggle" aria-label="切换明暗主题" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><path d="M12 4.5a7.5 7.5 0 0 1 0 15z" fill="currentColor" stroke="none"/></svg></button>
+            <a class="icon-button search-link" href="/zh-cn/search/" aria-label="搜索文章"><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+</a>
+            <button class="icon-button menu-toggle" type="button" aria-expanded="false" aria-controls="site-navigation" aria-label="展开导航"><span></span><span></span></button>
+        </div>
+    </div>
+    <div class="reading-progress" aria-hidden="true"></div>
+</header>
+
+    <main id="main-content" class="site-main main" tabindex="-1">
+        
+    <div class="reading-page">
+        <article class="main-article has-toc">
+    <header class="article-header">
+    <div class="article-wayfinding">
+        
+            <a href="/zh-cn/post/"><span aria-hidden="true">←</span> 全部文章</a>
+        
+        <span class="article-kind">笔记与思考</span>
+    </div>
+    <div class="article-details">
+    
+    <h1 class="article-title">FastGPT 深度指南：RAG、工作流与私有部署</h1>
+    <p class="article-subtitle">一篇讲透 FastGPT 定位、RAG 检索、可视化工作流、私有部署、API 接入、生产调优与选型边界的实战指南。</p>
+    <div class="article-meta">
+        
+            <time datetime="2026-10-08T00:00:00&#43;08:00">2026 年 10 月 08 日</time>
+            <span class="meta-divider" aria-hidden="true">/</span>
+            <span>约 3 分钟</span>
+        
+        
+            <div class="article-translations"><a href="/p/fastgpt-guide/" hreflang="en" lang="en">Read in English <span aria-hidden="true">↗</span></a></div>
+        
+    </div>
+</div>
+
+</header>
+
+    <div class="reading-layout">
+        
+            <aside class="reading-margin" aria-label="文章目录">
+                <details class="article-toc" open>
+                    <summary><span>本文目录</span><span class="toc-indicator" aria-hidden="true">+</span></summary>
+                    <nav id="TableOfContents">
+  <ol>
+    <li><a href="#先给结论fastgpt-到底是什么">先给结论：FastGPT 到底是什么</a></li>
+    <li><a href="#核心能力怎样协作">核心能力怎样协作</a>
+      <ol>
+        <li><a href="#知识库不只是文档转向量">知识库：不只是“文档转向量”</a></li>
+        <li><a href="#工作流把-prompt-变成可观察的程序">工作流：把 Prompt 变成可观察的程序</a></li>
+        <li><a href="#agent插件与发布">Agent、插件与发布</a></li>
+      </ol>
+    </li>
+    <li><a href="#从零做一个员工制度助手">从零做一个“员工制度助手”</a>
+      <ol>
+        <li><a href="#1-先定义验收问题">1. 先定义验收问题</a></li>
+        <li><a href="#2-整理与导入资料">2. 整理与导入资料</a></li>
+        <li><a href="#3-先用最小工作流跑通">3. 先用最小工作流跑通</a></li>
+        <li><a href="#4-再增加实时接口分支">4. 再增加实时接口分支</a></li>
+        <li><a href="#5-发布前做四类测试">5. 发布前做四类测试</a></li>
+      </ol>
+    </li>
+    <li><a href="#私有部署组件命令与生产注意事项">私有部署：组件、命令与生产注意事项</a></li>
+    <li><a href="#api-接入与应用边界">API 接入与应用边界</a></li>
+    <li><a href="#适合谁也不适合谁">适合谁，也不适合谁</a></li>
+    <li><a href="#真正决定效果的是持续评估">真正决定效果的，是持续评估</a></li>
+  </ol>
+</nav>
+                </details>
+            </aside>
+        
+        <div class="reading-body">
+            <div class="article-content"><h1 id="fastgpt-深度指南rag工作流与私有部署">FastGPT 深度指南：RAG、工作流与私有部署
+</h1><blockquote>
+<p>FastGPT 不是一个“换皮聊天框”，也不只是一个向量数据库管理界面。它把模型接入、文档处理、RAG 检索、流程编排、调试、发布和运营放进同一个平台，让团队可以用较低的工程成本，把一段 AI Demo 变成真正可交付的应用。</p>
+</blockquote>
+<p>如果你准备做企业知识库、客服助手、制度问答、内容审核、数据分析 Agent，通常会很快遇到几件麻烦事：模型供应商不止一家；文档格式五花八门；检索效果要持续调；业务流程不可能只靠一段 Prompt；上线后还要做权限、日志、配额和渠道接入。</p>
+<p><a class="link" href="https://github.com/labring/FastGPT"  target="_blank" rel="noopener"
+    >FastGPT</a> 正是试图把这些重复的基础设施收拢起来。官方把它定义为 <strong>AI Agent 构建平台</strong>，社区版面向个人开发者和小型交付团队，核心覆盖 Agent、工作流与知识库。本文不只告诉你按钮在哪里，而是从系统设计出发，讲清它解决了什么、内部怎样协作、如何跑通一个项目，以及什么时候不该用它。</p>
+<p><a href="/zh-cn/p/fastgpt-guide/platform-map.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/fastgpt-guide/platform-map.svg" alt="FastGPT 把模型、知识、流程和发布渠道组织成一套应用平台" loading="lazy" decoding="async"></a>
+</p>
+<hr>
+<h2 id="先给结论fastgpt-到底是什么">先给结论：FastGPT 到底是什么
+</h2><p>可以把 FastGPT 理解为位于 <strong>基础模型之上的 AI 应用层</strong>。模型负责理解与生成，向量数据库负责相似内容查找，而 FastGPT 负责把两者和业务流程组合成一个可配置、可调试、可发布的应用。</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>层次</th>
+<th>它解决的问题</th>
+<th>FastGPT 提供的能力</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>模型层</td>
+<td>调哪个聊天、Embedding、Rerank 或视觉模型</td>
+<td>统一配置模型提供商，通过 AI Proxy 转发与管理</td>
+</tr>
+<tr>
+<td>知识层</td>
+<td>文档怎样切分、索引、检索与引用</td>
+<td>Dataset、数据处理、向量/全文/混合检索、Rerank</td>
+</tr>
+<tr>
+<td>编排层</td>
+<td>多步任务怎样串起来</td>
+<td>可视化节点、变量传递、条件分支、插件与 Agent</td>
+</tr>
+<tr>
+<td>应用层</td>
+<td>如何调试、复用和交付</td>
+<td>应用配置、调试日志、分享链接、API、嵌入与 MCP</td>
+</tr>
+<tr>
+<td>运维层</td>
+<td>谁在用、花了多少、哪里失败</td>
+<td>团队空间、调用记录、配额、日志和数据标注</td>
+</tr>
+</tbody>
+</table></div>
+<p>它最适合两类人：一类是希望快速交付 AI 应用、但不想从零搭 RAG 与编排后台的开发者；另一类是懂业务、能理解流程节点，但不准备手写整套后端的产品或实施团队。</p>
+<p>FastGPT 也不是“安装后立刻拥有高质量答案”的魔法盒。它把工程链路搭好了，但答案质量仍取决于原始资料、分块策略、Embedding、检索参数、Rerank、Prompt 和模型能力。平台降低的是系统建设成本，不会自动消除数据问题。</p>
+<hr>
+<h2 id="核心能力怎样协作">核心能力怎样协作
+</h2><p>FastGPT 的价值不在某个孤立功能，而在于知识库、工作流和发布渠道能使用同一套应用上下文。</p>
+<h3 id="知识库不只是文档转向量">知识库：不只是“文档转向量”
+</h3><p>一份文档进入知识库后，通常经历解析、清洗、分块、索引生成和入库。查询时也不只是做一次向量 Top-K。根据<a class="link" href="https://doc.fastgpt.io/en/guide/dataset/dataset_engine"  target="_blank" rel="noopener"
+    >官方检索说明</a>，FastGPT 可以先做 Query Rewrite，再从语义检索、全文检索乃至图像检索等路径召回候选，用 RRF 融合多路排序，随后通过 Rerank 精排，并根据相关度与引用 Token 上限筛选最终上下文。</p>
+<p><a href="/zh-cn/p/fastgpt-guide/rag-pipeline.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/fastgpt-guide/rag-pipeline.svg" alt="FastGPT 知识库从入库到生成回答的完整链路" loading="lazy" decoding="async"></a>
+</p>
+<p>这里有四个容易被忽略的设计点：</p>
+<ol>
+<li><strong>Dataset、Collection、Data 是三层结构。</strong> Dataset 是可检索的知识库，Collection 类似一个文件或一组资料，Data 是最终参与问答的数据条目。</li>
+<li><strong>一条数据可以映射多个向量。</strong> 长文本可以保留完整答案，同时用多个更短、更聚焦的索引提高召回概率。</li>
+<li><strong>混合检索比单路向量检索更稳。</strong> 产品型号、错误码、人名等精确词更依赖全文检索；自然语言问题更依赖语义检索，RRF 用于融合排名。</li>
+<li><strong>引用上限用 Token 而非只用 Top-K。</strong> 因为不同分块长度差异很大，固定取 5 条可能有时太少、有时又塞爆上下文。</li>
+</ol>
+<p>MongoDB 保存向量之外的大部分业务数据；向量数据可以放在 PostgreSQL/PGVector、Milvus、OceanBase、SeekDB 等后端。使用 PGVector 时，官方文档说明向量 ID 会再关联回 MongoDB 中的原始数据，这也是为什么备份时不能只备向量库。</p>
+<h3 id="工作流把-prompt-变成可观察的程序">工作流：把 Prompt 变成可观察的程序
+</h3><p>最简单的聊天应用只有“用户问题 → AI 对话”两个节点；真实业务往往还需要分类、查库、调用 HTTP 接口、条件判断、格式化和兜底。FastGPT 的节点很像函数：有输入、输出和触发关系，前一个节点的输出可以成为后一个节点的变量。</p>
+<p><a href="/zh-cn/p/fastgpt-guide/workflow-example.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/fastgpt-guide/workflow-example.svg" alt="一个典型的客服工作流如何分流、检索与调用工具" loading="lazy" decoding="async"></a>
+</p>
+<p>官方工作流采用连接线状态推动执行：节点看到活跃前驱才执行，等待中的前驱会让它继续等待，没有可执行前驱则跳过。这个模型带来两个好处：一是分支与汇合能画出来，二是每次运行都可以检查节点输入输出，而不是只看到最后一段模型回答。</p>
+<p>实际项目中，我更建议把职责拆开：</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>节点</th>
+<th>只负责什么</th>
+<th>不要塞进去什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>问题分类</td>
+<td>判断咨询、投诉、查询或闲聊</td>
+<td>大段业务回答</td>
+</tr>
+<tr>
+<td>Query Rewrite</td>
+<td>补全指代，生成适合检索的完整问题</td>
+<td>修改订单号、型号等精确实体</td>
+</tr>
+<tr>
+<td>知识库搜索</td>
+<td>召回可引用资料</td>
+<td>直接替用户下结论</td>
+</tr>
+<tr>
+<td>HTTP / 插件</td>
+<td>查询实时数据或执行动作</td>
+<td>隐藏不可审计的复杂规则</td>
+</tr>
+<tr>
+<td>AI 对话</td>
+<td>综合上下文，按格式生成答案</td>
+<td>持久化关键业务状态</td>
+</tr>
+<tr>
+<td>指定回复</td>
+<td>错误、拒答、转人工等确定性输出</td>
+<td>需要模型推理的开放问题</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="agent插件与发布">Agent、插件与发布
+</h3><p>工作流适合路径相对确定的流程；Agent 更适合让模型根据目标自行选择工具和步骤。插件把搜索、数据库、消息通知、文档处理等外部能力封装成可复用工具。两者并非互相替代：一个可靠的生产 Agent，通常仍会把高风险动作约束在结构清晰的工具与子流程中。</p>
+<p>应用完成后可以通过分享链接、嵌入页面、OpenAI 风格 API 或 MCP Server 暴露。API Key 现在是成员级 OpenAPI 凭据，调用 <code>chat/completions</code> 时推荐在请求体中传 <code>appId</code>；只支持传统 OpenAI Key 配置的客户端，可以使用官方提供的兼容格式。发布不等于安全：公开分享链接会消耗应用所属团队的额度，API Key 应配置过期时间与配额，写操作工具还应做二次授权。</p>
+<hr>
+<h2 id="从零做一个员工制度助手">从零做一个“员工制度助手”
+</h2><p>下面用一个常见场景把整条链路串起来。目标不是让模型自由聊天，而是做到：答案基于公司制度、带来源、资料缺失时明确拒答，涉及个人数据时转到内部接口查询。</p>
+<h3 id="1-先定义验收问题">1. 先定义验收问题
+</h3><p>不要先上传几百份文件。先写 20～50 个代表性问题，其中至少包括：</p>
+<ul>
+<li>可直接命中的事实题：“试用期员工有几天年假？”</li>
+<li>需要跨段落理解的问题：“出差遇到周末，调休和报销分别怎么处理？”</li>
+<li>精确词问题：“OA-TRAVEL-017 表单在哪里？”</li>
+<li>多轮追问：“那海外出差呢？”</li>
+<li>应拒答的问题：“帮我查张三今年还剩多少年假。”</li>
+<li>资料中根本没有的问题，用来检查模型是否会编造。</li>
+</ul>
+<p>这组题既是调参基线，也是后续升级模型、修改分块时的回归测试。没有固定测试集，所谓“感觉回答更好了”通常不可复现。</p>
+<h3 id="2-整理与导入资料">2. 整理与导入资料
+</h3><p>优先处理文档质量，而不是立刻调相似度阈值：删除重复版本；保留标题层级；把扫描 PDF 做 OCR；给文件加版本、部门、生效日期等元数据；把已经失效的制度移出生产知识库。</p>
+<p>分块应保持“语义完整且主题单一”。一条规则的条件、例外和结论最好放在同一个块里；表格不要被机械切成互不相关的行。对于制度问答，可以为同一原文补充多种问题式索引，例如“年假有几天”“年假额度”“试用期能否休年假”，它们都指向同一段完整制度。</p>
+<h3 id="3-先用最小工作流跑通">3. 先用最小工作流跑通
+</h3><p>初版只需要：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">用户问题
+</span></span><span class="line"><span class="cl">  → Query Rewrite（仅多轮或指代不清时启用）
+</span></span><span class="line"><span class="cl">  → 知识库搜索（混合检索 + Rerank）
+</span></span><span class="line"><span class="cl">  → AI 对话（只依据引用回答）
+</span></span><span class="line"><span class="cl">  → 返回答案与来源
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>系统提示词可以从这个约束开始，而不是堆几十条“角色设定”：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">你是公司制度助手。只根据“引用资料”回答。
+</span></span><span class="line"><span class="cl">资料不足时明确说“现有制度资料中没有找到答案”，不要自行补充。
+</span></span><span class="line"><span class="cl">若问题涉及个人余额、审批状态或其他员工隐私，不要猜测，提示用户授权后查询内部系统。
+</span></span><span class="line"><span class="cl">回答先给结论，再列适用条件；引用制度名称与生效日期。
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>如果召回错误码和表单编号不稳定，先打开全文或混合检索；如果自然语言追问召回差，再启用 Query Rewrite；如果候选内容正确但顺序差，再检查 Rerank。一次只改一个变量并重跑测试集，否则你很难知道改进来自哪里。</p>
+<h3 id="4-再增加实时接口分支">4. 再增加实时接口分支
+</h3><p>将“还剩多少年假”识别为个人数据查询，先检查登录身份与授权，再调用内部 HR API。制度解释仍走知识库，个人余额走实时系统。不要把每天变化的数据定期塞进向量库，也不要让 LLM 直接拼数据库 SQL。</p>
+<h3 id="5-发布前做四类测试">5. 发布前做四类测试
+</h3><div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>测试</th>
+<th>重点观察</th>
+<th>合格标准示例</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>检索测试</td>
+<td>目标片段是否进入候选、排名是否合理</td>
+<td>Top 候选包含正确制度，引用无过期版本</td>
+</tr>
+<tr>
+<td>生成测试</td>
+<td>是否忠于引用、是否正确拒答</td>
+<td>无资料时不补写；数字与原文一致</td>
+</tr>
+<tr>
+<td>流程测试</td>
+<td>分支、变量、异常与超时</td>
+<td>API 失败进入兜底，不泄露内部错误</td>
+</tr>
+<tr>
+<td>安全测试</td>
+<td>越权、Prompt 注入、密钥与隐私</td>
+<td>非授权用户无法调用个人查询工具</td>
+</tr>
+</tbody>
+</table></div>
+<hr>
+<h2 id="私有部署组件命令与生产注意事项">私有部署：组件、命令与生产注意事项
+</h2><p><a href="/zh-cn/p/fastgpt-guide/deployment-architecture.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/fastgpt-guide/deployment-architecture.svg" alt="FastGPT 私有部署的主要组件与数据流" loading="lazy" decoding="async"></a>
+</p>
+<p>官方 Docker Compose 架构至少包含 FastGPT 主服务、MongoDB、向量数据库和 AI Proxy。启用 Agent/Skill 沙箱、对象存储、MCP 或更复杂的解析能力后，还会出现额外服务。测试环境可以单机起步，生产环境则应把“能启动”和“可运营”分开看。</p>
+<p>官方当前提供交互式安装脚本，在 Linux、macOS 或 Windows WSL 中运行：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="nv">FASTGPT_DEPLOY_BASE_URL</span><span class="o">=</span>https://doc.fastgpt.cn <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>  bash &lt;<span class="o">(</span>curl -fsSL https://doc.fastgpt.cn/deploy/install.sh<span class="o">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">docker compose --profile prepull pull
+</span></span><span class="line"><span class="cl">docker compose up -d
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>脚本会选择向量数据库方案、下载 Compose 配置并生成随机凭据。生产环境执行远程脚本前，应先下载并审阅内容；保存生成后的 <code>docker-compose.yml</code> 与凭据；把镜像标签固定到明确版本，不要长期依赖 <code>latest</code>。</p>
+<p>部署后首先做三件事：配置对外访问的 <code>FE_DOMAIN</code>；在管理后台配置聊天模型与 Embedding 模型；按需安装系统插件。主服务默认映射到 3000 端口，但生产环境应放在 HTTPS 反向代理之后，并只对外开放必要入口。</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>生产检查项</th>
+<th>建议</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>数据持久化</td>
+<td>MongoDB、向量库、对象存储分别使用持久卷；验证恢复而不只是“做过备份”</td>
+</tr>
+<tr>
+<td>凭据</td>
+<td>替换默认密码；API Key、数据库密码和模型密钥进入 Secret 管理，不写入仓库</td>
+</tr>
+<tr>
+<td>网络</td>
+<td>数据库不暴露公网；限制容器出站范围；上传与抓取功能设置大小、类型和域名白名单</td>
+</tr>
+<tr>
+<td>升级</td>
+<td>阅读跨版本迁移说明，小步升级；先备份并在预发布环境回放核心测试集</td>
+</tr>
+<tr>
+<td>观测</td>
+<td>记录节点耗时、模型错误、Token 消耗、检索命中与拒答率；为外部 API 设置超时和重试</td>
+</tr>
+<tr>
+<td>容量</td>
+<td>关注向量条数、索引构建时间、MongoDB 容量、并发请求和模型限流，而不只看 CPU</td>
+</tr>
+</tbody>
+</table></div>
+<p>向量库选型不必一开始就追求最大规模。官方建议中，PGVector 方案更轻量，适合中小规模；达到非常大的向量规模或需要更强分布式能力时再评估 Milvus 等方案。迁移成本不仅是搬向量，还包括索引重建、停机窗口、性能回归与备份策略。</p>
+<hr>
+<h2 id="api-接入与应用边界">API 接入与应用边界
+</h2><p>FastGPT 可以作为独立聊天页使用，也可以隐藏在你自己的 Web、企业微信、飞书或业务系统之后。OpenAI 风格接口降低了接入成本，但“兼容”不意味着每个扩展字段都完全等同于 OpenAI；应以当前实例的 OpenAPI 文档为准。</p>
+<p>一个便于理解的请求示例如下，实际 Key 和 App ID 从“发布渠道 → API”获得：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">curl https://fastgpt.example.com/api/v1/chat/completions <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>  -H <span class="s2">&#34;Authorization: Bearer </span><span class="nv">$FASTGPT_API_KEY</span><span class="s2">&#34;</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>  -H <span class="s2">&#34;Content-Type: application/json&#34;</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>  -d <span class="s1">&#39;{
+</span></span></span><span class="line"><span class="cl"><span class="s1">    &#34;appId&#34;: &#34;your-app-id&#34;,
+</span></span></span><span class="line"><span class="cl"><span class="s1">    &#34;stream&#34;: false,
+</span></span></span><span class="line"><span class="cl"><span class="s1">    &#34;messages&#34;: [
+</span></span></span><span class="line"><span class="cl"><span class="s1">      {&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;试用期员工有几天年假？&#34;}
+</span></span></span><span class="line"><span class="cl"><span class="s1">    ]
+</span></span></span><span class="line"><span class="cl"><span class="s1">  }&#39;</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>在应用架构里，建议把 FastGPT 当成“AI 决策与生成服务”，而不是主业务数据库：订单状态、余额、审批结果等事实仍由业务系统保存；FastGPT 通过只读或受控工具查询它们。涉及扣款、发送通知、删除数据等副作用操作时，要加入幂等键、权限校验、参数校验和人工确认，不能只相信模型生成的参数。</p>
+<hr>
+<h2 id="适合谁也不适合谁">适合谁，也不适合谁
+</h2><div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>场景</th>
+<th style="text-align:center">适配度</th>
+<th>原因</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>企业文档问答、客服知识助手</td>
+<td style="text-align:center">高</td>
+<td>知识库、引用、工作流、发布链路齐全</td>
+</tr>
+<tr>
+<td>内部流程助手、表单审核、内容处理</td>
+<td style="text-align:center">高</td>
+<td>可视化编排方便连接模型、规则和 HTTP 工具</td>
+</tr>
+<tr>
+<td>快速交付多个垂直 AI 应用</td>
+<td style="text-align:center">高</td>
+<td>模型、知识库、插件和应用模板可复用</td>
+</tr>
+<tr>
+<td>纯聊天模型体验页</td>
+<td style="text-align:center">中</td>
+<td>能做，但如果没有知识与流程需求，平台可能偏重</td>
+</tr>
+<tr>
+<td>超低延迟、高吞吐推理网关</td>
+<td style="text-align:center">低</td>
+<td>更适合由专门模型网关和推理服务承担</td>
+</tr>
+<tr>
+<td>强事务、强一致性的核心业务流程</td>
+<td style="text-align:center">低</td>
+<td>LLM 与可视化编排不能替代事务系统和确定性服务</td>
+</tr>
+<tr>
+<td>想直接运营同类多租户 SaaS</td>
+<td style="text-align:center">需谨慎</td>
+<td>许可证对同类多租户 SaaS 和品牌信息有额外条件</td>
+</tr>
+</tbody>
+</table></div>
+<p>与 Dify、Coze、Langflow、Flowise、LangChain/LlamaIndex 自研方案相比，FastGPT 的鲜明重心是 <strong>知识库问答 + 可视化工作流 + 私有部署交付</strong>。平台类工具更快、更统一；代码框架则更自由、更容易做深度定制。正确选择通常不是问“谁功能最多”，而是问：团队最想省掉哪部分工程工作，又愿意承担哪部分平台约束。</p>
+<p>许可证尤其值得单独阅读。FastGPT 使用带附加条件的 FastGPT Open Source License：其文本以 Apache License 2.0 为基础，但对运营类似 FastGPT 的多租户 SaaS、移除或修改控制台 Logo 与版权信息等情形有额外要求。本文不是法律意见，商业化前应以仓库中的<a class="link" href="https://github.com/labring/FastGPT/blob/main/LICENSE"  target="_blank" rel="noopener"
+    >最新 LICENSE</a>为准，必要时联系项目方取得授权。</p>
+<hr>
+<h2 id="真正决定效果的是持续评估">真正决定效果的，是持续评估
+</h2><p>FastGPT 最有价值的地方，是让一条 AI 应用链路变得可搭建、可观察、可复用；它最容易被误用的地方，是让人以为拖完节点就等于完成系统。</p>
+<p>一个可长期运行的项目，至少应持续观察这些指标：</p>
+<ul>
+<li><strong>检索命中率</strong>：正确资料是否进入候选，以及最终是否被引用；</li>
+<li><strong>忠实度</strong>：答案中的事实能否由引用支持；</li>
+<li><strong>任务成功率</strong>：流程是否真正完成业务目标，而不是只生成了流畅文本；</li>
+<li><strong>拒答与转人工率</strong>：过高说明覆盖不足，过低可能意味着模型在冒险回答；</li>
+<li><strong>P50 / P95 延迟</strong>：拆到 Query Rewrite、检索、Rerank、模型和外部工具；</li>
+<li><strong>单次成功任务成本</strong>：只看 Token 单价会忽略失败重试和无效调用；</li>
+<li><strong>版本回归</strong>：模型、Prompt、知识、工作流任一变化都应跑固定测试集。</li>
+</ul>
+<p>如果只记住一句话：<strong>把 FastGPT 当成 AI 应用工程平台，而不是答案质量的替代品。</strong> 先用最小流程证明价值，再用评测集迭代检索和 Prompt，最后才增加 Agent、插件与自动化动作。这样做出来的系统，通常比一开始就画满整张工作流画布更可靠。</p>
+<p>本文依据 2026 年 10 月可见的官方资料整理。FastGPT 更新较快，部署变量、版本依赖与接口字段请在实施前再次核对。</p>
+<p><strong>官方资料：</strong> <a class="link" href="https://github.com/labring/FastGPT"  target="_blank" rel="noopener"
+    >GitHub 仓库</a> · <a class="link" href="https://doc.fastgpt.io/en/guide/version/opensource/intro"  target="_blank" rel="noopener"
+    >社区版说明</a> · <a class="link" href="https://doc.fastgpt.io/en/guide/build/workflow/intro"  target="_blank" rel="noopener"
+    >工作流原理</a> · <a class="link" href="https://doc.fastgpt.io/en/guide/dataset/dataset_engine"  target="_blank" rel="noopener"
+    >知识库检索</a> · <a class="link" href="https://doc.fastgpt.io/en/self-host/deploy/docker"  target="_blank" rel="noopener"
+    >Docker Compose 部署</a> · <a class="link" href="https://doc.fastgpt.io/en/guide/build/publish/openapi"  target="_blank" rel="noopener"
+    >API 发布</a></p>
+
+</div>
+
+            <footer class="article-footer">
+    
+        <div class="article-tags" aria-label="文章标签"><span class="article-footer-label">相关主题</span><a href="/zh-cn/tags/fastgpt/">FastGPT</a><a href="/zh-cn/tags/rag/">RAG</a><a href="/zh-cn/tags/ai-agent/">AI Agent</a><a href="/zh-cn/tags/llm/">LLM</a><a href="/zh-cn/tags/%E5%BC%80%E6%BA%90%E9%A1%B9%E7%9B%AE/">开源项目</a></div>
+    
+    
+    
+    <div class="article-endnote"><span>感谢读到这里。</span><a href="#top">回到开头 <span aria-hidden="true">↑</span></a></div>
+</footer>
+
+        </div>
+    </div>
+    
+</article>
+
+        <div class="reading-afterword">
+            
+            
+    <aside class="reading-related">
+        <div class="reading-section-heading"><span class="article-footer-label">延伸阅读</span><span aria-hidden="true">↘</span></div>
+        
+            <a class="reading-related-link" href="/zh-cn/p/%E7%BB%8F%E5%85%B8%E9%9D%A2%E8%AF%95%E9%A2%98rag-%E6%A3%80%E7%B4%A2-top-k-%E5%88%B0%E5%BA%95%E6%80%8E%E4%B9%88%E8%AE%BE/"><span class="related-number">01</span><span class="related-title">经典面试题：RAG 检索 top-k 到底怎么设？</span><time datetime="2026-07-08">2026.07.08</time><span class="related-arrow" aria-hidden="true">↗</span></a>
+        
+            <a class="reading-related-link" href="/zh-cn/p/%E5%85%B3%E4%BA%8E%E5%BE%AE%E8%B0%83%E7%9A%84%E6%97%B6%E6%9C%BA/"><span class="related-number">02</span><span class="related-title">关于微调的时机</span><time datetime="2026-07-11">2026.07.11</time><span class="related-arrow" aria-hidden="true">↗</span></a>
+        
+            <a class="reading-related-link" href="/zh-cn/p/rag-%E6%8A%80%E6%9C%AF%E5%85%A8%E6%99%AF%E8%AE%A9%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%BB%8E%E9%97%AD%E5%8D%B7%E8%80%83%E8%AF%95%E5%88%B0%E5%BC%80%E5%8D%B7%E8%80%83%E8%AF%95/"><span class="related-number">03</span><span class="related-title">RAG 技术全景：让大模型从&#34;闭卷考试&#34;到&#34;开卷考试&#34;</span><time datetime="2026-07-08">2026.07.08</time><span class="related-arrow" aria-hidden="true">↗</span></a>
+        
+    </aside>
+
+
+            
+        </div>
+    </div>
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+    </main>
+    
+<footer class="site-footer">
+    <div class="footer-top"><a class="footer-wordmark" href="/zh-cn/" aria-label="Snow">Sno<span>w</span></a><p>认真记录，自由生长。</p><a href="#main-content" class="back-top">回到顶部 <span aria-hidden="true">↑</span></a></div>
+    <div class="footer-bottom"><span>© 2026 Snow</span><nav aria-label="更多链接"><a href="/zh-cn/about/">关于</a><a href="https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0" target="_blank" rel="noopener noreferrer me">Bilibili <span aria-hidden="true">↗</span></a><a href="https://github.com/SymphonyW" target="_blank" rel="noopener noreferrer me">GitHub <span aria-hidden="true">↗</span></a><a href="https://twitter.com" target="_blank" rel="noopener noreferrer me">Twitter <span aria-hidden="true">↗</span></a><a href="/zh-cn/index.xml">RSS ↗</a></nav><span class="footer-colophon">由 Hugo 构建 · 持续书写</span></div>
+</footer>
+
+    
+
+<script src="/ts/main.c86029ddb4aad8364879723acaf7efcd526e724d2381088d445aaf6f3ab1bfdf.js" defer></script>
+
+
+<script src="/ts/custom.6c99a7b037ac7e2bde801fbad26b9c20b3b18707868c164174142870ef3bc309.js" defer></script>
+
+
+
+
+
+<script>
+window.MathJax = {
+  tex: {
+    
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  svg: {
+    fontCache: 'global'
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
+
+</body>
+</html>

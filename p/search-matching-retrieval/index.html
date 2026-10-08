@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="A practical comparison of keyword matching, fuzzy search, vector retrieval, and RAG, with diagrams and classic application patterns.">
+<title>From Keyword Matching to Vector Retrieval: Three Ways to Search</title>
+
+<link rel='canonical' href='https://SymphonyW.github.io/p/search-matching-retrieval/'>
+<link rel="stylesheet" href="/scss/custom.min.bf7995e62147d50e1276b97e61d2c8120b52dfef9e32fbaed4e22d2affbd1b2b.css">
+<script>
+(() => {
+    let preference = 'auto';
+    try { preference = localStorage.getItem('StackColorScheme') || preference; } catch (_) {}
+    document.documentElement.dataset.scheme = preference === 'dark' || (preference === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+})();
+</script>
+
+<meta property='og:title' content="From Keyword Matching to Vector Retrieval: Three Ways to Search">
+<meta property='og:description' content="A practical comparison of keyword matching, fuzzy search, vector retrieval, and RAG, with diagrams and classic application patterns.">
+<meta property='og:url' content='https://SymphonyW.github.io/p/search-matching-retrieval/'>
+<meta property='og:site_name' content='Snow'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='Search' /><meta property='article:tag' content='Information Retrieval' /><meta property='article:tag' content='Vector Search' /><meta property='article:tag' content='RAG' /><meta property='article:tag' content='AI' /><meta property='article:published_time' content='2026-10-02T20:13:30&#43;08:00'/><meta property='article:modified_time' content='2026-10-02T20:13:30&#43;08:00'/><meta property='og:image' content='https://SymphonyW.github.io/p/search-matching-retrieval/bg.svg' />
+<meta name="twitter:title" content="From Keyword Matching to Vector Retrieval: Three Ways to Search">
+<meta name="twitter:description" content="A practical comparison of keyword matching, fuzzy search, vector retrieval, and RAG, with diagrams and classic application patterns."><meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content='https://SymphonyW.github.io/p/search-matching-retrieval/bg.svg' />
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    
+    <noscript><style>@media(max-width:760px){.site-header{position:static}.site-header__inner{height:auto;min-height:66px;flex-wrap:wrap}.site-nav{position:static;display:grid;order:3;flex-basis:100%;padding:8px 0 18px}.menu-toggle,.theme-toggle{display:none}}</style></noscript>
+</head>
+<body id="top" class="article-page">
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    
+<header class="site-header">
+    <div class="site-header__inner">
+        <a class="site-brand" href="/" aria-label="Snow — Home">S<span>now.</span></a>
+        <nav class="site-nav" id="site-navigation" aria-label="Main navigation">
+            
+            
+                
+                    
+                    
+                    <a href="/">Home</a>
+                
+            
+                
+                    
+                    
+                    <a href="/post/" aria-current="page">Blog</a>
+                
+            
+                
+                    
+                    
+                    <a href="/archives/">Archives</a>
+                
+            
+                
+                    
+                    
+                    <a href="/diary/">Diary</a>
+                
+            
+                
+                    
+                    
+                    <a href="/stats/">Stats</a>
+                
+            
+                
+            
+                
+                    
+                    
+                    <a href="/links/">Links</a>
+                
+            
+        </nav>
+        <div class="header-tools">
+            
+                <a class="language-link" href="/zh-cn/p/search-matching-retrieval/" lang="zh-cn" hreflang="zh-cn" aria-label="切换到中文">中</a>
+            
+            <button type="button" id="dark-mode-toggle" class="icon-button theme-toggle" aria-label="Toggle color theme" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><path d="M12 4.5a7.5 7.5 0 0 1 0 15z" fill="currentColor" stroke="none"/></svg></button>
+            <a class="icon-button search-link" href="/search/" aria-label="Search articles"><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+</a>
+            <button class="icon-button menu-toggle" type="button" aria-expanded="false" aria-controls="site-navigation" aria-label="Open navigation"><span></span><span></span></button>
+        </div>
+    </div>
+    <div class="reading-progress" aria-hidden="true"></div>
+</header>
+
+    <main id="main-content" class="site-main main" tabindex="-1">
+        
+    <div class="reading-page">
+        <article class="main-article has-toc">
+    <header class="article-header">
+    <div class="article-wayfinding">
+        
+            <a href="/post/"><span aria-hidden="true">←</span> All writing</a>
+        
+        <span class="article-kind">Notes & observations</span>
+    </div>
+    <div class="article-details">
+    
+    <h1 class="article-title">From Keyword Matching to Vector Retrieval: Three Ways to Search</h1>
+    <p class="article-subtitle">A practical comparison of keyword matching, fuzzy search, vector retrieval, and RAG, with diagrams and classic application patterns.</p>
+    <div class="article-meta">
+        
+            <time datetime="2026-10-02T20:13:30&#43;08:00">October 02, 2026</time>
+            <span class="meta-divider" aria-hidden="true">/</span>
+            <span>5 min read</span>
+        
+        
+            <div class="article-translations"><a href="/zh-cn/p/search-matching-retrieval/" hreflang="zh-cn" lang="zh-cn">阅读中文版 <span aria-hidden="true">↗</span></a></div>
+        
+    </div>
+</div>
+
+</header>
+
+    <div class="reading-layout">
+        
+            <aside class="reading-margin" aria-label="Article contents">
+                <details class="article-toc" open>
+                    <summary><span>On this page</span><span class="toc-indicator" aria-hidden="true">+</span></summary>
+                    <nav id="TableOfContents">
+  <ol>
+    <li><a href="#keyword-matching">Keyword Matching</a></li>
+    <li><a href="#fuzzy-search">Fuzzy Search</a></li>
+    <li><a href="#vector-retrieval">Vector Retrieval</a></li>
+    <li><a href="#core-differences">Core Differences</a></li>
+    <li><a href="#classic-applications">Classic Applications</a></li>
+    <li><a href="#practical-selection">Practical Selection</a></li>
+    <li><a href="#the-takeaway">The Takeaway</a></li>
+  </ol>
+</nav>
+                </details>
+            </aside>
+        
+        <div class="reading-body">
+            <div class="article-content"><h1 id="from-keyword-matching-to-vector-retrieval-three-ways-to-search">From Keyword Matching to Vector Retrieval: Three Ways to Search
+</h1><blockquote>
+<p>Search is not one technique. <strong>Keyword matching</strong> finds words that appear literally, <strong>fuzzy search</strong> rescues misspellings and partial input, and <strong>vector retrieval</strong> finds content with similar meaning. In RAG systems, these methods usually complement each other rather than replace each other.</p>
+</blockquote>
+<p><a href="/p/search-matching-retrieval/bg.svg" target="_blank" rel="noopener noreferrer"><img src="/p/search-matching-retrieval/bg.svg" alt="From keyword matching to vector retrieval" loading="lazy" decoding="async"></a>
+</p>
+<p>A quick example:</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>User intent</th>
+<th>Input</th>
+<th>Best starting point</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Find an explicit rule</td>
+<td><code>refund policy</code></td>
+<td>Keyword matching</td>
+</tr>
+<tr>
+<td>Recover a typo</td>
+<td><code>retun policy</code></td>
+<td>Fuzzy search</td>
+</tr>
+<tr>
+<td>Ask naturally</td>
+<td><code>Can I change my mind after buying this?</code></td>
+<td>Vector retrieval</td>
+</tr>
+<tr>
+<td>Need both precision and semantics</td>
+<td><code>Can a premium member refund the wrong plan?</code></td>
+<td>Hybrid retrieval + reranking</td>
+</tr>
+</tbody>
+</table></div>
+<p><a href="/p/search-matching-retrieval/matching-spectrum.svg" target="_blank" rel="noopener noreferrer"><img src="/p/search-matching-retrieval/matching-spectrum.svg" alt="Search capability spectrum" loading="lazy" decoding="async"></a>
+</p>
+<h2 id="keyword-matching">Keyword Matching
+</h2><p>Keyword matching is the classic information retrieval approach. Documents are tokenized, indexed, and ranked according to term overlap, term frequency, field weights, and document length.</p>
+<p><a href="/p/search-matching-retrieval/keyword-inverted-index.svg" target="_blank" rel="noopener noreferrer"><img src="/p/search-matching-retrieval/keyword-inverted-index.svg" alt="Keyword matching and inverted index" loading="lazy" decoding="async"></a>
+</p>
+<p>The most common structure is an <strong>inverted index</strong>: instead of scanning documents one by one, the system maps each term to the documents that contain it.</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Matching signal</td>
+<td>Literal term overlap</td>
+</tr>
+<tr>
+<td>Common algorithms</td>
+<td>TF-IDF, BM25, Boolean queries, field boosts</td>
+</tr>
+<tr>
+<td>Strengths</td>
+<td>Fast, stable, explainable, easy to filter</td>
+</tr>
+<tr>
+<td>Weaknesses</td>
+<td>Poor at synonyms, paraphrases, and unstated intent</td>
+</tr>
+<tr>
+<td>Best for</td>
+<td>SKU, order id, logs, legal clauses, code symbols, titles</td>
+</tr>
+</tbody>
+</table></div>
+<p>If a user searches for <code>redis setnx</code>, keyword retrieval is excellent. If they search for <code>how do I prevent duplicate orders</code>, a purely lexical system may miss articles that only mention <code>idempotency</code> or <code>distributed lock</code>.</p>
+<h2 id="fuzzy-search">Fuzzy Search
+</h2><p>Fuzzy search is still lexical search, but more tolerant. It asks whether the user input and the indexed term <strong>look similar enough</strong>.</p>
+<p><a href="/p/search-matching-retrieval/fuzzy-search-flow.svg" target="_blank" rel="noopener noreferrer"><img src="/p/search-matching-retrieval/fuzzy-search-flow.svg" alt="Fuzzy search flow" loading="lazy" decoding="async"></a>
+</p>
+<p>Common techniques include:</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Technique</th>
+<th>Solves</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Edit distance</td>
+<td>Insertions, deletions, substitutions, transpositions</td>
+<td><code>retun</code> → <code>return</code></td>
+</tr>
+<tr>
+<td>n-gram / trigram</td>
+<td>Substring similarity</td>
+<td><code>microserv</code> → <code>microservice</code></td>
+</tr>
+<tr>
+<td>Prefix matching</td>
+<td>Autocomplete</td>
+<td><code>kuber</code> → <code>kubernetes</code></td>
+</tr>
+<tr>
+<td>Phonetic or pinyin correction</td>
+<td>Input method mistakes</td>
+<td>pinyin-like input → Chinese term</td>
+</tr>
+<tr>
+<td>Synonym dictionaries</td>
+<td>Manually curated near-equivalents</td>
+<td><code>after-sales</code> ≈ <code>returns</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>Fuzzy search is great for search box ergonomics: typos, partial names, remembered fragments, and autocomplete. Elasticsearch, OpenSearch, Solr, PostgreSQL trigram, and Algolia all provide related capabilities.</p>
+<p>But fuzzy search does not fully understand meaning. <code>refund</code> and <code>return</code> are semantically related, but they may not be textually similar. <code>iPhone</code> and <code>Apple phone</code> can be far apart lexically. Once recall is widened, false positives also increase, so fuzzy search needs thresholds, field boosts, popularity, click signals, and business rules.</p>
+<h2 id="vector-retrieval">Vector Retrieval
+</h2><p>Vector retrieval uses an embedding model to convert text, images, audio, or other objects into numeric vectors. Items with similar meaning are close in vector space. At query time, the system embeds the user query and retrieves the nearest vectors.</p>
+<p><a href="/p/search-matching-retrieval/vector-rag-flow.svg" target="_blank" rel="noopener noreferrer"><img src="/p/search-matching-retrieval/vector-rag-flow.svg" alt="Vector retrieval and RAG flow" loading="lazy" decoding="async"></a>
+</p>
+<p>This is the retrieval foundation of many RAG systems: retrieve relevant chunks from a knowledge base, insert them into the prompt, and let the LLM answer with external context.</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Matching signal</td>
+<td>Semantic similarity in embedding space</td>
+</tr>
+<tr>
+<td>Common indexes</td>
+<td>HNSW, IVF, PQ, DiskANN</td>
+</tr>
+<tr>
+<td>Common metrics</td>
+<td>Cosine similarity, inner product, Euclidean distance</td>
+</tr>
+<tr>
+<td>Strengths</td>
+<td>Handles paraphrases, natural questions, cross-lingual and multimodal similarity</td>
+</tr>
+<tr>
+<td>Weaknesses</td>
+<td>Higher cost, weaker explainability, less reliable for exact constraints</td>
+</tr>
+<tr>
+<td>Best for</td>
+<td>Knowledge base QA, similar articles, image similarity, recommendations, semantic code search</td>
+</tr>
+</tbody>
+</table></div>
+<p>For example, a document may say:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">Customers may request no-reason returns within 7 days after order completion.
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>A user may ask:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">Can I send it back if I no longer want it?
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Keyword search may miss the connection. Vector search is more likely to retrieve the return policy because the meanings are close.</p>
+<p>Vector retrieval is not magic, though. It is weaker for exact IDs, version numbers, permissions, and precise field filters. For <code>HTTP 451</code>, <code>order 202610020001</code>, or <code>Go 1.22</code>, lexical and structured retrieval are often safer.</p>
+<h2 id="core-differences">Core Differences
+</h2><div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>Keyword matching</th>
+<th>Fuzzy search</th>
+<th>Vector retrieval</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Focus</td>
+<td>Did the term appear?</td>
+<td>Is the term similar?</td>
+<td>Is the meaning similar?</td>
+</tr>
+<tr>
+<td>Query style</td>
+<td>Precise, short, terminology-heavy</td>
+<td>Typo-prone, abbreviated, partial</td>
+<td>Natural, descriptive, long</td>
+</tr>
+<tr>
+<td>Recall</td>
+<td>Precise but can miss</td>
+<td>Wider lexical recall</td>
+<td>Strong semantic recall</td>
+</tr>
+<tr>
+<td>Explainability</td>
+<td>High</td>
+<td>Medium</td>
+<td>Lower</td>
+</tr>
+<tr>
+<td>Latency and cost</td>
+<td>Low</td>
+<td>Medium</td>
+<td>Medium to high</td>
+</tr>
+<tr>
+<td>Typical tools</td>
+<td>MySQL, Lucene, Elasticsearch BM25</td>
+<td>Elasticsearch fuzzy, trigram, Algolia</td>
+<td>FAISS, Milvus, Qdrant, Pinecone, Weaviate</td>
+</tr>
+</tbody>
+</table></div>
+<p>A simple mental model:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">Keyword matching: you said A, so I search for A.
+</span></span><span class="line"><span class="cl">Fuzzy search: you probably meant A, so I search for A.
+</span></span><span class="line"><span class="cl">Vector retrieval: you meant something like A, so I search for similar meaning.
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h2 id="classic-applications">Classic Applications
+</h2><div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Recommended approach</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Log search</td>
+<td>Keyword + time/service filters</td>
+<td>Exact error codes and fields matter</td>
+</tr>
+<tr>
+<td>E-commerce search</td>
+<td>Keyword + fuzzy + vector recall</td>
+<td>Product names need precision, user input is messy, recommendations need semantics</td>
+</tr>
+<tr>
+<td>Code search</td>
+<td>Symbol index + keyword + semantic vectors</td>
+<td>Names matter, but user intent can be natural language</td>
+</tr>
+<tr>
+<td>Enterprise knowledge QA</td>
+<td>Vector + BM25 + reranking + RAG</td>
+<td>The system must understand questions, retrieve evidence, and cite sources</td>
+</tr>
+<tr>
+<td>Image similarity</td>
+<td>Vector retrieval</td>
+<td>Visual similarity is hard to express with keywords</td>
+</tr>
+<tr>
+<td>Help center search</td>
+<td>Keyword + fuzzy + synonyms + vector retrieval</td>
+<td>Users mix product terms and natural language</td>
+</tr>
+</tbody>
+</table></div>
+<p>Enterprise RAG is the clearest example. Users rarely repeat document titles exactly. They ask questions like “Why was this reimbursement rejected?” or “How does sick leave work during probation?” A robust system filters by permissions, retrieves candidates with both BM25 and vectors, reranks them, and sends only a small set of reliable chunks to the LLM.</p>
+<p><a href="/p/search-matching-retrieval/hybrid-ranking.svg" target="_blank" rel="noopener noreferrer"><img src="/p/search-matching-retrieval/hybrid-ranking.svg" alt="Hybrid retrieval pipeline" loading="lazy" decoding="async"></a>
+</p>
+<h2 id="practical-selection">Practical Selection
+</h2><p><a href="/p/search-matching-retrieval/decision-map.svg" target="_blank" rel="noopener noreferrer"><img src="/p/search-matching-retrieval/decision-map.svg" alt="Search method decision map" loading="lazy" decoding="async"></a>
+</p>
+<p>Use this quick guide:</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Problem</th>
+<th>Start with</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Users type order IDs, error codes, function names, or exact terms</td>
+<td>Keyword matching</td>
+</tr>
+<tr>
+<td>Users often misspell, abbreviate, or type only prefixes</td>
+<td>Fuzzy search</td>
+</tr>
+<tr>
+<td>Users describe intent in natural language</td>
+<td>Vector retrieval</td>
+</tr>
+<tr>
+<td>You need exact filters, semantic understanding, and LLM grounding</td>
+<td>Hybrid retrieval</td>
+</tr>
+</tbody>
+</table></div>
+<p>Production search is usually a layered system:</p>
+<ol>
+<li><strong>Structured filters</strong>: permissions, tenants, time, category.</li>
+<li><strong>Keyword recall</strong>: BM25 protects exact terms, titles, IDs, and entities.</li>
+<li><strong>Vector recall</strong>: captures paraphrases and semantic intent.</li>
+<li><strong>Fusion</strong>: RRF or weighted scoring merges candidate lists.</li>
+<li><strong>Reranking</strong>: cross-encoders, LLM rerankers, or business rules refine the final order.</li>
+<li><strong>Generation</strong>: in RAG, only the most relevant and trustworthy chunks are inserted into the prompt.</li>
+</ol>
+<h2 id="the-takeaway">The Takeaway
+</h2><p>Keyword matching answers <strong>“does this word appear?”</strong> Fuzzy search answers <strong>“was this word typed imperfectly?”</strong> Vector retrieval answers <strong>“what does this query mean?”</strong></p>
+<p>For a normal search box, start with keyword retrieval, tokenization, field boosts, and fuzzy correction. For knowledge QA or intelligent support, add vector retrieval and RAG. For real production systems, hybrid retrieval is usually where the design lands, because users alternate between exact identifiers and vague natural language all the time.</p>
+
+</div>
+
+            <footer class="article-footer">
+    
+        <div class="article-tags" aria-label="Article tags"><span class="article-footer-label">Filed under</span><a href="/tags/search/">Search</a><a href="/tags/information-retrieval/">Information Retrieval</a><a href="/tags/vector-search/">Vector Search</a><a href="/tags/rag/">RAG</a><a href="/tags/ai/">AI</a></div>
+    
+    
+    
+    <div class="article-endnote"><span>Thanks for reading.</span><a href="#top">Back to top <span aria-hidden="true">↑</span></a></div>
+</footer>
+
+        </div>
+    </div>
+    
+</article>
+
+        <div class="reading-afterword">
+            
+            
+    <aside class="reading-related">
+        <div class="reading-section-heading"><span class="article-footer-label">Keep reading</span><span aria-hidden="true">↘</span></div>
+        
+            <a class="reading-related-link" href="/p/classic-interview-questionhow-exactly-should-you-set-rag-retrieval-top-k/"><span class="related-number">01</span><span class="related-title">Classic interview question:How exactly should you set RAG retrieval top-k?</span><time datetime="2026-07-08">2026.07.08</time><span class="related-arrow" aria-hidden="true">↗</span></a>
+        
+            <a class="reading-related-link" href="/p/rag-fully-explainedfrom-closed-book-to-open-book-llms/"><span class="related-number">02</span><span class="related-title">RAG Fully Explained:From &#34;Closed-Book&#34; to &#34;Open-Book&#34; LLMs</span><time datetime="2026-07-08">2026.07.08</time><span class="related-arrow" aria-hidden="true">↗</span></a>
+        
+    </aside>
+
+
+            
+        </div>
+    </div>
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+    </main>
+    
+<footer class="site-footer">
+    <div class="footer-top"><a class="footer-wordmark" href="/" aria-label="Snow">Sno<span>w</span></a><p>A place to think. A space to grow.</p><a href="#main-content" class="back-top">Back to top <span aria-hidden="true">↑</span></a></div>
+    <div class="footer-bottom"><span>© 2026 Snow</span><nav aria-label="More links"><a href="/about/">About</a><a href="https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0" target="_blank" rel="noopener noreferrer me">Bilibili <span aria-hidden="true">↗</span></a><a href="https://github.com/SymphonyW" target="_blank" rel="noopener noreferrer me">GitHub <span aria-hidden="true">↗</span></a><a href="https://twitter.com" target="_blank" rel="noopener noreferrer me">Twitter <span aria-hidden="true">↗</span></a><a href="/index.xml">RSS ↗</a></nav><span class="footer-colophon">Built with Hugo · Always in progress</span></div>
+</footer>
+
+    
+
+<script src="/ts/main.c86029ddb4aad8364879723acaf7efcd526e724d2381088d445aaf6f3ab1bfdf.js" defer></script>
+
+
+<script src="/ts/custom.6c99a7b037ac7e2bde801fbad26b9c20b3b18707868c164174142870ef3bc309.js" defer></script>
+
+
+
+
+
+<script>
+window.MathJax = {
+  tex: {
+    
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  svg: {
+    fontCache: 'global'
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
+
+</body>
+</html>

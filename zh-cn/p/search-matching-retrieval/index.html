@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="zh-cn" dir="ltr">
+<head>
+    <meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="讲清关键字匹配、模糊搜索、向量检索与 RAG 的特点、差别、应用场景和混合检索实践。">
+<title>从关键字匹配到向量检索：搜索技术的三条路</title>
+
+<link rel='canonical' href='https://SymphonyW.github.io/zh-cn/p/search-matching-retrieval/'>
+<link rel="stylesheet" href="/scss/custom.min.bf7995e62147d50e1276b97e61d2c8120b52dfef9e32fbaed4e22d2affbd1b2b.css">
+<script>
+(() => {
+    let preference = 'auto';
+    try { preference = localStorage.getItem('StackColorScheme') || preference; } catch (_) {}
+    document.documentElement.dataset.scheme = preference === 'dark' || (preference === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+})();
+</script>
+
+<meta property='og:title' content="从关键字匹配到向量检索：搜索技术的三条路">
+<meta property='og:description' content="讲清关键字匹配、模糊搜索、向量检索与 RAG 的特点、差别、应用场景和混合检索实践。">
+<meta property='og:url' content='https://SymphonyW.github.io/zh-cn/p/search-matching-retrieval/'>
+<meta property='og:site_name' content='Snow'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='搜索' /><meta property='article:tag' content='信息检索' /><meta property='article:tag' content='向量检索' /><meta property='article:tag' content='RAG' /><meta property='article:tag' content='AI' /><meta property='article:published_time' content='2026-10-02T20:13:30&#43;08:00'/><meta property='article:modified_time' content='2026-10-02T20:13:30&#43;08:00'/><meta property='og:image' content='https://SymphonyW.github.io/zh-cn/p/search-matching-retrieval/bg.svg' />
+<meta name="twitter:title" content="从关键字匹配到向量检索：搜索技术的三条路">
+<meta name="twitter:description" content="讲清关键字匹配、模糊搜索、向量检索与 RAG 的特点、差别、应用场景和混合检索实践。"><meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content='https://SymphonyW.github.io/zh-cn/p/search-matching-retrieval/bg.svg' />
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    
+    <noscript><style>@media(max-width:760px){.site-header{position:static}.site-header__inner{height:auto;min-height:66px;flex-wrap:wrap}.site-nav{position:static;display:grid;order:3;flex-basis:100%;padding:8px 0 18px}.menu-toggle,.theme-toggle{display:none}}</style></noscript>
+</head>
+<body id="top" class="article-page">
+    <a class="skip-link" href="#main-content">跳至正文</a>
+    
+<header class="site-header">
+    <div class="site-header__inner">
+        <a class="site-brand" href="/zh-cn/" aria-label="Snow — 主页">S<span>now.</span></a>
+        <nav class="site-nav" id="site-navigation" aria-label="主导航">
+            
+            
+                
+                    
+                    
+                    <a href="/zh-cn/">主页</a>
+                
+            
+                
+                    
+                    
+                    <a href="/zh-cn/post/" aria-current="page">博客</a>
+                
+            
+                
+                    
+                    
+                    <a href="/zh-cn/archives/">归档</a>
+                
+            
+                
+                    
+                    
+                    <a href="/zh-cn/stats/">写作记录</a>
+                
+            
+                
+                    
+                    
+                    <a href="/zh-cn/diary/">日记</a>
+                
+            
+                
+            
+                
+                    
+                    
+                    <a href="/zh-cn/links/">链接</a>
+                
+            
+        </nav>
+        <div class="header-tools">
+            
+                <a class="language-link" href="/p/search-matching-retrieval/" lang="en" hreflang="en" aria-label="Switch to English">EN</a>
+            
+            <button type="button" id="dark-mode-toggle" class="icon-button theme-toggle" aria-label="切换明暗主题" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><path d="M12 4.5a7.5 7.5 0 0 1 0 15z" fill="currentColor" stroke="none"/></svg></button>
+            <a class="icon-button search-link" href="/zh-cn/search/" aria-label="搜索文章"><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+</a>
+            <button class="icon-button menu-toggle" type="button" aria-expanded="false" aria-controls="site-navigation" aria-label="展开导航"><span></span><span></span></button>
+        </div>
+    </div>
+    <div class="reading-progress" aria-hidden="true"></div>
+</header>
+
+    <main id="main-content" class="site-main main" tabindex="-1">
+        
+    <div class="reading-page">
+        <article class="main-article has-toc">
+    <header class="article-header">
+    <div class="article-wayfinding">
+        
+            <a href="/zh-cn/post/"><span aria-hidden="true">←</span> 全部文章</a>
+        
+        <span class="article-kind">笔记与思考</span>
+    </div>
+    <div class="article-details">
+    
+    <h1 class="article-title">从关键字匹配到向量检索：搜索技术的三条路</h1>
+    <p class="article-subtitle">讲清关键字匹配、模糊搜索、向量检索与 RAG 的特点、差别、应用场景和混合检索实践。</p>
+    <div class="article-meta">
+        
+            <time datetime="2026-10-02T20:13:30&#43;08:00">2026 年 10 月 02 日</time>
+            <span class="meta-divider" aria-hidden="true">/</span>
+            <span>约 2 分钟</span>
+        
+        
+            <div class="article-translations"><a href="/p/search-matching-retrieval/" hreflang="en" lang="en">Read in English <span aria-hidden="true">↗</span></a></div>
+        
+    </div>
+</div>
+
+</header>
+
+    <div class="reading-layout">
+        
+            <aside class="reading-margin" aria-label="文章目录">
+                <details class="article-toc" open>
+                    <summary><span>本文目录</span><span class="toc-indicator" aria-hidden="true">+</span></summary>
+                    <nav id="TableOfContents">
+  <ol>
+    <li><a href="#关键字匹配找到字面上出现过的内容">关键字匹配：找到“字面上出现过”的内容</a></li>
+    <li><a href="#模糊搜索解决写错了也要搜到">模糊搜索：解决“写错了也要搜到”</a></li>
+    <li><a href="#向量检索找到意思接近的内容">向量检索：找到“意思接近”的内容</a></li>
+    <li><a href="#它们到底差在哪">它们到底差在哪</a></li>
+    <li><a href="#经典应用">经典应用</a></li>
+    <li><a href="#实战选型不要急着三选一">实战选型：不要急着三选一</a></li>
+    <li><a href="#一个容易记住的结论">一个容易记住的结论</a></li>
+  </ol>
+</nav>
+                </details>
+            </aside>
+        
+        <div class="reading-body">
+            <div class="article-content"><h1 id="从关键字匹配到向量检索搜索技术的三条路">从关键字匹配到向量检索：搜索技术的三条路
+</h1><blockquote>
+<p>搜索系统并不是只有一种做法。<strong>关键字匹配</strong>擅长找“写出来的词”，<strong>模糊搜索</strong>擅长救“写错或写不全的词”，<strong>向量检索</strong>擅长找“意思接近的内容”。到了 RAG 场景，它们往往不是互相替代，而是组合成一条更稳的检索链路。</p>
+</blockquote>
+<p><a href="/zh-cn/p/search-matching-retrieval/bg.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/search-matching-retrieval/bg.svg" alt="从关键字匹配到向量检索" loading="lazy" decoding="async"></a>
+</p>
+<p>先用一个例子定调：</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>用户真正想问</th>
+<th>输入</th>
+<th>更适合的检索方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>查某条明确规则</td>
+<td><code>退款政策</code></td>
+<td>关键字匹配</td>
+</tr>
+<tr>
+<td>输入有拼写或错别字</td>
+<td><code>退宽政策</code> / <code>retun policy</code></td>
+<td>模糊搜索</td>
+</tr>
+<tr>
+<td>说法很口语化</td>
+<td><code>买了东西后还能不能反悔</code></td>
+<td>向量检索</td>
+</tr>
+<tr>
+<td>要既准又能理解语义</td>
+<td><code>会员买错套餐怎么退款</code></td>
+<td>混合检索 + 重排序</td>
+</tr>
+</tbody>
+</table></div>
+<p><a href="/zh-cn/p/search-matching-retrieval/matching-spectrum.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/search-matching-retrieval/matching-spectrum.svg" alt="三类检索的能力光谱" loading="lazy" decoding="async"></a>
+</p>
+<h2 id="关键字匹配找到字面上出现过的内容">关键字匹配：找到“字面上出现过”的内容
+</h2><p>关键字匹配是最经典的信息检索方式。它的核心思想很朴素：把文档切成词，建立索引，查询时看哪些文档包含这些词，再根据词频、字段权重、文档长度等因素排序。</p>
+<p><a href="/zh-cn/p/search-matching-retrieval/keyword-inverted-index.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/search-matching-retrieval/keyword-inverted-index.svg" alt="关键字匹配与倒排索引" loading="lazy" decoding="async"></a>
+</p>
+<p>搜索引擎、数据库 <code>LIKE</code> 查询、日志平台、站内搜索、文档系统都大量使用这种思路。工程上最常见的结构是<strong>倒排索引</strong>：不是从文档找词，而是从词直接找到包含它的文档。</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>特点</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>匹配依据</td>
+<td>查询词和文档词项的字面重合</td>
+</tr>
+<tr>
+<td>常见算法</td>
+<td>TF-IDF、BM25、布尔查询、字段权重</td>
+</tr>
+<tr>
+<td>优点</td>
+<td>快、稳定、可解释、容易加过滤条件</td>
+</tr>
+<tr>
+<td>缺点</td>
+<td>不懂同义词和上下文，用户换一种说法就可能搜不到</td>
+</tr>
+<tr>
+<td>适合</td>
+<td>商品 SKU、订单号、日志关键字、法规条款、代码符号、标题搜索</td>
+</tr>
+</tbody>
+</table></div>
+<p>例如用户搜索 <code>redis setnx</code>，关键字检索非常合适，因为这个词本身就是准确术语；如果用户搜索 <code>如何防止重复下单</code>，纯关键字系统就可能漏掉只写了 <code>幂等</code>、<code>分布式锁</code> 的文章。</p>
+<h2 id="模糊搜索解决写错了也要搜到">模糊搜索：解决“写错了也要搜到”
+</h2><p>模糊搜索仍然是词面检索，只是比关键字匹配宽容一点。它关注的是：用户输入和真实词项<strong>长得像不像</strong>。</p>
+<p><a href="/zh-cn/p/search-matching-retrieval/fuzzy-search-flow.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/search-matching-retrieval/fuzzy-search-flow.svg" alt="模糊搜索的候选生成与排序" loading="lazy" decoding="async"></a>
+</p>
+<p>常见手段包括：</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>技术</th>
+<th>解决的问题</th>
+<th>例子</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>编辑距离</td>
+<td>少字、多字、错字、相邻字母颠倒</td>
+<td><code>retun</code> → <code>return</code></td>
+</tr>
+<tr>
+<td>n-gram / trigram</td>
+<td>子串相似、短文本近似匹配</td>
+<td><code>microserv</code> → <code>microservice</code></td>
+</tr>
+<tr>
+<td>前缀匹配</td>
+<td>搜索建议、自动补全</td>
+<td><code>kuber</code> → <code>kubernetes</code></td>
+</tr>
+<tr>
+<td>拼音/同音纠错</td>
+<td>中文输入法误差</td>
+<td><code>shiliangjiansuo</code> → <code>向量检索</code></td>
+</tr>
+<tr>
+<td>同义词词典</td>
+<td>人工维护近义表达</td>
+<td><code>售后</code> ≈ <code>退货</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>它最适合搜索框体验：用户没有输入完整词、英文拼错、中文有错别字、商品名只记得一半。Elasticsearch、OpenSearch、Solr、PostgreSQL trigram、Algolia 这类系统里都有对应能力。</p>
+<p>但要注意，模糊搜索的本质不是“理解语义”。<code>退款</code> 和 <code>退货</code> 语义相关，但字面未必相似；<code>苹果手机</code> 和 <code>iPhone</code> 字面差异很大，靠编辑距离很难自然匹配。模糊搜索放宽召回后，还会带来误匹配，所以需要阈值、字段权重、热度、点击率等信号做排序。</p>
+<h2 id="向量检索找到意思接近的内容">向量检索：找到“意思接近”的内容
+</h2><p>向量检索会先用 Embedding 模型把文本、图片、音频等内容转成一串数字。语义相近的内容，在向量空间里的距离也更近。查询时，系统把用户问题也转成向量，再找距离最近的内容。</p>
+<p><a href="/zh-cn/p/search-matching-retrieval/vector-rag-flow.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/search-matching-retrieval/vector-rag-flow.svg" alt="向量检索与 RAG 流程" loading="lazy" decoding="async"></a>
+</p>
+<p>这就是很多 RAG 系统的检索底座：先从知识库中召回相关片段，再把片段塞进 Prompt，让大模型基于资料回答。</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>特点</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>匹配依据</td>
+<td>Embedding 空间里的语义相似度</td>
+</tr>
+<tr>
+<td>常见索引</td>
+<td>HNSW、IVF、PQ、DiskANN</td>
+</tr>
+<tr>
+<td>常见度量</td>
+<td>余弦相似度、内积、欧氏距离</td>
+</tr>
+<tr>
+<td>优点</td>
+<td>能处理同义表达、口语化问题、跨语言/跨模态相似</td>
+</tr>
+<tr>
+<td>缺点</td>
+<td>成本更高，可解释性弱，精确过滤和强约束不如传统检索</td>
+</tr>
+<tr>
+<td>适合</td>
+<td>知识库问答、相似文章、相似图片、推荐、智能客服、代码语义搜索</td>
+</tr>
+</tbody>
+</table></div>
+<p>比如文档里写的是：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">用户在订单完成后的 7 天内，可申请无理由退货。
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>用户问：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">买完后不想要了还能退吗？
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>关键字匹配可能只看到 <code>买完</code>、<code>不想要</code>，命中不稳定；向量检索更容易把它和 <code>退货</code>、<code>订单完成后</code>、<code>7 天内</code> 这些语义相关片段拉近。</p>
+<p>向量检索也不是银弹。它对<strong>数字、版本号、专有名词、权限过滤、精确字段</strong>并不天然可靠。问 <code>HTTP 451</code>、<code>订单 202610020001</code>、<code>Go 1.22</code> 这类问题时，关键字和结构化过滤往往更可信。</p>
+<h2 id="它们到底差在哪">它们到底差在哪
+</h2><div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>维度</th>
+<th>关键字匹配</th>
+<th>模糊搜索</th>
+<th>向量检索</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>关注点</td>
+<td>词是否出现</td>
+<td>词是否相似</td>
+<td>意思是否接近</td>
+</tr>
+<tr>
+<td>用户输入</td>
+<td>明确、短、术语化</td>
+<td>有错字、缩写、前缀</td>
+<td>口语化、描述性、长问题</td>
+</tr>
+<tr>
+<td>召回能力</td>
+<td>精确但可能漏</td>
+<td>比关键字更宽</td>
+<td>语义召回强</td>
+</tr>
+<tr>
+<td>排序可解释性</td>
+<td>强</td>
+<td>中等</td>
+<td>弱，需要额外解释</td>
+</tr>
+<tr>
+<td>延迟与成本</td>
+<td>低</td>
+<td>中</td>
+<td>中到高</td>
+</tr>
+<tr>
+<td>典型工具</td>
+<td>MySQL、Lucene、Elasticsearch BM25</td>
+<td>Elasticsearch fuzzy、trigram、Algolia</td>
+<td>FAISS、Milvus、Qdrant、Pinecone、Weaviate</td>
+</tr>
+<tr>
+<td>常见问题</td>
+<td>同义词搜不到</td>
+<td>误匹配变多</td>
+<td>召回噪声、Embedding 漂移、难调参</td>
+</tr>
+</tbody>
+</table></div>
+<p>可以把它们理解成三层：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">关键字匹配：你说了 A，我找 A
+</span></span><span class="line"><span class="cl">模糊搜索：你大概写的是 A，我帮你找 A
+</span></span><span class="line"><span class="cl">向量检索：你说的是 A 的意思，我找和 A 意思接近的内容
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h2 id="经典应用">经典应用
+</h2><div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>场景</th>
+<th>推荐方案</th>
+<th>为什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>日志检索</td>
+<td>关键字 + 时间/服务过滤</td>
+<td>错一个字符都可能代表不同错误码，精确性优先</td>
+</tr>
+<tr>
+<td>电商搜索</td>
+<td>关键字 + 模糊搜索 + 向量召回</td>
+<td>商品名要准，用户输入也常常不完整，还需要语义推荐</td>
+</tr>
+<tr>
+<td>代码搜索</td>
+<td>符号索引 + 关键字 + 语义向量</td>
+<td>函数名要精确，需求描述又可能很口语</td>
+</tr>
+<tr>
+<td>企业知识库问答</td>
+<td>向量检索 + BM25 + 重排序 + RAG</td>
+<td>需要理解问题、召回资料、生成答案并引用来源</td>
+</tr>
+<tr>
+<td>图片以图搜图</td>
+<td>向量检索</td>
+<td>图像相似度很难靠关键字解决</td>
+</tr>
+<tr>
+<td>站内帮助中心</td>
+<td>关键字 + 模糊 + 同义词 + 向量</td>
+<td>用户可能输入术语，也可能输入自然语言问题</td>
+</tr>
+</tbody>
+</table></div>
+<p>最典型的例子是企业知识库 RAG。用户不会严格复述文档标题，而是问“这笔报销为什么被驳回”“试用期请病假怎么算”“客户要求删数据怎么办”。系统通常会先做权限过滤，再用 BM25 和向量各召回一批候选，最后重排序，选少量片段交给大模型回答。</p>
+<p><a href="/zh-cn/p/search-matching-retrieval/hybrid-ranking.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/search-matching-retrieval/hybrid-ranking.svg" alt="混合检索流水线" loading="lazy" decoding="async"></a>
+</p>
+<h2 id="实战选型不要急着三选一">实战选型：不要急着三选一
+</h2><p><a href="/zh-cn/p/search-matching-retrieval/decision-map.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/search-matching-retrieval/decision-map.svg" alt="搜索技术选型速查图" loading="lazy" decoding="async"></a>
+</p>
+<p>一个实用的判断方式：</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>你遇到的问题</th>
+<th>优先考虑</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>用户会输入订单号、错误码、函数名、固定术语</td>
+<td>关键字匹配</td>
+</tr>
+<tr>
+<td>用户经常拼错、少打、只输入前几个字</td>
+<td>模糊搜索</td>
+</tr>
+<tr>
+<td>用户用自然语言描述需求，文档表达方式又不固定</td>
+<td>向量检索</td>
+</tr>
+<tr>
+<td>既要精确过滤，又要语义理解，还要给 LLM 喂资料</td>
+<td>混合检索</td>
+</tr>
+</tbody>
+</table></div>
+<p>生产系统里更常见的是组合拳：</p>
+<ol>
+<li><strong>结构化过滤</strong>：先按权限、租户、时间、类目过滤，避免召回不该看的内容。</li>
+<li><strong>关键字召回</strong>：用 BM25 保住精确术语、标题、编号、实体名。</li>
+<li><strong>向量召回</strong>：补足同义表达、口语化问题和长文本语义。</li>
+<li><strong>融合排序</strong>：用 RRF 或加权分数合并两路候选。</li>
+<li><strong>重排序</strong>：用 cross-encoder、LLM reranker 或业务规则做精排。</li>
+<li><strong>生成回答</strong>：RAG 场景只把最相关、最可信、来源清楚的片段交给 LLM。</li>
+</ol>
+<h2 id="一个容易记住的结论">一个容易记住的结论
+</h2><p>关键字匹配解决的是<strong>有没有这个词</strong>，模糊搜索解决的是<strong>这个词是不是写歪了</strong>，向量检索解决的是<strong>这句话大概在说什么</strong>。</p>
+<p>如果你在做一个普通搜索框，先把关键字、分词、字段权重和模糊纠错做好；如果你在做知识库问答或智能客服，再引入向量检索和 RAG；如果你在做面向真实用户的生产系统，最终大概率会走向混合检索。因为用户既会输入精确编号，也会说一大段含糊的话，而好的搜索系统要同时接得住这两种输入。</p>
+
+</div>
+
+            <footer class="article-footer">
+    
+        <div class="article-tags" aria-label="文章标签"><span class="article-footer-label">相关主题</span><a href="/zh-cn/tags/%E6%90%9C%E7%B4%A2/">搜索</a><a href="/zh-cn/tags/%E4%BF%A1%E6%81%AF%E6%A3%80%E7%B4%A2/">信息检索</a><a href="/zh-cn/tags/%E5%90%91%E9%87%8F%E6%A3%80%E7%B4%A2/">向量检索</a><a href="/zh-cn/tags/rag/">RAG</a><a href="/zh-cn/tags/ai/">AI</a></div>
+    
+    
+    
+    <div class="article-endnote"><span>感谢读到这里。</span><a href="#top">回到开头 <span aria-hidden="true">↑</span></a></div>
+</footer>
+
+        </div>
+    </div>
+    
+</article>
+
+        <div class="reading-afterword">
+            
+            
+    <aside class="reading-related">
+        <div class="reading-section-heading"><span class="article-footer-label">延伸阅读</span><span aria-hidden="true">↘</span></div>
+        
+            <a class="reading-related-link" href="/zh-cn/p/%E7%BB%8F%E5%85%B8%E9%9D%A2%E8%AF%95%E9%A2%98rag-%E6%A3%80%E7%B4%A2-top-k-%E5%88%B0%E5%BA%95%E6%80%8E%E4%B9%88%E8%AE%BE/"><span class="related-number">01</span><span class="related-title">经典面试题：RAG 检索 top-k 到底怎么设？</span><time datetime="2026-07-08">2026.07.08</time><span class="related-arrow" aria-hidden="true">↗</span></a>
+        
+            <a class="reading-related-link" href="/zh-cn/p/rag-%E6%8A%80%E6%9C%AF%E5%85%A8%E6%99%AF%E8%AE%A9%E5%A4%A7%E6%A8%A1%E5%9E%8B%E4%BB%8E%E9%97%AD%E5%8D%B7%E8%80%83%E8%AF%95%E5%88%B0%E5%BC%80%E5%8D%B7%E8%80%83%E8%AF%95/"><span class="related-number">02</span><span class="related-title">RAG 技术全景：让大模型从&#34;闭卷考试&#34;到&#34;开卷考试&#34;</span><time datetime="2026-07-08">2026.07.08</time><span class="related-arrow" aria-hidden="true">↗</span></a>
+        
+    </aside>
+
+
+            
+        </div>
+    </div>
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+    </main>
+    
+<footer class="site-footer">
+    <div class="footer-top"><a class="footer-wordmark" href="/zh-cn/" aria-label="Snow">Sno<span>w</span></a><p>认真记录，自由生长。</p><a href="#main-content" class="back-top">回到顶部 <span aria-hidden="true">↑</span></a></div>
+    <div class="footer-bottom"><span>© 2026 Snow</span><nav aria-label="更多链接"><a href="/zh-cn/about/">关于</a><a href="https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0" target="_blank" rel="noopener noreferrer me">Bilibili <span aria-hidden="true">↗</span></a><a href="https://github.com/SymphonyW" target="_blank" rel="noopener noreferrer me">GitHub <span aria-hidden="true">↗</span></a><a href="https://twitter.com" target="_blank" rel="noopener noreferrer me">Twitter <span aria-hidden="true">↗</span></a><a href="/zh-cn/index.xml">RSS ↗</a></nav><span class="footer-colophon">由 Hugo 构建 · 持续书写</span></div>
+</footer>
+
+    
+
+<script src="/ts/main.c86029ddb4aad8364879723acaf7efcd526e724d2381088d445aaf6f3ab1bfdf.js" defer></script>
+
+
+<script src="/ts/custom.6c99a7b037ac7e2bde801fbad26b9c20b3b18707868c164174142870ef3bc309.js" defer></script>
+
+
+
+
+
+<script>
+window.MathJax = {
+  tex: {
+    
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  svg: {
+    fontCache: 'global'
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
+
+</body>
+</html>

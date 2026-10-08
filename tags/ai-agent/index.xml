@@ -1,0 +1,328 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+    <channel>
+        <title>AI Agent on Snow</title>
+        <link>https://SymphonyW.github.io/tags/ai-agent/</link>
+        <description>Recent content in AI Agent on Snow</description>
+        <generator>Hugo -- gohugo.io</generator>
+        <language>en</language>
+        <copyright>Snow</copyright>
+        <lastBuildDate>Thu, 08 Oct 2026 00:00:00 +0800</lastBuildDate><atom:link href="https://SymphonyW.github.io/tags/ai-agent/index.xml" rel="self" type="application/rss+xml" /><item>
+        <title>FastGPT in Depth: RAG, Workflows, and Self-Hosting</title>
+        <link>https://SymphonyW.github.io/p/fastgpt-guide/</link>
+        <pubDate>Thu, 08 Oct 2026 00:00:00 +0800</pubDate>
+        
+        <guid>https://SymphonyW.github.io/p/fastgpt-guide/</guid>
+        <description>&lt;img src="https://SymphonyW.github.io/p/fastgpt-guide/bg.png" alt="Featured image of post FastGPT in Depth: RAG, Workflows, and Self-Hosting" /&gt;&lt;h1 id=&#34;fastgpt-in-depth-rag-workflows-and-self-hosting&#34;&gt;FastGPT in Depth: RAG, Workflows, and Self-Hosting
+&lt;/h1&gt;&lt;blockquote&gt;
+&lt;p&gt;FastGPT is neither a reskinned chat window nor merely a vector-database console. It brings model access, document processing, RAG retrieval, workflow orchestration, debugging, publishing, and operations into one platform so a team can turn an AI demo into a deliverable application.&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;Teams building a company knowledge assistant, support bot, policy Q&amp;amp;A system, content-review pipeline, or data agent soon hit the same problems: multiple model providers, messy documents, retrieval tuning, business logic that no single prompt can express, and production requirements such as permissions, quotas, logs, and channel integrations.&lt;/p&gt;
+&lt;p&gt;&lt;a class=&#34;link&#34; href=&#34;https://github.com/labring/FastGPT&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;FastGPT&lt;/a&gt; consolidates much of that repeated infrastructure. The project describes itself as an &lt;strong&gt;AI Agent building platform&lt;/strong&gt;; its Community Edition includes the core Agent, workflow, and Dataset features. This guide focuses on how those parts work together, how to deliver a small application, and where the platform does—and does not—fit.&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/p/fastgpt-guide/platform-map.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/p/fastgpt-guide/platform-map.svg&#34; alt=&#34;FastGPT organizes models, knowledge, workflows, and publishing channels as one application platform&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;what-fastgpt-actually-is&#34;&gt;What FastGPT actually is
+&lt;/h2&gt;&lt;p&gt;FastGPT sits in the &lt;strong&gt;AI application layer above foundation models&lt;/strong&gt;. The model understands and generates language; the vector store finds similar content; FastGPT connects both to business processes and exposes the result as a configurable, debuggable application.&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Layer&lt;/th&gt;
+&lt;th&gt;Problem&lt;/th&gt;
+&lt;th&gt;What FastGPT adds&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;Models&lt;/td&gt;
+&lt;td&gt;Which chat, embedding, rerank, or vision model to call&lt;/td&gt;
+&lt;td&gt;Provider configuration and AI Proxy routing&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Knowledge&lt;/td&gt;
+&lt;td&gt;How to parse, index, retrieve, and cite documents&lt;/td&gt;
+&lt;td&gt;Datasets, ingestion, vector/full-text/hybrid search, reranking&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Orchestration&lt;/td&gt;
+&lt;td&gt;How to implement a multi-step task&lt;/td&gt;
+&lt;td&gt;Visual nodes, variables, branches, plugins, and Agents&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Delivery&lt;/td&gt;
+&lt;td&gt;How to test, reuse, and ship the result&lt;/td&gt;
+&lt;td&gt;Debug logs, share links, APIs, embeds, and MCP&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Operations&lt;/td&gt;
+&lt;td&gt;Who used it, what it cost, and what failed&lt;/td&gt;
+&lt;td&gt;Teams, quotas, records, logs, and annotation workflows&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;This is useful for developers who want to ship without building an entire RAG and orchestration control plane, and for product or delivery teams that can model a process but do not want to hand-code every backend component.&lt;/p&gt;
+&lt;p&gt;It is not a quality button. Answer quality still depends on source material, chunking, embeddings, retrieval settings, reranking, prompts, and the chosen model. FastGPT reduces systems work; it does not make poor data disappear.&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;how-the-core-pieces-cooperate&#34;&gt;How the core pieces cooperate
+&lt;/h2&gt;&lt;h3 id=&#34;datasets-go-beyond-documents-to-vectors&#34;&gt;Datasets go beyond “documents to vectors”
+&lt;/h3&gt;&lt;p&gt;During ingestion, a document is parsed, cleaned, chunked, indexed, and stored. At query time, FastGPT can rewrite the query, recall candidates through semantic, full-text, and image paths, fuse ranked lists with RRF, rerank candidates, and then filter the context by relevance and citation-token budget. The details are documented in the official &lt;a class=&#34;link&#34; href=&#34;https://doc.fastgpt.io/en/guide/dataset/dataset_engine&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Dataset search guide&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/p/fastgpt-guide/rag-pipeline.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/p/fastgpt-guide/rag-pipeline.svg&#34; alt=&#34;The complete FastGPT Dataset path from ingestion to grounded generation&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;p&gt;Four design details matter in practice:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;Dataset, Collection, and Data are separate levels.&lt;/strong&gt; A Dataset is searched as a whole, a Collection groups material much like a file, and Data entries are the units used for Q&amp;amp;A.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;One Data entry may map to several vectors.&lt;/strong&gt; Several focused indexes can improve recall while still returning one complete source passage.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Hybrid retrieval is more robust than vector-only search.&lt;/strong&gt; Exact identifiers benefit from full-text search, natural questions from semantic search, and RRF combines the rankings.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Citation limits use tokens, not just Top-K.&lt;/strong&gt; Fixed counts are unstable when chunk lengths differ greatly.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;MongoDB holds most non-vector data. Vector data can live in PostgreSQL/PGVector, Milvus, OceanBase, SeekDB, and other supported backends. With PGVector, vector IDs link back to source records in MongoDB, so a complete backup must cover both stores.&lt;/p&gt;
+&lt;h3 id=&#34;workflows-turn-prompts-into-observable-programs&#34;&gt;Workflows turn prompts into observable programs
+&lt;/h3&gt;&lt;p&gt;A minimal chat needs only an input and an AI Chat node. Real work adds classification, retrieval, HTTP calls, conditions, formatting, and fallback paths. A FastGPT node resembles a function: it has inputs, outputs, and triggers, and later nodes can reference earlier outputs.&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/p/fastgpt-guide/workflow-example.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/p/fastgpt-guide/workflow-example.svg&#34; alt=&#34;A customer-support workflow routes, retrieves, and calls controlled tools&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;p&gt;The workflow runtime advances through connection states. A node executes when a predecessor becomes active, waits when a predecessor is still waiting, and skips when nothing can activate it. This makes branches visible and lets operators inspect each node&amp;rsquo;s inputs and outputs instead of seeing only the final model response.&lt;/p&gt;
+&lt;p&gt;Keep responsibilities narrow:&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Node&lt;/th&gt;
+&lt;th&gt;One responsibility&lt;/th&gt;
+&lt;th&gt;Avoid putting this inside&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;Classification&lt;/td&gt;
+&lt;td&gt;Determine question type&lt;/td&gt;
+&lt;td&gt;Long-form answers&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Query Rewrite&lt;/td&gt;
+&lt;td&gt;Resolve references and complete a search query&lt;/td&gt;
+&lt;td&gt;Changing exact IDs or product numbers&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Dataset Search&lt;/td&gt;
+&lt;td&gt;Recall citable evidence&lt;/td&gt;
+&lt;td&gt;Final business decisions&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;HTTP / plugin&lt;/td&gt;
+&lt;td&gt;Fetch live data or perform a controlled action&lt;/td&gt;
+&lt;td&gt;Hidden, unauditable business rules&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;AI Chat&lt;/td&gt;
+&lt;td&gt;Synthesize context in the required format&lt;/td&gt;
+&lt;td&gt;Persistent business state&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Fixed Reply&lt;/td&gt;
+&lt;td&gt;Deterministic errors, refusal, or handoff&lt;/td&gt;
+&lt;td&gt;Open-ended reasoning&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;h3 id=&#34;agents-plugins-and-delivery&#34;&gt;Agents, plugins, and delivery
+&lt;/h3&gt;&lt;p&gt;Workflows are best when the path is known. Agents are useful when the model must plan and choose among tools. Plugins package search, databases, messaging, document processing, and other external capabilities. They complement each other: a reliable production Agent should still constrain sensitive actions to explicit tools and guarded subflows.&lt;/p&gt;
+&lt;p&gt;Finished applications can be exposed by share link, embed, OpenAI-style API, or MCP Server. API keys are member-level OpenAPI credentials; the current documentation recommends sending &lt;code&gt;appId&lt;/code&gt; in &lt;code&gt;chat/completions&lt;/code&gt;. Public links consume the owning team&amp;rsquo;s quota, so use expiration, quotas, authentication, and explicit approval around tools with side effects.&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;building-an-employee-policy-assistant&#34;&gt;Building an employee-policy assistant
+&lt;/h2&gt;&lt;p&gt;The goal is a grounded assistant that cites company policy, refuses unsupported questions, and uses an internal API only for personal information.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;1. Write acceptance questions first.&lt;/strong&gt; Prepare 20–50 questions covering direct facts, cross-section reasoning, exact form IDs, multi-turn follow-ups, private-data requests, and questions absent from the source set. This becomes the regression suite for every prompt, model, chunking, or retrieval change.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;2. Clean the material before tuning thresholds.&lt;/strong&gt; Remove duplicates and obsolete versions, preserve headings, OCR scanned PDFs, and attach metadata such as department, version, and effective date. Keep each chunk semantically complete. Conditions, exceptions, and conclusions belonging to one rule should remain together.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;3. Start with the smallest workflow.&lt;/strong&gt;&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;User question
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  → Query Rewrite (only for ambiguous follow-ups)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  → Dataset Search (hybrid retrieval + rerank)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  → AI Chat (answer only from citations)
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  → Answer with sources
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;A useful system instruction is short and testable:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;You are the company policy assistant. Answer only from the cited material.
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;If the evidence is insufficient, say that the current policy set has no answer.
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;For personal balances, approval status, or private employee data, do not guess;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;require authorization before querying the internal system.
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Give the conclusion first, then conditions, policy name, and effective date.
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;If form IDs fail, try full-text or hybrid search first. If conversational follow-ups fail, add query rewriting. If the right passages appear but are ordered poorly, inspect reranking. Change one variable at a time and rerun the same test set.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;4. Add live data as a separate branch.&lt;/strong&gt; Policy interpretation should use the Dataset; a remaining-leave balance should come from the HR system after identity and permission checks. Do not periodically embed rapidly changing balances into the vector store, and do not let the model compose unrestricted SQL.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;5. Test retrieval, generation, flow, and security.&lt;/strong&gt; Verify that the correct current policy is recalled; answers remain faithful; timeouts enter a safe fallback; and prompt injection cannot call private tools. A fluent final answer is not enough evidence that the system works.&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;self-hosting-and-production-concerns&#34;&gt;Self-hosting and production concerns
+&lt;/h2&gt;&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/p/fastgpt-guide/deployment-architecture.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/p/fastgpt-guide/deployment-architecture.svg&#34; alt=&#34;The main services and data paths in a self-hosted FastGPT deployment&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;p&gt;The official Docker Compose architecture includes the FastGPT application, MongoDB, a vector database, and AI Proxy. Agent/Skill sandboxes, object storage, MCP, and advanced parsing can add more services.&lt;/p&gt;
+&lt;p&gt;The current official installer runs on Linux, macOS, or Windows through WSL:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nv&#34;&gt;FASTGPT_DEPLOY_BASE_URL&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;https://doc.fastgpt.cn &lt;span class=&#34;se&#34;&gt;\
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;se&#34;&gt;&lt;/span&gt;  bash &amp;lt;&lt;span class=&#34;o&#34;&gt;(&lt;/span&gt;curl -fsSL https://doc.fastgpt.cn/deploy/install.sh&lt;span class=&#34;o&#34;&gt;)&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;docker compose --profile prepull pull
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;docker compose up -d
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;The script selects a vector backend, downloads Compose configuration, and generates credentials. For production, download and review remote scripts before execution, retain the generated Compose file and secrets, and pin explicit image versions instead of depending indefinitely on &lt;code&gt;latest&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;After deployment, configure the public &lt;code&gt;FE_DOMAIN&lt;/code&gt;, add at least a chat model and embedding model in the admin console, and install the required system plugins. Put the service behind an HTTPS reverse proxy and expose only necessary ports.&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Production area&lt;/th&gt;
+&lt;th&gt;Practical baseline&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;Persistence&lt;/td&gt;
+&lt;td&gt;Durable volumes for MongoDB, vector data, and object storage; prove that restore works&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Secrets&lt;/td&gt;
+&lt;td&gt;Replace defaults; keep model keys, database passwords, and API keys out of Git&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Network&lt;/td&gt;
+&lt;td&gt;Never expose databases publicly; restrict egress and apply upload/domain allowlists&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Upgrades&lt;/td&gt;
+&lt;td&gt;Read migration notes, upgrade in small steps, back up first, and replay the regression set&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Observability&lt;/td&gt;
+&lt;td&gt;Track node latency, model failures, token use, retrieval hits, and refusal rates&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Capacity&lt;/td&gt;
+&lt;td&gt;Watch vector count, indexing time, MongoDB growth, concurrency, and provider limits&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;Start with the lightest backend that meets measured needs. PGVector is a practical small-to-medium starting point in the official guidance; distributed engines such as Milvus become relevant at much larger scale. Migration includes index rebuilding, downtime planning, performance validation, and backups—not merely copying vectors.&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;api-integration-and-system-boundaries&#34;&gt;API integration and system boundaries
+&lt;/h2&gt;&lt;p&gt;FastGPT can be the chat UI or sit behind your own web app and collaboration channels. Its OpenAI-style API lowers integration cost, but compatibility does not mean every extension field is identical across versions. Verify against the OpenAPI documentation shipped with your instance.&lt;/p&gt;
+&lt;p&gt;The shape of a request is:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;curl https://fastgpt.example.com/api/v1/chat/completions &lt;span class=&#34;se&#34;&gt;\
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;se&#34;&gt;&lt;/span&gt;  -H &lt;span class=&#34;s2&#34;&gt;&amp;#34;Authorization: Bearer &lt;/span&gt;&lt;span class=&#34;nv&#34;&gt;$FASTGPT_API_KEY&lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;&lt;/span&gt; &lt;span class=&#34;se&#34;&gt;\
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;se&#34;&gt;&lt;/span&gt;  -H &lt;span class=&#34;s2&#34;&gt;&amp;#34;Content-Type: application/json&amp;#34;&lt;/span&gt; &lt;span class=&#34;se&#34;&gt;\
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;se&#34;&gt;&lt;/span&gt;  -d &lt;span class=&#34;s1&#34;&gt;&amp;#39;{
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;s1&#34;&gt;    &amp;#34;appId&amp;#34;: &amp;#34;your-app-id&amp;#34;,
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;s1&#34;&gt;    &amp;#34;stream&amp;#34;: false,
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;s1&#34;&gt;    &amp;#34;messages&amp;#34;: [
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;s1&#34;&gt;      {&amp;#34;role&amp;#34;: &amp;#34;user&amp;#34;, &amp;#34;content&amp;#34;: &amp;#34;How much leave does a probationary employee receive?&amp;#34;}
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;s1&#34;&gt;    ]
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;s1&#34;&gt;  }&amp;#39;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;Treat FastGPT as an AI decision and generation service, not as the system of record. Orders, balances, and approval results remain in deterministic business systems. For payments, notifications, deletion, or other side effects, add authorization, schema validation, idempotency, and human confirmation rather than trusting model-generated arguments.&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id=&#34;fit-trade-offs-and-license&#34;&gt;Fit, trade-offs, and license
+&lt;/h2&gt;&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Scenario&lt;/th&gt;
+&lt;th style=&#34;text-align:center&#34;&gt;Fit&lt;/th&gt;
+&lt;th&gt;Why&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;Enterprise document Q&amp;amp;A and support knowledge&lt;/td&gt;
+&lt;td style=&#34;text-align:center&#34;&gt;High&lt;/td&gt;
+&lt;td&gt;Datasets, citations, workflows, and delivery are integrated&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Internal process assistants and content review&lt;/td&gt;
+&lt;td style=&#34;text-align:center&#34;&gt;High&lt;/td&gt;
+&lt;td&gt;Visual flows connect models, rules, and HTTP tools&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Delivering several vertical AI apps quickly&lt;/td&gt;
+&lt;td style=&#34;text-align:center&#34;&gt;High&lt;/td&gt;
+&lt;td&gt;Models, Datasets, plugins, and templates are reusable&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;A basic model playground&lt;/td&gt;
+&lt;td style=&#34;text-align:center&#34;&gt;Medium&lt;/td&gt;
+&lt;td&gt;It works, but may be heavier than necessary&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Ultra-low-latency inference gateway&lt;/td&gt;
+&lt;td style=&#34;text-align:center&#34;&gt;Low&lt;/td&gt;
+&lt;td&gt;Use a specialized gateway and inference stack&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Transactional core business workflow&lt;/td&gt;
+&lt;td style=&#34;text-align:center&#34;&gt;Low&lt;/td&gt;
+&lt;td&gt;LLM orchestration is not a transaction system&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Competing multi-tenant SaaS&lt;/td&gt;
+&lt;td style=&#34;text-align:center&#34;&gt;Review first&lt;/td&gt;
+&lt;td&gt;The license places additional conditions on this use&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;Compared with Dify, Coze, Langflow, Flowise, or a custom LangChain/LlamaIndex stack, FastGPT has a clear center of gravity: &lt;strong&gt;knowledge-based applications, visual orchestration, and private delivery&lt;/strong&gt;. Platforms provide speed and consistency; code-first stacks provide maximum control. Choose according to which engineering work the team wants to avoid and which platform constraints it accepts.&lt;/p&gt;
+&lt;p&gt;Read the license carefully. The FastGPT Open Source License is based on Apache License 2.0 but adds conditions for operating a similar multi-tenant SaaS and for modifying or removing console logo and copyright information. This is not legal advice; check the repository&amp;rsquo;s current &lt;a class=&#34;link&#34; href=&#34;https://github.com/labring/FastGPT/blob/main/LICENSE&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;LICENSE&lt;/a&gt; before commercial use.&lt;/p&gt;
+&lt;p&gt;The lasting value of FastGPT is that it makes an AI application buildable, observable, and reusable. Its main risk is making a full canvas look like a finished system. Track retrieval hit rate, groundedness, task success, refusal and handoff rates, P50/P95 latency, cost per successful task, and regression results across every model, prompt, Dataset, and workflow change.&lt;/p&gt;
+&lt;p&gt;The useful rule is simple: &lt;strong&gt;treat FastGPT as an AI application engineering platform, not as a substitute for evaluation.&lt;/strong&gt; Prove value with the smallest flow, improve retrieval and prompts against a fixed test set, and add Agents and automated actions only when the simpler system has earned that complexity.&lt;/p&gt;
+&lt;p&gt;This article reflects official material available in October 2026. FastGPT moves quickly, so recheck deployment variables, version dependencies, and API fields before implementation.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Official references:&lt;/strong&gt; &lt;a class=&#34;link&#34; href=&#34;https://github.com/labring/FastGPT&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;GitHub repository&lt;/a&gt; · &lt;a class=&#34;link&#34; href=&#34;https://doc.fastgpt.io/en/guide/version/opensource/intro&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Community Edition&lt;/a&gt; · &lt;a class=&#34;link&#34; href=&#34;https://doc.fastgpt.io/en/guide/build/workflow/intro&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Workflow runtime&lt;/a&gt; · &lt;a class=&#34;link&#34; href=&#34;https://doc.fastgpt.io/en/guide/dataset/dataset_engine&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Dataset retrieval&lt;/a&gt; · &lt;a class=&#34;link&#34; href=&#34;https://doc.fastgpt.io/en/self-host/deploy/docker&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Docker Compose deployment&lt;/a&gt; · &lt;a class=&#34;link&#34; href=&#34;https://doc.fastgpt.io/en/guide/build/publish/openapi&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;API publishing&lt;/a&gt;&lt;/p&gt;
+</description>
+        </item>
+        
+    </channel>
+</rss>
