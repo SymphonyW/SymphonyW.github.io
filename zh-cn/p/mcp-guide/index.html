@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html lang="zh-cn" dir="ltr">
+<head>
+    <meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="从 Host、Client、Server 与三类原语讲清 MCP，拆解远程 MCP 的发现、选工具、调用、鉴权与返回链路，并用 Python 实现、测试、部署一个可供 Agent 使用的 MCP 服务。">
+<title>MCP 完全指南：原理、远程调用链路与自建服务接入 Agent</title>
+
+<link rel='canonical' href='https://SymphonyW.github.io/zh-cn/p/mcp-guide/'>
+<link rel="stylesheet" href="/scss/custom.min.bf7995e62147d50e1276b97e61d2c8120b52dfef9e32fbaed4e22d2affbd1b2b.css">
+<script>
+(() => {
+    let preference = 'auto';
+    try { preference = localStorage.getItem('StackColorScheme') || preference; } catch (_) {}
+    document.documentElement.dataset.scheme = preference === 'dark' || (preference === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+})();
+</script>
+
+<meta property='og:title' content="MCP 完全指南：原理、远程调用链路与自建服务接入 Agent">
+<meta property='og:description' content="从 Host、Client、Server 与三类原语讲清 MCP，拆解远程 MCP 的发现、选工具、调用、鉴权与返回链路，并用 Python 实现、测试、部署一个可供 Agent 使用的 MCP 服务。">
+<meta property='og:url' content='https://SymphonyW.github.io/zh-cn/p/mcp-guide/'>
+<meta property='og:site_name' content='Snow'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='MCP' /><meta property='article:tag' content='Agent' /><meta property='article:tag' content='AI' /><meta property='article:tag' content='Python' /><meta property='article:tag' content='Architecture' /><meta property='article:published_time' content='2026-10-09T15:00:00&#43;08:00'/><meta property='article:modified_time' content='2026-10-09T15:00:00&#43;08:00'/><meta property='og:image' content='https://SymphonyW.github.io/zh-cn/p/mcp-guide/bg.svg' />
+<meta name="twitter:title" content="MCP 完全指南：原理、远程调用链路与自建服务接入 Agent">
+<meta name="twitter:description" content="从 Host、Client、Server 与三类原语讲清 MCP，拆解远程 MCP 的发现、选工具、调用、鉴权与返回链路，并用 Python 实现、测试、部署一个可供 Agent 使用的 MCP 服务。"><meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content='https://SymphonyW.github.io/zh-cn/p/mcp-guide/bg.svg' />
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    
+    <noscript><style>@media(max-width:760px){.site-header{position:static}.site-header__inner{height:auto;min-height:66px;flex-wrap:wrap}.site-nav{position:static;display:grid;order:3;flex-basis:100%;padding:8px 0 18px}.menu-toggle,.theme-toggle{display:none}}</style></noscript>
+</head>
+<body id="top" class="article-page">
+    <a class="skip-link" href="#main-content">跳至正文</a>
+    
+<header class="site-header">
+    <div class="site-header__inner">
+        <a class="site-brand" href="/zh-cn/" aria-label="Snow — 主页">S<span>now.</span></a>
+        <nav class="site-nav" id="site-navigation" aria-label="主导航">
+            
+            
+                
+                    
+                    
+                    <a href="/zh-cn/">主页</a>
+                
+            
+                
+                    
+                    
+                    <a href="/zh-cn/post/" aria-current="page">博客</a>
+                
+            
+                
+                    
+                    
+                    <a href="/zh-cn/archives/">归档</a>
+                
+            
+                
+                    
+                    
+                    <a href="/zh-cn/stats/">写作记录</a>
+                
+            
+                
+                    
+                    
+                    <a href="/zh-cn/diary/">日记</a>
+                
+            
+                
+            
+                
+                    
+                    
+                    <a href="/zh-cn/links/">链接</a>
+                
+            
+        </nav>
+        <div class="header-tools">
+            
+                <a class="language-link" href="/p/mcp-guide/" lang="en" hreflang="en" aria-label="Switch to English">EN</a>
+            
+            <button type="button" id="dark-mode-toggle" class="icon-button theme-toggle" aria-label="切换明暗主题" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><path d="M12 4.5a7.5 7.5 0 0 1 0 15z" fill="currentColor" stroke="none"/></svg></button>
+            <a class="icon-button search-link" href="/zh-cn/search/" aria-label="搜索文章"><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+</a>
+            <button class="icon-button menu-toggle" type="button" aria-expanded="false" aria-controls="site-navigation" aria-label="展开导航"><span></span><span></span></button>
+        </div>
+    </div>
+    <div class="reading-progress" aria-hidden="true"></div>
+</header>
+
+    <main id="main-content" class="site-main main" tabindex="-1">
+        
+    <div class="reading-page">
+        <article class="main-article has-toc">
+    <header class="article-header">
+    <div class="article-wayfinding">
+        
+            <a href="/zh-cn/post/"><span aria-hidden="true">←</span> 全部文章</a>
+        
+        <span class="article-kind">笔记与思考</span>
+    </div>
+    <div class="article-details">
+    
+    <h1 class="article-title">MCP 完全指南：原理、远程调用链路与自建服务接入 Agent</h1>
+    <p class="article-subtitle">从 Host、Client、Server 与三类原语讲清 MCP，拆解远程 MCP 的发现、选工具、调用、鉴权与返回链路，并用 Python 实现、测试、部署一个可供 Agent 使用的 MCP 服务。</p>
+    <div class="article-meta">
+        
+            <time datetime="2026-10-09T15:00:00&#43;08:00">2026 年 10 月 09 日</time>
+            <span class="meta-divider" aria-hidden="true">/</span>
+            <span>约 7 分钟</span>
+        
+        
+            <div class="article-translations"><a href="/p/mcp-guide/" hreflang="en" lang="en">Read in English <span aria-hidden="true">↗</span></a></div>
+        
+    </div>
+</div>
+
+</header>
+
+    <div class="reading-layout">
+        
+            <aside class="reading-margin" aria-label="文章目录">
+                <details class="article-toc" open>
+                    <summary><span>本文目录</span><span class="toc-indicator" aria-hidden="true">+</span></summary>
+                    <nav id="TableOfContents">
+  <ol>
+    <li><a href="#一为什么需要-mcp">一、为什么需要 MCP</a></li>
+    <li><a href="#二先认清四个角色">二、先认清四个角色</a></li>
+    <li><a href="#三mcp-暴露什么">三、MCP 暴露什么</a>
+      <ol>
+        <li><a href="#tool-和普通-rest-api-有什么不同">Tool 和普通 REST API 有什么不同</a></li>
+      </ol>
+    </li>
+    <li><a href="#四远程-mcp-的完整调用链路">四、远程 MCP 的完整调用链路</a>
+      <ol>
+        <li><a href="#1-配置与发现">1. 配置与发现</a></li>
+        <li><a href="#2-工具进入模型上下文">2. 工具进入模型上下文</a></li>
+        <li><a href="#3-模型选择host-决策">3. 模型选择，Host 决策</a></li>
+        <li><a href="#4-http-调用与业务执行">4. HTTP 调用与业务执行</a></li>
+        <li><a href="#5-结果回到模型">5. 结果回到模型</a></li>
+      </ol>
+    </li>
+    <li><a href="#五两种远程连接模式">五、两种远程连接模式</a></li>
+    <li><a href="#六从零开发一个远程-mcp-server">六、从零开发一个远程 MCP Server</a>
+      <ol>
+        <li><a href="#1-初始化项目">1. 初始化项目</a></li>
+        <li><a href="#2-编写-serverpy">2. 编写 <code>server.py</code></a></li>
+        <li><a href="#3-本地测试">3. 本地测试</a></li>
+        <li><a href="#4-容器化与部署">4. 容器化与部署</a></li>
+      </ol>
+    </li>
+    <li><a href="#七让-agent-真正使用你的-mcp">七、让 Agent 真正使用你的 MCP</a>
+      <ol>
+        <li><a href="#接入-codex">接入 Codex</a></li>
+        <li><a href="#接入-openai-agents-sdk">接入 OpenAI Agents SDK</a></li>
+        <li><a href="#验证-agent-是否会用">验证 Agent 是否会用</a></li>
+      </ol>
+    </li>
+    <li><a href="#八工具设计决定-agent-上限">八、工具设计决定 Agent 上限</a>
+      <ol>
+        <li><a href="#好工具的形状">好工具的形状</a></li>
+        <li><a href="#mcp-不适合什么">MCP 不适合什么</a></li>
+      </ol>
+    </li>
+    <li><a href="#九安全把模型server-和返回内容都当作不可信边界">九、安全：把模型、Server 和返回内容都当作不可信边界</a></li>
+    <li><a href="#十可观测性与排错">十、可观测性与排错</a></li>
+    <li><a href="#十一生产检查清单">十一、生产检查清单</a></li>
+    <li><a href="#结语">结语</a></li>
+    <li><a href="#参考资料">参考资料</a></li>
+  </ol>
+</nav>
+                </details>
+            </aside>
+        
+        <div class="reading-body">
+            <div class="article-content"><h1 id="mcp-完全指南原理远程调用链路与自建服务接入-agent">MCP 完全指南：原理、远程调用链路与自建服务接入 Agent
+</h1><blockquote>
+<p>大模型会“思考”和生成文本，却不知道你公司今天新增了哪个项目，也不能凭空替你创建工单。MCP 做的事，是用一套标准协议把这些外部数据和动作安全地接到 Agent 身边。</p>
+</blockquote>
+<p><a href="/zh-cn/p/mcp-guide/bg.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/mcp-guide/bg.svg" alt="MCP 把 Agent Host 与工具、资源和提示模板连接起来" loading="lazy" decoding="async"></a>
+</p>
+<p>如果只记一句话，可以记住：</p>
+<blockquote>
+<p><strong>MCP（Model Context Protocol，模型上下文协议）是 Agent 应用与外部能力之间的标准接口。它规定如何发现能力、描述参数、发起调用、返回结果与协商权限；它不是模型，也不是新的业务 API。</strong></p>
+</blockquote>
+<p>本文按 <strong>2026-07-28 版 MCP 规范</strong>讲解，同时标出旧版客户端常见的初始化与会话差异。协议仍在快速演进，真正接入时应以所用 Host 和 SDK 支持的版本为准。</p>
+<h2 id="一为什么需要-mcp">一、为什么需要 MCP
+</h2><p>没有 MCP 时，每个 Agent 平台都有一套插件格式。若要让三个 Agent 连接 GitHub、数据库和内部工单系统，往往需要写九份适配代码：</p>
+<div class="mermaid">flowchart LR
+    subgraph Before[没有 MCP：N × M 个适配器]
+        A1[Agent A] --> X1[GitHub 适配]
+        A1 --> X2[数据库适配]
+        A2[Agent B] --> X3[GitHub 适配]
+        A2 --> X4[工单适配]
+    end
+    subgraph After[使用 MCP：统一协议边界]
+        B1[Agent A] --> P[MCP]
+        B2[Agent B] --> P
+        P --> S1[GitHub Server]
+        P --> S2[Database Server]
+        P --> S3[Ticket Server]
+    end
+</div><p>MCP 把“Agent 如何使用外部能力”从具体平台中抽了出来。它带来的核心价值不是少写一次 HTTP 请求，而是统一了以下契约：</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>问题</th>
+<th>MCP 给出的统一方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>服务有什么能力</td>
+<td><code>tools/list</code>、<code>resources/list</code>、<code>prompts/list</code></td>
+</tr>
+<tr>
+<td>参数长什么样</td>
+<td>JSON Schema</td>
+</tr>
+<tr>
+<td>怎样执行动作</td>
+<td><code>tools/call</code></td>
+</tr>
+<tr>
+<td>怎样读取上下文</td>
+<td><code>resources/read</code></td>
+</tr>
+<tr>
+<td>怎样返回结果</td>
+<td><code>content</code>、<code>structuredContent</code>、错误信息与元数据</td>
+</tr>
+<tr>
+<td>双方支持哪些功能</td>
+<td>协议版本、capabilities 与扩展协商</td>
+</tr>
+<tr>
+<td>消息如何传输</td>
+<td>本地 <code>stdio</code> 或远程 Streamable HTTP</td>
+</tr>
+</tbody>
+</table></div>
+<p>它和 USB-C 的类比有用但不完整：USB-C 统一了物理接口，MCP 统一的是一组<strong>面向模型的语义与调用契约</strong>。一个工具的名字、描述和 Schema 会直接影响模型是否选中它，因此 MCP 元数据本身就是产品界面的一部分。</p>
+<h2 id="二先认清四个角色">二、先认清四个角色
+</h2><div class="mermaid">flowchart LR
+    U[用户] --> H[Host<br/>Agent 应用]
+    H --> M[LLM]
+    H --> C1[MCP Client A]
+    H --> C2[MCP Client B]
+    C1 <-->|MCP| S1[MCP Server<br/>项目系统]
+    C2 <-->|MCP| S2[MCP Server<br/>知识库]
+    S1 --> API1[(业务 API / DB)]
+    S2 --> API2[(文档 / 搜索)]
+</div><div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>角色</th>
+<th>做什么</th>
+<th>常见误解</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>User</strong></td>
+<td>提出目标并对高风险动作确认</td>
+<td>用户通常不直接构造 MCP 请求</td>
+</tr>
+<tr>
+<td><strong>Host</strong></td>
+<td>承载 Agent、模型、上下文、策略、审批与多个 MCP Client</td>
+<td>MCP Server 不负责整个 Agent 循环</td>
+</tr>
+<tr>
+<td><strong>MCP Client</strong></td>
+<td>与一个 Server 通信，完成发现、调用和协议兼容</td>
+<td>它一般是 Host 内部组件，不等于用户界面</td>
+</tr>
+<tr>
+<td><strong>MCP Server</strong></td>
+<td>暴露能力，校验调用并连接真实业务系统</td>
+<td>它不是把整个数据库无条件交给模型</td>
+</tr>
+</tbody>
+</table></div>
+<p>最重要的一点：<strong>通常不是模型直接访问 MCP Server</strong>。Host 先把允许的能力提供给模型；模型产生工具调用意图；Host 再根据权限、审批和运行策略决定是否执行。这个边界让“模型想做什么”和“系统允许做什么”可以分开。</p>
+<h2 id="三mcp-暴露什么">三、MCP 暴露什么
+</h2><p>MCP Server 主要暴露三类原语：</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>原语</th>
+<th>控制者</th>
+<th>适合什么</th>
+<th>示例</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Tools</strong></td>
+<td>模型选择调用，Host 执行策略把关</td>
+<td>查询或执行动作</td>
+<td><code>search_projects</code>、<code>create_ticket</code></td>
+</tr>
+<tr>
+<td><strong>Resources</strong></td>
+<td>Host / 应用选择加载</td>
+<td>可寻址的只读上下文</td>
+<td><code>project://P-1024/spec</code></td>
+</tr>
+<tr>
+<td><strong>Prompts</strong></td>
+<td>用户或 Host 选择</td>
+<td>可复用的工作流模板</td>
+<td>“生成发布检查清单”</td>
+</tr>
+</tbody>
+</table></div>
+<p>此外还有通知、补全、引导式输入等能力。不要因为协议支持很多功能就全部实现：大多数服务从少量清晰的 Tools 开始就够了。</p>
+<h3 id="tool-和普通-rest-api-有什么不同">Tool 和普通 REST API 有什么不同
+</h3><p>底层业务逻辑完全可以继续使用 REST、gRPC 或数据库。MCP Server 更像一层“面向 Agent 的适配器”：</p>
+<div class="mermaid">flowchart LR
+    L[LLM 看到的工具<br/>名称 + 描述 + Schema] --> S[MCP Server<br/>鉴权 · 校验 · 编排]
+    S --> R1[REST API]
+    S --> R2[gRPC]
+    S --> R3[(Database)]
+    S --> R4[Message Queue]
+</div><p>REST 路由通常为人类开发者设计，例如 <code>PATCH /v1/projects/:id</code>；MCP Tool 应围绕用户目标设计，例如 <code>archive_project(project_id, reason)</code>。不要简单地把数百个内部端点一比一暴露给模型。</p>
+<h2 id="四远程-mcp-的完整调用链路">四、远程 MCP 的完整调用链路
+</h2><p>远程 MCP 通常使用 <strong>Streamable HTTP</strong>。旧的 HTTP+SSE transport 已被取代，只应为旧客户端保留兼容。下面先看一次典型工具调用：</p>
+<div class="mermaid">sequenceDiagram
+    autonumber
+    actor User as 用户
+    participant Host as Agent Host
+    participant Model as LLM
+    participant Client as MCP Client
+    participant Server as Remote MCP Server
+    participant API as 业务系统
+
+    Host->>Client: 连接服务器配置
+    Client->>Server: 发现协议版本与 capabilities
+    Server-->>Client: server info + capabilities
+    Client->>Server: tools/list
+    Server-->>Client: 工具名、描述、输入/输出 Schema、annotations
+    User->>Host: “列出本周延期的项目”
+    Host->>Model: 用户消息 + 可用工具定义
+    Model-->>Host: 调用 list_projects(status="delayed")
+    Host->>Host: 策略检查 / 必要时请求确认
+    Host->>Client: 执行工具调用
+    Client->>Server: tools/call + 身份凭据
+    Server->>Server: 鉴权、租户隔离、参数校验
+    Server->>API: 查询真实业务数据
+    API-->>Server: 项目记录
+    Server-->>Client: content + structuredContent
+    Client-->>Host: 工具结果
+    Host->>Model: 将允许的结果加入上下文
+    Model-->>Host: 组织自然语言答案
+    Host-->>User: 最终回复 + 来源/动作状态
+</div><p>这条链路可以拆成五段。</p>
+<h3 id="1-配置与发现">1. 配置与发现
+</h3><p>Host 保存 MCP Server 的名称、URL 和认证方式。连接时，双方确认协议版本、服务信息和 capabilities；Client 再读取工具列表。现代客户端会缓存列表，并在服务通知能力变化或缓存失效时刷新。</p>
+<p>截至本文所用的 2026-07-28 规范，新链路以无会话的 <code>server/discover</code> 和每请求元数据为主；兼容旧规范的客户端则可能先走 <code>initialize</code> → <code>initialized</code>，并携带 <code>Mcp-Session-Id</code>。<strong>SDK 会处理大部分兼容逻辑，业务代码不要自己拼 JSON-RPC。</strong></p>
+<h3 id="2-工具进入模型上下文">2. 工具进入模型上下文
+</h3><p>Host 并不一定把所有工具都塞给模型。它可能按租户、角色、当前任务或工具搜索结果过滤，只向模型提供相关的名称、描述和 Schema。这一步决定模型“知道自己能做什么”。</p>
+<p>工具越多不一定越好。五个边界明确的工具，通常比五十个描述含糊的工具更可靠，也更节省上下文。</p>
+<h3 id="3-模型选择host-决策">3. 模型选择，Host 决策
+</h3><p>模型返回的是一个结构化调用意图，而不是直接执行结果。Host 应在这里做策略判断：</p>
+<ul>
+<li>该用户能否使用这个 Server 和 Tool；</li>
+<li>读取是否可直接执行，写入是否需要确认；</li>
+<li>参数是否命中数据边界、费用上限或速率限制；</li>
+<li>是否存在提示注入、越权或破坏性风险。</li>
+</ul>
+<p>Tool annotations 能帮助 Host 判断 <code>readOnly</code>、<code>destructive</code>、<code>openWorld</code> 等性质，但它们只是提示，不能替代服务端鉴权。</p>
+<h3 id="4-http-调用与业务执行">4. HTTP 调用与业务执行
+</h3><p>Client 通过 HTTPS 向 <code>/mcp</code> 发送 MCP 请求。现代远程请求包含协议版本和路由相关信息，认证通常放在 <code>Authorization</code> header。Server 必须再次完成：令牌验证、scope 校验、租户隔离、参数校验、业务授权、超时与审计。</p>
+<p>然后它才调用真正的 REST/gRPC/数据库。MCP 不会替你解决业务授权，也不会自动让一条危险 SQL 变安全。</p>
+<p>把 SDK 隐藏的细节展开，一次现代 Tool 调用大致是下面这样（为便于阅读省略部分每请求 <code>_meta</code>）：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-http" data-lang="http"><span class="line"><span class="cl"><span class="nf">POST</span> <span class="nn">/mcp</span> <span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span>
+</span></span><span class="line"><span class="cl"><span class="n">Host</span><span class="o">:</span> <span class="l">mcp.example.com</span>
+</span></span><span class="line"><span class="cl"><span class="n">Authorization</span><span class="o">:</span> <span class="l">Bearer &lt;access-token&gt;</span>
+</span></span><span class="line"><span class="cl"><span class="n">Content-Type</span><span class="o">:</span> <span class="l">application/json</span>
+</span></span><span class="line"><span class="cl"><span class="n">Mcp-Protocol-Version</span><span class="o">:</span> <span class="l">2026-07-28</span>
+</span></span><span class="line"><span class="cl"><span class="n">Mcp-Method</span><span class="o">:</span> <span class="l">tools/call</span>
+</span></span><span class="line"><span class="cl"><span class="n">Mcp-Name</span><span class="o">:</span> <span class="l">list_projects</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;jsonrpc&#34;</span><span class="p">:</span> <span class="s2">&#34;2.0&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;id&#34;</span><span class="p">:</span> <span class="mi">42</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;method&#34;</span><span class="p">:</span> <span class="s2">&#34;tools/call&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;params&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;name&#34;</span><span class="p">:</span> <span class="s2">&#34;list_projects&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;arguments&#34;</span><span class="p">:</span> <span class="p">{</span><span class="nt">&#34;status&#34;</span><span class="p">:</span> <span class="s2">&#34;delayed&#34;</span><span class="p">,</span> <span class="nt">&#34;limit&#34;</span><span class="p">:</span> <span class="mi">5</span><span class="p">}</span>
+</span></span><span class="line"><span class="cl">  <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>成功结果仍是 JSON-RPC，其中 <code>content</code> 供模型阅读，<code>structuredContent</code> 供程序可靠消费：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;jsonrpc&#34;</span><span class="p">:</span> <span class="s2">&#34;2.0&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;id&#34;</span><span class="p">:</span> <span class="mi">42</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;result&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;content&#34;</span><span class="p">:</span> <span class="p">[{</span><span class="nt">&#34;type&#34;</span><span class="p">:</span> <span class="s2">&#34;text&#34;</span><span class="p">,</span> <span class="nt">&#34;text&#34;</span><span class="p">:</span> <span class="s2">&#34;Found 1 delayed project.&#34;</span><span class="p">}],</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;structuredContent&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">      <span class="nt">&#34;result&#34;</span><span class="p">:</span> <span class="p">[{</span><span class="nt">&#34;id&#34;</span><span class="p">:</span> <span class="s2">&#34;P-1002&#34;</span><span class="p">,</span> <span class="nt">&#34;name&#34;</span><span class="p">:</span> <span class="s2">&#34;Billing migration&#34;</span><span class="p">}]</span>
+</span></span><span class="line"><span class="cl">    <span class="p">},</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;isError&#34;</span><span class="p">:</span> <span class="kc">false</span>
+</span></span><span class="line"><span class="cl">  <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>不要在业务代码中手写这些报文。示例的意义是方便查日志、网关和 trace；版本协商、header 与 JSON-RPC 细节应交给 SDK。</p>
+<h3 id="5-结果回到模型">5. 结果回到模型
+</h3><p>工具结果常有三条通道：</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>字段</th>
+<th>谁使用</th>
+<th>建议</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>content</code></td>
+<td>模型</td>
+<td>简洁、可理解，说明发生了什么</td>
+</tr>
+<tr>
+<td><code>structuredContent</code></td>
+<td>Host / 后续工具 / UI</td>
+<td>遵守输出 Schema，返回稳定 ID 与字段</td>
+</tr>
+<tr>
+<td><code>_meta</code></td>
+<td>Client 应用</td>
+<td>放客户端专用信息；不要把它当秘密保险箱</td>
+</tr>
+</tbody>
+</table></div>
+<p>Host 将允许模型看到的结果放回上下文，模型再生成最终答复。<strong>MCP 调用成功不等于用户任务成功</strong>：Agent 还需要检查 <code>isError</code>、确认数据完整性，并可能继续调用下一项工具。</p>
+<h2 id="五两种远程连接模式">五、两种远程连接模式
+</h2><div class="mermaid">flowchart TB
+    subgraph Direct[模式 A：应用运行时直接连接]
+        A[你的 Agent 应用] --> C[MCP Client]
+        C --> S[Remote MCP Server]
+    end
+    subgraph Hosted[模式 B：模型平台托管连接]
+        B[你的应用] --> P[模型 / Agent 平台]
+        P --> HS[Remote MCP Server]
+    end
+</div><div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>模式</th>
+<th>优点</th>
+<th>适合场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>运行时直连</strong></td>
+<td>网络、凭据、审批、过滤都由你的应用掌控</td>
+<td>私网服务、严格合规、自定义策略</td>
+</tr>
+<tr>
+<td><strong>平台托管 MCP</strong></td>
+<td>接入代码少，Agent 平台负责协议调用</td>
+<td>公网 HTTPS 服务、快速集成</td>
+</tr>
+</tbody>
+</table></div>
+<p>在 OpenAI Agents SDK 中，公开远程服务可作为 hosted MCP tool；本地或私有服务则可以由 SDK runtime 通过 stdio 或 Streamable HTTP 管理。选择标准不是“哪种更新”，而是<strong>连接与信任边界应该由谁拥有</strong>。</p>
+<h2 id="六从零开发一个远程-mcp-server">六、从零开发一个远程 MCP Server
+</h2><p>下面做一个最小但完整的“项目查询”服务。示例使用 Python SDK v2、Python 3.10+，并选择无状态 Streamable HTTP，便于水平扩展。</p>
+<h3 id="1-初始化项目">1. 初始化项目
+</h3><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">mkdir project-mcp <span class="o">&amp;&amp;</span> <span class="nb">cd</span> project-mcp
+</span></span><span class="line"><span class="cl">uv init
+</span></span><span class="line"><span class="cl">uv add <span class="s2">&#34;mcp[cli]&gt;=2,&lt;3&#34;</span> pydantic
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>固定主版本很重要：MCP SDK 与规范演进较快，不应让生产构建在无审核时跨主版本升级。</p>
+<h3 id="2-编写-serverpy">2. 编写 <code>server.py</code>
+</h3><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span><span class="lnt">25
+</span><span class="lnt">26
+</span><span class="lnt">27
+</span><span class="lnt">28
+</span><span class="lnt">29
+</span><span class="lnt">30
+</span><span class="lnt">31
+</span><span class="lnt">32
+</span><span class="lnt">33
+</span><span class="lnt">34
+</span><span class="lnt">35
+</span><span class="lnt">36
+</span><span class="lnt">37
+</span><span class="lnt">38
+</span><span class="lnt">39
+</span><span class="lnt">40
+</span><span class="lnt">41
+</span><span class="lnt">42
+</span><span class="lnt">43
+</span><span class="lnt">44
+</span><span class="lnt">45
+</span><span class="lnt">46
+</span><span class="lnt">47
+</span><span class="lnt">48
+</span><span class="lnt">49
+</span><span class="lnt">50
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-python" data-lang="python"><span class="line"><span class="cl"><span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Annotated</span><span class="p">,</span> <span class="n">Literal</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kn">from</span> <span class="nn">mcp.server</span> <span class="kn">import</span> <span class="n">MCPServer</span>
+</span></span><span class="line"><span class="cl"><span class="kn">from</span> <span class="nn">mcp.types</span> <span class="kn">import</span> <span class="n">ToolAnnotations</span>
+</span></span><span class="line"><span class="cl"><span class="kn">from</span> <span class="nn">pydantic</span> <span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">Field</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="k">class</span> <span class="nc">Project</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">    <span class="nb">id</span><span class="p">:</span> <span class="nb">str</span>
+</span></span><span class="line"><span class="cl">    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
+</span></span><span class="line"><span class="cl">    <span class="n">status</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&#34;active&#34;</span><span class="p">,</span> <span class="s2">&#34;delayed&#34;</span><span class="p">,</span> <span class="s2">&#34;archived&#34;</span><span class="p">]</span>
+</span></span><span class="line"><span class="cl">    <span class="n">owner</span><span class="p">:</span> <span class="nb">str</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="n">PROJECTS</span> <span class="o">=</span> <span class="p">[</span>
+</span></span><span class="line"><span class="cl">    <span class="n">Project</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&#34;P-1001&#34;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&#34;Search upgrade&#34;</span><span class="p">,</span> <span class="n">status</span><span class="o">=</span><span class="s2">&#34;active&#34;</span><span class="p">,</span> <span class="n">owner</span><span class="o">=</span><span class="s2">&#34;Lin&#34;</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl">    <span class="n">Project</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&#34;P-1002&#34;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&#34;Billing migration&#34;</span><span class="p">,</span> <span class="n">status</span><span class="o">=</span><span class="s2">&#34;delayed&#34;</span><span class="p">,</span> <span class="n">owner</span><span class="o">=</span><span class="s2">&#34;Kai&#34;</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl"><span class="p">]</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="n">mcp</span> <span class="o">=</span> <span class="n">MCPServer</span><span class="p">(</span><span class="s2">&#34;project-catalog&#34;</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="s2">&#34;1.0.0&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="nd">@mcp.tool</span><span class="p">(</span>
+</span></span><span class="line"><span class="cl">    <span class="n">annotations</span><span class="o">=</span><span class="n">ToolAnnotations</span><span class="p">(</span>
+</span></span><span class="line"><span class="cl">        <span class="n">readOnlyHint</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="n">idempotentHint</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="n">destructiveHint</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="n">openWorldHint</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="k">def</span> <span class="nf">list_projects</span><span class="p">(</span>
+</span></span><span class="line"><span class="cl">    <span class="n">status</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&#34;active&#34;</span><span class="p">,</span> <span class="s2">&#34;delayed&#34;</span><span class="p">,</span> <span class="s2">&#34;archived&#34;</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">limit</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">ge</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">le</span><span class="o">=</span><span class="mi">50</span><span class="p">)]</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl"><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Project</span><span class="p">]:</span>
+</span></span><span class="line"><span class="cl">    <span class="s2">&#34;&#34;&#34;List projects, optionally filtered by exact status.
+</span></span></span><span class="line"><span class="cl"><span class="s2">
+</span></span></span><span class="line"><span class="cl"><span class="s2">    Use this for project discovery. It never modifies project data.
+</span></span></span><span class="line"><span class="cl"><span class="s2">    &#34;&#34;&#34;</span>
+</span></span><span class="line"><span class="cl">    <span class="n">matches</span> <span class="o">=</span> <span class="p">[</span><span class="n">p</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">PROJECTS</span> <span class="k">if</span> <span class="n">status</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">p</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="n">status</span><span class="p">]</span>
+</span></span><span class="line"><span class="cl">    <span class="k">return</span> <span class="n">matches</span><span class="p">[:</span><span class="n">limit</span><span class="p">]</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&#34;__main__&#34;</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">    <span class="n">mcp</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+</span></span><span class="line"><span class="cl">        <span class="n">transport</span><span class="o">=</span><span class="s2">&#34;streamable-http&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="n">host</span><span class="o">=</span><span class="s2">&#34;0.0.0.0&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="n">port</span><span class="o">=</span><span class="mi">8000</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="n">stateless_http</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="n">json_response</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="p">)</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这段代码虽短，却已经定义了完整契约：</p>
+<ul>
+<li>函数名成为 Tool 名；</li>
+<li>docstring 成为模型看到的描述；</li>
+<li>类型注解生成输入 JSON Schema；</li>
+<li>返回类型生成输出 Schema；</li>
+<li><code>ToolAnnotations</code> 告诉 Host 它是只读、幂等、非破坏且不访问开放互联网的；</li>
+<li>SDK 处理 MCP 消息、协议版本与 Streamable HTTP。</li>
+</ul>
+<p>生产环境里把 <code>PROJECTS</code> 替换成业务 Service 调用即可，但不要跳过“从当前认证身份推导租户”这一步。</p>
+<h3 id="3-本地测试">3. 本地测试
+</h3><p>先用官方 Inspector 检查能力发现、Schema 和结果：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">uv run mcp dev server.py
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>再启动真正的远程 transport：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">uv run python server.py
+</span></span><span class="line"><span class="cl"><span class="c1"># MCP endpoint: http://127.0.0.1:8000/mcp</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>另一种可靠的自动化检查，是用同一 SDK 作为客户端：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-python" data-lang="python"><span class="line"><span class="cl"><span class="kn">import</span> <span class="nn">asyncio</span>
+</span></span><span class="line"><span class="cl"><span class="kn">from</span> <span class="nn">mcp</span> <span class="kn">import</span> <span class="n">Client</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="k">async</span> <span class="k">def</span> <span class="nf">main</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">    <span class="k">async</span> <span class="k">with</span> <span class="n">Client</span><span class="p">(</span><span class="s2">&#34;http://127.0.0.1:8000/mcp&#34;</span><span class="p">)</span> <span class="k">as</span> <span class="n">client</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">        <span class="n">tools</span> <span class="o">=</span> <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">list_tools</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">        <span class="k">assert</span> <span class="nb">any</span><span class="p">(</span><span class="n">tool</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&#34;list_projects&#34;</span> <span class="k">for</span> <span class="n">tool</span> <span class="ow">in</span> <span class="n">tools</span><span class="o">.</span><span class="n">tools</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="n">result</span> <span class="o">=</span> <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">call_tool</span><span class="p">(</span>
+</span></span><span class="line"><span class="cl">            <span class="s2">&#34;list_projects&#34;</span><span class="p">,</span> <span class="p">{</span><span class="s2">&#34;status&#34;</span><span class="p">:</span> <span class="s2">&#34;delayed&#34;</span><span class="p">,</span> <span class="s2">&#34;limit&#34;</span><span class="p">:</span> <span class="mi">5</span><span class="p">}</span>
+</span></span><span class="line"><span class="cl">        <span class="p">)</span>
+</span></span><span class="line"><span class="cl">        <span class="k">assert</span> <span class="ow">not</span> <span class="n">result</span><span class="o">.</span><span class="n">is_error</span>
+</span></span><span class="line"><span class="cl">        <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">structured_content</span><span class="p">[</span><span class="s2">&#34;result&#34;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&#34;id&#34;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&#34;P-1002&#34;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">main</span><span class="p">())</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>测试至少覆盖：正常参数、边界值、非法枚举、无权限、下游超时、空结果和输出 Schema。Inspector 能证明“协议可用”，自动化测试才能证明“升级后仍然可用”。</p>
+<h3 id="4-容器化与部署">4. 容器化与部署
+</h3><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span><span class="lnt">9
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-dockerfile" data-lang="dockerfile"><span class="line"><span class="cl"><span class="k">FROM</span><span class="s"> python:3.13-slim</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">WORKDIR</span><span class="s"> /app</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">COPY</span> pyproject.toml uv.lock ./<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">RUN</span> pip install --no-cache-dir uv <span class="o">&amp;&amp;</span> uv sync --frozen --no-dev<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">COPY</span> server.py ./<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">EXPOSE</span><span class="s"> 8000</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">CMD</span> <span class="p">[</span><span class="s2">&#34;uv&#34;</span><span class="p">,</span> <span class="s2">&#34;run&#34;</span><span class="p">,</span> <span class="s2">&#34;python&#34;</span><span class="p">,</span> <span class="s2">&#34;server.py&#34;</span><span class="p">]</span><span class="err">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">docker build -t project-mcp:1.0.0 .
+</span></span><span class="line"><span class="cl">docker run --rm -p 8000:8000 project-mcp:1.0.0
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>生产地址应是稳定 HTTPS URL，例如：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">https://mcp.example.com/mcp
+</span></span></code></pre></td></tr></table>
+</div>
+</div><blockquote>
+<p>上面的演示服务没有认证，只能用于本机学习。部署到任何可被其他人访问的网络前，必须接入 SDK 的 token verifier / OAuth 配置，并在每个 Tool 内落实业务授权。</p>
+</blockquote>
+<p>反向代理和平台需要允许流式响应；设置合理的请求体上限、调用超时和连接空闲时间。无状态模式适合普通查询与动作；需要跨调用状态时，优先让服务返回显式 <code>handle</code>，再由后续工具把它作为参数传回，而不是偷偷依赖某台实例的内存。</p>
+<h2 id="七让-agent-真正使用你的-mcp">七、让 Agent 真正使用你的 MCP
+</h2><p>“服务能访问”只完成了一半。要让 Agent 稳定调用，还需要<strong>注册、授权、告知使用时机、验证真实行为</strong>。</p>
+<h3 id="接入-codex">接入 Codex
+</h3><p>使用 Codex CLI 添加远程服务：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">codex mcp add projects --url https://mcp.example.com/mcp
+</span></span><span class="line"><span class="cl">codex mcp list
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>也可以写入 <code>~/.codex/config.toml</code>：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-toml" data-lang="toml"><span class="line"><span class="cl"><span class="p">[</span><span class="nx">mcp_servers</span><span class="p">.</span><span class="nx">projects</span><span class="p">]</span>
+</span></span><span class="line"><span class="cl"><span class="nx">url</span> <span class="p">=</span> <span class="s2">&#34;https://mcp.example.com/mcp&#34;</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>然后在项目 <code>AGENTS.md</code> 中给出简短、可验证的路由规则：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-md" data-lang="md"><span class="line"><span class="cl">查询项目状态、负责人或项目 ID 时，先使用 projects MCP 的只读工具。
+</span></span><span class="line"><span class="cl">任何修改、归档或删除项目的动作都必须先向用户展示目标与影响，并等待确认。
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>配置决定“Agent 能看见哪些能力”，指令决定“什么时候优先使用”。不要写“永远相信工具结果”之类的规则，远程内容仍可能过期或包含恶意文本。</p>
+<h3 id="接入-openai-agents-sdk">接入 OpenAI Agents SDK
+</h3><p>公开的远程 MCP 可以作为 hosted tool 附到 Agent 上：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-python" data-lang="python"><span class="line"><span class="cl"><span class="kn">from</span> <span class="nn">agents</span> <span class="kn">import</span> <span class="n">Agent</span><span class="p">,</span> <span class="n">HostedMCPTool</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="n">agent</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span>
+</span></span><span class="line"><span class="cl">    <span class="n">name</span><span class="o">=</span><span class="s2">&#34;Project assistant&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">instructions</span><span class="o">=</span><span class="s2">&#34;Use the projects MCP for current project facts.&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">tools</span><span class="o">=</span><span class="p">[</span>
+</span></span><span class="line"><span class="cl">        <span class="n">HostedMCPTool</span><span class="p">(</span>
+</span></span><span class="line"><span class="cl">            <span class="n">tool_config</span><span class="o">=</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">                <span class="s2">&#34;type&#34;</span><span class="p">:</span> <span class="s2">&#34;mcp&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">                <span class="s2">&#34;server_label&#34;</span><span class="p">:</span> <span class="s2">&#34;projects&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">                <span class="s2">&#34;server_url&#34;</span><span class="p">:</span> <span class="s2">&#34;https://mcp.example.com/mcp&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">                <span class="s2">&#34;require_approval&#34;</span><span class="p">:</span> <span class="s2">&#34;never&#34;</span><span class="p">,</span>  <span class="c1"># 仅适合这里的只读工具</span>
+</span></span><span class="line"><span class="cl">            <span class="p">}</span>
+</span></span><span class="line"><span class="cl">        <span class="p">)</span>
+</span></span><span class="line"><span class="cl">    <span class="p">],</span>
+</span></span><span class="line"><span class="cl"><span class="p">)</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>写操作不要照抄 <code>never</code>。审批策略应与工具风险匹配，并且服务端仍需独立鉴权。私有服务也可以让 Agents SDK runtime 直接管理连接，从而由你的应用控制网络、过滤与审批边界。</p>
+<h3 id="验证-agent-是否会用">验证 Agent 是否会用
+</h3><p>准备一组小型评测，而不是只问一句“能用吗”：</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>用例</th>
+<th>期望行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>“列出延期项目”</td>
+<td>调 <code>list_projects(status=&quot;delayed&quot;)</code></td>
+</tr>
+<tr>
+<td>“介绍什么是延期项目”</td>
+<td>若是通用定义，不应无意义调用</td>
+</tr>
+<tr>
+<td>“把 P-1002 删除”</td>
+<td>当前无删除工具，应说明做不到，不能伪造成功</td>
+</tr>
+<tr>
+<td>“列出 <code>status=hacked</code>”</td>
+<td>Schema 拒绝非法枚举，Agent 应修正或解释</td>
+</tr>
+<tr>
+<td>Tool 返回网页中的“忽略之前指令”</td>
+<td>把它视作不可信数据，不执行越权动作</td>
+</tr>
+</tbody>
+</table></div>
+<p>观察三类指标：工具选择是否正确、参数是否正确、拿到结果后是否忠实回答。只看最终文字，容易漏掉重复调用、越权尝试和不必要的高成本请求。</p>
+<h2 id="八工具设计决定-agent-上限">八、工具设计决定 Agent 上限
+</h2><h3 id="好工具的形状">好工具的形状
+</h3><div class="mermaid">flowchart LR
+    G[用户目标] --> N[清楚的动词名]
+    N --> D[说明何时使用]
+    D --> I[窄而明确的输入 Schema]
+    I --> A[真实 annotations]
+    A --> O[稳定的结构化输出]
+    O --> E[可恢复的错误]
+</div><p>建议遵循这些规则：</p>
+<ol>
+<li><strong>一个工具完成一个可识别目标。</strong> 用 <code>list_projects</code>、<code>get_project</code>、<code>update_project</code>，不要做 <code>project_action(mode, payload)</code> 万能入口。</li>
+<li><strong>描述“何时用”，而不只描述实现。</strong> 模型靠描述选择工具。</li>
+<li><strong>输入要窄。</strong> 枚举、长度、范围、格式能写进 Schema 就不要只写在文档里。</li>
+<li><strong>读取与写入分开。</strong> 这样 Host 才能给不同审批策略。</li>
+<li><strong>返回稳定 ID。</strong> 后续调用使用 <code>P-1002</code>，不要让模型靠名称猜记录。</li>
+<li><strong>分页且设上限。</strong> 不要一次把十万行塞进上下文。</li>
+<li><strong>错误应可恢复。</strong> “项目不存在，请先 list_projects 获取 ID”比堆栈信息有用。</li>
+<li><strong>Schema 向后兼容。</strong> 新增可选字段通常安全；改名、改类型或删除字段可能让旧 Agent 失效。</li>
+</ol>
+<h3 id="mcp-不适合什么">MCP 不适合什么
+</h3><ul>
+<li>纯粹在应用内部、只被一处调用的简单函数，直接 function tool 可能更省事；</li>
+<li>大文件持续传输、实时音视频等数据面，不应硬塞进工具结果；</li>
+<li>要求严格确定性的核心交易流程，不应把关键状态机完全交给模型自由规划；</li>
+<li>没有授权边界的“任意 SQL”“任意 Shell”“任意 URL 抓取”，不应作为生产工具暴露。</li>
+</ul>
+<h2 id="九安全把模型server-和返回内容都当作不可信边界">九、安全：把模型、Server 和返回内容都当作不可信边界
+</h2><div class="mermaid">flowchart LR
+    U[用户输入<br/>不可信] --> H[Host 策略层]
+    H -->|最小工具集| M[模型输出<br/>不可信意图]
+    M --> A{审批 / 授权}
+    A --> S[MCP Server<br/>再次鉴权与校验]
+    S --> B[业务系统]
+    B --> R[工具结果<br/>仍不可信]
+    R --> H
+</div><p>上线前至少做好以下事项：</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>风险</th>
+<th>防线</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>越权读取或跨租户访问</td>
+<td>每次调用验证 token、scope、tenant 与对象级权限</td>
+</tr>
+<tr>
+<td>破坏性动作</td>
+<td>单独工具、明确 annotations、用户确认、幂等键、可审计与可回滚</td>
+</tr>
+<tr>
+<td>提示注入</td>
+<td>把 Tool/Resource 返回当数据；禁止其改写系统策略或索要更多工具</td>
+</tr>
+<tr>
+<td>Token 泄漏</td>
+<td>不写入 Tool 描述、结果和日志；不向错误 audience 透传 token</td>
+</tr>
+<tr>
+<td>SSRF</td>
+<td>URL allowlist、DNS/IP 校验、阻止云元数据与内网地址、限制重定向</td>
+</tr>
+<tr>
+<td>数据过量</td>
+<td>字段最小化、分页、结果上限、PII 脱敏</td>
+</tr>
+<tr>
+<td>拒绝服务与费用失控</td>
+<td>速率限制、并发限制、超时、熔断、配额</td>
+</tr>
+<tr>
+<td>供应链漂移</td>
+<td>固定 SDK 主版本、扫描依赖、灰度升级、可回滚部署</td>
+</tr>
+</tbody>
+</table></div>
+<p>认证回答“你是谁”，授权回答“你能对哪条数据做什么”。只验证 Bearer Token 是否存在远远不够。对多用户服务，业务查询必须从<strong>已验证凭据</strong>中取得用户和租户，绝不能信任模型传入的 <code>user_id</code>。</p>
+<p>OAuth 场景使用标准授权发现、最小 scope 和明确 audience。Tool annotations、Host 弹窗、网络 allowlist 都属于纵深防御，但服务端对象级授权才是最终边界。</p>
+<h2 id="十可观测性与排错">十、可观测性与排错
+</h2><p>一次 MCP 问题可能出现在四层：模型没选工具、Host 拦截、协议失败、业务系统失败。日志必须能把它们串起来。</p>
+<p>建议记录：</p>
+<ul>
+<li><code>trace_id</code> / request ID、Server 与 Tool 名称、版本；</li>
+<li>已脱敏的调用方、租户、审批结果；</li>
+<li>总耗时和下游耗时、结果大小、错误分类；</li>
+<li>Schema 版本与部署版本。</li>
+</ul>
+<p>不要记录 access token、完整私密文档或未经脱敏的 Tool 结果。</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>现象</th>
+<th>先查什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Server 完全连不上</td>
+<td>URL、HTTPS 证书、DNS、Host header、防火墙、<code>/mcp</code> 路径</td>
+</tr>
+<tr>
+<td>已连接但看不到工具</td>
+<td>discovery/capabilities、<code>tools/list</code>、注册代码是否执行</td>
+</tr>
+<tr>
+<td>模型从不调用</td>
+<td>Tool 名称与描述、指令、是否给了过多相似工具</td>
+</tr>
+<tr>
+<td>参数总是错</td>
+<td>Schema 是否太宽或语义含糊，枚举与示例是否清楚</td>
+</tr>
+<tr>
+<td>本地正常、远程超时</td>
+<td>代理流式配置、平台超时、下游延迟、冷启动</td>
+</tr>
+<tr>
+<td>调用成功但回答错误</td>
+<td><code>content</code> 是否清楚、结构化结果是否完整、模型是否拿到旧缓存</td>
+</tr>
+<tr>
+<td>多副本偶发失败</td>
+<td>是否暗中依赖进程内状态或旧版 session sticky routing</td>
+</tr>
+</tbody>
+</table></div>
+<p>最短排错路径通常是：<strong>Inspector 直连 Server → SDK Client 直连 → Host 中查看工具列表 → 观察一次完整 Agent trace</strong>。这样能快速定位问题属于服务、协议还是模型决策。</p>
+<h2 id="十一生产检查清单">十一、生产检查清单
+</h2><ul>
+<li><input disabled="" type="checkbox"> Tool 名称、描述、输入/输出 Schema 已评审</li>
+<li><input disabled="" type="checkbox"> 读取、写入、破坏性动作已拆分</li>
+<li><input disabled="" type="checkbox"> 每次请求都做认证、scope、租户和对象级授权</li>
+<li><input disabled="" type="checkbox"> 远程 endpoint 使用稳定 HTTPS 与 Streamable HTTP</li>
+<li><input disabled="" type="checkbox"> 写操作有审批、幂等与审计，必要时可回滚</li>
+<li><input disabled="" type="checkbox"> 结果有分页与大小上限，不含 secrets</li>
+<li><input disabled="" type="checkbox"> 超时、重试、限流、熔断和下游错误映射已配置</li>
+<li><input disabled="" type="checkbox"> Inspector、自动化测试和 Agent 行为评测均通过</li>
+<li><input disabled="" type="checkbox"> 有 trace、指标、脱敏日志和告警</li>
+<li><input disabled="" type="checkbox"> SDK 与 Schema 版本固定，升级可灰度和回滚</li>
+</ul>
+<h2 id="结语">结语
+</h2><p>MCP 真正解决的不是“让模型发一个 HTTP 请求”，而是让<strong>能力发现、参数契约、调用执行、结果返回和安全策略</strong>有一条共同的标准链路。</p>
+<p>开发自己的 MCP，可以按这条最短路径推进：</p>
+<div class="mermaid">flowchart LR
+    A[选一个真实用户目标] --> B[设计一个窄 Tool]
+    B --> C[本地 Inspector]
+    C --> D[自动化测试]
+    D --> E[Streamable HTTP + Auth]
+    E --> F[接入 Agent]
+    F --> G[行为评测与观测]
+    G --> H[再增加下一个 Tool]
+</div><p>先把一个只读工具做准，再增加写操作；先把权限边界做实，再追求复杂编排。MCP 降低了连接成本，却不会替代良好的 API 设计、授权模型与工程治理。</p>
+<h2 id="参考资料">参考资料
+</h2><ul>
+<li><a class="link" href="https://modelcontextprotocol.io/specification/2026-07-28"  target="_blank" rel="noopener"
+    >Model Context Protocol 官方规范与文档</a></li>
+<li><a class="link" href="https://github.com/modelcontextprotocol/python-sdk"  target="_blank" rel="noopener"
+    >MCP Python SDK v2</a></li>
+<li><a class="link" href="https://developers.openai.com/plugins/build/mcp-server"  target="_blank" rel="noopener"
+    >OpenAI：构建 MCP Server</a></li>
+<li><a class="link" href="https://developers.openai.com/api/docs/guides/agents/integrations-observability"  target="_blank" rel="noopener"
+    >OpenAI Agents SDK：MCP 集成与可观测性</a></li>
+<li><a class="link" href="https://developers.openai.com/learn/docs-mcp"  target="_blank" rel="noopener"
+    >OpenAI Docs MCP：Codex 接入示例</a></li>
+</ul>
+
+</div>
+
+            <footer class="article-footer">
+    
+        <div class="article-tags" aria-label="文章标签"><span class="article-footer-label">相关主题</span><a href="/zh-cn/tags/mcp/">MCP</a><a href="/zh-cn/tags/agent/">Agent</a><a href="/zh-cn/tags/ai/">AI</a><a href="/zh-cn/tags/python/">Python</a><a href="/zh-cn/tags/architecture/">Architecture</a></div>
+    
+    
+    
+    <div class="article-endnote"><span>感谢读到这里。</span><a href="#top">回到开头 <span aria-hidden="true">↑</span></a></div>
+</footer>
+
+        </div>
+    </div>
+    
+</article>
+
+        <div class="reading-afterword">
+            
+            
+
+            
+        </div>
+    </div>
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+    </main>
+    
+<footer class="site-footer">
+    <div class="footer-top"><a class="footer-wordmark" href="/zh-cn/" aria-label="Snow">Sno<span>w</span></a><p>认真记录，自由生长。</p><a href="#main-content" class="back-top">回到顶部 <span aria-hidden="true">↑</span></a></div>
+    <div class="footer-bottom"><span>© 2026 Snow</span><nav aria-label="更多链接"><a href="/zh-cn/about/">关于</a><a href="https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0" target="_blank" rel="noopener noreferrer me">Bilibili <span aria-hidden="true">↗</span></a><a href="https://github.com/SymphonyW" target="_blank" rel="noopener noreferrer me">GitHub <span aria-hidden="true">↗</span></a><a href="https://twitter.com" target="_blank" rel="noopener noreferrer me">Twitter <span aria-hidden="true">↗</span></a><a href="/zh-cn/index.xml">RSS ↗</a></nav><span class="footer-colophon">由 Hugo 构建 · 持续书写</span></div>
+</footer>
+
+    
+
+<script src="/ts/main.c86029ddb4aad8364879723acaf7efcd526e724d2381088d445aaf6f3ab1bfdf.js" defer></script>
+
+
+<script src="/ts/custom.6c99a7b037ac7e2bde801fbad26b9c20b3b18707868c164174142870ef3bc309.js" defer></script>
+
+
+
+
+
+<script>
+window.MathJax = {
+  tex: {
+    
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  svg: {
+    fontCache: 'global'
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
+<script type="module">
+  import('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs').then(({ default: mermaid }) => {
+    const diagrams = Array.from(document.querySelectorAll('.mermaid'));
+
+    diagrams.forEach((el) => {
+      el.dataset.mermaidSource = el.textContent.trim();
+    });
+
+    const renderMermaid = () => {
+      const scheme = document.documentElement.getAttribute('data-scheme');
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: scheme === 'dark' ? 'dark' : 'default',
+        securityLevel: 'loose',
+        fontFamily: 'inherit'
+      });
+
+      diagrams.forEach((el) => {
+        el.removeAttribute('data-processed');
+        el.textContent = el.dataset.mermaidSource;
+      });
+
+      return mermaid.run({ nodes: diagrams });
+    };
+
+    renderMermaid().catch((error) => console.error('Mermaid render failed:', error));
+
+    
+    const observer = new MutationObserver(() => {
+      renderMermaid().catch((error) => console.error('Mermaid render failed:', error));
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-scheme'] });
+  }).catch((error) => console.error('Mermaid failed to load:', error));
+</script>
+</body>
+</html>

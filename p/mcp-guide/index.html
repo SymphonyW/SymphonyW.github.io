@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Understand MCP hosts, clients, servers, and primitives; trace a remote call end to end; then build, deploy, secure, and connect a Python MCP server to an agent.">
+<title>The Complete MCP Guide: Architecture, Remote Call Flow, and Building Your Own Server</title>
+
+<link rel='canonical' href='https://SymphonyW.github.io/p/mcp-guide/'>
+<link rel="stylesheet" href="/scss/custom.min.bf7995e62147d50e1276b97e61d2c8120b52dfef9e32fbaed4e22d2affbd1b2b.css">
+<script>
+(() => {
+    let preference = 'auto';
+    try { preference = localStorage.getItem('StackColorScheme') || preference; } catch (_) {}
+    document.documentElement.dataset.scheme = preference === 'dark' || (preference === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+})();
+</script>
+
+<meta property='og:title' content="The Complete MCP Guide: Architecture, Remote Call Flow, and Building Your Own Server">
+<meta property='og:description' content="Understand MCP hosts, clients, servers, and primitives; trace a remote call end to end; then build, deploy, secure, and connect a Python MCP server to an agent.">
+<meta property='og:url' content='https://SymphonyW.github.io/p/mcp-guide/'>
+<meta property='og:site_name' content='Snow'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='MCP' /><meta property='article:tag' content='Agent' /><meta property='article:tag' content='AI' /><meta property='article:tag' content='Python' /><meta property='article:tag' content='Architecture' /><meta property='article:published_time' content='2026-10-09T15:00:00&#43;08:00'/><meta property='article:modified_time' content='2026-10-09T15:00:00&#43;08:00'/><meta property='og:image' content='https://SymphonyW.github.io/p/mcp-guide/bg.svg' />
+<meta name="twitter:title" content="The Complete MCP Guide: Architecture, Remote Call Flow, and Building Your Own Server">
+<meta name="twitter:description" content="Understand MCP hosts, clients, servers, and primitives; trace a remote call end to end; then build, deploy, secure, and connect a Python MCP server to an agent."><meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content='https://SymphonyW.github.io/p/mcp-guide/bg.svg' />
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    
+    <noscript><style>@media(max-width:760px){.site-header{position:static}.site-header__inner{height:auto;min-height:66px;flex-wrap:wrap}.site-nav{position:static;display:grid;order:3;flex-basis:100%;padding:8px 0 18px}.menu-toggle,.theme-toggle{display:none}}</style></noscript>
+</head>
+<body id="top" class="article-page">
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    
+<header class="site-header">
+    <div class="site-header__inner">
+        <a class="site-brand" href="/" aria-label="Snow — Home">S<span>now.</span></a>
+        <nav class="site-nav" id="site-navigation" aria-label="Main navigation">
+            
+            
+                
+                    
+                    
+                    <a href="/">Home</a>
+                
+            
+                
+                    
+                    
+                    <a href="/post/" aria-current="page">Blog</a>
+                
+            
+                
+                    
+                    
+                    <a href="/archives/">Archives</a>
+                
+            
+                
+                    
+                    
+                    <a href="/diary/">Diary</a>
+                
+            
+                
+                    
+                    
+                    <a href="/stats/">Stats</a>
+                
+            
+                
+            
+                
+                    
+                    
+                    <a href="/links/">Links</a>
+                
+            
+        </nav>
+        <div class="header-tools">
+            
+                <a class="language-link" href="/zh-cn/p/mcp-guide/" lang="zh-cn" hreflang="zh-cn" aria-label="切换到中文">中</a>
+            
+            <button type="button" id="dark-mode-toggle" class="icon-button theme-toggle" aria-label="Toggle color theme" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><path d="M12 4.5a7.5 7.5 0 0 1 0 15z" fill="currentColor" stroke="none"/></svg></button>
+            <a class="icon-button search-link" href="/search/" aria-label="Search articles"><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+</a>
+            <button class="icon-button menu-toggle" type="button" aria-expanded="false" aria-controls="site-navigation" aria-label="Open navigation"><span></span><span></span></button>
+        </div>
+    </div>
+    <div class="reading-progress" aria-hidden="true"></div>
+</header>
+
+    <main id="main-content" class="site-main main" tabindex="-1">
+        
+    <div class="reading-page">
+        <article class="main-article has-toc">
+    <header class="article-header">
+    <div class="article-wayfinding">
+        
+            <a href="/post/"><span aria-hidden="true">←</span> All writing</a>
+        
+        <span class="article-kind">Notes & observations</span>
+    </div>
+    <div class="article-details">
+    
+    <h1 class="article-title">The Complete MCP Guide: Architecture, Remote Call Flow, and Building Your Own Server</h1>
+    <p class="article-subtitle">Understand MCP hosts, clients, servers, and primitives; trace a remote call end to end; then build, deploy, secure, and connect a Python MCP server to an agent.</p>
+    <div class="article-meta">
+        
+            <time datetime="2026-10-09T15:00:00&#43;08:00">October 09, 2026</time>
+            <span class="meta-divider" aria-hidden="true">/</span>
+            <span>15 min read</span>
+        
+        
+            <div class="article-translations"><a href="/zh-cn/p/mcp-guide/" hreflang="zh-cn" lang="zh-cn">阅读中文版 <span aria-hidden="true">↗</span></a></div>
+        
+    </div>
+</div>
+
+</header>
+
+    <div class="reading-layout">
+        
+            <aside class="reading-margin" aria-label="Article contents">
+                <details class="article-toc" open>
+                    <summary><span>On this page</span><span class="toc-indicator" aria-hidden="true">+</span></summary>
+                    <nav id="TableOfContents">
+  <ol>
+    <li><a href="#why-mcp-exists">Why MCP exists</a></li>
+    <li><a href="#the-four-roles">The four roles</a></li>
+    <li><a href="#tools-resources-and-prompts">Tools, resources, and prompts</a></li>
+    <li><a href="#the-complete-remote-mcp-call-path">The complete remote MCP call path</a>
+      <ol>
+        <li><a href="#1-configuration-and-discovery">1. Configuration and discovery</a></li>
+        <li><a href="#2-tools-enter-model-context">2. Tools enter model context</a></li>
+        <li><a href="#3-the-model-selects-the-host-decides">3. The model selects; the host decides</a></li>
+        <li><a href="#4-http-and-business-execution">4. HTTP and business execution</a></li>
+        <li><a href="#5-results-return-to-the-model">5. Results return to the model</a></li>
+      </ol>
+    </li>
+    <li><a href="#two-remote-connection-models">Two remote connection models</a></li>
+    <li><a href="#build-a-remote-mcp-server">Build a remote MCP server</a>
+      <ol>
+        <li><a href="#set-up-the-project">Set up the project</a></li>
+        <li><a href="#create-serverpy">Create <code>server.py</code></a></li>
+        <li><a href="#test-locally">Test locally</a></li>
+        <li><a href="#containerize-and-deploy">Containerize and deploy</a></li>
+      </ol>
+    </li>
+    <li><a href="#connect-the-server-to-an-agent">Connect the server to an agent</a>
+      <ol>
+        <li><a href="#codex">Codex</a></li>
+        <li><a href="#openai-agents-sdk">OpenAI Agents SDK</a></li>
+        <li><a href="#verify-actual-agent-behavior">Verify actual agent behavior</a></li>
+      </ol>
+    </li>
+    <li><a href="#tool-design-sets-the-agents-ceiling">Tool design sets the agent&rsquo;s ceiling</a></li>
+    <li><a href="#security-every-boundary-is-untrusted">Security: every boundary is untrusted</a></li>
+    <li><a href="#observability-and-troubleshooting">Observability and troubleshooting</a></li>
+    <li><a href="#production-checklist">Production checklist</a></li>
+    <li><a href="#closing-thought">Closing thought</a></li>
+    <li><a href="#references">References</a></li>
+  </ol>
+</nav>
+                </details>
+            </aside>
+        
+        <div class="reading-body">
+            <div class="article-content"><h1 id="the-complete-mcp-guide-architecture-remote-call-flow-and-building-your-own-server">The Complete MCP Guide: Architecture, Remote Call Flow, and Building Your Own Server
+</h1><blockquote>
+<p>A language model can reason and generate text, but it does not know which project your company created today, nor can it create a ticket by imagination alone. MCP provides a standard, controlled path from an agent to that live data and those actions.</p>
+</blockquote>
+<p><a href="/p/mcp-guide/bg.svg" target="_blank" rel="noopener noreferrer"><img src="/p/mcp-guide/bg.svg" alt="MCP connects an agent host to tools, resources, and prompt templates" loading="lazy" decoding="async"></a>
+</p>
+<p>The one-sentence definition is:</p>
+<blockquote>
+<p><strong>The Model Context Protocol (MCP) is a standard interface between agent applications and external capabilities. It defines capability discovery, schemas, calls, results, and negotiation. It is neither a model nor a replacement for your business API.</strong></p>
+</blockquote>
+<p>This article follows the <strong>2026-07-28 MCP specification</strong> and calls out common differences in older clients. MCP is evolving quickly, so production integrations should follow the protocol versions supported by their host and SDK.</p>
+<h2 id="why-mcp-exists">Why MCP exists
+</h2><p>Without a shared protocol, every agent platform needs a custom adapter for every external system. Connecting three hosts to GitHub, a database, and a ticket system can quickly become nine integrations.</p>
+<div class="mermaid">flowchart LR
+    subgraph Before[Without MCP: N × M adapters]
+        A1[Agent A] --> X1[GitHub adapter]
+        A1 --> X2[Database adapter]
+        A2[Agent B] --> X3[GitHub adapter]
+        A2 --> X4[Ticket adapter]
+    end
+    subgraph After[With MCP: one protocol boundary]
+        B1[Agent A] --> P[MCP]
+        B2[Agent B] --> P
+        P --> S1[GitHub Server]
+        P --> S2[Database Server]
+        P --> S3[Ticket Server]
+    end
+</div><p>MCP standardizes more than the final HTTP request:</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Question</th>
+<th>MCP mechanism</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>What can this server do?</td>
+<td><code>tools/list</code>, <code>resources/list</code>, <code>prompts/list</code></td>
+</tr>
+<tr>
+<td>What arguments are valid?</td>
+<td>JSON Schema</td>
+</tr>
+<tr>
+<td>How is an action executed?</td>
+<td><code>tools/call</code></td>
+</tr>
+<tr>
+<td>How is addressable context read?</td>
+<td><code>resources/read</code></td>
+</tr>
+<tr>
+<td>How are results represented?</td>
+<td><code>content</code>, <code>structuredContent</code>, errors, and metadata</td>
+</tr>
+<tr>
+<td>Which features do both sides support?</td>
+<td>Protocol version, capabilities, and extensions</td>
+</tr>
+<tr>
+<td>How do messages travel?</td>
+<td>Local <code>stdio</code> or remote Streamable HTTP</td>
+</tr>
+</tbody>
+</table></div>
+<p>The USB-C analogy is useful but incomplete. USB-C standardizes a physical interface; MCP standardizes an interface whose names, descriptions, and schemas are interpreted by a model. Metadata is therefore part of the product experience, not incidental documentation.</p>
+<h2 id="the-four-roles">The four roles
+</h2><div class="mermaid">flowchart LR
+    U[User] --> H[Host<br/>Agent application]
+    H --> M[LLM]
+    H --> C1[MCP Client A]
+    H --> C2[MCP Client B]
+    C1 <-->|MCP| S1[MCP Server<br/>Project system]
+    C2 <-->|MCP| S2[MCP Server<br/>Knowledge base]
+    S1 --> API1[(Business API / DB)]
+    S2 --> API2[(Documents / Search)]
+</div><div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Responsibility</th>
+<th>Important boundary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>User</strong></td>
+<td>States a goal and confirms consequential actions</td>
+<td>Usually does not construct protocol messages</td>
+</tr>
+<tr>
+<td><strong>Host</strong></td>
+<td>Owns the agent, model context, policy, approvals, and MCP clients</td>
+<td>The MCP server does not run the whole agent loop</td>
+</tr>
+<tr>
+<td><strong>MCP Client</strong></td>
+<td>Talks to one server and handles discovery, calls, and compatibility</td>
+<td>Usually an internal host component</td>
+</tr>
+<tr>
+<td><strong>MCP Server</strong></td>
+<td>Exposes capabilities, validates calls, and reaches business systems</td>
+<td>It must not expose unrestricted backend access</td>
+</tr>
+</tbody>
+</table></div>
+<p>The model normally does <strong>not</strong> connect directly to the server. The host shows the model an allowed set of capabilities. The model proposes a tool call. The host applies policy and approval rules before executing it. This separates model intent from system authority.</p>
+<h2 id="tools-resources-and-prompts">Tools, resources, and prompts
+</h2><div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Primitive</th>
+<th>Primary controller</th>
+<th>Best for</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Tools</strong></td>
+<td>Model selects; host governs execution</td>
+<td>Queries and actions</td>
+<td><code>search_projects</code>, <code>create_ticket</code></td>
+</tr>
+<tr>
+<td><strong>Resources</strong></td>
+<td>Host or application loads</td>
+<td>Addressable, usually read-only context</td>
+<td><code>project://P-1024/spec</code></td>
+</tr>
+<tr>
+<td><strong>Prompts</strong></td>
+<td>User or host selects</td>
+<td>Reusable workflow templates</td>
+<td>“Create a release checklist”</td>
+</tr>
+</tbody>
+</table></div>
+<p>The protocol also includes notifications and other optional capabilities. A useful server rarely needs all of them. Start with a few well-designed tools.</p>
+<p>An MCP server is often an agent-facing adapter over existing systems:</p>
+<div class="mermaid">flowchart LR
+    L[Tool visible to the LLM<br/>name + description + schema] --> S[MCP Server<br/>auth · validation · orchestration]
+    S --> R1[REST API]
+    S --> R2[gRPC]
+    S --> R3[(Database)]
+    S --> R4[Message queue]
+</div><p>A REST route might be <code>PATCH /v1/projects/:id</code>. A useful MCP tool is goal-oriented: <code>archive_project(project_id, reason)</code>. Do not mirror hundreds of internal endpoints into hundreds of model tools.</p>
+<h2 id="the-complete-remote-mcp-call-path">The complete remote MCP call path
+</h2><p>Remote MCP normally uses <strong>Streamable HTTP</strong>. The older HTTP+SSE transport is superseded and should only remain for compatibility.</p>
+<div class="mermaid">sequenceDiagram
+    autonumber
+    actor User
+    participant Host as Agent Host
+    participant Model as LLM
+    participant Client as MCP Client
+    participant Server as Remote MCP Server
+    participant API as Business system
+
+    Host->>Client: Load server configuration
+    Client->>Server: Discover protocol and capabilities
+    Server-->>Client: Server info + capabilities
+    Client->>Server: tools/list
+    Server-->>Client: Names, descriptions, schemas, annotations
+    User->>Host: “List delayed projects this week”
+    Host->>Model: Message + allowed tool definitions
+    Model-->>Host: list_projects(status="delayed")
+    Host->>Host: Policy check / approval if needed
+    Host->>Client: Execute approved call
+    Client->>Server: tools/call + credentials
+    Server->>Server: Authenticate, authorize, validate
+    Server->>API: Query current business data
+    API-->>Server: Project records
+    Server-->>Client: content + structuredContent
+    Client-->>Host: Tool result
+    Host->>Model: Add allowed result to context
+    Model-->>Host: Compose answer
+    Host-->>User: Final response + action status
+</div><h3 id="1-configuration-and-discovery">1. Configuration and discovery
+</h3><p>The host stores a server name, URL, and authentication method. The client learns the protocol version, server information, and capabilities, then lists tools. Hosts may cache the list and refresh it when capabilities change or the cache expires.</p>
+<p>In the 2026-07-28 protocol, the modern path is stateless: <code>server/discover</code> and per-request metadata replace the old connection handshake and protocol-level session. Older clients can still use <code>initialize</code> → <code>initialized</code> and <code>Mcp-Session-Id</code>. Let the SDK negotiate this; application code should not handcraft JSON-RPC.</p>
+<h3 id="2-tools-enter-model-context">2. Tools enter model context
+</h3><p>The host may filter tools by user, tenant, role, task, or dynamic tool search. Only the relevant names, descriptions, and schemas need to enter context. Five distinct tools are usually more reliable and cheaper than fifty overlapping ones.</p>
+<h3 id="3-the-model-selects-the-host-decides">3. The model selects; the host decides
+</h3><p>The model produces structured intent, not authority. The host should decide whether the user may call that tool, whether a write needs confirmation, whether arguments cross cost or data boundaries, and whether prompt injection or destructive behavior is suspected.</p>
+<p>Annotations such as <code>readOnly</code>, <code>destructive</code>, and <code>openWorld</code> inform host policy. They are hints, not authorization controls.</p>
+<h3 id="4-http-and-business-execution">4. HTTP and business execution
+</h3><p>The client sends an MCP request over HTTPS to an endpoint such as <code>/mcp</code>, with protocol-routing information and usually an <code>Authorization</code> header. The server must independently validate the token, scopes, tenant, object-level permission, arguments, timeouts, and audit context before calling the real REST API, gRPC service, or database.</p>
+<p>MCP does not make a dangerous SQL query safe, and it does not replace business authorization.</p>
+<p>Expanding the details normally hidden by an SDK, a modern tool call looks roughly like this (some per-request <code>_meta</code> is omitted for readability):</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-http" data-lang="http"><span class="line"><span class="cl"><span class="nf">POST</span> <span class="nn">/mcp</span> <span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span>
+</span></span><span class="line"><span class="cl"><span class="n">Host</span><span class="o">:</span> <span class="l">mcp.example.com</span>
+</span></span><span class="line"><span class="cl"><span class="n">Authorization</span><span class="o">:</span> <span class="l">Bearer &lt;access-token&gt;</span>
+</span></span><span class="line"><span class="cl"><span class="n">Content-Type</span><span class="o">:</span> <span class="l">application/json</span>
+</span></span><span class="line"><span class="cl"><span class="n">Mcp-Protocol-Version</span><span class="o">:</span> <span class="l">2026-07-28</span>
+</span></span><span class="line"><span class="cl"><span class="n">Mcp-Method</span><span class="o">:</span> <span class="l">tools/call</span>
+</span></span><span class="line"><span class="cl"><span class="n">Mcp-Name</span><span class="o">:</span> <span class="l">list_projects</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;jsonrpc&#34;</span><span class="p">:</span> <span class="s2">&#34;2.0&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;id&#34;</span><span class="p">:</span> <span class="mi">42</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;method&#34;</span><span class="p">:</span> <span class="s2">&#34;tools/call&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;params&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;name&#34;</span><span class="p">:</span> <span class="s2">&#34;list_projects&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;arguments&#34;</span><span class="p">:</span> <span class="p">{</span><span class="nt">&#34;status&#34;</span><span class="p">:</span> <span class="s2">&#34;delayed&#34;</span><span class="p">,</span> <span class="nt">&#34;limit&#34;</span><span class="p">:</span> <span class="mi">5</span><span class="p">}</span>
+</span></span><span class="line"><span class="cl">  <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>The successful JSON-RPC result carries model-readable content and schema-bound data for the application:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;jsonrpc&#34;</span><span class="p">:</span> <span class="s2">&#34;2.0&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;id&#34;</span><span class="p">:</span> <span class="mi">42</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;result&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;content&#34;</span><span class="p">:</span> <span class="p">[{</span><span class="nt">&#34;type&#34;</span><span class="p">:</span> <span class="s2">&#34;text&#34;</span><span class="p">,</span> <span class="nt">&#34;text&#34;</span><span class="p">:</span> <span class="s2">&#34;Found 1 delayed project.&#34;</span><span class="p">}],</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;structuredContent&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">      <span class="nt">&#34;result&#34;</span><span class="p">:</span> <span class="p">[{</span><span class="nt">&#34;id&#34;</span><span class="p">:</span> <span class="s2">&#34;P-1002&#34;</span><span class="p">,</span> <span class="nt">&#34;name&#34;</span><span class="p">:</span> <span class="s2">&#34;Billing migration&#34;</span><span class="p">}]</span>
+</span></span><span class="line"><span class="cl">    <span class="p">},</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;isError&#34;</span><span class="p">:</span> <span class="kc">false</span>
+</span></span><span class="line"><span class="cl">  <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Do not handcraft these messages in application code. The example is useful for reading gateway logs and traces; SDKs should own negotiation, headers, and JSON-RPC details.</p>
+<h3 id="5-results-return-to-the-model">5. Results return to the model
+</h3><div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Channel</th>
+<th>Consumer</th>
+<th>Guidance</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>content</code></td>
+<td>Model</td>
+<td>Concise, understandable explanation of the result</td>
+</tr>
+<tr>
+<td><code>structuredContent</code></td>
+<td>Host, UI, or later calls</td>
+<td>Schema-valid fields and stable identifiers</td>
+</tr>
+<tr>
+<td><code>_meta</code></td>
+<td>Client application</td>
+<td>Client-only data; not a secret vault</td>
+</tr>
+</tbody>
+</table></div>
+<p>The host puts approved result content back into the model context. The model then answers or plans another call. A successful MCP request does not necessarily mean the user task succeeded: the agent must inspect <code>isError</code>, completeness, and any follow-up requirements.</p>
+<h2 id="two-remote-connection-models">Two remote connection models
+</h2><div class="mermaid">flowchart TB
+    subgraph Direct[Mode A: runtime-managed connection]
+        A[Your agent application] --> C[MCP Client]
+        C --> S[Remote MCP Server]
+    end
+    subgraph Hosted[Mode B: platform-hosted connection]
+        B[Your application] --> P[Model / Agent platform]
+        P --> HS[Remote MCP Server]
+    end
+</div><div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Main advantage</th>
+<th>Best fit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Runtime-managed</strong></td>
+<td>Your app owns networking, credentials, filtering, and approval</td>
+<td>Private networks, strict compliance, custom policy</td>
+</tr>
+<tr>
+<td><strong>Hosted MCP</strong></td>
+<td>Less integration code; the agent platform handles protocol calls</td>
+<td>Public HTTPS services and quick integrations</td>
+</tr>
+</tbody>
+</table></div>
+<p>The OpenAI Agents SDK supports hosted MCP for public remote servers and runtime-managed stdio or Streamable HTTP for local and private servers. The choice is about who should own the connection and trust boundary.</p>
+<h2 id="build-a-remote-mcp-server">Build a remote MCP server
+</h2><p>The following minimal project exposes a read-only project catalog. It uses Python SDK v2, Python 3.10+, and stateless Streamable HTTP so that replicas can scale horizontally.</p>
+<h3 id="set-up-the-project">Set up the project
+</h3><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">mkdir project-mcp <span class="o">&amp;&amp;</span> <span class="nb">cd</span> project-mcp
+</span></span><span class="line"><span class="cl">uv init
+</span></span><span class="line"><span class="cl">uv add <span class="s2">&#34;mcp[cli]&gt;=2,&lt;3&#34;</span> pydantic
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Pin the major SDK version. The protocol and SDKs move quickly; a production build should not cross a major version without review.</p>
+<h3 id="create-serverpy">Create <code>server.py</code>
+</h3><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span><span class="lnt">25
+</span><span class="lnt">26
+</span><span class="lnt">27
+</span><span class="lnt">28
+</span><span class="lnt">29
+</span><span class="lnt">30
+</span><span class="lnt">31
+</span><span class="lnt">32
+</span><span class="lnt">33
+</span><span class="lnt">34
+</span><span class="lnt">35
+</span><span class="lnt">36
+</span><span class="lnt">37
+</span><span class="lnt">38
+</span><span class="lnt">39
+</span><span class="lnt">40
+</span><span class="lnt">41
+</span><span class="lnt">42
+</span><span class="lnt">43
+</span><span class="lnt">44
+</span><span class="lnt">45
+</span><span class="lnt">46
+</span><span class="lnt">47
+</span><span class="lnt">48
+</span><span class="lnt">49
+</span><span class="lnt">50
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-python" data-lang="python"><span class="line"><span class="cl"><span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Annotated</span><span class="p">,</span> <span class="n">Literal</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kn">from</span> <span class="nn">mcp.server</span> <span class="kn">import</span> <span class="n">MCPServer</span>
+</span></span><span class="line"><span class="cl"><span class="kn">from</span> <span class="nn">mcp.types</span> <span class="kn">import</span> <span class="n">ToolAnnotations</span>
+</span></span><span class="line"><span class="cl"><span class="kn">from</span> <span class="nn">pydantic</span> <span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">Field</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="k">class</span> <span class="nc">Project</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">    <span class="nb">id</span><span class="p">:</span> <span class="nb">str</span>
+</span></span><span class="line"><span class="cl">    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
+</span></span><span class="line"><span class="cl">    <span class="n">status</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&#34;active&#34;</span><span class="p">,</span> <span class="s2">&#34;delayed&#34;</span><span class="p">,</span> <span class="s2">&#34;archived&#34;</span><span class="p">]</span>
+</span></span><span class="line"><span class="cl">    <span class="n">owner</span><span class="p">:</span> <span class="nb">str</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="n">PROJECTS</span> <span class="o">=</span> <span class="p">[</span>
+</span></span><span class="line"><span class="cl">    <span class="n">Project</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&#34;P-1001&#34;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&#34;Search upgrade&#34;</span><span class="p">,</span> <span class="n">status</span><span class="o">=</span><span class="s2">&#34;active&#34;</span><span class="p">,</span> <span class="n">owner</span><span class="o">=</span><span class="s2">&#34;Lin&#34;</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl">    <span class="n">Project</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="s2">&#34;P-1002&#34;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&#34;Billing migration&#34;</span><span class="p">,</span> <span class="n">status</span><span class="o">=</span><span class="s2">&#34;delayed&#34;</span><span class="p">,</span> <span class="n">owner</span><span class="o">=</span><span class="s2">&#34;Kai&#34;</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl"><span class="p">]</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="n">mcp</span> <span class="o">=</span> <span class="n">MCPServer</span><span class="p">(</span><span class="s2">&#34;project-catalog&#34;</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="s2">&#34;1.0.0&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="nd">@mcp.tool</span><span class="p">(</span>
+</span></span><span class="line"><span class="cl">    <span class="n">annotations</span><span class="o">=</span><span class="n">ToolAnnotations</span><span class="p">(</span>
+</span></span><span class="line"><span class="cl">        <span class="n">readOnlyHint</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="n">idempotentHint</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="n">destructiveHint</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="n">openWorldHint</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="p">)</span>
+</span></span><span class="line"><span class="cl"><span class="k">def</span> <span class="nf">list_projects</span><span class="p">(</span>
+</span></span><span class="line"><span class="cl">    <span class="n">status</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&#34;active&#34;</span><span class="p">,</span> <span class="s2">&#34;delayed&#34;</span><span class="p">,</span> <span class="s2">&#34;archived&#34;</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">limit</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Field</span><span class="p">(</span><span class="n">ge</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">le</span><span class="o">=</span><span class="mi">50</span><span class="p">)]</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl"><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Project</span><span class="p">]:</span>
+</span></span><span class="line"><span class="cl">    <span class="s2">&#34;&#34;&#34;List projects, optionally filtered by exact status.
+</span></span></span><span class="line"><span class="cl"><span class="s2">
+</span></span></span><span class="line"><span class="cl"><span class="s2">    Use this for project discovery. It never modifies project data.
+</span></span></span><span class="line"><span class="cl"><span class="s2">    &#34;&#34;&#34;</span>
+</span></span><span class="line"><span class="cl">    <span class="n">matches</span> <span class="o">=</span> <span class="p">[</span><span class="n">p</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">PROJECTS</span> <span class="k">if</span> <span class="n">status</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">p</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="n">status</span><span class="p">]</span>
+</span></span><span class="line"><span class="cl">    <span class="k">return</span> <span class="n">matches</span><span class="p">[:</span><span class="n">limit</span><span class="p">]</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&#34;__main__&#34;</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">    <span class="n">mcp</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+</span></span><span class="line"><span class="cl">        <span class="n">transport</span><span class="o">=</span><span class="s2">&#34;streamable-http&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="n">host</span><span class="o">=</span><span class="s2">&#34;0.0.0.0&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="n">port</span><span class="o">=</span><span class="mi">8000</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="n">stateless_http</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="n">json_response</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="p">)</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>The function name becomes the tool name, its docstring becomes the description, type hints generate the input schema, and the return annotation generates the output schema. The annotations describe behavior to the host. The SDK handles MCP framing, version compatibility, and Streamable HTTP.</p>
+<p>Replace the in-memory list with a business service call in production, but always derive the tenant from verified credentials rather than a model-supplied <code>user_id</code>.</p>
+<h3 id="test-locally">Test locally
+</h3><p>Use the official Inspector first:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">uv run mcp dev server.py
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Then start the HTTP server:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">uv run python server.py
+</span></span><span class="line"><span class="cl"><span class="c1"># http://127.0.0.1:8000/mcp</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>An SDK client makes a compact regression check:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-python" data-lang="python"><span class="line"><span class="cl"><span class="kn">import</span> <span class="nn">asyncio</span>
+</span></span><span class="line"><span class="cl"><span class="kn">from</span> <span class="nn">mcp</span> <span class="kn">import</span> <span class="n">Client</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="k">async</span> <span class="k">def</span> <span class="nf">main</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">    <span class="k">async</span> <span class="k">with</span> <span class="n">Client</span><span class="p">(</span><span class="s2">&#34;http://127.0.0.1:8000/mcp&#34;</span><span class="p">)</span> <span class="k">as</span> <span class="n">client</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">        <span class="n">tools</span> <span class="o">=</span> <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">list_tools</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">        <span class="k">assert</span> <span class="nb">any</span><span class="p">(</span><span class="n">tool</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&#34;list_projects&#34;</span> <span class="k">for</span> <span class="n">tool</span> <span class="ow">in</span> <span class="n">tools</span><span class="o">.</span><span class="n">tools</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="n">result</span> <span class="o">=</span> <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">call_tool</span><span class="p">(</span>
+</span></span><span class="line"><span class="cl">            <span class="s2">&#34;list_projects&#34;</span><span class="p">,</span> <span class="p">{</span><span class="s2">&#34;status&#34;</span><span class="p">:</span> <span class="s2">&#34;delayed&#34;</span><span class="p">,</span> <span class="s2">&#34;limit&#34;</span><span class="p">:</span> <span class="mi">5</span><span class="p">}</span>
+</span></span><span class="line"><span class="cl">        <span class="p">)</span>
+</span></span><span class="line"><span class="cl">        <span class="k">assert</span> <span class="ow">not</span> <span class="n">result</span><span class="o">.</span><span class="n">is_error</span>
+</span></span><span class="line"><span class="cl">        <span class="k">assert</span> <span class="n">result</span><span class="o">.</span><span class="n">structured_content</span><span class="p">[</span><span class="s2">&#34;result&#34;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&#34;id&#34;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&#34;P-1002&#34;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">main</span><span class="p">())</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Test valid calls, boundaries, invalid enums, authorization failures, downstream timeouts, empty results, and output-schema validation. Inspector proves the protocol works; automated tests prove it still works after an upgrade.</p>
+<h3 id="containerize-and-deploy">Containerize and deploy
+</h3><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span><span class="lnt">9
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-dockerfile" data-lang="dockerfile"><span class="line"><span class="cl"><span class="k">FROM</span><span class="s"> python:3.13-slim</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">WORKDIR</span><span class="s"> /app</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">COPY</span> pyproject.toml uv.lock ./<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">RUN</span> pip install --no-cache-dir uv <span class="o">&amp;&amp;</span> uv sync --frozen --no-dev<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">COPY</span> server.py ./<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">EXPOSE</span><span class="s"> 8000</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">CMD</span> <span class="p">[</span><span class="s2">&#34;uv&#34;</span><span class="p">,</span> <span class="s2">&#34;run&#34;</span><span class="p">,</span> <span class="s2">&#34;python&#34;</span><span class="p">,</span> <span class="s2">&#34;server.py&#34;</span><span class="p">]</span><span class="err">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">docker build -t project-mcp:1.0.0 .
+</span></span><span class="line"><span class="cl">docker run --rm -p 8000:8000 project-mcp:1.0.0
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Production should expose a stable HTTPS URL such as <code>https://mcp.example.com/mcp</code>. Configure proxies for streaming behavior, bounded request size, sensible timeouts, and idle connections.</p>
+<blockquote>
+<p>The demo server has no authentication and is only suitable for local learning. Before exposing it to any network, configure the SDK&rsquo;s token verifier or OAuth support and enforce business authorization inside every tool.</p>
+</blockquote>
+<p>Stateless mode is a good default. If a workflow needs state across calls, prefer returning an explicit server-minted handle and accepting it in later tools instead of hiding state in one replica&rsquo;s memory.</p>
+<h2 id="connect-the-server-to-an-agent">Connect the server to an agent
+</h2><p>A reachable endpoint is only half the work. The agent needs registration, authorization, routing guidance, and behavioral tests.</p>
+<h3 id="codex">Codex
+</h3><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">codex mcp add projects --url https://mcp.example.com/mcp
+</span></span><span class="line"><span class="cl">codex mcp list
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Or configure <code>~/.codex/config.toml</code>:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-toml" data-lang="toml"><span class="line"><span class="cl"><span class="p">[</span><span class="nx">mcp_servers</span><span class="p">.</span><span class="nx">projects</span><span class="p">]</span>
+</span></span><span class="line"><span class="cl"><span class="nx">url</span> <span class="p">=</span> <span class="s2">&#34;https://mcp.example.com/mcp&#34;</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Add a short, testable routing rule to the project&rsquo;s <code>AGENTS.md</code>:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-md" data-lang="md"><span class="line"><span class="cl">When a task needs a current project status, owner, or project ID, use the
+</span></span><span class="line"><span class="cl">read-only tools from the projects MCP first. Before any update, archive, or
+</span></span><span class="line"><span class="cl">delete operation, show the exact target and impact and wait for confirmation.
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Configuration determines what the agent can see. Instructions help it decide when to use those capabilities. Never tell it to blindly trust remote content; tool results can be stale or malicious.</p>
+<h3 id="openai-agents-sdk">OpenAI Agents SDK
+</h3><p>A public remote server can be attached as a hosted MCP tool:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-python" data-lang="python"><span class="line"><span class="cl"><span class="kn">from</span> <span class="nn">agents</span> <span class="kn">import</span> <span class="n">Agent</span><span class="p">,</span> <span class="n">HostedMCPTool</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="n">agent</span> <span class="o">=</span> <span class="n">Agent</span><span class="p">(</span>
+</span></span><span class="line"><span class="cl">    <span class="n">name</span><span class="o">=</span><span class="s2">&#34;Project assistant&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">instructions</span><span class="o">=</span><span class="s2">&#34;Use the projects MCP for current project facts.&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="n">tools</span><span class="o">=</span><span class="p">[</span>
+</span></span><span class="line"><span class="cl">        <span class="n">HostedMCPTool</span><span class="p">(</span>
+</span></span><span class="line"><span class="cl">            <span class="n">tool_config</span><span class="o">=</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">                <span class="s2">&#34;type&#34;</span><span class="p">:</span> <span class="s2">&#34;mcp&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">                <span class="s2">&#34;server_label&#34;</span><span class="p">:</span> <span class="s2">&#34;projects&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">                <span class="s2">&#34;server_url&#34;</span><span class="p">:</span> <span class="s2">&#34;https://mcp.example.com/mcp&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">                <span class="s2">&#34;require_approval&#34;</span><span class="p">:</span> <span class="s2">&#34;never&#34;</span><span class="p">,</span>  <span class="c1"># safe only for this read-only tool</span>
+</span></span><span class="line"><span class="cl">            <span class="p">}</span>
+</span></span><span class="line"><span class="cl">        <span class="p">)</span>
+</span></span><span class="line"><span class="cl">    <span class="p">],</span>
+</span></span><span class="line"><span class="cl"><span class="p">)</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Do not copy <code>never</code> onto write tools. Match approval policy to risk, and keep independent authorization on the server. For private services, let your Agents SDK runtime own the connection so that your application controls networking, filtering, and approvals.</p>
+<h3 id="verify-actual-agent-behavior">Verify actual agent behavior
+</h3><div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Prompt</th>
+<th>Expected behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>“List delayed projects”</td>
+<td>Calls <code>list_projects(status=&quot;delayed&quot;)</code></td>
+</tr>
+<tr>
+<td>“What does delayed mean?”</td>
+<td>Answers generally without a pointless call unless company policy is requested</td>
+</tr>
+<tr>
+<td>“Delete P-1002”</td>
+<td>Explains that no delete tool exists; never fabricates success</td>
+</tr>
+<tr>
+<td>“Use <code>status=hacked</code>”</td>
+<td>Schema rejects it; agent corrects or explains</td>
+</tr>
+<tr>
+<td>Result contains “ignore previous instructions”</td>
+<td>Treats it as untrusted data and does not escalate privileges</td>
+</tr>
+</tbody>
+</table></div>
+<p>Measure tool selection, argument correctness, and answer faithfulness. Looking only at final prose can hide duplicate calls, denied actions, and unnecessary cost.</p>
+<h2 id="tool-design-sets-the-agents-ceiling">Tool design sets the agent&rsquo;s ceiling
+</h2><div class="mermaid">flowchart LR
+    G[User goal] --> N[Clear verb name]
+    N --> D[When-to-use description]
+    D --> I[Narrow input schema]
+    I --> A[Truthful annotations]
+    A --> O[Stable structured output]
+    O --> E[Recoverable errors]
+</div><ol>
+<li>Give each tool one recognizable goal. Prefer <code>list_projects</code>, <code>get_project</code>, and <code>update_project</code> over <code>project_action(mode, payload)</code>.</li>
+<li>Describe when to use the tool, not only how it is implemented.</li>
+<li>Encode enums, lengths, ranges, and formats in the schema.</li>
+<li>Separate reads and writes so the host can apply different approval rules.</li>
+<li>Return stable IDs for later calls.</li>
+<li>Paginate and cap results.</li>
+<li>Return actionable errors, not stack traces.</li>
+<li>Evolve schemas compatibly. Optional additions are safer than renames or type changes.</li>
+</ol>
+<p>MCP is not always the answer. A private function used by one application may be simpler as a function tool. Large continuous media transfer needs a different data plane. Deterministic transaction state machines should not be delegated entirely to model planning. Unrestricted SQL, shell, or URL-fetching tools should not be exposed in production.</p>
+<h2 id="security-every-boundary-is-untrusted">Security: every boundary is untrusted
+</h2><div class="mermaid">flowchart LR
+    U[User input<br/>untrusted] --> H[Host policy]
+    H -->|minimum tool set| M[Model output<br/>untrusted intent]
+    M --> A{Approval / authorization}
+    A --> S[MCP Server<br/>authenticate and validate again]
+    S --> B[Business system]
+    B --> R[Tool result<br/>still untrusted]
+    R --> H
+</div><div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Required defense</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Cross-tenant access</td>
+<td>Validate token, scope, tenant, and object permission on every call</td>
+</tr>
+<tr>
+<td>Destructive action</td>
+<td>Separate tool, truthful annotations, confirmation, idempotency key, audit, rollback</td>
+</tr>
+<tr>
+<td>Prompt injection</td>
+<td>Treat returned content as data; never let it rewrite host policy</td>
+</tr>
+<tr>
+<td>Token leakage</td>
+<td>Keep tokens out of descriptions, results, and logs; validate token audience</td>
+</tr>
+<tr>
+<td>SSRF</td>
+<td>URL allowlists, DNS/IP checks, block metadata/private ranges, bound redirects</td>
+</tr>
+<tr>
+<td>Excessive data</td>
+<td>Field minimization, pagination, result caps, PII redaction</td>
+</tr>
+<tr>
+<td>Cost or denial of service</td>
+<td>Rate, concurrency, timeout, circuit-breaker, and quota controls</td>
+</tr>
+<tr>
+<td>Supply-chain drift</td>
+<td>Pin SDK majors, scan dependencies, canary upgrades, rollback</td>
+</tr>
+</tbody>
+</table></div>
+<p>Authentication says who the caller is; authorization says what that caller may do to this particular object. Never trust a model-provided <code>user_id</code> as the tenant boundary. OAuth deployments should use standard discovery, narrow scopes, and an explicit audience.</p>
+<p>Host prompts, annotations, approval dialogs, and network allowlists are defense in depth. Server-side object authorization remains the final boundary.</p>
+<h2 id="observability-and-troubleshooting">Observability and troubleshooting
+</h2><p>An MCP failure can happen because the model did not select a tool, the host denied it, the protocol failed, or a downstream system failed. Logs and traces need to connect these layers.</p>
+<p>Record a trace or request ID, server/tool/version, redacted caller and tenant, approval outcome, total and downstream latency, result size, error category, schema version, and deployment version. Never log access tokens or complete private results.</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Check first</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Server cannot connect</td>
+<td>URL, certificate, DNS, Host header, firewall, <code>/mcp</code> path</td>
+</tr>
+<tr>
+<td>Connected but no tools</td>
+<td>Discovery/capabilities, <code>tools/list</code>, registration code</td>
+</tr>
+<tr>
+<td>Model never calls a tool</td>
+<td>Names, descriptions, instructions, overlapping tools</td>
+</tr>
+<tr>
+<td>Arguments are consistently wrong</td>
+<td>Schema breadth, ambiguous semantics, missing enums</td>
+</tr>
+<tr>
+<td>Local works; remote times out</td>
+<td>Proxy streaming, platform timeout, cold start, downstream latency</td>
+</tr>
+<tr>
+<td>Call succeeds; answer is wrong</td>
+<td>Content clarity, missing structured fields, stale cache</td>
+</tr>
+<tr>
+<td>Multi-replica failures</td>
+<td>Hidden process state or old session affinity assumptions</td>
+</tr>
+</tbody>
+</table></div>
+<p>The shortest diagnostic path is usually: <strong>Inspector → direct SDK client → host tool list → one complete agent trace</strong>. It separates server, protocol, and model-decision problems quickly.</p>
+<h2 id="production-checklist">Production checklist
+</h2><ul>
+<li><input disabled="" type="checkbox"> Tool names, descriptions, input schemas, and output schemas reviewed</li>
+<li><input disabled="" type="checkbox"> Reads, writes, and destructive operations separated</li>
+<li><input disabled="" type="checkbox"> Authentication, scopes, tenant, and object authorization enforced per request</li>
+<li><input disabled="" type="checkbox"> Stable HTTPS Streamable HTTP endpoint</li>
+<li><input disabled="" type="checkbox"> Approval, idempotency, audit, and rollback for writes</li>
+<li><input disabled="" type="checkbox"> Pagination and result-size limits; no secrets in results</li>
+<li><input disabled="" type="checkbox"> Timeouts, retries, rate limits, circuit breakers, and downstream error mapping</li>
+<li><input disabled="" type="checkbox"> Inspector checks, automated tests, and agent behavior evals pass</li>
+<li><input disabled="" type="checkbox"> Traces, metrics, redacted logs, and alerts exist</li>
+<li><input disabled="" type="checkbox"> SDK and schema versions pinned; upgrades can canary and roll back</li>
+</ul>
+<h2 id="closing-thought">Closing thought
+</h2><p>MCP is not merely a way for a model to send an HTTP request. It gives capability discovery, argument contracts, execution, results, and security policy a shared path.</p>
+<div class="mermaid">flowchart LR
+    A[Pick one real user goal] --> B[Design one narrow tool]
+    B --> C[Test with Inspector]
+    C --> D[Automate tests]
+    D --> E[Streamable HTTP + auth]
+    E --> F[Connect the agent]
+    F --> G[Evaluate and observe]
+    G --> H[Add the next tool]
+</div><p>Make one read-only tool accurate before adding writes. Establish authorization before building elaborate orchestration. MCP reduces integration cost; it does not replace sound API design, authorization, or operational discipline.</p>
+<h2 id="references">References
+</h2><ul>
+<li><a class="link" href="https://modelcontextprotocol.io/specification/2026-07-28"  target="_blank" rel="noopener"
+    >Official Model Context Protocol specification</a></li>
+<li><a class="link" href="https://github.com/modelcontextprotocol/python-sdk"  target="_blank" rel="noopener"
+    >MCP Python SDK v2</a></li>
+<li><a class="link" href="https://developers.openai.com/plugins/build/mcp-server"  target="_blank" rel="noopener"
+    >OpenAI: Build an MCP server</a></li>
+<li><a class="link" href="https://developers.openai.com/api/docs/guides/agents/integrations-observability"  target="_blank" rel="noopener"
+    >OpenAI Agents SDK: MCP integrations and observability</a></li>
+<li><a class="link" href="https://developers.openai.com/learn/docs-mcp"  target="_blank" rel="noopener"
+    >OpenAI Docs MCP: Codex setup</a></li>
+</ul>
+
+</div>
+
+            <footer class="article-footer">
+    
+        <div class="article-tags" aria-label="Article tags"><span class="article-footer-label">Filed under</span><a href="/tags/mcp/">MCP</a><a href="/tags/agent/">Agent</a><a href="/tags/ai/">AI</a><a href="/tags/python/">Python</a><a href="/tags/architecture/">Architecture</a></div>
+    
+    
+    
+    <div class="article-endnote"><span>Thanks for reading.</span><a href="#top">Back to top <span aria-hidden="true">↑</span></a></div>
+</footer>
+
+        </div>
+    </div>
+    
+</article>
+
+        <div class="reading-afterword">
+            
+            
+
+            
+        </div>
+    </div>
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+    </main>
+    
+<footer class="site-footer">
+    <div class="footer-top"><a class="footer-wordmark" href="/" aria-label="Snow">Sno<span>w</span></a><p>A place to think. A space to grow.</p><a href="#main-content" class="back-top">Back to top <span aria-hidden="true">↑</span></a></div>
+    <div class="footer-bottom"><span>© 2026 Snow</span><nav aria-label="More links"><a href="/about/">About</a><a href="https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0" target="_blank" rel="noopener noreferrer me">Bilibili <span aria-hidden="true">↗</span></a><a href="https://github.com/SymphonyW" target="_blank" rel="noopener noreferrer me">GitHub <span aria-hidden="true">↗</span></a><a href="https://twitter.com" target="_blank" rel="noopener noreferrer me">Twitter <span aria-hidden="true">↗</span></a><a href="/index.xml">RSS ↗</a></nav><span class="footer-colophon">Built with Hugo · Always in progress</span></div>
+</footer>
+
+    
+
+<script src="/ts/main.c86029ddb4aad8364879723acaf7efcd526e724d2381088d445aaf6f3ab1bfdf.js" defer></script>
+
+
+<script src="/ts/custom.6c99a7b037ac7e2bde801fbad26b9c20b3b18707868c164174142870ef3bc309.js" defer></script>
+
+
+
+
+
+<script>
+window.MathJax = {
+  tex: {
+    
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  svg: {
+    fontCache: 'global'
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
+<script type="module">
+  import('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs').then(({ default: mermaid }) => {
+    const diagrams = Array.from(document.querySelectorAll('.mermaid'));
+
+    diagrams.forEach((el) => {
+      el.dataset.mermaidSource = el.textContent.trim();
+    });
+
+    const renderMermaid = () => {
+      const scheme = document.documentElement.getAttribute('data-scheme');
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: scheme === 'dark' ? 'dark' : 'default',
+        securityLevel: 'loose',
+        fontFamily: 'inherit'
+      });
+
+      diagrams.forEach((el) => {
+        el.removeAttribute('data-processed');
+        el.textContent = el.dataset.mermaidSource;
+      });
+
+      return mermaid.run({ nodes: diagrams });
+    };
+
+    renderMermaid().catch((error) => console.error('Mermaid render failed:', error));
+
+    
+    const observer = new MutationObserver(() => {
+      renderMermaid().catch((error) => console.error('Mermaid render failed:', error));
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-scheme'] });
+  }).catch((error) => console.error('Mermaid failed to load:', error));
+</script>
+</body>
+</html>

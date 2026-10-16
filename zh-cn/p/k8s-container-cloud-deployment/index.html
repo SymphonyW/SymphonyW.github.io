@@ -114,7 +114,7 @@
         
             <time datetime="2026-09-03T22:11:19&#43;08:00">2026 年 09 月 03 日</time>
             <span class="meta-divider" aria-hidden="true">/</span>
-            <span>约 8 分钟</span>
+            <span>约 9 分钟</span>
         
         
             <div class="article-translations"><a href="/p/k8s-container-cloud-deployment/" hreflang="en" lang="en">Read in English <span aria-hidden="true">↗</span></a></div>
@@ -144,8 +144,26 @@
         <li><a href="#8-登录并推送镜像仓库">8. 登录并推送镜像仓库</a></li>
       </ol>
     </li>
-    <li><a href="#三在容器云平台创建工作负载">三、在容器云平台创建工作负载</a></li>
-    <li><a href="#四配置服务入口">四、配置服务入口</a></li>
+    <li><a href="#三在容器云平台创建工作负载">三、在容器云平台创建工作负载</a>
+      <ol>
+        <li><a href="#1-进入集群并检查资源状态">1. 进入集群并检查资源状态</a></li>
+        <li><a href="#2-先选对工作负载类型">2. 先选对工作负载类型</a></li>
+        <li><a href="#3-按四步向导创建-deployment">3. 按四步向导创建 Deployment</a>
+          <ol>
+            <li><a href="#第一步基本信息">第一步：基本信息</a></li>
+            <li><a href="#第二步容器配置">第二步：容器配置</a></li>
+            <li><a href="#第三步服务配置">第三步：服务配置</a></li>
+            <li><a href="#第四步高级配置">第四步：高级配置</a></li>
+          </ol>
+        </li>
+      </ol>
+    </li>
+    <li><a href="#四配置服务入口">四、配置服务入口</a>
+      <ol>
+        <li><a href="#1-创建-service">1. 创建 Service</a></li>
+        <li><a href="#2-创建-routeingress">2. 创建 Route（Ingress）</a></li>
+      </ol>
+    </li>
     <li><a href="#五发布验证和回滚">五、发布、验证和回滚</a></li>
     <li><a href="#六常见问题速查">六、常见问题速查</a></li>
     <li><a href="#七上线前检查清单">七、上线前检查清单</a></li>
@@ -162,7 +180,7 @@
 </blockquote>
 <p><a href="/zh-cn/p/k8s-container-cloud-deployment/bg.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/k8s-container-cloud-deployment/bg.svg" alt="K8s 容器云部署流程" loading="lazy" decoding="async"></a>
 </p>
-<p>这篇文章按一次真实上线的顺序来讲，不绑定某个具体厂商控制台。只要你的公司平台底层是 Kubernetes，大部分步骤都能对应到类似的概念。</p>
+<p>这篇文章按一次真实上线的顺序来讲，并以中国电信云 CeakE 容器服务 CKE 的控制台为例展示具体操作。不同平台的页面名称可能不同，但只要底层是 Kubernetes，工作负载、Service、Ingress、探针和滚动更新等概念都能一一对应。</p>
 <div class="mermaid">flowchart LR
     A[代码仓库] --> B[编写 Dockerfile]
     B --> C[本地构建镜像]
@@ -828,7 +846,110 @@
 </div>
 </div><p>推送成功后，容器云平台才能从仓库拉到这个镜像。注意：<strong>K8s 集群不会使用你本机 Docker 里的镜像</strong>。除非是特殊的本地集群，生产平台只会从镜像仓库拉取。</p>
 <h2 id="三在容器云平台创建工作负载">三、在容器云平台创建工作负载
-</h2><p>镜像准备好后，才进入平台部署阶段。不同平台页面不一样，但字段基本类似。</p>
+</h2><p>镜像准备好后，才进入平台部署阶段。下面结合控制台截图走一遍完整流程。</p>
+<h3 id="1-进入集群并检查资源状态">1. 进入集群并检查资源状态
+</h3><p>在“容器 → 集群列表”中找到目标集群。进入控制台前先确认集群状态为“运行中”，并核对集群类型、版本、节点数和所属租户，避免把服务发布到错误的环境。</p>
+<p><a href="/zh-cn/p/k8s-container-cloud-deployment/1.Cluster.png" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/k8s-container-cloud-deployment/1.Cluster.png" alt="CeakE CKE 集群列表" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p>进入集群后的“概览”页会集中展示 Deployment、StatefulSet、DaemonSet、Job、CronJob 和 Pod 数量，以及节点健康状态、CPU、内存和磁盘使用情况。</p>
+<p><a href="/zh-cn/p/k8s-container-cloud-deployment/2.Summary.png" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/k8s-container-cloud-deployment/2.Summary.png" alt="CeakE CKE 集群资源概览" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p>发布前不要只看“节点健康”，还要同时检查资源水位和事件列表。截图里 CPU、内存都已经有一定占用；如果 requests 配得过大，Pod 可能因为剩余可分配资源不足而一直处于 <code>Pending</code>。事件列表中的 Warning 也应在发布前确认是否与目标项目或网络入口有关。</p>
+<h3 id="2-先选对工作负载类型">2. 先选对工作负载类型
+</h3><p>左侧“工作负载”菜单并不只有 Deployment。平台把常见控制器和 Pod 分开列出，选择时可以按运行模式判断：</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>控制台入口</th>
+<th>Kubernetes 对象</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>无状态负载</td>
+<td><code>Deployment</code></td>
+<td>Web、API 等可横向扩容、实例可替换的服务</td>
+</tr>
+<tr>
+<td>守护进程集</td>
+<td><code>DaemonSet</code></td>
+<td>每个节点运行一个实例，如日志采集、监控 Agent</td>
+</tr>
+<tr>
+<td>有状态负载</td>
+<td><code>StatefulSet</code></td>
+<td>需要稳定网络标识、顺序发布或持久存储的服务</td>
+</tr>
+<tr>
+<td>普通任务</td>
+<td><code>Job</code></td>
+<td>数据迁移、一次性计算等执行完成即退出的任务</td>
+</tr>
+<tr>
+<td>定时任务</td>
+<td><code>CronJob</code></td>
+<td>按 Cron 表达式周期执行的任务</td>
+</tr>
+<tr>
+<td>容器组</td>
+<td><code>Pod</code></td>
+<td>查看实际运行实例和排错，一般不直接创建长期业务 Pod</td>
+</tr>
+</tbody>
+</table></div>
+<p><a href="/zh-cn/p/k8s-container-cloud-deployment/3.Deployment.png" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/k8s-container-cloud-deployment/3.Deployment.png" alt="无状态负载 Deployment 列表" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p>Deployment 列表中的“容器组（运行/期望）”、副本数和状态可以快速判断发布是否完成。比如 <code>0/1</code> 且状态为 <code>Updating</code>，说明新 Pod 还没有达到期望状态。</p>
+<p><a href="/zh-cn/p/k8s-container-cloud-deployment/4.DaemonSets.png" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/k8s-container-cloud-deployment/4.DaemonSets.png" alt="守护进程集 DaemonSet 列表" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p><a href="/zh-cn/p/k8s-container-cloud-deployment/5.StatefulSet.png" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/k8s-container-cloud-deployment/5.StatefulSet.png" alt="有状态负载 StatefulSet 列表" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p><a href="/zh-cn/p/k8s-container-cloud-deployment/6.Job.png" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/k8s-container-cloud-deployment/6.Job.png" alt="普通任务 Job 列表" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p><a href="/zh-cn/p/k8s-container-cloud-deployment/7.CronJob.png" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/k8s-container-cloud-deployment/7.CronJob.png" alt="定时任务 CronJob 列表" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p><a href="/zh-cn/p/k8s-container-cloud-deployment/8.Pod.png" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/k8s-container-cloud-deployment/8.Pod.png" alt="容器组 Pod 列表" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p>Pod 页面尤其适合排错：它同时展示状态、就绪容器数、重启次数、Pod IP 和所在节点。截图中的 <code>CrashLoopBackOff</code> 和异常高的重启次数就是明确的故障信号，此时应优先查看容器日志、上一轮日志和 Pod 事件，而不是先改 Service 或 Route。</p>
+<h3 id="3-按四步向导创建-deployment">3. 按四步向导创建 Deployment
+</h3><p>在“无状态负载”页面点击“新建无状态工作负载”，控制台会依次进入基本信息、容器配置、服务配置和高级配置四个步骤。</p>
+<h4 id="第一步基本信息">第一步：基本信息
+</h4><p><a href="/zh-cn/p/k8s-container-cloud-deployment/3.1.Basic-Info.png" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/k8s-container-cloud-deployment/3.1.Basic-Info.png" alt="新建 Deployment 的基本信息" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p>填写名称、项目（对应 Namespace）、实例数量和描述。测试环境可以先用 1 个实例验证；生产环境通常至少 2 个实例，并结合滚动更新策略保证发布期间仍有可用 Pod。</p>
+<h4 id="第二步容器配置">第二步：容器配置
+</h4><p><a href="/zh-cn/p/k8s-container-cloud-deployment/3.2.Container-Setting-1.png" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/k8s-container-cloud-deployment/3.2.Container-Setting-1.png" alt="Deployment 容器镜像与资源配置" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p>容器镜像既可以从平台镜像仓库选择，也可以直接输入完整镜像地址。需要重点核对镜像 Tag、拉取策略以及 vCPU/内存的请求和限制：</p>
+<ul>
+<li>使用不可变 Tag 时可以选 <code>IfNotPresent</code>；截图中的默认值是 <code>Always</code>，它适合同一 Tag 可能被覆盖的场景，但生产发布仍建议使用唯一 Tag；</li>
+<li>不建议把 CPU、内存请求与限制都保持为“无限制”，至少要设置合理的 requests，生产环境再根据压测和监控设置 limits；</li>
+<li>容器名称是 Pod 内的标识，不等于 Deployment 名称；一个 Pod 也可以配置多个容器。</li>
+</ul>
+<p><a href="/zh-cn/p/k8s-container-cloud-deployment/3.2.Container-Setting-2.png" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/k8s-container-cloud-deployment/3.2.Container-Setting-2.png" alt="Deployment 环境变量、探针和存储配置" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p>向下滚动可以配置环境变量、启动命令、运行参数、工作目录、健康检查和存储卷。平台把 Kubernetes 的三类探针分别显示为存活检查（Liveness）、就绪检查（Readiness）和启动检查（Startup）：</p>
+<ul>
+<li>Readiness 决定 Pod 是否加入 Service Endpoint，业务服务通常应该配置；</li>
+<li>Liveness 用于判断是否需要重启容器，不要把偶发抖动的外部依赖放进检查逻辑；</li>
+<li>启动慢的应用可使用 Startup Probe，避免还在启动时就被 Liveness 反复重启。</li>
+</ul>
+<h4 id="第三步服务配置">第三步：服务配置
+</h4><p><a href="/zh-cn/p/k8s-container-cloud-deployment/3.3.Service-Setting.png" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/k8s-container-cloud-deployment/3.3.Service-Setting.png" alt="Deployment 向导中的服务配置" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p>这里可以绑定已有 Service，也可以直接新建。若当前工作负载暂时不需要被访问，可以先跳过，后续再从“网络 → 服务”中单独创建。</p>
+<p><a href="/zh-cn/p/k8s-container-cloud-deployment/3.3.New-Service.png" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/k8s-container-cloud-deployment/3.3.New-Service.png" alt="Deployment 向导中新建 Service" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p>新建 Service 时要填写访问类型、服务端口、容器端口和协议。对普通内部服务优先使用 <code>ClusterIP</code>；<code>NodePort</code> 会在节点上开放端口；<code>LoadBalancer</code> 是否可用取决于云平台和负载均衡配置。最关键的是把 Service 正确绑定到工作负载标签，否则 Service 不会产生 Endpoint。</p>
+<h4 id="第四步高级配置">第四步：高级配置
+</h4><p><a href="/zh-cn/p/k8s-container-cloud-deployment/3.4.Advanced-Settings-1.png" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/k8s-container-cloud-deployment/3.4.Advanced-Settings-1.png" alt="Deployment 网络与滚动更新配置" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p>高级配置上半部分包括 DNS 策略、额外 Hosts/网络，以及升级策略。常规场景保持 <code>ClusterFirst</code>；升级方式使用 <code>RollingUpdate</code> 时，需要结合副本数设置最大扩容 Pod 数（<code>maxSurge</code>）和最大不可用 Pod 数（<code>maxUnavailable</code>）。单副本服务若允许 <code>maxUnavailable: 1</code>，发布过程中会短暂不可用。</p>
+<p><a href="/zh-cn/p/k8s-container-cloud-deployment/3.4.Advanced-Settings-2.png" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/k8s-container-cloud-deployment/3.4.Advanced-Settings-2.png" alt="Deployment 调度、标签和镜像密钥配置" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p>高级配置下半部分可以设置节点亲和性、工作负载亲和/反亲和、污点容忍、标签、注解、应用监控和私有镜像密钥。只有在确实需要指定节点、跨节点分散副本或访问私有仓库时再修改；不清楚含义时，先保留平台默认的调度配置。</p>
+<p>四步表单最终仍会生成 Kubernetes Deployment。填写时可以用下面这张表快速对照：</p>
 <div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
 <thead>
 <tr>
@@ -1038,7 +1159,50 @@
     S --> P1[Pod 1]
     S --> P2[Pod 2]
     S --> P3[Pod 3]
-</div><p>集群内访问一般用 <code>Service</code>：</p>
+</div><h3 id="1-创建-service">1. 创建 Service
+</h3><p>“网络 → 服务”页面会显示访问方式、Cluster IP 或外部 IP，以及“服务端口 → 容器端口/协议”的映射关系。列表中的 <code>ClusterIP</code>、<code>NodePort</code> 和 <code>LoadBalancer</code> 对应三种不同暴露范围，不能只根据端口号判断服务是否能从公网访问。</p>
+<p><a href="/zh-cn/p/k8s-container-cloud-deployment/9.Service.png" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/k8s-container-cloud-deployment/9.Service.png" alt="Service 列表与端口映射" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p><a href="/zh-cn/p/k8s-container-cloud-deployment/9.1.New-Service.png" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/k8s-container-cloud-deployment/9.1.New-Service.png" alt="新建 Service 表单" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p>新建 Service 时先选择项目和名称，再选择访问类型并配置端口：</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>表单字段</th>
+<th>Kubernetes 字段</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>服务端口</td>
+<td><code>spec.ports[].port</code></td>
+<td>客户端访问 Service 使用的端口</td>
+</tr>
+<tr>
+<td>容器端口</td>
+<td><code>spec.ports[].targetPort</code></td>
+<td>流量最终转发到 Pod 的端口</td>
+</tr>
+<tr>
+<td>访问类型</td>
+<td><code>spec.type</code></td>
+<td><code>ClusterIP</code>、<code>NodePort</code> 或 <code>LoadBalancer</code></td>
+</tr>
+<tr>
+<td>绑定工作负载/标签</td>
+<td><code>spec.selector</code></td>
+<td>必须能匹配目标 Pod 的 labels</td>
+</tr>
+<tr>
+<td>Session Hold</td>
+<td><code>sessionAffinity</code></td>
+<td>只有业务确实需要会话粘性时才开启</td>
+</tr>
+</tbody>
+</table></div>
+<p>集群内访问一般用 <code>Service</code>：</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
 <pre tabindex="0" class="chroma"><code><span class="lnt"> 1
@@ -1123,7 +1287,14 @@
 </span></span></span><span class="line"><span class="cl"><span class="w">                  </span><span class="nt">number</span><span class="p">:</span><span class="w"> </span><span class="m">80</span><span class="w">
 </span></span></span></code></pre></td></tr></table>
 </div>
-</div><p>平台页面里可能不会叫 Ingress，而是叫“域名”“路由”“七层负载均衡”“应用入口”。核心字段仍然是：域名、路径、后端 Service、端口、证书。</p>
+</div><h3 id="2-创建-routeingress">2. 创建 Route（Ingress）
+</h3><p>该平台把 Ingress 放在“网络 → 路由”中。路由列表展示名称、绑定的 Service、项目和类型；一个路由可以包含多条后端规则。</p>
+<p><a href="/zh-cn/p/k8s-container-cloud-deployment/10.Route.png" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/k8s-container-cloud-deployment/10.Route.png" alt="Route 列表" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p><a href="/zh-cn/p/k8s-container-cloud-deployment/10.1.New-Route.png" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/k8s-container-cloud-deployment/10.1.New-Route.png" alt="新建 Route 表单" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p>新建路由时依次填写路由名称、项目、Ingress 类型、协议、域名、路径匹配方式、目标 Service 和目标端口。截图中的类型为 <code>nginx</code>、匹配方式为 <code>Prefix</code>，它们分别对应 Ingress Controller 和 <code>pathType: Prefix</code>。如果选择 HTTPS，还需要按平台要求配置 TLS 证书或 Secret。</p>
+<p>平台页面里可能不会叫 Ingress，而是叫“域名”“路由”“七层负载均衡”或“应用入口”。无论名称如何，排错时都沿着 <strong>Route/Ingress → Service → Endpoint → Pod</strong> 这条链路逐层检查。</p>
 <h2 id="五发布验证和回滚">五、发布、验证和回滚
 </h2><p>如果平台支持直接应用 YAML，可以这样发布：</p>
 <div class="highlight"><div class="chroma">

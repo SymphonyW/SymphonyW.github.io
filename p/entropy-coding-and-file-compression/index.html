@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="从信息熵、概率模型和完整压缩流水线出发，讲清 Huffman、算术编码、Range Coding、ANS、Golomb/Rice，以及 RLE、LZ、BWT、预测、变换和量化等方法。">
+<title>Entropy Coding and File Compression: Distinctions, Common Methods, and the Role of Local Continuity</title>
+
+<link rel='canonical' href='https://SymphonyW.github.io/p/entropy-coding-and-file-compression/'>
+<link rel="stylesheet" href="/scss/custom.min.bf7995e62147d50e1276b97e61d2c8120b52dfef9e32fbaed4e22d2affbd1b2b.css">
+<script>
+(() => {
+    let preference = 'auto';
+    try { preference = localStorage.getItem('StackColorScheme') || preference; } catch (_) {}
+    document.documentElement.dataset.scheme = preference === 'dark' || (preference === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+})();
+</script>
+
+<meta property='og:title' content="Entropy Coding and File Compression: Distinctions, Common Methods, and the Role of Local Continuity">
+<meta property='og:description' content="从信息熵、概率模型和完整压缩流水线出发，讲清 Huffman、算术编码、Range Coding、ANS、Golomb/Rice，以及 RLE、LZ、BWT、预测、变换和量化等方法。">
+<meta property='og:url' content='https://SymphonyW.github.io/p/entropy-coding-and-file-compression/'>
+<meta property='og:site_name' content='Snow'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='数据压缩' /><meta property='article:tag' content='熵编码' /><meta property='article:tag' content='信息论' /><meta property='article:tag' content='编码算法' /><meta property='article:published_time' content='2026-10-15T20:30:00&#43;08:00'/><meta property='article:modified_time' content='2026-10-15T20:30:00&#43;08:00'/><meta property='og:image' content='https://SymphonyW.github.io/p/entropy-coding-and-file-compression/bg.svg' />
+<meta name="twitter:title" content="Entropy Coding and File Compression: Distinctions, Common Methods, and the Role of Local Continuity">
+<meta name="twitter:description" content="从信息熵、概率模型和完整压缩流水线出发，讲清 Huffman、算术编码、Range Coding、ANS、Golomb/Rice，以及 RLE、LZ、BWT、预测、变换和量化等方法。"><meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content='https://SymphonyW.github.io/p/entropy-coding-and-file-compression/bg.svg' />
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    
+    <noscript><style>@media(max-width:760px){.site-header{position:static}.site-header__inner{height:auto;min-height:66px;flex-wrap:wrap}.site-nav{position:static;display:grid;order:3;flex-basis:100%;padding:8px 0 18px}.menu-toggle,.theme-toggle{display:none}}</style></noscript>
+</head>
+<body id="top" class="article-page">
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    
+<header class="site-header">
+    <div class="site-header__inner">
+        <a class="site-brand" href="/" aria-label="Snow — Home">S<span>now.</span></a>
+        <nav class="site-nav" id="site-navigation" aria-label="Main navigation">
+            
+            
+                
+                    
+                    
+                    <a href="/">Home</a>
+                
+            
+                
+                    
+                    
+                    <a href="/post/" aria-current="page">Blog</a>
+                
+            
+                
+                    
+                    
+                    <a href="/archives/">Archives</a>
+                
+            
+                
+                    
+                    
+                    <a href="/diary/">Diary</a>
+                
+            
+                
+                    
+                    
+                    <a href="/stats/">Stats</a>
+                
+            
+                
+            
+                
+                    
+                    
+                    <a href="/links/">Links</a>
+                
+            
+        </nav>
+        <div class="header-tools">
+            
+                <a class="language-link" href="/zh-cn/p/entropy-coding-and-file-compression/" lang="zh-cn" hreflang="zh-cn" aria-label="切换到中文">中</a>
+            
+            <button type="button" id="dark-mode-toggle" class="icon-button theme-toggle" aria-label="Toggle color theme" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><path d="M12 4.5a7.5 7.5 0 0 1 0 15z" fill="currentColor" stroke="none"/></svg></button>
+            <a class="icon-button search-link" href="/search/" aria-label="Search articles"><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+</a>
+            <button class="icon-button menu-toggle" type="button" aria-expanded="false" aria-controls="site-navigation" aria-label="Open navigation"><span></span><span></span></button>
+        </div>
+    </div>
+    <div class="reading-progress" aria-hidden="true"></div>
+</header>
+
+    <main id="main-content" class="site-main main" tabindex="-1">
+        
+    <div class="reading-page">
+        <article class="main-article has-toc">
+    <header class="article-header">
+    <div class="article-wayfinding">
+        
+            <a href="/post/"><span aria-hidden="true">←</span> All writing</a>
+        
+        <span class="article-kind">Notes & observations</span>
+    </div>
+    <div class="article-details">
+    
+    <h1 class="article-title">Entropy Coding and File Compression: Distinctions, Common Methods, and the Role of Local Continuity</h1>
+    <p class="article-subtitle">从信息熵、概率模型和完整压缩流水线出发，讲清 Huffman、算术编码、Range Coding、ANS、Golomb/Rice，以及 RLE、LZ、BWT、预测、变换和量化等方法。</p>
+    <div class="article-meta">
+        
+            <time datetime="2026-10-15T20:30:00&#43;08:00">October 15, 2026</time>
+            <span class="meta-divider" aria-hidden="true">/</span>
+            <span>5 min read</span>
+        
+        
+            <div class="article-translations"><a href="/zh-cn/p/entropy-coding-and-file-compression/" hreflang="zh-cn" lang="zh-cn">阅读中文版 <span aria-hidden="true">↗</span></a></div>
+        
+    </div>
+</div>
+
+</header>
+
+    <div class="reading-layout">
+        
+            <aside class="reading-margin" aria-label="Article contents">
+                <details class="article-toc" open>
+                    <summary><span>On this page</span><span class="toc-indicator" aria-hidden="true">+</span></summary>
+                    <nav id="TableOfContents">
+  <ol>
+    <li><a href="#从信息量到熵">从“信息量”到“熵”</a></li>
+    <li><a href="#常见熵编码方法">常见熵编码方法</a>
+      <ol>
+        <li><a href="#huffman-coding给高频符号更短的前缀码">Huffman Coding：给高频符号更短的前缀码</a></li>
+        <li><a href="#arithmetic-coding把整个序列缩进一个概率区间">Arithmetic Coding：把整个序列缩进一个概率区间</a></li>
+        <li><a href="#range-coding算术编码的工程化整数实现">Range Coding：算术编码的工程化整数实现</a></li>
+        <li><a href="#ans用一个整数状态吸收和释放符号">ANS：用一个整数状态吸收和释放符号</a></li>
+        <li><a href="#golomb--rice专门善待小整数残差">Golomb / Rice：专门善待小整数残差</a></li>
+        <li><a href="#context--binary-arithmetic以-cabac-为代表的组合系统">Context + Binary Arithmetic：以 CABAC 为代表的组合系统</a></li>
+      </ol>
+    </li>
+    <li><a href="#常见文件压缩方法">常见文件压缩方法</a>
+      <ol>
+        <li><a href="#rle把连续重复写成值--次数">RLE：把连续重复写成“值 + 次数”</a></li>
+        <li><a href="#lz77--lz78--lzw用引用代替重复内容">LZ77 / LZ78 / LZW：用引用代替重复内容</a></li>
+        <li><a href="#bwt--mtf先把相似上下文聚到一起">BWT + MTF：先把相似上下文聚到一起</a></li>
+        <li><a href="#delta-与预测编码不存原值存没猜中的部分">Delta 与预测编码：不存原值，存“没猜中的部分”</a></li>
+        <li><a href="#变换编码把相关性搬到少数系数上">变换编码：把相关性搬到少数系数上</a></li>
+        <li><a href="#量化真正丢信息的步骤">量化：真正“丢信息”的步骤</a></li>
+        <li><a href="#专用模型懂数据结构通常比通吃压得更好">专用模型：懂数据结构，通常比“通吃”压得更好</a></li>
+      </ol>
+    </li>
+    <li><a href="#常见格式究竟组合了什么">常见格式究竟组合了什么</a></li>
+    <li><a href="#为什么局部连续性更有利于压缩">为什么局部连续性更有利于压缩</a>
+      <ol>
+        <li><a href="#为什么二维图像尤其依赖扫描顺序">为什么二维图像尤其依赖扫描顺序</a></li>
+        <li><a href="#局部连续性不是越强越万能">局部连续性不是越强越万能</a></li>
+      </ol>
+    </li>
+    <li><a href="#怎样在工程中改善可压缩性">怎样在工程中改善可压缩性</a></li>
+    <li><a href="#最后总结">最后总结</a></li>
+    <li><a href="#参考资料">参考资料</a></li>
+  </ol>
+</nav>
+                </details>
+            </aside>
+        
+        <div class="reading-body">
+            <div class="article-content"><h1 id="熵编码与文件压缩区别常见方法与局部连续性的作用">熵编码与文件压缩：区别、常见方法与局部连续性的作用
+</h1><blockquote>
+<p><strong>熵编码是“怎样用更少的比特表示一串符号”，文件压缩是“怎样把整个文件变得更小”。</strong> 前者通常是后者的最后一环，而不是与后者平级的概念。</p>
+</blockquote>
+<p><a href="/p/entropy-coding-and-file-compression/bg.svg" target="_blank" rel="noopener noreferrer"><img src="/p/entropy-coding-and-file-compression/bg.svg" alt="熵编码与文件压缩的关系" loading="lazy" decoding="async"></a>
+</p>
+<p>先看最容易混淆的结论：</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>问题</th>
+<th>简短答案</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Huffman、Arithmetic、ANS 是什么</td>
+<td>熵编码器：依据符号概率分配比特</td>
+</tr>
+<tr>
+<td>RLE、LZ77、LZW、Delta、Prediction 是什么</td>
+<td>建模、变换或消除重复的方法，不是狭义熵编码</td>
+</tr>
+<tr>
+<td>ZIP、gzip、PNG、JPEG、Zstandard 是什么</td>
+<td>完整格式或压缩方案，内部通常组合多种方法</td>
+</tr>
+<tr>
+<td>量化是不是熵编码</td>
+<td>不是；量化会降低精度，通常是有损压缩的主要来源</td>
+</tr>
+<tr>
+<td>局部连续为什么有用</td>
+<td>它让相邻值更可预测，使差值、残差、游程或变换系数更集中</td>
+</tr>
+<tr>
+<td>连续性会直接降低零阶熵吗</td>
+<td>不一定；若符号计数不变，静态无上下文熵编码甚至完全看不出顺序变化</td>
+</tr>
+</tbody>
+</table></div>
+<p><a href="/p/entropy-coding-and-file-compression/compression-pipeline.svg" target="_blank" rel="noopener noreferrer"><img src="/p/entropy-coding-and-file-compression/compression-pipeline.svg" alt="完整压缩流水线与熵编码所在位置" loading="lazy" decoding="async"></a>
+</p>
+<p>一条典型压缩链路可以写成：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">原始数据
+</span></span><span class="line"><span class="cl">  → 重排 / 分块 / 预测 / 字典匹配 / 变换
+</span></span><span class="line"><span class="cl">  → 可选的量化（有损）
+</span></span><span class="line"><span class="cl">  → 产生符号：字面量、长度、距离、残差、系数……
+</span></span><span class="line"><span class="cl">  → 概率建模
+</span></span><span class="line"><span class="cl">  → 熵编码
+</span></span><span class="line"><span class="cl">  → 文件头、码表、索引、校验和与容器封装
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>其中每一层解决的问题不同：</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>层次</th>
+<th>解决什么问题</th>
+<th>典型方法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>建模与去冗余</td>
+<td>找到重复、相关性和可预测性</td>
+<td>RLE、LZ77、LZW、预测、Delta、BWT</td>
+</tr>
+<tr>
+<td>数据变换</td>
+<td>把信息集中到更容易编码的位置</td>
+<td>DCT、小波、颜色变换、MTF、字节重排</td>
+</tr>
+<tr>
+<td>量化</td>
+<td>主动丢掉不重要的信息</td>
+<td>JPEG 系数量化、音视频感知量化</td>
+</tr>
+<tr>
+<td>概率建模</td>
+<td>估计“下一个符号多可能出现”</td>
+<td>频率表、上下文模型、自适应模型</td>
+</tr>
+<tr>
+<td>熵编码</td>
+<td>按概率把符号映射为比特</td>
+<td>Huffman、Arithmetic、Range、ANS、Rice</td>
+</tr>
+<tr>
+<td>文件封装</td>
+<td>让结果可保存、校验、随机访问和解码</td>
+<td>Header、码表、块索引、CRC、元数据</td>
+</tr>
+</tbody>
+</table></div>
+<p>因此，<strong>文件压缩关心端到端结果，熵编码只关心给定符号及其概率后如何接近理论码长。</strong></p>
+<h2 id="从信息量到熵">从“信息量”到“熵”
+</h2><p>如果一个符号出现的概率为 $p(x)$，它携带的信息量定义为：</p>
+<p>$$
+I(x)=-\log_2 p(x)
+$$</p>
+<p>越常见的符号越“不意外”，需要的比特越少；越罕见的符号越意外，需要的比特越多。例如：</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th style="text-align:right">符号概率</th>
+<th style="text-align:right">理想信息量</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:right">$1/2$</td>
+<td style="text-align:right">1 bit</td>
+</tr>
+<tr>
+<td style="text-align:right">$1/4$</td>
+<td style="text-align:right">2 bits</td>
+</tr>
+<tr>
+<td style="text-align:right">$1/8$</td>
+<td style="text-align:right">3 bits</td>
+</tr>
+<tr>
+<td style="text-align:right">$1/1000$</td>
+<td style="text-align:right">约 9.97 bits</td>
+</tr>
+</tbody>
+</table></div>
+<p>信源的平均信息量就是熵：</p>
+<p>$$
+H(X)=-\sum_x p(x)\log_2p(x)
+$$</p>
+<p>假设四个符号的概率分别是 $0.5、0.25、0.125、0.125$，那么：</p>
+<p>$$
+H(X)=0.5\times1+0.25\times2+0.125\times3+0.125\times3=1.75\ \text{bit/符号}
+$$</p>
+<p>这意味着：如果符号确实服从这个分布，足够长的序列平均很难低于 1.75 bit/符号。熵编码的目标，就是让实际平均码长尽量靠近这个值。</p>
+<p>但编码器通常拿不到真实分布 $p$，只能使用模型估计出的 $q$。这时理想平均码长对应交叉熵：</p>
+<p>$$
+H(p,q)=H(p)+D_{KL}(p\Vert q)
+$$</p>
+<p>$D_{KL}$ 是模型失配带来的额外代价。这个公式揭示了压缩工程里极重要的一点：</p>
+<blockquote>
+<p><strong>换一个更强的熵编码器，收益可能只有几个百分点；让概率模型更懂数据，收益往往更大。</strong></p>
+</blockquote>
+<p>例如，一个编码器如果不知道“<code>q</code> 后面很可能是 <code>u</code>”，就只能按字母 <code>u</code> 的全局频率编码；加入上下文后，它可以使用 $P(u\mid q)$，条件分布更偏斜，码长也更短。</p>
+<h2 id="常见熵编码方法">常见熵编码方法
+</h2><p><a href="/p/entropy-coding-and-file-compression/entropy-coding-map.svg" target="_blank" rel="noopener noreferrer"><img src="/p/entropy-coding-and-file-compression/entropy-coding-map.svg" alt="常见熵编码方法的定位与取舍" loading="lazy" decoding="async"></a>
+</p>
+<h3 id="huffman-coding给高频符号更短的前缀码">Huffman Coding：给高频符号更短的前缀码
+</h3><p>Huffman 编码反复合并概率最小的两个节点，最终得到一棵二叉树。左、右边分别记作 0、1，从根到叶子的路径就是符号码字。</p>
+<p>以前面的概率为例，可以得到：</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>符号</th>
+<th style="text-align:right">概率</th>
+<th style="text-align:right">一组可行码字</th>
+<th style="text-align:right">码长</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A</td>
+<td style="text-align:right">0.5</td>
+<td style="text-align:right"><code>0</code></td>
+<td style="text-align:right">1</td>
+</tr>
+<tr>
+<td>B</td>
+<td style="text-align:right">0.25</td>
+<td style="text-align:right"><code>10</code></td>
+<td style="text-align:right">2</td>
+</tr>
+<tr>
+<td>C</td>
+<td style="text-align:right">0.125</td>
+<td style="text-align:right"><code>110</code></td>
+<td style="text-align:right">3</td>
+</tr>
+<tr>
+<td>D</td>
+<td style="text-align:right">0.125</td>
+<td style="text-align:right"><code>111</code></td>
+<td style="text-align:right">3</td>
+</tr>
+</tbody>
+</table></div>
+<p>没有任何码字是另一个码字的前缀，所以解码器可以从左到右唯一解析。这个例子的平均码长恰好等于 1.75 bit/符号。</p>
+<p>Huffman 的优点是结构清楚、查表解码快、实现成熟；局限是<strong>每个符号的码长只能是整数个 bit</strong>。当某符号概率是 0.9 时，理想码长只有约 0.152 bit，但普通二元 Huffman 仍至少要给它 1 bit。对单符号二元前缀码，平均码长满足 $H\le L&amp;lt H+1$；把多个符号组成一块再编码可以摊薄这部分整数化损失，但码表也会迅速变大。</p>
+<p>Huffman 常见于 DEFLATE、PNG、基线 JPEG、Brotli 和 Zstandard 的部分符号流中。1952 年的 <a class="link" href="https://doi.org/10.1109/JRPROC.1952.273898"  target="_blank" rel="noopener"
+    >Huffman 原始论文</a> 给出了最小冗余前缀码的构造方法。</p>
+<h3 id="arithmetic-coding把整个序列缩进一个概率区间">Arithmetic Coding：把整个序列缩进一个概率区间
+</h3><p>算术编码不急着给每个符号分配独立码字，而是维护一个区间 $[L,H)$：</p>
+<ol>
+<li>初始区间是 $[0,1)$；</li>
+<li>按当前概率把区间切成若干段；</li>
+<li>读到哪个符号，就选择它对应的子区间；</li>
+<li>对后续符号重复细分；</li>
+<li>最后选一个落在最终区间内的二进制小数作为编码结果。</li>
+</ol>
+<p>如果序列概率为 $P(x_1,x_2,\ldots,x_n)$，理想码长接近：</p>
+<p>$$
+-\log_2 P(x_1,x_2,\ldots,x_n)
+$$</p>
+<p>因为它对<strong>整段序列</strong>分配比特，码长不必在每个符号边界上取整数，所以通常比逐符号 Huffman 更接近熵极限。实际实现需要处理有限精度、区间缩放、进位和终止标记；专利历史也曾影响它在部分格式中的普及。</p>
+<p>算术编码可以配合静态模型，也可以边编码边更新概率。真正决定效果的是“区间编码器 + 概率模型”的组合，而不是单独的区间操作。</p>
+<h3 id="range-coding算术编码的工程化整数实现">Range Coding：算术编码的工程化整数实现
+</h3><p>Range Coding 通常被视为算术编码的一类实现。它不直接维护无限精度小数，而是使用固定宽度整数表示 <code>low</code> 与 <code>range</code>，区间过小时就输出高位并重新归一化。</p>
+<p>两者在思想上几乎相同：</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>对比</th>
+<th>Arithmetic Coding</th>
+<th>Range Coding</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>核心对象</td>
+<td>概率区间</td>
+<td>整数范围</td>
+</tr>
+<tr>
+<td>理论基础</td>
+<td>整段序列落入嵌套区间</td>
+<td>同一原理</td>
+</tr>
+<tr>
+<td>工程重点</td>
+<td>精度、进位、重归一化</td>
+<td>整数乘除、字节输出、重归一化</td>
+</tr>
+<tr>
+<td>常见印象</td>
+<td>教科书概念更常见</td>
+<td>压缩器实现中更常见</td>
+</tr>
+</tbody>
+</table></div>
+<p>所以不应把 Range Coding 理解成与算术编码毫无关系的另一套理论；它更像同一思想的一种机器友好表达。LZMA 系列就会把 LZ 产生的符号交给 Range Coder。</p>
+<h3 id="ans用一个整数状态吸收和释放符号">ANS：用一个整数状态吸收和释放符号
+</h3><p>ANS（Asymmetric Numeral Systems，非对称数字系统）维护一个整数状态。编码符号时，状态根据符号概率跳到新的状态，并在状态过大时输出低位；解码则根据当前状态恢复符号并回到前一个状态。</p>
+<p>常见变体包括：</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>变体</th>
+<th>特点</th>
+<th>常见定位</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>rANS</td>
+<td>用整数算术更新状态</td>
+<td>软件实现、便于多路并行</td>
+</tr>
+<tr>
+<td>tANS</td>
+<td>把状态转移预先放进表中</td>
+<td>查表快，需构建状态表</td>
+</tr>
+<tr>
+<td>FSE</td>
+<td>有限状态熵编码，属于 tANS 家族的工程实现</td>
+<td>Zstandard 的长度、距离等符号</td>
+</tr>
+</tbody>
+</table></div>
+<p>ANS 能像算术编码一样利用细粒度概率，又可以通过状态机和查表获得很高吞吐，因此现代压缩格式经常使用它。Jarek Duda 的 <a class="link" href="https://arxiv.org/abs/1311.2540"  target="_blank" rel="noopener"
+    >ANS 论文</a> 系统讨论了它在压缩率与速度之间的定位。</p>
+<p>ANS 也有自己的工程复杂度：频率必须归一化到有限状态数，表需要随码流保存或约定，典型编码与解码方向相反，多路交织时还要谨慎管理状态。因此“ANS 一定优于一切”并不成立，实际选择仍取决于数据规模、延迟、内存、硬件和实现质量。</p>
+<h3 id="golomb--rice专门善待小整数残差">Golomb / Rice：专门善待小整数残差
+</h3><p>Golomb 编码适合近似几何分布的非负整数。给定参数 $m$，把整数 $n$ 写成：</p>
+<p>$$
+n=qm+r
+$$</p>
+<p>商 $q$ 使用一元码，余数 $r$ 使用截断二进制码。Rice 编码是 $m=2^k$ 的特例，因此商、余数可用移位和掩码快速得到。</p>
+<p>它特别适合“绝大部分残差接近 0，少数残差较大”的数据。带符号残差通常先映射成非负数，例如：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">0 → 0, -1 → 1, +1 → 2, -2 → 3, +2 → 4, ...
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>FLAC 会先做线性预测，再用 Rice 类编码保存预测残差。这里真正制造可压缩性的主要是预测，Rice 负责把已经偏向小整数的残差高效写成比特。</p>
+<h3 id="context--binary-arithmetic以-cabac-为代表的组合系统">Context + Binary Arithmetic：以 CABAC 为代表的组合系统
+</h3><p>CABAC 不是单一“神奇码表”，而是三部分的组合：</p>
+<ol>
+<li><strong>二值化</strong>：把多值语法元素拆成二进制决策；</li>
+<li><strong>上下文建模</strong>：根据邻近块、已编码语法等选择概率状态；</li>
+<li><strong>二进制算术编码</strong>：依据该概率输出比特流。</li>
+</ol>
+<p>它再次说明：实际系统往往把“模型”和“熵编码核心”紧密组合。讨论压缩率时，只说用了算术编码却不说概率如何得到，信息是不完整的。</p>
+<p>把这些方法放在一起看：</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>方法</th>
+<th>基本单位</th>
+<th>优势</th>
+<th>代价或限制</th>
+<th>常见场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Huffman</td>
+<td>单个符号的前缀码</td>
+<td>简单、快速、成熟</td>
+<td>码长整数化</td>
+<td>DEFLATE、JPEG、PNG、Brotli</td>
+</tr>
+<tr>
+<td>Arithmetic</td>
+<td>整段序列的区间</td>
+<td>压缩率接近熵极限</td>
+<td>串行依赖与实现细节较多</td>
+<td>图像、视频、上下文模型</td>
+</tr>
+<tr>
+<td>Range</td>
+<td>整数范围</td>
+<td>便于工程实现</td>
+<td>乘除与重归一化仍有成本</td>
+<td>LZMA、通用压缩器</td>
+</tr>
+<tr>
+<td>rANS / tANS</td>
+<td>整数状态或状态表</td>
+<td>高吞吐、概率精度高</td>
+<td>表与状态管理复杂</td>
+<td>Zstandard、现代图像编码</td>
+</tr>
+<tr>
+<td>Golomb / Rice</td>
+<td>非负小整数</td>
+<td>极简，特别适合残差</td>
+<td>只适合特定分布</td>
+<td>FLAC、预测残差</td>
+</tr>
+<tr>
+<td>CABAC 类组合</td>
+<td>上下文中的二进制决策</td>
+<td>能利用复杂局部条件</td>
+<td>计算与并行化成本高</td>
+<td>H.264/H.265 等视频编码</td>
+</tr>
+</tbody>
+</table></div>
+<p>“静态还是自适应”是另一条独立维度。Huffman、Arithmetic、Range、ANS 都可以在不同程度上配静态频率表、分块更新或上下文模型，不能简单地把某一种编码器等同于某一种建模方式。</p>
+<h2 id="常见文件压缩方法">常见文件压缩方法
+</h2><p>熵编码只压缩“符号概率不均匀”这一类冗余。完整文件压缩还会利用连续重复、重复子串、相邻相关、频域能量集中和人类感知不敏感等性质。</p>
+<h3 id="rle把连续重复写成值--次数">RLE：把连续重复写成“值 + 次数”
+</h3><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">AAAAAAAABBBCC  →  (A,8)(B,3)(C,2)
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>RLE（Run-Length Encoding）对掩码、空白区域、扫描线和量化后大量为零的系数非常有效，但对 <code>ABABABAB</code> 无能为力，因为相同符号没有连续出现；对噪声数据还可能因计数信息而膨胀。</p>
+<p>RLE 不是狭义熵编码。它先把数据改写成“符号 + 游程长度”，之后仍可对符号和长度再做 Huffman、ANS 或 Rice 编码。</p>
+<h3 id="lz77--lz78--lzw用引用代替重复内容">LZ77 / LZ78 / LZW：用引用代替重复内容
+</h3><p>Lempel-Ziv 家族利用重复字符串：</p>
+<ul>
+<li><strong>LZ77</strong> 在滑动窗口中向后查找匹配，用 <code>&lt;距离, 长度&gt;</code> 代替重复片段；</li>
+<li><strong>LZ78</strong> 显式构建短语字典，用字典索引表示新短语；</li>
+<li><strong>LZW</strong> 在 LZ78 思路上让编解码器同步扩展字典，码流主要保存索引。</li>
+</ul>
+<p>例如：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">the_cat_and_the_cat
+</span></span><span class="line"><span class="cl">            └─────┘  可以引用前面出现过的 &#34;the_cat&#34;
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>LZ 方法利用的是<strong>重复子串</strong>，不要求相邻数值接近。<code>ABCDEFGABCDEFG</code> 数值并不平滑，但第二个 <code>ABCDEFG</code> 仍可以被一次回引用压缩。</p>
+<p><a class="link" href="https://datatracker.ietf.org/doc/html/rfc1951"  target="_blank" rel="noopener"
+    >DEFLATE 规范 RFC 1951</a> 明确规定每个块结合 LZ77 与 Huffman：LZ77 把输入变成字面量、长度和距离，Huffman 再编码这些符号。这正是“去重复 + 熵编码”的经典分工。</p>
+<h3 id="bwt--mtf先把相似上下文聚到一起">BWT + MTF：先把相似上下文聚到一起
+</h3><p>BWT（Burrows-Wheeler Transform）是一种可逆重排。它不会直接缩短数据，却会让拥有相似后缀上下文的字符聚集，使输出更容易出现长游程。典型链路是：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">BWT → Move-to-Front → RLE → Huffman
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>bzip2 就采用这一类设计。BWT 的意义不是“字符本身发生了变化”，而是<strong>重新组织顺序，创造更强的局部性</strong>，让后续 MTF、RLE 和熵编码更有效。</p>
+<h3 id="delta-与预测编码不存原值存没猜中的部分">Delta 与预测编码：不存原值，存“没猜中的部分”
+</h3><p>对时间戳、传感器、音频、像素等连续信号，相邻值常常接近。Delta Coding 保存：</p>
+<p>$$
+d_i=x_i-x_{i-1}
+$$</p>
+<p>更一般的预测编码会先计算预测值 $\hat{x}_i$，再保存残差：</p>
+<p>$$
+e_i=x_i-\hat{x}_i
+$$</p>
+<p>只要预测准确，残差就会大量集中在 0 附近。PNG 为每条扫描线提供 None、Sub、Up、Average、Paeth 五类可逆过滤器，目的就是在 DEFLATE 前把像素字节转换成更适合压缩的残差；<a class="link" href="https://www.w3.org/TR/PNG-Filters.html"  target="_blank" rel="noopener"
+    >PNG 规范</a> 也明确把过滤称为压缩前的准备步骤。</p>
+<h3 id="变换编码把相关性搬到少数系数上">变换编码：把相关性搬到少数系数上
+</h3><p>DCT、小波、MDCT 等变换会把空间域或时间域信号转到频率域。自然图像的相邻像素通常接近，经过 DCT 后，能量常集中在少数低频系数，其余高频系数较小。</p>
+<p>变换本身可以完全可逆，也不必减小数据量；它的价值是改变表示方式。后续如果：</p>
+<ul>
+<li>无损保存所有系数，只是重新建模，仍属于无损压缩；</li>
+<li>对系数进行舍入、截断或分档，就进入有损压缩。</li>
+</ul>
+<h3 id="量化真正丢信息的步骤">量化：真正“丢信息”的步骤
+</h3><p>量化把一段取值映射到同一个代表值。例如 JPEG 中：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">DCT 系数  3, -2, 1, 0  ──较粗量化──&gt;  0, 0, 0, 0
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>大量小系数变成 0 后，游程编码和熵编码都更有效，但原值无法精确恢复。因此：</p>
+<blockquote>
+<p><strong>JPEG 常见的失真主要来自色度抽样与量化，不来自 Huffman。Huffman 只是无损地编码量化后的符号。</strong></p>
+</blockquote>
+<p>原始 JPEG 标准同时定义过 Huffman 与算术熵编码；<a class="link" href="https://www.itu.int/en/ITU-T/studygroups/2009-2012/Pages/16/jpeg1x_about.aspx"  target="_blank" rel="noopener"
+    >ITU 对 JPEG-1 的说明</a> 指出，基线流程要求 Huffman，而其他流程也可使用算术编码。</p>
+<h3 id="专用模型懂数据结构通常比通吃压得更好">专用模型：懂数据结构，通常比“通吃”压得更好
+</h3><p>通用压缩器只看到字节；专用压缩器知道数据的含义：</p>
+<ul>
+<li>FLAC 知道输入是音频采样，可做声道去相关、线性预测和 Rice 残差编码；</li>
+<li>PNG 知道二维像素邻域，可按扫描线选择预测过滤器；</li>
+<li>JPEG 知道图像的颜色与频率结构，可做颜色变换、DCT 和量化；</li>
+<li>视频编码器知道帧间运动，可用运动补偿生成小残差；</li>
+<li>列式数据库知道一列具有同一类型，可选择 Delta、RLE、字典或位打包。</li>
+</ul>
+<p>代价是适用范围变窄、格式更复杂。没有一种方法在所有文件上都最优。</p>
+<h2 id="常见格式究竟组合了什么">常见格式究竟组合了什么
+</h2><div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>格式或算法</th>
+<th>前端去冗余 / 变换</th>
+<th>熵编码</th>
+<th>无损 / 有损</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>RLE</td>
+<td>连续游程</td>
+<td>可无独立熵编码</td>
+<td>无损</td>
+<td>数据不成段重复时可能变大</td>
+</tr>
+<tr>
+<td>LZW / GIF</td>
+<td>自增长字典</td>
+<td>固定或变宽索引码</td>
+<td>无损</td>
+<td>GIF 还受调色板限制</td>
+</tr>
+<tr>
+<td>gzip / DEFLATE</td>
+<td>LZ77</td>
+<td>Huffman</td>
+<td>无损</td>
+<td>gzip 是封装，DEFLATE 是核心压缩格式</td>
+</tr>
+<tr>
+<td>ZIP</td>
+<td>取决于条目所选方法，常见为 DEFLATE</td>
+<td>取决于方法</td>
+<td>通常无损</td>
+<td>ZIP 更像可容纳多个文件与多种方法的归档容器</td>
+</tr>
+<tr>
+<td>PNG</td>
+<td>扫描线预测过滤</td>
+<td>DEFLATE 中的 Huffman</td>
+<td>无损</td>
+<td>还包含块结构与 CRC</td>
+</tr>
+<tr>
+<td>bzip2</td>
+<td>BWT + MTF + RLE</td>
+<td>Huffman</td>
+<td>无损</td>
+<td>压缩率较好，速度和随机访问一般</td>
+</tr>
+<tr>
+<td>xz / LZMA2</td>
+<td>大窗口字典匹配</td>
+<td>Range Coding</td>
+<td>无损</td>
+<td>高压缩比通常伴随更多时间与内存</td>
+</tr>
+<tr>
+<td>Zstandard</td>
+<td>LZ77 类序列建模</td>
+<td>字面量用 Huffman，序列用 FSE</td>
+<td>无损</td>
+<td>兼顾速度、压缩率与可调级别</td>
+</tr>
+<tr>
+<td>Brotli</td>
+<td>LZ77 + 静态字典 + 上下文建模</td>
+<td>Huffman</td>
+<td>无损</td>
+<td>Web 文本资源常见；规范见 <a class="link" href="https://datatracker.ietf.org/doc/html/rfc7932"  target="_blank" rel="noopener"
+    >RFC 7932</a></td>
+</tr>
+<tr>
+<td>JPEG</td>
+<td>颜色变换 + DCT + 量化 + 游程</td>
+<td>常见为 Huffman</td>
+<td>通常有损</td>
+<td>也定义了无损过程，但日常 JPEG 多指有损 DCT 流程</td>
+</tr>
+<tr>
+<td>FLAC</td>
+<td>去相关 + 线性预测</td>
+<td>Rice 类编码</td>
+<td>无损</td>
+<td>针对 PCM 音频</td>
+</tr>
+<tr>
+<td>H.264 / H.265</td>
+<td>帧内/帧间预测 + 变换 + 量化</td>
+<td>CAVLC / CABAC 等</td>
+<td>通常有损</td>
+<td>主要压缩收益来自预测和量化</td>
+</tr>
+</tbody>
+</table></div>
+<p>Zstandard 是很好的现代例子：<a class="link" href="https://datatracker.ietf.org/doc/html/rfc8878"  target="_blank" rel="noopener"
+    >RFC 8878</a> 描述了它如何分别编码字面量与匹配序列，并使用 Huffman 与 FSE 两类熵编码。这说明一个格式内部甚至可以为不同符号流选择不同编码器。</p>
+<h2 id="为什么局部连续性更有利于压缩">为什么局部连续性更有利于压缩
+</h2><p>“局部连续性好”通常表示相邻样本相同、相近，或能由邻域可靠预测。它真正带来的不是某种神秘加成，而是更低的<strong>条件不确定性</strong>：</p>
+<p>$$
+H(X_i\mid X_{i-1},X_{i-2},\ldots) &lt; H(X_i)
+$$</p>
+<p>知道附近数据后，下一个值更容易猜。预测器把这部分“已经能猜到的信息”剥离，只留下更集中的残差，熵编码器才有机会用更少的比特表示它。</p>
+<p><a href="/p/entropy-coding-and-file-compression/locality-example.svg" target="_blank" rel="noopener noreferrer"><img src="/p/entropy-coding-and-file-compression/locality-example.svg" alt="相同直方图下，局部连续性如何改变差分残差" loading="lazy" decoding="async"></a>
+</p>
+<p>看两段包含完全相同数字的序列：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">连续排列：100, 101, 102, 103, 104, 105, 106, 107
+</span></span><span class="line"><span class="cl">打乱排列：100, 107, 101, 106, 102, 105, 103, 104
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>它们的数值集合和出现次数完全一样，所以不考虑上下文的零阶经验熵都等于：</p>
+<p>$$
+H_0=\log_2 8=3\ \text{bit/符号}
+$$</p>
+<p>如果只按全局频率做静态 Huffman，两个序列的编码长度也一样，因为编码器根本不看顺序。</p>
+<p>做一阶差分后却完全不同：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">连续排列的差分：+1, +1, +1, +1, +1, +1, +1
+</span></span><span class="line"><span class="cl">打乱排列的差分：+7, -6, +5, -4, +3, -2, +1
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>第一组残差几乎只有一个符号，第二组残差仍很分散。对大数据而言，前者可以用 RLE、Rice、Huffman、ANS 等极低成本编码；后者需要描述更多种残差。</p>
+<p>所以更准确的因果链是：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">局部连续 / 局部相关
+</span></span><span class="line"><span class="cl">        ↓
+</span></span><span class="line"><span class="cl">邻域更能预测当前值
+</span></span><span class="line"><span class="cl">        ↓
+</span></span><span class="line"><span class="cl">差值或预测残差集中在 0 附近
+</span></span><span class="line"><span class="cl">        ↓
+</span></span><span class="line"><span class="cl">出现大量小值、零值和重复游程
+</span></span><span class="line"><span class="cl">        ↓
+</span></span><span class="line"><span class="cl">概率分布更偏斜，条件熵更低
+</span></span><span class="line"><span class="cl">        ↓
+</span></span><span class="line"><span class="cl">熵编码得到更短的平均码长
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这里必须强调一个边界：</p>
+<blockquote>
+<p><strong>局部连续性通常不是直接帮助“无上下文熵编码器”，而是帮助预测器、变换、RLE、LZ 或上下文模型产生更容易熵编码的符号。</strong></p>
+</blockquote>
+<p>不同类型的“局部性”会喂饱不同算法：</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>数据性质</th>
+<th>受益方法</th>
+<th>原因</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>相邻符号完全相同</td>
+<td>RLE</td>
+<td>直接形成长游程</td>
+</tr>
+<tr>
+<td>相邻数值接近</td>
+<td>Delta、预测、Rice</td>
+<td>残差集中在 0 附近</td>
+</tr>
+<tr>
+<td>一段字符串在附近重复</td>
+<td>LZ77</td>
+<td>回引用距离较短且仍在窗口内</td>
+</tr>
+<tr>
+<td>相似上下文产生相似字符</td>
+<td>上下文模型、BWT</td>
+<td>条件概率更集中</td>
+</tr>
+<tr>
+<td>相邻像素或采样高度相关</td>
+<td>DCT、小波、线性预测</td>
+<td>能量集中或残差变小</td>
+</tr>
+<tr>
+<td>同类型记录聚在一起</td>
+<td>字典、RLE、Delta、位打包</td>
+<td>字段分布更稳定、重复更多</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="为什么二维图像尤其依赖扫描顺序">为什么二维图像尤其依赖扫描顺序
+</h3><p>图像是二维的，但最终文件是线性字节流。若按合理的扫描顺序保存，左右像素在流中相邻，上下像素也容易通过上一行缓冲区访问；如果把所有像素随机打乱，颜色直方图不变，空间结构却消失了。</p>
+<p>PNG 的 Sub、Up、Average、Paeth 过滤器正是在利用左、上、左上邻域。平滑天空中相邻像素原值可能是 <code>180, 181, 180, 182</code>，过滤后变成 <code>180, 1, -1, 2</code>；后面的小残差明显更集中。PNG 规范的设计说明指出，过滤能显著减小真彩色和灰度图像的压缩体积，原因就在这里。</p>
+<h3 id="局部连续性不是越强越万能">局部连续性不是越强越万能
+</h3><p>还要注意几个反例：</p>
+<ul>
+<li><code>ABCDEFGABCDEFG</code> 不平滑，却有重复子串，LZ 会很喜欢；</li>
+<li>平滑递增序列的原始字节直方图可能很均匀，必须先做 Delta 或使用上下文才能获益；</li>
+<li>白噪声、加密数据和已经压缩过的数据通常缺少可利用结构，再压一次往往只增加文件头；</li>
+<li>局部相关范围超过字典窗口时，LZ77 可能看不到远处重复；</li>
+<li>为了制造局部性而排序记录，可能破坏原有顺序语义，还必须额外保存恢复顺序的信息；</li>
+<li>小文件即使数据可压缩，码表、文件头和校验和也可能抵消收益。</li>
+</ul>
+<h2 id="怎样在工程中改善可压缩性">怎样在工程中改善可压缩性
+</h2><p>如果可以控制数据布局，通常先改善模型和局部性，再考虑更换熵编码器：</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>数据类型</th>
+<th>常见做法</th>
+<th>产生的可压缩符号</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>单调时间戳</td>
+<td>Delta，必要时 Delta-of-Delta</td>
+<td>大量小整数或 0</td>
+</tr>
+<tr>
+<td>浮点传感器</td>
+<td>预测、XOR 相邻位模式、分块</td>
+<td>前导/尾随零与小残差</td>
+</tr>
+<tr>
+<td>表格记录</td>
+<td>按列存储、同类聚簇、字典编码</td>
+<td>重复值、连续 ID、小索引</td>
+</tr>
+<tr>
+<td>RGB 图像</td>
+<td>颜色去相关、行过滤、分通道或分块</td>
+<td>小色差与局部残差</td>
+</tr>
+<tr>
+<td>音频</td>
+<td>声道去相关、线性预测</td>
+<td>近零预测残差</td>
+</tr>
+<tr>
+<td>文本</td>
+<td>词典、上下文建模、BWT 或 LZ</td>
+<td>短语引用与偏斜字符分布</td>
+</tr>
+<tr>
+<td>稀疏张量</td>
+<td>索引差分、零游程、块稀疏</td>
+<td>小索引增量和长零段</td>
+</tr>
+</tbody>
+</table></div>
+<p>实际优化时可以按下面的顺序排查：</p>
+<ol>
+<li><strong>先确认可逆性要求</strong>：是否允许量化或丢失精度；</li>
+<li><strong>识别冗余类型</strong>：连续游程、重复子串、数值相关还是感知冗余；</li>
+<li><strong>选择合适表示</strong>：预测、Delta、字典、变换、重排或分块；</li>
+<li><strong>再选择概率模型和熵编码器</strong>：Huffman、Range、ANS、Rice 等；</li>
+<li><strong>把元数据算进总成本</strong>：码表、字典、索引、块头和校验和都占空间；</li>
+<li><strong>用真实数据衡量</strong>：同时测压缩率、压缩速度、解压速度、内存和随机访问。</li>
+</ol>
+<p>只盯压缩率容易做出错误选择。日志传输可能优先低延迟，软件包分发可能优先解压速度，冷归档可以接受慢压缩，数据库则可能更看重按块随机访问和直接在压缩数据上执行查询。</p>
+<h2 id="最后总结">最后总结
+</h2><p>可以用三句话记住全文：</p>
+<ol>
+<li><strong>熵编码是概率到比特的映射，文件压缩是从原始文件到可恢复码流的完整系统。</strong></li>
+<li><strong>RLE、LZ、预测、Delta、BWT、变换和量化负责暴露或制造偏斜分布，Huffman、Arithmetic、Range、ANS、Rice 负责把这种偏斜变成更短的比特流。</strong></li>
+<li><strong>局部连续性降低的是“给定邻域后的不确定性”；只有通过预测、差分、上下文或重排利用它，才会真正转化为压缩收益。</strong></li>
+</ol>
+<p>下一次看到“某格式使用 Huffman，所以它的压缩原理就是 Huffman”时，可以追问四件事：它先对数据做了什么变换？产生了哪些符号？概率由谁估计？文件里还保存了哪些元数据？把这四层分开，绝大多数压缩格式都会清楚很多。</p>
+<h2 id="参考资料">参考资料
+</h2><ul>
+<li>D. A. Huffman, <a class="link" href="https://doi.org/10.1109/JRPROC.1952.273898"  target="_blank" rel="noopener"
+    >A Method for the Construction of Minimum-Redundancy Codes</a></li>
+<li>Jarek Duda, <a class="link" href="https://arxiv.org/abs/1311.2540"  target="_blank" rel="noopener"
+    >Asymmetric Numeral Systems: entropy coding combining speed of Huffman coding with compression rate of arithmetic coding</a></li>
+<li>IETF, <a class="link" href="https://datatracker.ietf.org/doc/html/rfc1951"  target="_blank" rel="noopener"
+    >RFC 1951: DEFLATE Compressed Data Format Specification</a></li>
+<li>IETF, <a class="link" href="https://datatracker.ietf.org/doc/html/rfc7932"  target="_blank" rel="noopener"
+    >RFC 7932: Brotli Compressed Data Format</a></li>
+<li>IETF, <a class="link" href="https://datatracker.ietf.org/doc/html/rfc8878"  target="_blank" rel="noopener"
+    >RFC 8878: Zstandard Compression</a></li>
+<li>W3C, <a class="link" href="https://www.w3.org/TR/PNG-Filters.html"  target="_blank" rel="noopener"
+    >PNG Specification: Filter Algorithms</a></li>
+<li>ITU-T, <a class="link" href="https://www.itu.int/en/ITU-T/studygroups/2009-2012/Pages/16/jpeg1x_about.aspx"  target="_blank" rel="noopener"
+    >JPEG-1 entropy coders overview</a></li>
+</ul>
+
+</div>
+
+            <footer class="article-footer">
+    
+        <div class="article-tags" aria-label="Article tags"><span class="article-footer-label">Filed under</span><a href="/tags/%E6%95%B0%E6%8D%AE%E5%8E%8B%E7%BC%A9/">数据压缩</a><a href="/tags/%E7%86%B5%E7%BC%96%E7%A0%81/">熵编码</a><a href="/tags/%E4%BF%A1%E6%81%AF%E8%AE%BA/">信息论</a><a href="/tags/%E7%BC%96%E7%A0%81%E7%AE%97%E6%B3%95/">编码算法</a></div>
+    
+    
+    
+    <div class="article-endnote"><span>Thanks for reading.</span><a href="#top">Back to top <span aria-hidden="true">↑</span></a></div>
+</footer>
+
+        </div>
+    </div>
+    <link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI&#43;WdtXRGWt2kTvGFasHpSy3SV"crossorigin="anonymous"
+            ><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG&#43;vnGctmUb0ZY0l8"crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"integrity="sha384-&#43;VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4&#43;/RRE05"crossorigin="anonymous"
+                defer
+                >
+            </script><script>
+    window.addEventListener("DOMContentLoaded", () => {
+        renderMathInElement(document.body, {
+            delimiters: [
+                { left: "$$", right: "$$", display: true },
+                { left: "$", right: "$", display: false },
+                { left: "\\(", right: "\\)", display: false },
+                { left: "\\[", right: "\\]", display: true }
+            ],
+            ignoredClasses: ["gist"]
+        });})
+</script>
+</article>
+
+        <div class="reading-afterword">
+            
+            
+
+            
+        </div>
+    </div>
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+    </main>
+    
+<footer class="site-footer">
+    <div class="footer-top"><a class="footer-wordmark" href="/" aria-label="Snow">Sno<span>w</span></a><p>A place to think. A space to grow.</p><a href="#main-content" class="back-top">Back to top <span aria-hidden="true">↑</span></a></div>
+    <div class="footer-bottom"><span>© 2026 Snow</span><nav aria-label="More links"><a href="/about/">About</a><a href="https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0" target="_blank" rel="noopener noreferrer me">Bilibili <span aria-hidden="true">↗</span></a><a href="https://github.com/SymphonyW" target="_blank" rel="noopener noreferrer me">GitHub <span aria-hidden="true">↗</span></a><a href="https://twitter.com" target="_blank" rel="noopener noreferrer me">Twitter <span aria-hidden="true">↗</span></a><a href="/index.xml">RSS ↗</a></nav><span class="footer-colophon">Built with Hugo · Always in progress</span></div>
+</footer>
+
+    
+
+<script src="/ts/main.c86029ddb4aad8364879723acaf7efcd526e724d2381088d445aaf6f3ab1bfdf.js" defer></script>
+
+
+<script src="/ts/custom.6c99a7b037ac7e2bde801fbad26b9c20b3b18707868c164174142870ef3bc309.js" defer></script>
+
+
+
+
+
+<script>
+window.MathJax = {
+  tex: {
+    
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  svg: {
+    fontCache: 'global'
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
+
+</body>
+</html>

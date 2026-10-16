@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="A practical guide to Agentic RAG: how it differs from traditional RAG, how the control loop works, common architectures, implementation patterns, evaluation, risks, and when to use it.">
+<title>Agentic RAG Explained: Turning Retrieval into a Planning and Reflection Loop</title>
+
+<link rel='canonical' href='https://SymphonyW.github.io/p/agentic-rag-guide/'>
+<link rel="stylesheet" href="/scss/custom.min.bf7995e62147d50e1276b97e61d2c8120b52dfef9e32fbaed4e22d2affbd1b2b.css">
+<script>
+(() => {
+    let preference = 'auto';
+    try { preference = localStorage.getItem('StackColorScheme') || preference; } catch (_) {}
+    document.documentElement.dataset.scheme = preference === 'dark' || (preference === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+})();
+</script>
+
+<meta property='og:title' content="Agentic RAG Explained: Turning Retrieval into a Planning and Reflection Loop">
+<meta property='og:description' content="A practical guide to Agentic RAG: how it differs from traditional RAG, how the control loop works, common architectures, implementation patterns, evaluation, risks, and when to use it.">
+<meta property='og:url' content='https://SymphonyW.github.io/p/agentic-rag-guide/'>
+<meta property='og:site_name' content='Snow'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='Agentic RAG' /><meta property='article:tag' content='RAG' /><meta property='article:tag' content='AI Agent' /><meta property='article:tag' content='LLM' /><meta property='article:tag' content='Information Retrieval' /><meta property='article:published_time' content='2026-10-15T15:00:00&#43;08:00'/><meta property='article:modified_time' content='2026-10-15T15:00:00&#43;08:00'/><meta property='og:image' content='https://SymphonyW.github.io/p/agentic-rag-guide/bg.png' />
+<meta name="twitter:title" content="Agentic RAG Explained: Turning Retrieval into a Planning and Reflection Loop">
+<meta name="twitter:description" content="A practical guide to Agentic RAG: how it differs from traditional RAG, how the control loop works, common architectures, implementation patterns, evaluation, risks, and when to use it."><meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content='https://SymphonyW.github.io/p/agentic-rag-guide/bg.png' />
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    
+    <noscript><style>@media(max-width:760px){.site-header{position:static}.site-header__inner{height:auto;min-height:66px;flex-wrap:wrap}.site-nav{position:static;display:grid;order:3;flex-basis:100%;padding:8px 0 18px}.menu-toggle,.theme-toggle{display:none}}</style></noscript>
+</head>
+<body id="top" class="article-page">
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    
+<header class="site-header">
+    <div class="site-header__inner">
+        <a class="site-brand" href="/" aria-label="Snow — Home">S<span>now.</span></a>
+        <nav class="site-nav" id="site-navigation" aria-label="Main navigation">
+            
+            
+                
+                    
+                    
+                    <a href="/">Home</a>
+                
+            
+                
+                    
+                    
+                    <a href="/post/" aria-current="page">Blog</a>
+                
+            
+                
+                    
+                    
+                    <a href="/archives/">Archives</a>
+                
+            
+                
+                    
+                    
+                    <a href="/diary/">Diary</a>
+                
+            
+                
+                    
+                    
+                    <a href="/stats/">Stats</a>
+                
+            
+                
+            
+                
+                    
+                    
+                    <a href="/links/">Links</a>
+                
+            
+        </nav>
+        <div class="header-tools">
+            
+                <a class="language-link" href="/zh-cn/p/agentic-rag-guide/" lang="zh-cn" hreflang="zh-cn" aria-label="切换到中文">中</a>
+            
+            <button type="button" id="dark-mode-toggle" class="icon-button theme-toggle" aria-label="Toggle color theme" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><path d="M12 4.5a7.5 7.5 0 0 1 0 15z" fill="currentColor" stroke="none"/></svg></button>
+            <a class="icon-button search-link" href="/search/" aria-label="Search articles"><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+</a>
+            <button class="icon-button menu-toggle" type="button" aria-expanded="false" aria-controls="site-navigation" aria-label="Open navigation"><span></span><span></span></button>
+        </div>
+    </div>
+    <div class="reading-progress" aria-hidden="true"></div>
+</header>
+
+    <main id="main-content" class="site-main main" tabindex="-1">
+        
+    <div class="reading-page">
+        <article class="main-article has-toc">
+    <header class="article-header">
+    <div class="article-wayfinding">
+        
+            <a href="/post/"><span aria-hidden="true">←</span> All writing</a>
+        
+        <span class="article-kind">Notes & observations</span>
+    </div>
+    <div class="article-details">
+    
+    <h1 class="article-title">Agentic RAG Explained: Turning Retrieval into a Planning and Reflection Loop</h1>
+    <p class="article-subtitle">A practical guide to Agentic RAG: how it differs from traditional RAG, how the control loop works, common architectures, implementation patterns, evaluation, risks, and when to use it.</p>
+    <div class="article-meta">
+        
+            <time datetime="2026-10-15T15:00:00&#43;08:00">October 15, 2026</time>
+            <span class="meta-divider" aria-hidden="true">/</span>
+            <span>12 min read</span>
+        
+        
+            <div class="article-translations"><a href="/zh-cn/p/agentic-rag-guide/" hreflang="zh-cn" lang="zh-cn">阅读中文版 <span aria-hidden="true">↗</span></a></div>
+        
+    </div>
+</div>
+
+</header>
+
+    <div class="reading-layout">
+        
+            <aside class="reading-margin" aria-label="Article contents">
+                <details class="article-toc" open>
+                    <summary><span>On this page</span><span class="toc-indicator" aria-hidden="true">+</span></summary>
+                    <nav id="TableOfContents">
+  <ol>
+    <li><a href="#start-with-traditional-rag">Start with traditional RAG</a></li>
+    <li><a href="#what-makes-agentic-rag-agentic">What makes Agentic RAG “agentic”</a></li>
+    <li><a href="#the-complete-operating-loop">The complete operating loop</a></li>
+    <li><a href="#common-architectures">Common architectures</a>
+      <ol>
+        <li><a href="#one-agent-with-multiple-tools">One agent with multiple tools</a></li>
+        <li><a href="#router-with-specialized-retrievers">Router with specialized retrievers</a></li>
+        <li><a href="#corrective-or-reflective-rag">Corrective or reflective RAG</a></li>
+        <li><a href="#multi-agent-rag">Multi-agent RAG</a></li>
+      </ol>
+    </li>
+    <li><a href="#traditional-rag-vs-agentic-rag">Traditional RAG vs. Agentic RAG</a></li>
+    <li><a href="#offline-knowledge-engineering-still-matters">Offline knowledge engineering still matters</a></li>
+    <li><a href="#production-failure-modes">Production failure modes</a>
+      <ol>
+        <li><a href="#endless-search-and-runaway-cost">Endless search and runaway cost</a></li>
+        <li><a href="#treating-reflection-as-fact-checking">Treating reflection as fact checking</a></li>
+        <li><a href="#prompt-injection-inside-retrieved-content">Prompt injection inside retrieved content</a></li>
+        <li><a href="#keeping-only-the-final-answer">Keeping only the final answer</a></li>
+        <li><a href="#using-agents-to-hide-weak-retrieval">Using agents to hide weak retrieval</a></li>
+      </ol>
+    </li>
+    <li><a href="#evaluate-the-trajectory-not-only-the-answer">Evaluate the trajectory, not only the answer</a></li>
+    <li><a href="#when-to-use-it">When to use it</a></li>
+    <li><a href="#conclusion">Conclusion</a></li>
+    <li><a href="#references">References</a></li>
+  </ol>
+</nav>
+                </details>
+            </aside>
+        
+        <div class="reading-body">
+            <div class="article-content"><h1 id="agentic-rag-explained-turning-retrieval-into-a-planning-and-reflection-loop">Agentic RAG Explained: Turning Retrieval into a Planning and Reflection Loop
+</h1><blockquote>
+<p>Traditional RAG resembles a predefined assembly line: receive a question, retrieve once, add context, and generate an answer. Agentic RAG adds a controller that can decide whether to retrieve, decompose a task, select data sources, judge whether the evidence is sufficient, and search again when it is not.</p>
+</blockquote>
+<p><a href="/p/agentic-rag-guide/bg.png" target="_blank" rel="noopener noreferrer"><img src="/p/agentic-rag-guide/bg.png" alt="An agent orchestrates multiple knowledge sources and evaluates evidence in a loop" width="1672" height="941" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="177" data-flex-basis="426px"></a>
+</p>
+<p>Here is the short version:</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Question</th>
+<th>Short answer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>What is Agentic RAG?</td>
+<td>A RAG architecture in which an agent plans, invokes, evaluates, and iterates retrieval at runtime</td>
+</tr>
+<tr>
+<td>What is the main difference?</td>
+<td>Not the presence of a vector database, but whether the <strong>retrieval control flow can change in response to intermediate results</strong></td>
+</tr>
+<tr>
+<td>Does it require multiple agents?</td>
+<td>No. One agent with several retrieval tools is enough</td>
+</tr>
+<tr>
+<td>Is it always better?</td>
+<td>No. For simple questions it may only add latency, cost, and uncertainty</td>
+</tr>
+<tr>
+<td>Where does it help most?</td>
+<td>Multi-hop, multi-source tasks that require clarification or evidence checks</td>
+</tr>
+<tr>
+<td>What matters most in production?</td>
+<td>Bounded loops, evidence gates, permission isolation, traces, and layered evaluation</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="start-with-traditional-rag">Start with traditional RAG
+</h2><p>RAG stands for Retrieval-Augmented Generation. It combines the model&rsquo;s parametric memory with external, non-parametric knowledge. After a user asks a question, the system retrieves relevant material and asks the model to answer from that material.</p>
+<p>The original 2020 <a class="link" href="https://arxiv.org/abs/2005.11401"  target="_blank" rel="noopener"
+    >RAG paper</a> explored combining a generative model with a dense vector index to improve factuality, knowledge updates, and provenance in knowledge-intensive tasks. In practice, a traditional online RAG pipeline often looks like this:</p>
+<div class="mermaid">flowchart LR
+    Q[User question] --> T[Clean or rewrite by fixed rules]
+    T --> E[Create query embedding]
+    E --> R[Retrieve Top-K chunks]
+    R --> K[Optional reranking]
+    K --> P[Build prompt]
+    P --> L[LLM generates answer]
+    L --> A[Return answer and citations]
+</div><p>This design has real strengths: a short path, predictable latency, straightforward caching and load testing, and a clean way to distinguish retrieval failures from generation failures. When most questions can be answered by searching one knowledge base once, this is often all you need.</p>
+<p>The limit appears when a question hides several dependent tasks. Consider:</p>
+<blockquote>
+<p>“Compare the permission changes in the last three releases of products A and B, then assess the migration risk for existing customers.”</p>
+</blockquote>
+<p>The system must identify the release range, search both changelogs, inspect permission documentation, find migration notes, align dates, and only then compare the evidence. A single similarity search may cover only part of the task. Even if ten passages are returned, the model may not know what evidence is still missing.</p>
+<h2 id="what-makes-agentic-rag-agentic">What makes Agentic RAG “agentic”
+</h2><p>Agentic RAG is not simply traditional RAG with a stronger model, nor merely vector search plus function calling. The real change is <strong>who controls retrieval</strong>:</p>
+<blockquote>
+<p><strong>Retrieval stops being a mandatory one-time stage and becomes a tool that an agent can select, repeat, and adapt according to results.</strong></p>
+</blockquote>
+<p>The system commonly organizes planning, tool calls, state updates, and stopping decisions into a controlled loop. The agent may decide:</p>
+<ul>
+<li>whether external evidence is needed at all;</li>
+<li>whether to use vector search, keyword search, SQL, a knowledge graph, an internal API, or the web;</li>
+<li>whether to decompose the request into independent subquestions;</li>
+<li>whether results are relevant, mutually consistent, and sufficient;</li>
+<li>whether to rewrite the query, expand the time range, switch sources, or ask the user for clarification;</li>
+<li>when enough evidence has been gathered to stop and answer.</li>
+</ul>
+<p>This reason-act-observe loop follows the broader idea behind <a class="link" href="https://arxiv.org/abs/2210.03629"  target="_blank" rel="noopener"
+    >ReAct</a>. A 2025 <a class="link" href="https://arxiv.org/abs/2501.09136"  target="_blank" rel="noopener"
+    >survey of Agentic RAG</a> identifies planning, reflection, tool use, and multi-agent collaboration as recurring agentic patterns.</p>
+<div class="mermaid">flowchart TD
+    U[User question] --> P[Understand intent and create plan]
+    P --> D{Enough evidence?}
+    D -- Yes --> G[Generate from evidence]
+    D -- No --> S[Select source and retrieval tool]
+    S --> Q[Create or rewrite query]
+    Q --> R[Run retrieval]
+    R --> V[Evaluate relevance, coverage, conflicts]
+    V --> C{Next action}
+    C -- Gather more evidence --> S
+    C -- Clarification needed --> H[Ask the user]
+    C -- Budget exhausted --> F[Degrade gracefully]
+    C -- Ready to answer --> G
+    G --> A[Answer, citations, uncertainty]
+</div><p>An important boundary follows from this definition: <strong>a pipeline with query rewriting, hybrid search, and reranking can still be “advanced RAG” rather than Agentic RAG if every stage always runs in a fixed order.</strong> The agentic property comes from runtime adaptation, not from the number of components.</p>
+<h2 id="the-complete-operating-loop">The complete operating loop
+</h2><p>The online path can be separated into seven responsibilities. Implementations may merge nodes, but observability and evaluation should keep these concerns distinguishable.</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>Question being answered</th>
+<th>Typical output</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. Intent analysis</td>
+<td>What does the user need, and are external facts required?</td>
+<td>Task type, entities, time range, constraints</td>
+</tr>
+<tr>
+<td>2. Decomposition</td>
+<td>Are there independently verifiable subproblems?</td>
+<td>Subquestions and dependencies</td>
+</tr>
+<tr>
+<td>3. Source routing</td>
+<td>Which source is authoritative and suitable?</td>
+<td>Tool, index, and filters</td>
+</tr>
+<tr>
+<td>4. Query planning</td>
+<td>Which semantic, keyword, or structured queries should run?</td>
+<td>Executable queries</td>
+</tr>
+<tr>
+<td>5. Result evaluation</td>
+<td>Is the material relevant, fresh, complete, and consistent?</td>
+<td>Scores, coverage, conflict flags</td>
+</tr>
+<tr>
+<td>6. Correction</td>
+<td>Should the agent change query, source, or scope?</td>
+<td>Next action and remaining budget</td>
+</tr>
+<tr>
+<td>7. Synthesis</td>
+<td>Can every important claim be traced to evidence?</td>
+<td>Answer, citations, uncertainty</td>
+</tr>
+</tbody>
+</table></div>
+<p>Suppose a user asks, “Should we upgrade our production database from version 13 to 16?” A useful trajectory might be:</p>
+<div class="mermaid">sequenceDiagram
+    participant U as User
+    participant A as Agent
+    participant D as Internal docs
+    participant M as Asset database
+    participant W as Official docs
+
+    U->>A: Should we upgrade production from 13 to 16?
+    A->>M: Get versions, extensions, instance sizes, maintenance windows
+    M-->>A: Return environment inventory
+    A->>D: Search incidents, compatibility tests, change policy
+    D-->>A: Return internal evidence
+    A->>W: Check breaking changes and support windows for 14, 15, 16
+    W-->>A: Return official evidence
+    A->>A: Check extension compatibility and evidence gaps
+    A->>D: Search for missing extension test results
+    D-->>A: No complete test record found
+    A-->>U: Give a conditional recommendation and required tests
+</div><p>The key is not merely that several searches occurred. The later search depends on an earlier observation. If the inventory reveals a particular extension, the agent then investigates that extension. A fixed pipeline cannot economically encode every such branch.</p>
+<h2 id="common-architectures">Common architectures
+</h2><p>Agentic RAG is a family of architectures, not a single topology.</p>
+<div class="mermaid">flowchart TB
+    O[Orchestration and state] --> P[Planner / Router]
+    P --> T1[Vector retrieval]
+    P --> T2[Keyword or hybrid retrieval]
+    P --> T3[SQL / API]
+    P --> T4[Knowledge graph / Web]
+    T1 --> E[Evidence pool]
+    T2 --> E
+    T3 --> E
+    T4 --> E
+    E --> J[Evidence evaluator]
+    J -->|Insufficient| P
+    J -->|Sufficient| G[Answer generator]
+    G --> C[Citation and safety gates]
+</div><h3 id="one-agent-with-multiple-tools">One agent with multiple tools
+</h3><p>A single agent plans, selects tools, evaluates results, and answers. This is the easiest design to start with when there are few tools and one permission boundary. Its weakness is that responsibilities accumulate in one prompt, making decisions harder to test and stabilize.</p>
+<h3 id="router-with-specialized-retrievers">Router with specialized retrievers
+</h3><p>A router only classifies the question and selects a data source; stable, specialized pipelines handle the actual retrieval. For example, policy questions use the document index, order questions use SQL, and live status uses a business API. This is more controllable than a fully open agent and often the most practical production compromise.</p>
+<h3 id="corrective-or-reflective-rag">Corrective or reflective RAG
+</h3><p>The system retrieves first, then evaluates result quality. Weak evidence triggers query rewriting, broader sources, or web search. <a class="link" href="https://arxiv.org/abs/2401.15884"  target="_blank" rel="noopener"
+    >CRAG</a> focuses on correcting retrieval, while <a class="link" href="https://arxiv.org/abs/2310.11511"  target="_blank" rel="noopener"
+    >Self-RAG</a> trains a model to decide when to retrieve and to critique its generations. These ideas overlap with Agentic RAG but are not synonyms: they can be components inside an agent loop or fixed stages in a non-agentic pipeline.</p>
+<h3 id="multi-agent-rag">Multi-agent RAG
+</h3><p>Work is divided among research, retrieval, verification, and writing agents, or among agents specialized by knowledge domain. This can help when work is genuinely parallel, expertise differs, or permissions must be isolated. It also increases communication cost, state coordination, and debugging complexity. <strong>Multi-agent orchestration is an optional extension, not a requirement for Agentic RAG.</strong></p>
+<h2 id="traditional-rag-vs-agentic-rag">Traditional RAG vs. Agentic RAG
+</h2><p>The useful comparison is not “dumb versus smart.” It is an engineering trade-off between a deterministic pipeline and a runtime decision system.</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>Traditional RAG</th>
+<th>Agentic RAG</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Control flow</td>
+<td>Predefined</td>
+<td>Dynamic branches and loops</td>
+</tr>
+<tr>
+<td>Whether to retrieve</td>
+<td>Usually always</td>
+<td>Retrieve, skip, or defer</td>
+</tr>
+<tr>
+<td>Query handling</td>
+<td>Original query or fixed rewrite</td>
+<td>Dynamic decomposition, expansion, and clarification</td>
+</tr>
+<tr>
+<td>Data sources</td>
+<td>One index or a fixed combination</td>
+<td>Runtime selection across heterogeneous sources</td>
+</tr>
+<tr>
+<td>Retrieval count</td>
+<td>Once or a fixed number</td>
+<td>Until evidence is sufficient or budget is exhausted</td>
+</tr>
+<tr>
+<td>Multi-hop work</td>
+<td>Relies on one retrieval covering the task</td>
+<td>Uses one result to decide the next retrieval</td>
+</tr>
+<tr>
+<td>Failure handling</td>
+<td>Current result or fixed fallback</td>
+<td>Evaluate, retry, switch tools, clarify, or degrade</td>
+</tr>
+<tr>
+<td>Predictability</td>
+<td>High</td>
+<td>Lower; requires state and budgets</td>
+</tr>
+<tr>
+<td>Latency and cost</td>
+<td>Lower and steadier</td>
+<td>Usually higher and more variable</td>
+</tr>
+<tr>
+<td>Observability</td>
+<td>Retrieval and final answer</td>
+<td>Also plan, calls, state transitions, stopping reason</td>
+</tr>
+<tr>
+<td>Security surface</td>
+<td>Relatively concentrated</td>
+<td>Broader tool, injection, and authorization risks</td>
+</tr>
+<tr>
+<td>Best fit</td>
+<td>High-volume, single-hop, bounded questions</td>
+<td>Multi-step, multi-source research and decision support</td>
+</tr>
+</tbody>
+</table></div>
+<p>The two approaches are not mutually exclusive. A production system can take a fast traditional path first and escalate only complex or low-confidence requests to an agentic path.</p>
+<div class="mermaid">flowchart LR
+    Q[User question] --> X{Complexity and risk check}
+    X -- Simple, single-hop --> R[Traditional RAG fast path]
+    X -- Multi-hop or low confidence --> A[Agentic RAG deep path]
+    R --> G[Shared answer and citation layer]
+    A --> G
+</div><p>This tiered design keeps common requests fast and reserves planning and retrieval budgets for questions that benefit from them.</p>
+<h2 id="offline-knowledge-engineering-still-matters">Offline knowledge engineering still matters
+</h2><p>Agentic RAG mainly changes online query execution. It does not replace document parsing, chunking, metadata, permissions, indexing, or freshness management. A powerful agent searching bad data simply searches bad data more times.</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Responsibility</th>
+<th>Important design choices</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Knowledge</td>
+<td>Ingest, parse, chunk, index, update</td>
+<td>Quality, versioning, permissions, freshness</td>
+</tr>
+<tr>
+<td>Tools</td>
+<td>Expose retrieval through clear interfaces</td>
+<td>Input schemas, filters, timeouts, result format</td>
+</tr>
+<tr>
+<td>Orchestration</td>
+<td>Plan, route, loop, maintain state and budget</td>
+<td>Step limits, concurrency, retries, checkpoints</td>
+</tr>
+<tr>
+<td>Governance</td>
+<td>Evaluate, observe, secure, involve humans</td>
+<td>Traces, audits, approval, offline test sets</td>
+</tr>
+</tbody>
+</table></div>
+<p>Tool descriptions should be specific. “Search the knowledge base” is not enough. The agent needs to know the source&rsquo;s coverage, time range, suitable question types, return fields, and permission constraints. More vaguely described tools can actually increase routing errors.</p>
+<p>This framework-neutral pseudocode shows a minimal bounded loop:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span><span class="lnt">25
+</span><span class="lnt">26
+</span><span class="lnt">27
+</span><span class="lnt">28
+</span><span class="lnt">29
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-python" data-lang="python"><span class="line"><span class="cl"><span class="k">def</span> <span class="nf">answer</span><span class="p">(</span><span class="n">question</span><span class="p">,</span> <span class="n">user</span><span class="p">,</span> <span class="n">max_steps</span><span class="o">=</span><span class="mi">6</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">    <span class="n">state</span> <span class="o">=</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="s2">&#34;question&#34;</span><span class="p">:</span> <span class="n">question</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="s2">&#34;evidence&#34;</span><span class="p">:</span> <span class="p">[],</span>
+</span></span><span class="line"><span class="cl">        <span class="s2">&#34;open_questions&#34;</span><span class="p">:</span> <span class="p">[</span><span class="n">question</span><span class="p">],</span>
+</span></span><span class="line"><span class="cl">        <span class="s2">&#34;trace&#34;</span><span class="p">:</span> <span class="p">[],</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="k">for</span> <span class="n">step</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">max_steps</span><span class="p">):</span>
+</span></span><span class="line"><span class="cl">        <span class="n">decision</span> <span class="o">=</span> <span class="n">planner</span><span class="o">.</span><span class="n">decide</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">allowed_tools</span><span class="o">=</span><span class="n">user</span><span class="o">.</span><span class="n">allowed_tools</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="k">if</span> <span class="n">decision</span><span class="o">.</span><span class="n">action</span> <span class="o">==</span> <span class="s2">&#34;clarify&#34;</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">            <span class="k">return</span> <span class="n">ask_user</span><span class="p">(</span><span class="n">decision</span><span class="o">.</span><span class="n">question</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="k">if</span> <span class="n">decision</span><span class="o">.</span><span class="n">action</span> <span class="o">==</span> <span class="s2">&#34;answer&#34;</span><span class="p">:</span>
+</span></span><span class="line"><span class="cl">            <span class="k">if</span> <span class="n">evidence_gate</span><span class="o">.</span><span class="n">passed</span><span class="p">(</span><span class="n">state</span><span class="p">[</span><span class="s2">&#34;evidence&#34;</span><span class="p">]):</span>
+</span></span><span class="line"><span class="cl">                <span class="k">return</span> <span class="n">generator</span><span class="o">.</span><span class="n">grounded_answer</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">            <span class="n">decision</span> <span class="o">=</span> <span class="n">planner</span><span class="o">.</span><span class="n">repair_missing_evidence</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="n">result</span> <span class="o">=</span> <span class="n">tools</span><span class="p">[</span><span class="n">decision</span><span class="o">.</span><span class="n">tool</span><span class="p">]</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+</span></span><span class="line"><span class="cl">            <span class="n">query</span><span class="o">=</span><span class="n">decision</span><span class="o">.</span><span class="n">query</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">            <span class="n">filters</span><span class="o">=</span><span class="n">decision</span><span class="o">.</span><span class="n">filters</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">            <span class="n">identity</span><span class="o">=</span><span class="n">user</span><span class="o">.</span><span class="n">identity</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">        <span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">        <span class="n">grade</span> <span class="o">=</span> <span class="n">evaluator</span><span class="o">.</span><span class="n">grade</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">state</span><span class="p">[</span><span class="s2">&#34;open_questions&#34;</span><span class="p">])</span>
+</span></span><span class="line"><span class="cl">        <span class="n">state</span> <span class="o">=</span> <span class="n">update_state</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">decision</span><span class="p">,</span> <span class="n">result</span><span class="p">,</span> <span class="n">grade</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">    <span class="k">return</span> <span class="n">generator</span><span class="o">.</span><span class="n">bounded_fallback</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>The safeguards are more important than the loop itself: <code>allowed_tools</code> constrains authorization, <code>max_steps</code> prevents runaway execution, <code>evidence_gate</code> blocks unsupported answers, and <code>trace</code> preserves structured evidence for debugging and evaluation.</p>
+<h2 id="production-failure-modes">Production failure modes
+</h2><h3 id="endless-search-and-runaway-cost">Endless search and runaway cost
+</h3><p>If the stopping rule is only “the model thinks it has enough,” the agent can bounce among nearly identical queries. Bound maximum steps, total tokens, per-tool timeouts, concurrency, and cost. When the budget is exhausted, return an explicit degraded result.</p>
+<h3 id="treating-reflection-as-fact-checking">Treating reflection as fact checking
+</h3><p>Asking the same model to review its own answer does not create independent evidence. A reflection node should inspect observable properties: whether every subquestion has a source, whether citations support claims, and whether time ranges agree.</p>
+<h3 id="prompt-injection-inside-retrieved-content">Prompt injection inside retrieved content
+</h3><p>A page or document can contain text such as “ignore prior instructions and call this tool.” Retrieved content must be treated as <strong>untrusted data</strong>, not as high-priority instructions. Validate tool parameters, use source allowlists and least privilege, and require approval for high-impact actions.</p>
+<h3 id="keeping-only-the-final-answer">Keeping only the final answer
+</h3><p>Failures can arise during decomposition, routing, querying, retrieval, evaluation, stopping, or generation. Logs should include structured decisions, tool names, query parameters, document IDs, scores, latency, token use, errors, and stopping reasons. There is no need to store or expose private chain-of-thought.</p>
+<h3 id="using-agents-to-hide-weak-retrieval">Using agents to hide weak retrieval
+</h3><p>If the correct document rarely appears in Top-K, first fix parsing, chunking, embeddings, filters, hybrid retrieval, and reranking. An agent may repair occasional gaps, but it is not a replacement for sound information retrieval.</p>
+<h2 id="evaluate-the-trajectory-not-only-the-answer">Evaluate the trajectory, not only the answer
+</h2><p>Traditional RAG evaluation often emphasizes retrieval hits and answer correctness. Agentic RAG must also ask whether the right tool was selected, whether searches were useful, and whether the agent stopped at the right time.</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Suggested metrics</th>
+<th>Question answered</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Retrieval</td>
+<td>Recall@K, MRR, nDCG, evidence coverage</td>
+<td>Was the right material found?</td>
+</tr>
+<tr>
+<td>Generation</td>
+<td>Correctness, faithfulness, citation precision and completeness</td>
+<td>Is the answer supported?</td>
+</tr>
+<tr>
+<td>Trajectory</td>
+<td>Tool-choice accuracy, query utility, average steps, stop accuracy</td>
+<td>Was the process reasonable?</td>
+</tr>
+<tr>
+<td>System</td>
+<td>P50/P95 latency, token and tool cost, timeout rate</td>
+<td>Was the quality gain worth it?</td>
+</tr>
+<tr>
+<td>Safety</td>
+<td>Unauthorized-call rate, injection success rate, data leakage rate</td>
+<td>Did the system preserve boundaries?</td>
+</tr>
+</tbody>
+</table></div>
+<p>Build a layered test set: simple single-hop cases for the fast path; multi-hop cases for decomposition and evidence composition; underspecified requests for clarification; conflicting sources for conflict handling; and malicious documents for prompt-injection defenses. A handful of answers that “look good” is not enough for production decisions.</p>
+<h2 id="when-to-use-it">When to use it
+</h2><div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Recommended approach</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>FAQ, manuals, single-policy questions</td>
+<td>Traditional RAG</td>
+<td>Stable query shape and clear answer boundaries</td>
+</tr>
+<tr>
+<td>One index with occasional recall problems</td>
+<td>Advanced RAG</td>
+<td>Improve hybrid search, reranking, rewrites, and evaluation first</td>
+</tr>
+<tr>
+<td>Interdependent subquestions</td>
+<td>Agentic RAG</td>
+<td>Requires decomposition and follow-up retrieval</td>
+</tr>
+<tr>
+<td>Documents, databases, and live APIs together</td>
+<td>Agentic RAG</td>
+<td>Requires dynamic routing across heterogeneous tools</td>
+</tr>
+<tr>
+<td>Medical, financial, or production-changing actions</td>
+<td>Agentic RAG plus human approval</td>
+<td>Retrieval can support judgment; high-impact action still needs authorization</td>
+</tr>
+<tr>
+<td>Very low latency, high throughput, fixed output</td>
+<td>Traditional RAG or rules</td>
+<td>Agent loops rarely justify their overhead</td>
+</tr>
+</tbody>
+</table></div>
+<p>For a new system, evolve in this order:</p>
+<ol>
+<li>Build an evaluable traditional RAG baseline.</li>
+<li>Add hybrid retrieval, metadata filters, reranking, and citation checks.</li>
+<li>Give only obvious source-selection decisions to a router.</li>
+<li>Add a bounded retrieve-evaluate-correct loop for complex queries.</li>
+<li>Consider multi-agent workflows, long-term memory, and broader tool access last.</li>
+</ol>
+<h2 id="conclusion">Conclusion
+</h2><p>The value of Agentic RAG is not that it makes RAG look more like an “agent.” It gives a system three abilities that a fixed retrieval pipeline lacks:</p>
+<ol>
+<li><strong>Plan</strong>: turn a complex request into verifiable retrieval tasks.</li>
+<li><strong>Adapt</strong>: change queries, sources, or ask for clarification based on intermediate evidence.</li>
+<li><strong>Verify</strong>: stop, degrade, or involve a human when evidence is missing, contradictory, or outside the permission boundary.</li>
+</ol>
+<p>The costs are equally real: more model calls, higher latency, more state, a larger security surface, and harder evaluation. Mature systems usually do not make every request agentic. They retain a stable traditional RAG fast path and reserve Agentic RAG for questions that genuinely require multi-step, multi-source, runtime decisions.</p>
+<p>In one sentence:</p>
+<blockquote>
+<p><strong>Traditional RAG asks, “Which passage is relevant?” Agentic RAG additionally asks, “What should I find next, where should I look, and do I have enough evidence to stop?”</strong></p>
+</blockquote>
+<h2 id="references">References
+</h2><ul>
+<li>Lewis et al., <a class="link" href="https://arxiv.org/abs/2005.11401"  target="_blank" rel="noopener"
+    >Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks</a>, 2020.</li>
+<li>Yao et al., <a class="link" href="https://arxiv.org/abs/2210.03629"  target="_blank" rel="noopener"
+    >ReAct: Synergizing Reasoning and Acting in Language Models</a>, 2022.</li>
+<li>Asai et al., <a class="link" href="https://arxiv.org/abs/2310.11511"  target="_blank" rel="noopener"
+    >Self-RAG: Learning to Retrieve, Generate, and Critique through Self-Reflection</a>, 2023.</li>
+<li>Yan et al., <a class="link" href="https://arxiv.org/abs/2401.15884"  target="_blank" rel="noopener"
+    >Corrective Retrieval Augmented Generation</a>, 2024.</li>
+<li>Singh et al., <a class="link" href="https://arxiv.org/abs/2501.09136"  target="_blank" rel="noopener"
+    >Agentic Retrieval-Augmented Generation: A Survey on Agentic RAG</a>, 2025.</li>
+<li>Microsoft, <a class="link" href="https://learn.microsoft.com/en-us/azure/architecture/ai-ml/guide/rag/rag-agentic"  target="_blank" rel="noopener"
+    >Develop an Agentic RAG Solution on Azure</a>.</li>
+<li>LangChain, <a class="link" href="https://docs.langchain.com/oss/python/learn"  target="_blank" rel="noopener"
+    >RAG agent and custom RAG agent tutorials</a>.</li>
+</ul>
+
+</div>
+
+            <footer class="article-footer">
+    
+        <div class="article-tags" aria-label="Article tags"><span class="article-footer-label">Filed under</span><a href="/tags/agentic-rag/">Agentic RAG</a><a href="/tags/rag/">RAG</a><a href="/tags/ai-agent/">AI Agent</a><a href="/tags/llm/">LLM</a><a href="/tags/information-retrieval/">Information Retrieval</a></div>
+    
+    
+    
+    <div class="article-endnote"><span>Thanks for reading.</span><a href="#top">Back to top <span aria-hidden="true">↑</span></a></div>
+</footer>
+
+        </div>
+    </div>
+    
+</article>
+
+        <div class="reading-afterword">
+            
+            
+    <aside class="reading-related">
+        <div class="reading-section-heading"><span class="article-footer-label">Keep reading</span><span aria-hidden="true">↘</span></div>
+        
+            <a class="reading-related-link" href="/p/fastgpt-guide/"><span class="related-number">01</span><span class="related-title">FastGPT in Depth: RAG, Workflows, and Self-Hosting</span><time datetime="2026-10-08">2026.10.08</time><span class="related-arrow" aria-hidden="true">↗</span></a>
+        
+            <a class="reading-related-link" href="/p/classic-interview-questionhow-exactly-should-you-set-rag-retrieval-top-k/"><span class="related-number">02</span><span class="related-title">Classic interview question:How exactly should you set RAG retrieval top-k?</span><time datetime="2026-07-08">2026.07.08</time><span class="related-arrow" aria-hidden="true">↗</span></a>
+        
+            <a class="reading-related-link" href="/p/search-matching-retrieval/"><span class="related-number">03</span><span class="related-title">From Keyword Matching to Vector Retrieval: Three Ways to Search</span><time datetime="2026-10-02">2026.10.02</time><span class="related-arrow" aria-hidden="true">↗</span></a>
+        
+    </aside>
+
+
+            
+        </div>
+    </div>
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+    </main>
+    
+<footer class="site-footer">
+    <div class="footer-top"><a class="footer-wordmark" href="/" aria-label="Snow">Sno<span>w</span></a><p>A place to think. A space to grow.</p><a href="#main-content" class="back-top">Back to top <span aria-hidden="true">↑</span></a></div>
+    <div class="footer-bottom"><span>© 2026 Snow</span><nav aria-label="More links"><a href="/about/">About</a><a href="https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0" target="_blank" rel="noopener noreferrer me">Bilibili <span aria-hidden="true">↗</span></a><a href="https://github.com/SymphonyW" target="_blank" rel="noopener noreferrer me">GitHub <span aria-hidden="true">↗</span></a><a href="https://twitter.com" target="_blank" rel="noopener noreferrer me">Twitter <span aria-hidden="true">↗</span></a><a href="/index.xml">RSS ↗</a></nav><span class="footer-colophon">Built with Hugo · Always in progress</span></div>
+</footer>
+
+    
+
+<script src="/ts/main.c86029ddb4aad8364879723acaf7efcd526e724d2381088d445aaf6f3ab1bfdf.js" defer></script>
+
+
+<script src="/ts/custom.6c99a7b037ac7e2bde801fbad26b9c20b3b18707868c164174142870ef3bc309.js" defer></script>
+
+
+
+
+
+<script>
+window.MathJax = {
+  tex: {
+    
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  svg: {
+    fontCache: 'global'
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
+<script type="module">
+  import('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs').then(({ default: mermaid }) => {
+    const diagrams = Array.from(document.querySelectorAll('.mermaid'));
+
+    diagrams.forEach((el) => {
+      el.dataset.mermaidSource = el.textContent.trim();
+    });
+
+    const renderMermaid = () => {
+      const scheme = document.documentElement.getAttribute('data-scheme');
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: scheme === 'dark' ? 'dark' : 'default',
+        securityLevel: 'loose',
+        fontFamily: 'inherit'
+      });
+
+      diagrams.forEach((el) => {
+        el.removeAttribute('data-processed');
+        el.textContent = el.dataset.mermaidSource;
+      });
+
+      return mermaid.run({ nodes: diagrams });
+    };
+
+    renderMermaid().catch((error) => console.error('Mermaid render failed:', error));
+
+    
+    const observer = new MutationObserver(() => {
+      renderMermaid().catch((error) => console.error('Mermaid render failed:', error));
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-scheme'] });
+  }).catch((error) => console.error('Mermaid failed to load:', error));
+</script>
+</body>
+</html>

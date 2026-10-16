@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+    <channel>
+        <title>文件存储 on Snow</title>
+        <link>https://SymphonyW.github.io/zh-cn/tags/%E6%96%87%E4%BB%B6%E5%AD%98%E5%82%A8/</link>
+        <description>Recent content in 文件存储 on Snow</description>
+        <generator>Hugo -- gohugo.io</generator>
+        <language>zh-cn</language>
+        <copyright>Snow</copyright>
+        <lastBuildDate>Tue, 13 Oct 2026 16:03:50 +0800</lastBuildDate><atom:link href="https://SymphonyW.github.io/zh-cn/tags/%E6%96%87%E4%BB%B6%E5%AD%98%E5%82%A8/index.xml" rel="self" type="application/rss+xml" /><item>
+        <title>对象、文件与块存储：云计算的三种基础存储怎么选？</title>
+        <link>https://SymphonyW.github.io/zh-cn/p/cloud-storage-object-file-block/</link>
+        <pubDate>Tue, 13 Oct 2026 16:03:50 +0800</pubDate>
+        
+        <guid>https://SymphonyW.github.io/zh-cn/p/cloud-storage-object-file-block/</guid>
+        <description>&lt;img src="https://SymphonyW.github.io/zh-cn/p/cloud-storage-object-file-block/bg.svg" alt="Featured image of post 对象、文件与块存储：云计算的三种基础存储怎么选？" /&gt;&lt;h1 id=&#34;对象文件与块存储云计算的三种基础存储怎么选&#34;&gt;对象、文件与块存储：云计算的三种基础存储怎么选？
+&lt;/h1&gt;&lt;p&gt;把数据放进云里，看起来只是“找个地方存起来”，实际却要先回答一个更基础的问题：应用希望以什么方式访问这些数据？&lt;/p&gt;
+&lt;p&gt;云计算里最常见的三类基础存储——&lt;strong&gt;对象存储（Object Storage）、文件存储（File Storage）和块存储（Block Storage）&lt;/strong&gt;——保存的最终都是二进制数据，真正的区别在于：&lt;strong&gt;数据如何被组织、通过什么接口访问，以及由谁负责管理文件系统。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/cloud-storage-object-file-block/bg.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/cloud-storage-object-file-block/bg.svg&#34; alt=&#34;对象存储、文件存储与块存储的基本模型&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;p&gt;先看结论：&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;对比维度&lt;/th&gt;
+&lt;th&gt;对象存储&lt;/th&gt;
+&lt;th&gt;文件存储&lt;/th&gt;
+&lt;th&gt;块存储&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;基本单位&lt;/td&gt;
+&lt;td&gt;对象&lt;/td&gt;
+&lt;td&gt;文件和目录&lt;/td&gt;
+&lt;td&gt;固定大小的数据块&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;常见访问方式&lt;/td&gt;
+&lt;td&gt;HTTP API、SDK&lt;/td&gt;
+&lt;td&gt;NFS、SMB、文件系统接口&lt;/td&gt;
+&lt;td&gt;挂载为块设备，由操作系统读写&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;数据组织&lt;/td&gt;
+&lt;td&gt;Bucket + Key，通常是扁平命名空间&lt;/td&gt;
+&lt;td&gt;目录树&lt;/td&gt;
+&lt;td&gt;只提供块地址，本身没有文件和目录&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;谁管理文件系统&lt;/td&gt;
+&lt;td&gt;存储服务&lt;/td&gt;
+&lt;td&gt;文件存储服务&lt;/td&gt;
+&lt;td&gt;使用者或操作系统&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;核心优势&lt;/td&gt;
+&lt;td&gt;容量大、扩展容易、耐久性高&lt;/td&gt;
+&lt;td&gt;多客户端共享、兼容传统应用&lt;/td&gt;
+&lt;td&gt;低延迟、控制力强、适合频繁随机读写&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;典型场景&lt;/td&gt;
+&lt;td&gt;图片、视频、备份、日志、数据湖&lt;/td&gt;
+&lt;td&gt;共享目录、内容管理、开发目录&lt;/td&gt;
+&lt;td&gt;云主机系统盘、数据库、事务型应用&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;h2 id=&#34;一三种存储本质上差在哪里&#34;&gt;一、三种存储，本质上差在哪里？
+&lt;/h2&gt;&lt;p&gt;三者并不一定对应三种不同的物理硬盘。底层介质可能同样是 HDD、SSD，甚至同一套分布式存储集群；不同的是系统向上暴露的&lt;strong&gt;抽象层&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/cloud-storage-object-file-block/storage-layers.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/cloud-storage-object-file-block/storage-layers.svg&#34; alt=&#34;三种存储从应用寻址到底层数据的访问链路&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;p&gt;对象存储已经理解“一个对象及其 Key”；文件存储进一步提供目录、文件名、权限和锁；块存储反而暴露更低层的逻辑块地址，把文件系统语义留给操作系统或数据库。抽象越高，服务替使用者管理的事情越多；抽象越低，使用者得到的控制力越强。&lt;/p&gt;
+&lt;h3 id=&#34;对象存储用唯一的-key-找到一份完整数据&#34;&gt;对象存储：用唯一的 Key 找到一份完整数据
+&lt;/h3&gt;&lt;p&gt;对象存储把每份数据保存为一个“对象”。一个对象通常由三部分组成：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;数据本身&lt;/strong&gt;：例如图片、视频、压缩包或日志文件；&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;元数据&lt;/strong&gt;：例如内容类型、创建时间、缓存策略和自定义标签；&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;唯一标识&lt;/strong&gt;：通常称为 Key，用来定位对象。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;应用一般通过 HTTP API 或 SDK 执行 &lt;code&gt;PUT&lt;/code&gt;、&lt;code&gt;GET&lt;/code&gt;、&lt;code&gt;DELETE&lt;/code&gt; 等操作。控制台里看到的“文件夹”往往只是 Key 前缀形成的视觉效果，例如 &lt;code&gt;images/2026/avatar.png&lt;/code&gt; 仍然可以只是一个完整的 Key，并不代表后端真的存在层层嵌套的目录。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;一次写入是怎样完成的？&lt;/strong&gt; 当客户端发起 &lt;code&gt;PUT bucket/key&lt;/code&gt; 时，请求通常先经过鉴权和路由层。系统根据 Bucket 和 Key 找到负责该命名空间的分区，为对象分配版本号和存储位置，再把较大的对象切成若干片段。数据片段会附带校验和，并通过多副本或纠删码分散到不同磁盘、节点乃至可用区。达到服务设定的持久化条件后，元数据索引才会把这个 Key 指向新版本并向客户端返回成功。具体顺序因产品而异，但核心都是把“名字到数据位置的映射”和“真正的数据”分开管理。&lt;/p&gt;
+&lt;p&gt;读取时则走相反方向：系统先由 Key 找到对象版本和片段位置，再从一个或多个节点读取数据，校验内容后返回。若发现片段损坏，后台任务可以利用其他副本或冗余片段重建它。这也是对象存储容易横向扩展的原因：一个 Key 可以被稳定地路由到某个分区，不同对象之间通常不需要共享目录锁。&lt;/p&gt;
+&lt;p&gt;这种模型很适合海量、相对独立的数据。系统可以把不同对象分散到大量节点上，容量扩展和高耐久性更容易实现，使用者也不必管理磁盘和文件系统。&lt;/p&gt;
+&lt;p&gt;但对象存储&lt;strong&gt;不是一块可以随意修改任意字节的远程硬盘&lt;/strong&gt;。更新对象时，常见做法是重新上传整个对象；重命名也可能需要“复制新对象，再删除旧对象”。虽然部分服务提供分段上传、范围读取等能力，它仍不适合直接承载传统数据库的数据文件。&lt;/p&gt;
+&lt;p&gt;这种限制并非单纯“功能没做完”，而是对象模型主动做出的取舍。把对象视为一个完整版本，可以让系统更容易计算校验和、生成版本、跨节点复制并处理失败重试；代价是失去了文件系统那种随时覆盖中间几个字节的语义。&lt;/p&gt;
+&lt;p&gt;适合它的场景包括：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;网站静态资源、用户上传的图片和视频；&lt;/li&gt;
+&lt;li&gt;备份、归档和软件安装包；&lt;/li&gt;
+&lt;li&gt;日志、数据湖和机器学习数据集；&lt;/li&gt;
+&lt;li&gt;需要通过互联网直接分发的大文件。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;文件存储把云端目录挂载到多台机器&#34;&gt;文件存储：把云端目录挂载到多台机器
+&lt;/h3&gt;&lt;p&gt;文件存储保留了人们最熟悉的目录树：目录下面有子目录和文件，文件有名称、权限、修改时间等属性。应用可以通过 NFS、SMB 等协议，把远端文件系统挂载到本地，然后像访问普通目录一样使用它。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;路径是怎样变成数据的？&lt;/strong&gt; 当应用调用 &lt;code&gt;open(&amp;quot;/team/report.md&amp;quot;)&lt;/code&gt; 时，文件系统需要逐级解析 &lt;code&gt;/&lt;/code&gt;、&lt;code&gt;team&lt;/code&gt; 和 &lt;code&gt;report.md&lt;/code&gt;。目录项把名称映射到 inode 或文件 ID，元数据记录文件大小、权限、时间戳以及数据所在位置。权限检查和锁处理完成后，客户端获得文件句柄，后续的 &lt;code&gt;read&lt;/code&gt;、&lt;code&gt;write&lt;/code&gt; 才能访问真正的数据块。&lt;/p&gt;
+&lt;p&gt;为了避免每次读写都跨网络往返，客户端通常会缓存目录项、属性和文件内容，并通过租约、锁、版本号或缓存失效通知维持多客户端之间的一致性。这里存在一个天然拉扯：缓存越积极，读取越快；但多个客户端同时修改时，协调成本也越高。NFS、SMB 以及不同云产品提供的锁和一致性语义并不完全相同，因此“能挂载”不等于“任何共享写入方式都安全”。&lt;/p&gt;
+&lt;p&gt;它的最大价值不是“能存文件”——三种存储都能保存文件内容——而是提供了&lt;strong&gt;共享的文件系统语义&lt;/strong&gt;。多台云主机可以访问同一套目录，旧应用也常常不需要改造代码就能迁移到云上。&lt;/p&gt;
+&lt;p&gt;代价是文件系统需要维护目录、权限、锁和元数据。面对大量小文件或极高并发时，元数据操作可能成为瓶颈；不同产品对 POSIX 语义、文件锁和一致性的支持也可能不同，迁移关键应用前需要确认。&lt;/p&gt;
+&lt;p&gt;小文件问题也来自这里：创建一百万个 1 KB 文件，不只是写入约 1 GB 数据，还包含一百万次文件创建、目录更新、权限记录和时间戳修改。扩展型文件系统往往会把元数据服务与数据服务分开，并对目录或文件 ID 分片，但热点目录仍可能把大量请求集中到少数元数据节点。&lt;/p&gt;
+&lt;p&gt;常见场景有：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;多台服务器共同访问的共享目录；&lt;/li&gt;
+&lt;li&gt;内容管理系统、媒体制作和团队工作区；&lt;/li&gt;
+&lt;li&gt;用户主目录、开发环境和企业文件共享；&lt;/li&gt;
+&lt;li&gt;依赖本地路径、无法直接改成对象 API 的传统应用。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;块存储给操作系统一块云硬盘&#34;&gt;块存储：给操作系统一块“云硬盘”
+&lt;/h3&gt;&lt;p&gt;块存储把空间切分成许多固定大小的数据块，并把它作为一块裸设备交给云主机。设备本身只认识块地址，不认识“订单表”“图片”或“目录”；操作系统需要先在上面创建文件系统，数据库也可以按自己的格式直接管理这些块。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;一个块请求里有什么？&lt;/strong&gt; 操作系统向虚拟磁盘发出的核心信息通常可以简化为“从逻辑块地址 LBA 开始，读取或写入多长的数据”。云平台维护一张卷映射表，把这段逻辑地址翻译到后端存储节点上的物理片段。写入可以先进入日志或缓存，再复制到其他节点；只有满足确认策略后，系统才把完成结果返回给主机。精简置备只在真正写入时分配后端空间，扩容本质上则是扩大这张逻辑地址映射。&lt;/p&gt;
+&lt;p&gt;块设备不知道上层正在更新一张数据库表还是一个文件。它可以保证某次块操作的完成状态，并提供写屏障或刷新能力，但文件系统日志、数据库 WAL、事务提交和崩溃恢复仍由上层负责。如果应用没有正确发出 &lt;code&gt;flush&lt;/code&gt;，或者快照时内存里的事务尚未落盘，即使块存储本身没有丢数据，恢复出来的文件系统或数据库也可能不一致。&lt;/p&gt;
+&lt;p&gt;站在云主机里看，它很像本地磁盘，因此适合低延迟、频繁覆盖和随机读写。云主机系统盘、数据库数据盘、消息队列和需要稳定 IOPS 的事务型系统，通常优先考虑块存储。&lt;/p&gt;
+&lt;p&gt;与此同时，使用者要负责分区、格式化、扩容后的文件系统调整以及数据保护。一个普通块存储卷通常由一台主机独占使用；即使产品支持多主机挂载，也必须配合支持并发访问的集群文件系统或应用，否则很容易损坏数据。&lt;/p&gt;
+&lt;p&gt;块存储快照通常利用写时复制（Copy-on-Write）或重定向写（Redirect-on-Write）：创建快照时不立即复制整块磁盘，而是先保存块映射关系，后续只记录发生变化的块。因此快照可以很快创建，但它通常只保证&lt;strong&gt;卷崩溃一致性&lt;/strong&gt;。要获得应用一致性快照，还需要先冻结文件系统、刷新缓存，或让数据库进入合适的备份状态。&lt;/p&gt;
+&lt;p&gt;一句话概括三者的边界：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;对象存储交付“可通过 Key 访问的对象”，文件存储交付“可共享的目录树”，块存储交付“可自行管理的磁盘空间”。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;h2 id=&#34;二可靠性一致性和性能是怎样实现的&#34;&gt;二、可靠性、一致性和性能是怎样实现的？
+&lt;/h2&gt;&lt;p&gt;讨论云存储时，几个词经常被混在一起：&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;概念&lt;/th&gt;
+&lt;th&gt;真正回答的问题&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;耐久性（Durability）&lt;/td&gt;
+&lt;td&gt;已经确认写入的数据，长期丢失的概率有多低？&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;可用性（Availability）&lt;/td&gt;
+&lt;td&gt;现在发起请求，服务能否及时响应？&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;一致性（Consistency）&lt;/td&gt;
+&lt;td&gt;多个客户端在什么时刻能看到同一个最新状态？&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;原子性（Atomicity）&lt;/td&gt;
+&lt;td&gt;一次修改会完整生效，还是可能暴露中间状态？&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;一个系统可以耐久性很高，但在网络故障时暂时不可用；也可以始终响应，却让某些客户端短时间读到旧版本。因此，“数据不会丢”和“任何时候都能读到最新数据”是两种不同保证。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;多副本与纠删码。&lt;/strong&gt; 多副本直接保存若干份完整数据，读取和故障切换简单，但容量成本较高。纠删码把数据编码成 $k$ 个数据片和 $m$ 个校验片，只要仍有足够片段就能恢复原数据，空间效率更高，但编码、重建和小块更新会消耗更多 CPU、网络与磁盘 I/O。对象存储的大对象和冷数据常适合纠删码；追求低延迟的热数据常偏向副本。具体实现并不由“对象、文件、块”这个名称决定，同一产品也可能按存储层级采用不同策略。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;写成功到底意味着什么？&lt;/strong&gt; 分布式系统通常不会等待所有副本都完成才响应，而是依据确认数量、故障域和写入日志等规则判断。确认得越保守，故障后的数据风险越低，但写延迟可能越高。后台修复还必须持续扫描校验和，在磁盘或节点损坏后重新补齐冗余；仅仅“最初写了三份”并不能保证冗余永远健康。&lt;/p&gt;
+&lt;p&gt;三种接口对外承诺的原子性也不同：&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;类型&lt;/th&gt;
+&lt;th&gt;通常能依赖的边界&lt;/th&gt;
+&lt;th&gt;不能想当然的部分&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;对象存储&lt;/td&gt;
+&lt;td&gt;单个对象的创建或替换通常以完整版本出现&lt;/td&gt;
+&lt;td&gt;多对象事务、目录重命名和跨 Key 原子更新&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;文件存储&lt;/td&gt;
+&lt;td&gt;文件与目录操作由协议提供，并可能支持锁、原子重命名&lt;/td&gt;
+&lt;td&gt;不同客户端缓存下的严格 POSIX 语义、任意应用的并发写安全&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;块存储&lt;/td&gt;
+&lt;td&gt;已完成的块读写以及产品声明的写入顺序、刷新语义&lt;/td&gt;
+&lt;td&gt;文件或数据库事务的一致性，这属于上层职责&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;这些保证必须以具体产品文档为准。例如，许多现代对象存储已经为单对象操作提供强一致性，但这并不会自动带来跨多个对象的事务能力。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;性能也不是简单的三档排名。&lt;/strong&gt; 一次 I/O 的延迟大致由客户端处理、网络往返、元数据查询、排队和介质访问共同组成。IOPS 描述每秒能完成多少次操作，吞吐量描述每秒能传输多少数据；在未碰到网络或服务上限时，可以粗略理解为：&lt;/p&gt;
+&lt;p&gt;$$
+\text{吞吐量} \approx \text{IOPS} \times \text{平均 I/O 大小}
+$$&lt;/p&gt;
+&lt;p&gt;数据库常发出大量 4 KiB 或 16 KiB 的随机 I/O，更关心延迟和 IOPS；备份或数据分析一次传输数 MiB，往往更关心吞吐量。对象存储单次请求延迟可能更高，却可以并行读取大量对象，聚合吞吐反而可能远高于一块块存储卷。&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;访问需求&lt;/th&gt;
+&lt;th&gt;更值得优先考虑&lt;/th&gt;
+&lt;th&gt;原因&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;单次读写一张完整图片&lt;/td&gt;
+&lt;td&gt;对象存储&lt;/td&gt;
+&lt;td&gt;接口简单，可直接扩展到海量对象&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;多台服务器共同编辑目录中的文件&lt;/td&gt;
+&lt;td&gt;文件存储&lt;/td&gt;
+&lt;td&gt;原生提供目录、权限和共享访问&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;数据库进行大量小块随机写入&lt;/td&gt;
+&lt;td&gt;块存储&lt;/td&gt;
+&lt;td&gt;延迟更低，可由数据库和文件系统精细控制&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;一次扫描 PB 级日志或训练数据&lt;/td&gt;
+&lt;td&gt;对象存储&lt;/td&gt;
+&lt;td&gt;吞吐可以通过大量对象并行扩展&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;应用必须使用本地文件路径&lt;/td&gt;
+&lt;td&gt;文件存储或块存储&lt;/td&gt;
+&lt;td&gt;可以挂载为文件系统，无须改成对象 API&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;最后，&lt;strong&gt;高耐久性不等于备份&lt;/strong&gt;。副本和纠删码主要处理硬件故障，却会忠实同步误删除、错误覆盖和应用逻辑错误。版本控制、快照和跨区域复制各自解决一部分问题，但重要数据仍应保留权限隔离、恢复流程经过验证的独立备份。&lt;/p&gt;
+&lt;h2 id=&#34;三30-秒完成一次初步选型&#34;&gt;三、30 秒完成一次初步选型
+&lt;/h2&gt;&lt;p&gt;选型时至少要同时看五件事：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;接口&lt;/strong&gt;：应用使用对象 API、文件路径，还是原始块设备？&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;共享与并发&lt;/strong&gt;：数据由一台主机独占，还是多台主机同时读写？&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;访问模式&lt;/strong&gt;：以整对象顺序读写为主，还是频繁随机更新小范围数据？&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;语义要求&lt;/strong&gt;：是否依赖文件锁、原子重命名、事务刷新或严格一致性？&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;运维边界&lt;/strong&gt;：谁负责扩容、文件系统、快照、备份和恢复演练？&lt;/li&gt;
+&lt;/ol&gt;
+&lt;div class=&#34;mermaid&#34;&gt;flowchart TD
+    A[应用要怎样访问数据？] --&gt; B{能使用对象 API 吗？}
+    B --&gt;|能，主要整份读写| O[对象存储]
+    B --&gt;|不能| C{多台主机要共享同一目录吗？}
+    C --&gt;|需要| F[文件存储]
+    C --&gt;|不需要| D{需要低延迟随机读写&lt;br/&gt;或自行管理文件系统吗？}
+    D --&gt;|需要| K[块存储]
+    D --&gt;|不确定| E[先确认应用接口和访问模式]
+&lt;/div&gt;&lt;p&gt;现实系统很少只选一种。例如，一个电商系统可以把数据库放在块存储上，把多台应用服务器共享的配置或生成文件放在文件存储上，再把商品图片、日志和备份放进对象存储。它们不是互相替代的三个等级，而是解决不同问题的三种工具。&lt;/p&gt;
+&lt;p&gt;最后记住一个最实用的判断方法：**不要先问哪种存储“最好”，先问应用已经会说哪种语言。**说 HTTP API，就从对象存储开始；说目录和文件路径，就看文件存储；需要一块由操作系统或数据库完全掌控的磁盘，就选块存储。&lt;/p&gt;
+</description>
+        </item>
+        
+    </channel>
+</rss>

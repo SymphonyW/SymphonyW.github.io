@@ -114,7 +114,7 @@
         
             <time datetime="2026-09-03T22:11:19&#43;08:00">September 03, 2026</time>
             <span class="meta-divider" aria-hidden="true">/</span>
-            <span>12 min read</span>
+            <span>16 min read</span>
         
         
             <div class="article-translations"><a href="/zh-cn/p/k8s-container-cloud-deployment/" hreflang="zh-cn" lang="zh-cn">阅读中文版 <span aria-hidden="true">↗</span></a></div>
@@ -144,8 +144,26 @@
         <li><a href="#push-to-registry">Push to registry</a></li>
       </ol>
     </li>
-    <li><a href="#3-create-the-workload-on-the-platform">3. Create the workload on the platform</a></li>
-    <li><a href="#4-configure-service-entry">4. Configure service entry</a></li>
+    <li><a href="#3-create-the-workload-on-the-platform">3. Create the workload on the platform</a>
+      <ol>
+        <li><a href="#check-the-cluster-and-available-capacity">Check the cluster and available capacity</a></li>
+        <li><a href="#choose-the-correct-workload-type">Choose the correct workload type</a></li>
+        <li><a href="#create-a-deployment-with-the-four-step-wizard">Create a Deployment with the four-step wizard</a>
+          <ol>
+            <li><a href="#step-1-basic-information">Step 1: basic information</a></li>
+            <li><a href="#step-2-container-configuration">Step 2: container configuration</a></li>
+            <li><a href="#step-3-service-configuration">Step 3: service configuration</a></li>
+            <li><a href="#step-4-advanced-configuration">Step 4: advanced configuration</a></li>
+          </ol>
+        </li>
+      </ol>
+    </li>
+    <li><a href="#4-configure-service-entry">4. Configure service entry</a>
+      <ol>
+        <li><a href="#create-a-service">Create a Service</a></li>
+        <li><a href="#create-a-route-ingress">Create a Route (Ingress)</a></li>
+      </ol>
+    </li>
     <li><a href="#5-validate-release-and-prepare-rollback">5. Validate release and prepare rollback</a></li>
     <li><a href="#6-common-troubleshooting-table">6. Common troubleshooting table</a></li>
     <li><a href="#7-pre-release-checklist">7. Pre-release checklist</a></li>
@@ -162,7 +180,7 @@
 </blockquote>
 <p><a href="/p/k8s-container-cloud-deployment/bg.svg" target="_blank" rel="noopener noreferrer"><img src="/p/k8s-container-cloud-deployment/bg.svg" alt="K8s container cloud deployment workflow" loading="lazy" decoding="async"></a>
 </p>
-<p>This article follows the order of a typical internal platform deployment. It does not depend on a specific vendor console. If the platform is built on Kubernetes, most fields map to the same underlying resources.</p>
+<p>This article follows the order of a real deployment and uses the China Telecom Cloud CeakE Container Service CKE console for the UI walkthrough. Other consoles may use different labels, but the underlying Kubernetes concepts—workloads, Services, Ingress, probes, and rolling updates—map closely.</p>
 <div class="mermaid">flowchart LR
     A[Source code] --> B[Write Dockerfile]
     B --> C[Build image locally]
@@ -795,7 +813,110 @@
 </div>
 </div><p>The cluster will not use images stored only in your local Docker daemon. A real platform pulls from the registry.</p>
 <h2 id="3-create-the-workload-on-the-platform">3. Create the workload on the platform
-</h2><p>Once the image exists in the registry, create the workload.</p>
+</h2><p>Once the image exists in the registry, create the workload. The screenshots below show the complete console flow.</p>
+<h3 id="check-the-cluster-and-available-capacity">Check the cluster and available capacity
+</h3><p>Open <strong>Container → Cluster List</strong>, locate the target cluster, and confirm that it is running. Check the cluster type, version, node count, and tenant before entering the console so the service is not deployed to the wrong environment.</p>
+<p><a href="/p/k8s-container-cloud-deployment/1.Cluster.png" target="_blank" rel="noopener noreferrer"><img src="/p/k8s-container-cloud-deployment/1.Cluster.png" alt="CeakE CKE cluster list" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p>The cluster overview summarizes Deployment, StatefulSet, DaemonSet, Job, CronJob, and Pod counts together with node health and CPU, memory, and disk usage.</p>
+<p><a href="/p/k8s-container-cloud-deployment/2.Summary.png" target="_blank" rel="noopener noreferrer"><img src="/p/k8s-container-cloud-deployment/2.Summary.png" alt="CeakE CKE cluster resource overview" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p>Do not rely on the green node status alone. Check resource headroom and recent warning events as well. If requests exceed the remaining allocatable resources, a new Pod can stay <code>Pending</code> even when every node is healthy.</p>
+<h3 id="choose-the-correct-workload-type">Choose the correct workload type
+</h3><p>The Workloads menu contains more than Deployment. Choose the controller based on how the process should run:</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Console entry</th>
+<th>Kubernetes object</th>
+<th>Best fit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Stateless workload</td>
+<td><code>Deployment</code></td>
+<td>Replaceable and horizontally scalable web or API services</td>
+</tr>
+<tr>
+<td>DaemonSet</td>
+<td><code>DaemonSet</code></td>
+<td>One instance per node, such as logging or monitoring agents</td>
+</tr>
+<tr>
+<td>Stateful workload</td>
+<td><code>StatefulSet</code></td>
+<td>Stable identity, ordered rollout, or persistent storage</td>
+</tr>
+<tr>
+<td>Job</td>
+<td><code>Job</code></td>
+<td>One-time work that exits after completion</td>
+</tr>
+<tr>
+<td>CronJob</td>
+<td><code>CronJob</code></td>
+<td>Work executed periodically from a Cron schedule</td>
+</tr>
+<tr>
+<td>Pod</td>
+<td><code>Pod</code></td>
+<td>Inspecting and troubleshooting runtime instances; rarely a direct long-lived deployment choice</td>
+</tr>
+</tbody>
+</table></div>
+<p><a href="/p/k8s-container-cloud-deployment/3.Deployment.png" target="_blank" rel="noopener noreferrer"><img src="/p/k8s-container-cloud-deployment/3.Deployment.png" alt="Deployment list" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p>The running/desired Pod count, replica count, and status provide a quick rollout check. A row showing <code>0/1</code> and <code>Updating</code>, for example, has not reached the desired state.</p>
+<p><a href="/p/k8s-container-cloud-deployment/4.DaemonSets.png" target="_blank" rel="noopener noreferrer"><img src="/p/k8s-container-cloud-deployment/4.DaemonSets.png" alt="DaemonSet list" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p><a href="/p/k8s-container-cloud-deployment/5.StatefulSet.png" target="_blank" rel="noopener noreferrer"><img src="/p/k8s-container-cloud-deployment/5.StatefulSet.png" alt="StatefulSet list" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p><a href="/p/k8s-container-cloud-deployment/6.Job.png" target="_blank" rel="noopener noreferrer"><img src="/p/k8s-container-cloud-deployment/6.Job.png" alt="Job list" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p><a href="/p/k8s-container-cloud-deployment/7.CronJob.png" target="_blank" rel="noopener noreferrer"><img src="/p/k8s-container-cloud-deployment/7.CronJob.png" alt="CronJob list" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p><a href="/p/k8s-container-cloud-deployment/8.Pod.png" target="_blank" rel="noopener noreferrer"><img src="/p/k8s-container-cloud-deployment/8.Pod.png" alt="Pod list" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p>The Pod page is especially useful during incidents because it shows status, ready containers, restart count, Pod IP, and node. The <code>CrashLoopBackOff</code> row and very high restart count in the screenshot are direct failure signals; inspect container logs, previous logs, and Pod events before changing Service or Route settings.</p>
+<h3 id="create-a-deployment-with-the-four-step-wizard">Create a Deployment with the four-step wizard
+</h3><p>From <strong>Stateless Workload</strong>, select <strong>Create Stateless Workload</strong>. The wizard is divided into Basic Information, Container Configuration, Service Configuration, and Advanced Configuration.</p>
+<h4 id="step-1-basic-information">Step 1: basic information
+</h4><p><a href="/p/k8s-container-cloud-deployment/3.1.Basic-Info.png" target="_blank" rel="noopener noreferrer"><img src="/p/k8s-container-cloud-deployment/3.1.Basic-Info.png" alt="Deployment basic information" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p>Enter the name, project (the Kubernetes namespace), replica count, and description. One replica is enough for an initial test; production commonly starts with at least two replicas and a rolling strategy that preserves availability.</p>
+<h4 id="step-2-container-configuration">Step 2: container configuration
+</h4><p><a href="/p/k8s-container-cloud-deployment/3.2.Container-Setting-1.png" target="_blank" rel="noopener noreferrer"><img src="/p/k8s-container-cloud-deployment/3.2.Container-Setting-1.png" alt="Deployment image and resource configuration" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p>The image can be selected from the platform registry or entered as a full image reference. Verify the tag, pull policy, and vCPU/memory requests and limits:</p>
+<ul>
+<li><code>IfNotPresent</code> works well with immutable tags. The screenshot shows <code>Always</code> as the default; that is useful when tags can be overwritten, but production releases should still use unique tags.</li>
+<li>Avoid leaving all CPU and memory controls unlimited. Set realistic requests, then define limits from load-test and monitoring data.</li>
+<li>The container name identifies a container inside the Pod; it does not have to match the Deployment, and a Pod can contain multiple containers.</li>
+</ul>
+<p><a href="/p/k8s-container-cloud-deployment/3.2.Container-Setting-2.png" target="_blank" rel="noopener noreferrer"><img src="/p/k8s-container-cloud-deployment/3.2.Container-Setting-2.png" alt="Deployment environment, probes, and storage configuration" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p>Further down, the form exposes environment variables, command and arguments, working directory, storage, and all three Kubernetes probes:</p>
+<ul>
+<li>Readiness decides whether the Pod is included in Service endpoints and should normally be enabled for a network service.</li>
+<li>Liveness decides whether Kubernetes should restart the container; avoid coupling it to unstable downstream dependencies.</li>
+<li>Startup protects slow-starting applications from being restarted by liveness checks before initialization completes.</li>
+</ul>
+<h4 id="step-3-service-configuration">Step 3: service configuration
+</h4><p><a href="/p/k8s-container-cloud-deployment/3.3.Service-Setting.png" target="_blank" rel="noopener noreferrer"><img src="/p/k8s-container-cloud-deployment/3.3.Service-Setting.png" alt="Service configuration inside the Deployment wizard" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p>Bind an existing Service or create one directly from the wizard. This step can be skipped when the workload does not need an endpoint yet; a Service can be added later from the Network menu.</p>
+<p><a href="/p/k8s-container-cloud-deployment/3.3.New-Service.png" target="_blank" rel="noopener noreferrer"><img src="/p/k8s-container-cloud-deployment/3.3.New-Service.png" alt="Create a Service inside the Deployment wizard" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p>Select the access type, protocol, Service port, and container port. Prefer <code>ClusterIP</code> for ordinary internal services. <code>NodePort</code> opens a port on the nodes, while <code>LoadBalancer</code> depends on the cloud integration. Most importantly, the Service selector must match the workload labels or no endpoint will be created.</p>
+<h4 id="step-4-advanced-configuration">Step 4: advanced configuration
+</h4><p><a href="/p/k8s-container-cloud-deployment/3.4.Advanced-Settings-1.png" target="_blank" rel="noopener noreferrer"><img src="/p/k8s-container-cloud-deployment/3.4.Advanced-Settings-1.png" alt="Deployment networking and rolling-update configuration" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p>The first part contains DNS and additional host/network settings plus the rollout strategy. <code>ClusterFirst</code> is the usual DNS policy. With <code>RollingUpdate</code>, choose <code>maxSurge</code> and <code>maxUnavailable</code> together with the replica count; a single-replica service that allows one unavailable Pod will have downtime during a rollout.</p>
+<p><a href="/p/k8s-container-cloud-deployment/3.4.Advanced-Settings-2.png" target="_blank" rel="noopener noreferrer"><img src="/p/k8s-container-cloud-deployment/3.4.Advanced-Settings-2.png" alt="Deployment scheduling, labels, and image-secret configuration" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p>The remaining controls cover node affinity, workload affinity/anti-affinity, tolerations, labels, annotations, monitoring, and private image credentials. Change scheduling rules only for a real placement requirement, and select an image secret when the cluster must authenticate to a private registry.</p>
+<p>The four-step form ultimately produces a Kubernetes Deployment. Use the following table as a field checklist:</p>
 <div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
 <thead>
 <tr>
@@ -999,7 +1120,50 @@
     S --> P1[Pod 1]
     S --> P2[Pod 2]
     S --> P3[Pod 3]
-</div><p>Internal access usually uses a <code>Service</code>:</p>
+</div><h3 id="create-a-service">Create a Service
+</h3><p>The <strong>Network → Service</strong> page shows the access type, Cluster IP or external IP, and each Service-port-to-container-port mapping. <code>ClusterIP</code>, <code>NodePort</code>, and <code>LoadBalancer</code> expose the application at different scopes, so a port number alone does not tell you whether the service is publicly reachable.</p>
+<p><a href="/p/k8s-container-cloud-deployment/9.Service.png" target="_blank" rel="noopener noreferrer"><img src="/p/k8s-container-cloud-deployment/9.Service.png" alt="Service list and port mappings" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p><a href="/p/k8s-container-cloud-deployment/9.1.New-Service.png" target="_blank" rel="noopener noreferrer"><img src="/p/k8s-container-cloud-deployment/9.1.New-Service.png" alt="Create Service form" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p>Choose the project and name, then set the access type and ports:</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Form field</th>
+<th>Kubernetes field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Service port</td>
+<td><code>spec.ports[].port</code></td>
+<td>Port used by clients of the Service</td>
+</tr>
+<tr>
+<td>Container port</td>
+<td><code>spec.ports[].targetPort</code></td>
+<td>Port that receives the traffic in the Pod</td>
+</tr>
+<tr>
+<td>Access type</td>
+<td><code>spec.type</code></td>
+<td><code>ClusterIP</code>, <code>NodePort</code>, or <code>LoadBalancer</code></td>
+</tr>
+<tr>
+<td>Workload/label binding</td>
+<td><code>spec.selector</code></td>
+<td>Must match labels on the target Pods</td>
+</tr>
+<tr>
+<td>Session Hold</td>
+<td><code>sessionAffinity</code></td>
+<td>Enable only when the application requires sticky sessions</td>
+</tr>
+</tbody>
+</table></div>
+<p>Internal access usually uses a <code>Service</code>:</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
 <pre tabindex="0" class="chroma"><code><span class="lnt"> 1
@@ -1084,7 +1248,14 @@
 </span></span></span><span class="line"><span class="cl"><span class="w">                  </span><span class="nt">number</span><span class="p">:</span><span class="w"> </span><span class="m">80</span><span class="w">
 </span></span></span></code></pre></td></tr></table>
 </div>
-</div><p>In a platform console this may be called domain, route, layer-7 load balancer, or application entry. The core fields are still host, path, backend Service, port, and certificate.</p>
+</div><h3 id="create-a-route-ingress">Create a Route (Ingress)
+</h3><p>This platform exposes Ingress under <strong>Network → Route</strong>. The list shows the route name, bound Services, project, and type; a single route can contain multiple backend rules.</p>
+<p><a href="/p/k8s-container-cloud-deployment/10.Route.png" target="_blank" rel="noopener noreferrer"><img src="/p/k8s-container-cloud-deployment/10.Route.png" alt="Route list" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p><a href="/p/k8s-container-cloud-deployment/10.1.New-Route.png" target="_blank" rel="noopener noreferrer"><img src="/p/k8s-container-cloud-deployment/10.1.New-Route.png" alt="Create Route form" width="3200" height="1536" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="208" data-flex-basis="500px"></a>
+</p>
+<p>Enter the route name, project, Ingress type, protocol, host, path matching mode, target Service, and target port. The screenshot uses type <code>nginx</code> and match mode <code>Prefix</code>, which correspond to the Ingress controller and <code>pathType: Prefix</code>. HTTPS additionally requires the TLS certificate or Secret expected by the platform.</p>
+<p>A console may call this object Ingress, domain, route, layer-7 load balancer, or application entry. Whatever the label, troubleshoot the same chain: <strong>Route/Ingress → Service → Endpoint → Pod</strong>.</p>
 <h2 id="5-validate-release-and-prepare-rollback">5. Validate release and prepare rollback
 </h2><p>If YAML deployment is supported:</p>
 <div class="highlight"><div class="chroma">

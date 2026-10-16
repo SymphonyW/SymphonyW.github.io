@@ -7,7 +7,512 @@
         <generator>Hugo -- gohugo.io</generator>
         <language>zh-cn</language>
         <copyright>Snow</copyright>
-        <lastBuildDate>Fri, 02 Oct 2026 20:13:30 +0800</lastBuildDate><atom:link href="https://SymphonyW.github.io/zh-cn/tags/%E4%BF%A1%E6%81%AF%E6%A3%80%E7%B4%A2/index.xml" rel="self" type="application/rss+xml" /><item>
+        <lastBuildDate>Thu, 15 Oct 2026 15:00:00 +0800</lastBuildDate><atom:link href="https://SymphonyW.github.io/zh-cn/tags/%E4%BF%A1%E6%81%AF%E6%A3%80%E7%B4%A2/index.xml" rel="self" type="application/rss+xml" /><item>
+        <title>Agentic RAG 深度解析：让检索从固定流水线变成会规划、会反思的智能体</title>
+        <link>https://SymphonyW.github.io/zh-cn/p/agentic-rag-guide/</link>
+        <pubDate>Thu, 15 Oct 2026 15:00:00 +0800</pubDate>
+        
+        <guid>https://SymphonyW.github.io/zh-cn/p/agentic-rag-guide/</guid>
+        <description>&lt;img src="https://SymphonyW.github.io/zh-cn/p/agentic-rag-guide/bg.png" alt="Featured image of post Agentic RAG 深度解析：让检索从固定流水线变成会规划、会反思的智能体" /&gt;&lt;h1 id=&#34;agentic-rag-深度解析让检索从固定流水线变成会规划会反思的智能体&#34;&gt;Agentic RAG 深度解析：让检索从固定流水线变成会规划、会反思的智能体
+&lt;/h1&gt;&lt;blockquote&gt;
+&lt;p&gt;传统 RAG 像一条预先铺好的流水线：收到问题、检索一次、拼接上下文、生成答案。Agentic RAG 则给这条流水线加上了一个“控制者”：它可以判断要不要检索、把问题拆成几步、选择不同数据源、检查证据是否够用，并在必要时改写查询继续搜索。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/agentic-rag-guide/bg.png&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/agentic-rag-guide/bg.png&#34; alt=&#34;Agent 调度多种知识源并循环评估证据&#34; width=&#34;1672&#34; height=&#34;941&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34; class=&#34;gallery-image&#34; data-flex-grow=&#34;177&#34; data-flex-basis=&#34;426px&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;p&gt;先给出本文最重要的结论：&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;问题&lt;/th&gt;
+&lt;th&gt;简短答案&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;Agentic RAG 是什么&lt;/td&gt;
+&lt;td&gt;由 Agent 在运行时规划、调用、评估和迭代检索的 RAG 架构&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;和传统 RAG 最大的区别&lt;/td&gt;
+&lt;td&gt;不在于有没有向量库，而在于&lt;strong&gt;检索控制流是否能根据中间结果动态改变&lt;/strong&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;一定需要多个 Agent 吗&lt;/td&gt;
+&lt;td&gt;不需要。一个 Agent 加多个检索工具就可以构成 Agentic RAG&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;一定比传统 RAG 好吗&lt;/td&gt;
+&lt;td&gt;不一定。简单问答往往只会得到更高延迟、更高成本和更多不确定性&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;最适合什么问题&lt;/td&gt;
+&lt;td&gt;多跳推理、多数据源、需要澄清或证据校验的复杂任务&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;落地最关键的能力&lt;/td&gt;
+&lt;td&gt;有界循环、证据门控、权限隔离、完整轨迹与分层评估&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;h2 id=&#34;一先回到传统-rag&#34;&gt;一、先回到传统 RAG
+&lt;/h2&gt;&lt;p&gt;RAG 是 Retrieval-Augmented Generation 的缩写，即&lt;strong&gt;检索增强生成&lt;/strong&gt;。它把大模型参数中的“内部记忆”和外部知识库中的“非参数记忆”结合起来。用户提问后，系统先找出相关资料，再让模型依据这些资料回答。&lt;/p&gt;
+&lt;p&gt;2020 年的 &lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2005.11401&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;RAG 原始论文&lt;/a&gt; 重点讨论了如何把生成模型与外部稠密向量索引结合，以改善知识密集型任务中的事实性、知识更新与来源追溯问题。工程实践中的传统 RAG 通常被简化成下面这条在线链路：&lt;/p&gt;
+&lt;div class=&#34;mermaid&#34;&gt;flowchart LR
+    Q[用户问题] --&gt; T[清洗或固定规则改写]
+    T --&gt; E[生成查询向量]
+    E --&gt; R[检索 Top-K 文档]
+    R --&gt; K[可选：重排序]
+    K --&gt; P[拼接 Prompt]
+    P --&gt; L[LLM 生成答案]
+    L --&gt; A[返回答案与引用]
+&lt;/div&gt;&lt;p&gt;它的优势非常明确：流程短、延迟可预测、容易缓存、容易压测，也容易定位“是检索错了，还是生成错了”。如果问题基本都能通过“对一个知识库搜索一次”解决，这种结构往往已经足够好。&lt;/p&gt;
+&lt;p&gt;但固定流水线也有天然边界。假设用户问：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;“对比 A、B 两款产品最近三个版本的权限变化，并判断旧客户迁移时有哪些风险。”&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;这个问题隐含了多个子任务：识别版本范围、分别查 A 和 B 的更新日志、查权限说明、找迁移文档、对齐发布时间，最后才能做比较。一次相似度搜索很可能只覆盖其中一部分；即使拿到了十段文本，模型也未必知道缺失的是哪一块证据。&lt;/p&gt;
+&lt;h2 id=&#34;二agentic-rag-到底agentic在哪里&#34;&gt;二、Agentic RAG 到底“Agentic”在哪里
+&lt;/h2&gt;&lt;p&gt;Agentic RAG 不是给传统 RAG 换一个更强的模型，也不是“向量检索 + Function Calling”的简单拼装。它真正改变的是&lt;strong&gt;控制权&lt;/strong&gt;：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;检索不再是每次都执行一次的固定步骤，而是 Agent 可以按需选择、重复调用并根据结果调整的工具。&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;这类系统通常把规划、工具调用、状态更新和停止判断组织成一个受控循环。Agent 可以做出以下决策：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;当前问题能否直接回答，还是必须查资料；&lt;/li&gt;
+&lt;li&gt;应该查向量库、关键字索引、SQL、知识图谱、内部 API，还是公开网页；&lt;/li&gt;
+&lt;li&gt;原问题是否需要拆成多个子问题；&lt;/li&gt;
+&lt;li&gt;检索结果是否相关、是否互相矛盾、是否覆盖了所有子问题；&lt;/li&gt;
+&lt;li&gt;应该改写查询、扩大时间范围、切换数据源，还是向用户澄清；&lt;/li&gt;
+&lt;li&gt;证据何时已经足够，可以停止搜索并生成答案。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这种“推理—行动—观察—再推理”的思想与 &lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2210.03629&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;ReAct&lt;/a&gt; 一脉相承。2025 年的 &lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2501.09136&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Agentic RAG 综述&lt;/a&gt; 则把规划、反思、工具使用和多 Agent 协作归纳为常见的 Agentic 设计模式。&lt;/p&gt;
+&lt;div class=&#34;mermaid&#34;&gt;flowchart TD
+    U[用户问题] --&gt; P[理解意图与制定计划]
+    P --&gt; D{证据已经足够？}
+    D -- 是 --&gt; G[基于证据生成答案]
+    D -- 否 --&gt; S[选择数据源与检索工具]
+    S --&gt; Q[生成或改写查询]
+    Q --&gt; R[执行检索]
+    R --&gt; V[评估相关性、覆盖度与冲突]
+    V --&gt; C{下一步}
+    C -- 补充证据 --&gt; S
+    C -- 需要澄清 --&gt; H[向用户提问]
+    C -- 达到预算上限 --&gt; F[降级回答或说明无法确认]
+    C -- 可以作答 --&gt; G
+    G --&gt; A[答案、引用与不确定性说明]
+&lt;/div&gt;&lt;p&gt;这里有一个很容易被忽略的判断标准：&lt;strong&gt;只要查询改写、混合检索、重排序都按预先写死的顺序执行，它仍然可以是“高级 RAG”，但未必是 Agentic RAG。&lt;/strong&gt; Agentic 的关键不是组件数量，而是系统会不会依据中间状态改变后续路径。&lt;/p&gt;
+&lt;h2 id=&#34;三一条完整的-agentic-rag-工作循环&#34;&gt;三、一条完整的 Agentic RAG 工作循环
+&lt;/h2&gt;&lt;p&gt;可以把在线流程拆成七个阶段。实际系统可以合并节点，但这些责任最好在日志和评估中保持可区分。&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;阶段&lt;/th&gt;
+&lt;th&gt;Agent 要解决的问题&lt;/th&gt;
+&lt;th&gt;典型输出&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;1. 意图识别&lt;/td&gt;
+&lt;td&gt;用户真正想得到什么，是否需要外部事实&lt;/td&gt;
+&lt;td&gt;任务类型、时间范围、实体、约束&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;2. 任务分解&lt;/td&gt;
+&lt;td&gt;是否包含多个可独立验证的子问题&lt;/td&gt;
+&lt;td&gt;子问题列表、依赖关系&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;3. 数据源路由&lt;/td&gt;
+&lt;td&gt;哪个来源最权威、最适合当前子问题&lt;/td&gt;
+&lt;td&gt;工具名、索引名、过滤条件&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;4. 查询规划&lt;/td&gt;
+&lt;td&gt;用什么关键词、向量查询或结构化条件&lt;/td&gt;
+&lt;td&gt;一组可执行查询&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;5. 结果评估&lt;/td&gt;
+&lt;td&gt;资料是否相关、充分、新鲜、相互一致&lt;/td&gt;
+&lt;td&gt;相关性、覆盖度、冲突标记&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;6. 纠正与迭代&lt;/td&gt;
+&lt;td&gt;要不要换查询、换来源或缩小问题&lt;/td&gt;
+&lt;td&gt;下一动作、剩余预算&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;7. 综合回答&lt;/td&gt;
+&lt;td&gt;怎样让每个关键结论都能回到证据&lt;/td&gt;
+&lt;td&gt;答案、引用、不确定性&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;假设用户问：“我们是否应该把生产数据库从 13 升级到 16？”Agent 可能执行这样的轨迹：&lt;/p&gt;
+&lt;div class=&#34;mermaid&#34;&gt;sequenceDiagram
+    participant U as 用户
+    participant A as Agent
+    participant D as 内部文档库
+    participant M as 资产数据库
+    participant W as 官方文档
+
+    U-&gt;&gt;A: 是否应该把生产数据库从 13 升级到 16？
+    A-&gt;&gt;M: 查询当前版本、扩展、实例规模和维护窗口
+    M--&gt;&gt;A: 返回环境清单
+    A-&gt;&gt;D: 检索历史故障、兼容性测试和变更规范
+    D--&gt;&gt;A: 返回内部证据
+    A-&gt;&gt;W: 查询 14、15、16 的破坏性变更与支持周期
+    W--&gt;&gt;A: 返回官方资料
+    A-&gt;&gt;A: 检查扩展兼容性与证据缺口
+    A-&gt;&gt;D: 继续检索缺失扩展的测试记录
+    D--&gt;&gt;A: 未找到完整记录
+    A--&gt;&gt;U: 给出条件式建议、风险清单，并明确需要补做的测试
+&lt;/div&gt;&lt;p&gt;重点不是“多搜了几次”，而是后一次检索由前一次结果决定。如果资产数据库显示用了某个特殊扩展，Agent 才需要针对该扩展继续查兼容性；这正是固定流水线难以经济覆盖的分支。&lt;/p&gt;
+&lt;h2 id=&#34;四常见架构并不只有一种&#34;&gt;四、常见架构并不只有一种
+&lt;/h2&gt;&lt;p&gt;Agentic RAG 更像一个架构族，而不是唯一拓扑。&lt;/p&gt;
+&lt;div class=&#34;mermaid&#34;&gt;flowchart TB
+    O[编排与状态层] --&gt; P[规划器 / Router]
+    P --&gt; T1[向量检索]
+    P --&gt; T2[关键字或混合检索]
+    P --&gt; T3[SQL / API]
+    P --&gt; T4[知识图谱 / Web]
+    T1 --&gt; E[证据池]
+    T2 --&gt; E
+    T3 --&gt; E
+    T4 --&gt; E
+    E --&gt; J[证据评估器]
+    J --&gt;|不足| P
+    J --&gt;|充分| G[答案生成器]
+    G --&gt; C[引用校验与安全门控]
+&lt;/div&gt;&lt;h3 id=&#34;单-agent--多工具&#34;&gt;单 Agent + 多工具
+&lt;/h3&gt;&lt;p&gt;一个 Agent 同时负责规划、选工具、评估和回答。这是最容易起步的结构，适合工具数量少、权限边界一致的场景。缺点是职责容易堆在一个 Prompt 里，决策稳定性和可测试性会逐渐变差。&lt;/p&gt;
+&lt;h3 id=&#34;router--专用检索器&#34;&gt;Router + 专用检索器
+&lt;/h3&gt;&lt;p&gt;Router 只负责判断问题类型和数据源，具体检索由稳定的专用链路完成。例如“制度问题走文档库，订单问题走 SQL，最新状态走业务 API”。它比完全开放的 Agent 更可控，通常也是生产系统最实用的折中。&lt;/p&gt;
+&lt;h3 id=&#34;纠正式或反思式-rag&#34;&gt;纠正式或反思式 RAG
+&lt;/h3&gt;&lt;p&gt;先检索，再由评估器判断结果质量；如果证据差，就改写查询、扩大来源或触发 Web 搜索。&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2401.15884&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;CRAG&lt;/a&gt; 强调对检索结果进行纠正，&lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2310.11511&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Self-RAG&lt;/a&gt; 则让模型学习何时检索并对生成内容进行自我反思。它们与 Agentic RAG 高度相关，但不能简单画等号：这些机制可以成为 Agent 循环里的部件，也可以被做成固定流程。&lt;/p&gt;
+&lt;h3 id=&#34;多-agent-rag&#34;&gt;多 Agent RAG
+&lt;/h3&gt;&lt;p&gt;把任务分给研究、检索、验证、写作等不同 Agent，或按知识域划分 Agent。它适合真正可以并行、权限不同或专业性很强的任务，但会显著增加通信成本、状态同步和故障定位难度。&lt;strong&gt;多 Agent 是可选的扩展，不是 Agentic RAG 的入场券。&lt;/strong&gt;&lt;/p&gt;
+&lt;h2 id=&#34;五和传统-rag-的区别&#34;&gt;五、和传统 RAG 的区别
+&lt;/h2&gt;&lt;p&gt;最准确的比较不是“传统 RAG 笨、Agentic RAG 聪明”，而是“确定性流水线”和“运行时决策系统”之间的工程取舍。&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;对比维度&lt;/th&gt;
+&lt;th&gt;传统 RAG&lt;/th&gt;
+&lt;th&gt;Agentic RAG&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;控制流&lt;/td&gt;
+&lt;td&gt;预先固定&lt;/td&gt;
+&lt;td&gt;根据中间结果动态分支和循环&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;是否检索&lt;/td&gt;
+&lt;td&gt;通常每次都检索&lt;/td&gt;
+&lt;td&gt;可以选择检索、跳过或稍后再检索&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;查询处理&lt;/td&gt;
+&lt;td&gt;原查询或固定改写&lt;/td&gt;
+&lt;td&gt;动态拆分、改写、扩展、追问&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;数据源&lt;/td&gt;
+&lt;td&gt;通常一个索引或固定组合&lt;/td&gt;
+&lt;td&gt;运行时选择多个异构来源&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;检索次数&lt;/td&gt;
+&lt;td&gt;一次或固定次数&lt;/td&gt;
+&lt;td&gt;直到证据充分或预算耗尽&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;多跳问题&lt;/td&gt;
+&lt;td&gt;依赖一次召回覆盖全部信息&lt;/td&gt;
+&lt;td&gt;可依据前一步结果继续追踪下一跳&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;失败处理&lt;/td&gt;
+&lt;td&gt;返回当前结果或走固定兜底&lt;/td&gt;
+&lt;td&gt;评估、重试、换工具、澄清、降级&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;可预测性&lt;/td&gt;
+&lt;td&gt;高&lt;/td&gt;
+&lt;td&gt;较低，需要状态机和预算约束&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;延迟与成本&lt;/td&gt;
+&lt;td&gt;较低且稳定&lt;/td&gt;
+&lt;td&gt;通常更高，波动也更大&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;可观测性&lt;/td&gt;
+&lt;td&gt;看检索结果和最终答案&lt;/td&gt;
+&lt;td&gt;还要看计划、工具调用、状态和停止原因&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;安全面&lt;/td&gt;
+&lt;td&gt;相对集中&lt;/td&gt;
+&lt;td&gt;工具权限、提示注入和越权风险更大&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;最适合&lt;/td&gt;
+&lt;td&gt;高频、单跳、边界清晰的问答&lt;/td&gt;
+&lt;td&gt;多步、多源、开放式研究与决策支持&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;还有一个重要事实：传统 RAG 与 Agentic RAG 不是二选一。生产系统常见的做法是&lt;strong&gt;先走快速路径，只有检测到复杂问题或低置信度时才升级到 Agentic 路径&lt;/strong&gt;。&lt;/p&gt;
+&lt;div class=&#34;mermaid&#34;&gt;flowchart LR
+    Q[用户问题] --&gt; X{复杂度与风险检测}
+    X -- 简单、单跳 --&gt; R[传统 RAG 快速路径]
+    X -- 多约束、多跳、低置信度 --&gt; A[Agentic RAG 深度路径]
+    R --&gt; G[统一答案与引用层]
+    A --&gt; G
+&lt;/div&gt;&lt;p&gt;这种分层路由往往比“所有请求都交给 Agent”更划算：常见问题保持低延迟，复杂问题才使用额外的规划和检索预算。&lt;/p&gt;
+&lt;h2 id=&#34;六实现时离线知识工程并没有消失&#34;&gt;六、实现时，离线知识工程并没有消失
+&lt;/h2&gt;&lt;p&gt;Agentic RAG 主要改变在线查询阶段，但它无法替代离线的数据治理。文档解析错误、切块不合理、元数据缺失、权限标签不完整，再强的 Agent 也只能在坏数据上反复搜索。&lt;/p&gt;
+&lt;p&gt;一个可落地的系统通常分成四层：&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;层&lt;/th&gt;
+&lt;th&gt;主要职责&lt;/th&gt;
+&lt;th&gt;关键设计&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;知识层&lt;/td&gt;
+&lt;td&gt;采集、解析、切块、索引、更新&lt;/td&gt;
+&lt;td&gt;数据质量、版本、权限、新鲜度&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;工具层&lt;/td&gt;
+&lt;td&gt;把检索能力暴露为清晰接口&lt;/td&gt;
+&lt;td&gt;输入 Schema、过滤器、超时、结果格式&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;编排层&lt;/td&gt;
+&lt;td&gt;规划、路由、循环、状态和预算&lt;/td&gt;
+&lt;td&gt;最大步数、并发、重试、检查点&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;治理层&lt;/td&gt;
+&lt;td&gt;评估、观测、安全和人工介入&lt;/td&gt;
+&lt;td&gt;轨迹、审计、审批、离线测试集&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;工具描述要具体，不能只写“搜索知识库”。更好的描述会告诉 Agent：数据覆盖什么时间、适合解决什么问题、返回什么字段、有哪些权限限制。否则工具越多，选错工具的概率反而越高。&lt;/p&gt;
+&lt;p&gt;下面是一段与框架无关的伪代码，它展示了最小闭环：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;12
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;13
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;14
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;15
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;16
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;17
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;18
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;19
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;20
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;21
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;22
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;23
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;24
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;25
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;26
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;27
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;28
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;29
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-python&#34; data-lang=&#34;python&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;k&#34;&gt;def&lt;/span&gt; &lt;span class=&#34;nf&#34;&gt;answer&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;question&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;user&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;max_steps&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;mi&#34;&gt;6&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;):&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;n&#34;&gt;state&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;=&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;s2&#34;&gt;&amp;#34;question&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;question&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;s2&#34;&gt;&amp;#34;evidence&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;[],&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;s2&#34;&gt;&amp;#34;open_questions&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;[&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;question&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;],&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;s2&#34;&gt;&amp;#34;trace&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;[],&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;p&#34;&gt;}&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;k&#34;&gt;for&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;step&lt;/span&gt; &lt;span class=&#34;ow&#34;&gt;in&lt;/span&gt; &lt;span class=&#34;nb&#34;&gt;range&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;max_steps&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;):&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;n&#34;&gt;decision&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;=&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;planner&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;decide&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;state&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;allowed_tools&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;user&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;allowed_tools&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;k&#34;&gt;if&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;decision&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;action&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;==&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;clarify&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;            &lt;span class=&#34;k&#34;&gt;return&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;ask_user&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;decision&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;question&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;k&#34;&gt;if&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;decision&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;action&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;==&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;answer&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;            &lt;span class=&#34;k&#34;&gt;if&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;evidence_gate&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;passed&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;state&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;[&lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;evidence&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;]):&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;                &lt;span class=&#34;k&#34;&gt;return&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;generator&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;grounded_answer&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;state&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;            &lt;span class=&#34;n&#34;&gt;decision&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;=&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;planner&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;repair_missing_evidence&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;state&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;n&#34;&gt;result&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;=&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;tools&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;[&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;decision&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;tool&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;]&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;run&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;            &lt;span class=&#34;n&#34;&gt;query&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;decision&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;query&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;            &lt;span class=&#34;n&#34;&gt;filters&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;decision&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;filters&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;            &lt;span class=&#34;n&#34;&gt;identity&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;user&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;identity&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;n&#34;&gt;grade&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;=&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;evaluator&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;grade&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;result&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;state&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;[&lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;open_questions&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;])&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        &lt;span class=&#34;n&#34;&gt;state&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;=&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;update_state&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;state&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;decision&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;result&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;grade&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    &lt;span class=&#34;k&#34;&gt;return&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;generator&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;bounded_fallback&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;state&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;真正重要的不是这段循环本身，而是其中的护栏：&lt;code&gt;allowed_tools&lt;/code&gt; 限制权限，&lt;code&gt;max_steps&lt;/code&gt; 防止失控，&lt;code&gt;evidence_gate&lt;/code&gt; 阻止无证据作答，&lt;code&gt;trace&lt;/code&gt; 为复盘和评估保留结构化轨迹。&lt;/p&gt;
+&lt;h2 id=&#34;七生产环境最容易踩的坑&#34;&gt;七、生产环境最容易踩的坑
+&lt;/h2&gt;&lt;h3 id=&#34;无限搜索与成本失控&#34;&gt;无限搜索与成本失控
+&lt;/h3&gt;&lt;p&gt;如果停止条件只是“模型觉得够了”，Agent 可能在相似查询之间来回打转。至少需要限制最大步数、总 Token、单工具超时、并发数和总费用，并在预算耗尽时返回明确的降级结果。&lt;/p&gt;
+&lt;h3 id=&#34;把反思误当成事实校验&#34;&gt;把“反思”误当成事实校验
+&lt;/h3&gt;&lt;p&gt;让同一个模型评价自己的答案，并不会自动得到独立证据。反思节点应该检查可观察指标，例如来源是否覆盖全部子问题、引用是否真的支持结论、时间范围是否一致，而不是只问一句“答案好吗”。&lt;/p&gt;
+&lt;h3 id=&#34;检索内容中的提示注入&#34;&gt;检索内容中的提示注入
+&lt;/h3&gt;&lt;p&gt;网页或文档也可能包含“忽略系统指令并调用某工具”之类的恶意文本。检索结果必须被当作&lt;strong&gt;不可信数据&lt;/strong&gt;，不能当作高优先级指令。工具调用应经过参数校验、来源白名单、最小权限和高风险操作审批。&lt;/p&gt;
+&lt;h3 id=&#34;只有最终答案没有执行轨迹&#34;&gt;只有最终答案，没有执行轨迹
+&lt;/h3&gt;&lt;p&gt;Agentic RAG 出错时，问题可能发生在任务分解、路由、查询、召回、评估、停止或生成中的任意一层。日志至少应记录结构化决策、工具名、查询参数、文档 ID、评分、耗时、Token、错误与停止原因；不必保存或暴露模型的私有思维过程。&lt;/p&gt;
+&lt;h3 id=&#34;用更复杂的架构掩盖基础检索问题&#34;&gt;用更复杂的架构掩盖基础检索问题
+&lt;/h3&gt;&lt;p&gt;如果 Top-K 里长期没有正确文档，先检查解析、切块、Embedding、过滤器、混合检索和重排序。Agent 可以修补偶发缺口，却不该替代基本的信息检索工程。&lt;/p&gt;
+&lt;h2 id=&#34;八评估对象从答案扩展到了轨迹&#34;&gt;八、评估对象从“答案”扩展到了“轨迹”
+&lt;/h2&gt;&lt;p&gt;传统 RAG 常看命中率和回答正确率。Agentic RAG 还必须回答：它是否选择了正确工具？是否做了不必要的搜索？是否在证据不足时过早停止？&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;评估层&lt;/th&gt;
+&lt;th&gt;建议指标&lt;/th&gt;
+&lt;th&gt;要回答的问题&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;检索&lt;/td&gt;
+&lt;td&gt;Recall@K、MRR、nDCG、证据覆盖率&lt;/td&gt;
+&lt;td&gt;正确资料有没有被找到&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;生成&lt;/td&gt;
+&lt;td&gt;正确性、忠实度、引用精度与完整度&lt;/td&gt;
+&lt;td&gt;答案是否被证据支持&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;轨迹&lt;/td&gt;
+&lt;td&gt;工具选择准确率、查询有效率、平均步数、停止正确率&lt;/td&gt;
+&lt;td&gt;Agent 的过程是否合理&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;系统&lt;/td&gt;
+&lt;td&gt;P50/P95 延迟、Token 成本、工具成本、超时率&lt;/td&gt;
+&lt;td&gt;质量提升是否值得代价&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;安全&lt;/td&gt;
+&lt;td&gt;越权调用率、注入攻击成功率、敏感信息泄漏率&lt;/td&gt;
+&lt;td&gt;系统是否守住权限与数据边界&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;测试集也要分层：简单单跳题用于验证快速路径；多跳题验证分解与证据组合；信息不足题验证是否会澄清；矛盾资料题验证冲突处理；恶意文档验证提示注入防护。只用“答案看起来不错”的十几个示例，无法支撑生产决策。&lt;/p&gt;
+&lt;h2 id=&#34;九什么时候该用什么时候不该用&#34;&gt;九、什么时候该用，什么时候不该用
+&lt;/h2&gt;&lt;p&gt;可以用下面这张表做初筛：&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;场景&lt;/th&gt;
+&lt;th&gt;推荐方案&lt;/th&gt;
+&lt;th&gt;原因&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;FAQ、产品手册、制度单点问答&lt;/td&gt;
+&lt;td&gt;传统 RAG&lt;/td&gt;
+&lt;td&gt;查询稳定、答案边界清晰，优先延迟和成本&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;一个索引，但偶尔召回不佳&lt;/td&gt;
+&lt;td&gt;高级 RAG&lt;/td&gt;
+&lt;td&gt;先加混合检索、Rerank、查询改写和评估器&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;问题包含多个相互依赖的子问题&lt;/td&gt;
+&lt;td&gt;Agentic RAG&lt;/td&gt;
+&lt;td&gt;需要分解并根据中间结果继续检索&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;同时查询文档、数据库与实时 API&lt;/td&gt;
+&lt;td&gt;Agentic RAG&lt;/td&gt;
+&lt;td&gt;需要动态路由异构工具&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;医疗、金融、发布生产变更等高风险动作&lt;/td&gt;
+&lt;td&gt;Agentic RAG + 人工审批&lt;/td&gt;
+&lt;td&gt;自动检索可以辅助判断，高风险动作仍需明确授权&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;极低延迟、高吞吐、答案结构固定&lt;/td&gt;
+&lt;td&gt;传统 RAG 或规则系统&lt;/td&gt;
+&lt;td&gt;Agent 循环的收益通常抵不过额外开销&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;如果你正在从零建设，建议按以下顺序演进：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;先做可评估的传统 RAG，建立检索与答案基线；&lt;/li&gt;
+&lt;li&gt;加入混合检索、元数据过滤、Rerank 和引用校验；&lt;/li&gt;
+&lt;li&gt;只把最明显的动态决策交给 Router；&lt;/li&gt;
+&lt;li&gt;为复杂查询增加有界的“检索—评估—纠正”循环；&lt;/li&gt;
+&lt;li&gt;最后才考虑多 Agent、长期记忆和更开放的工具权限。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h2 id=&#34;十总结&#34;&gt;十、总结
+&lt;/h2&gt;&lt;p&gt;Agentic RAG 的价值，不是让 RAG 看起来更像一个“智能体”，而是让系统在面对复杂问题时拥有三种传统固定流水线缺少的能力：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;规划&lt;/strong&gt;：把复杂问题拆成可以验证的检索任务；&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;适应&lt;/strong&gt;：根据中间结果改查询、换数据源或请求澄清；&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;校验&lt;/strong&gt;：在证据不足、冲突或超出权限时停止、降级或交给人。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;它的代价同样真实：更多模型调用、更高延迟、更复杂的状态、更大的安全面，以及更困难的评估。真正成熟的方案通常不是“把所有 RAG 都 Agent 化”，而是保留一条稳定的传统 RAG 快速路径，再让 Agentic RAG 处理那些确实需要多步、多源和动态决策的问题。&lt;/p&gt;
+&lt;p&gt;一句话概括：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;传统 RAG 解决“从哪里找一段相关资料”，Agentic RAG 进一步解决“为了完成这个任务，接下来应该找什么、去哪里找、找到后是否还要继续”。&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;h2 id=&#34;参考资料&#34;&gt;参考资料
+&lt;/h2&gt;&lt;ul&gt;
+&lt;li&gt;Lewis et al., &lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2005.11401&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks&lt;/a&gt;, 2020.&lt;/li&gt;
+&lt;li&gt;Yao et al., &lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2210.03629&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;ReAct: Synergizing Reasoning and Acting in Language Models&lt;/a&gt;, 2022.&lt;/li&gt;
+&lt;li&gt;Asai et al., &lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2310.11511&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Self-RAG: Learning to Retrieve, Generate, and Critique through Self-Reflection&lt;/a&gt;, 2023.&lt;/li&gt;
+&lt;li&gt;Yan et al., &lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2401.15884&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Corrective Retrieval Augmented Generation&lt;/a&gt;, 2024.&lt;/li&gt;
+&lt;li&gt;Singh et al., &lt;a class=&#34;link&#34; href=&#34;https://arxiv.org/abs/2501.09136&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Agentic Retrieval-Augmented Generation: A Survey on Agentic RAG&lt;/a&gt;, 2025.&lt;/li&gt;
+&lt;li&gt;Microsoft, &lt;a class=&#34;link&#34; href=&#34;https://learn.microsoft.com/en-us/azure/architecture/ai-ml/guide/rag/rag-agentic&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Develop an Agentic RAG Solution on Azure&lt;/a&gt;.&lt;/li&gt;
+&lt;li&gt;LangChain, &lt;a class=&#34;link&#34; href=&#34;https://docs.langchain.com/oss/python/learn&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;RAG agent 与自定义 RAG Agent 教程索引&lt;/a&gt;.&lt;/li&gt;
+&lt;/ul&gt;
+</description>
+        </item>
+        <item>
         <title>从关键字匹配到向量检索：搜索技术的三条路</title>
         <link>https://SymphonyW.github.io/zh-cn/p/search-matching-retrieval/</link>
         <pubDate>Fri, 02 Oct 2026 20:13:30 +0800</pubDate>

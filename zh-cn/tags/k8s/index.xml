@@ -19,7 +19,7 @@
 &lt;/blockquote&gt;
 &lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/bg.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/bg.svg&#34; alt=&#34;K8s 容器云部署流程&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
 &lt;/p&gt;
-&lt;p&gt;这篇文章按一次真实上线的顺序来讲，不绑定某个具体厂商控制台。只要你的公司平台底层是 Kubernetes，大部分步骤都能对应到类似的概念。&lt;/p&gt;
+&lt;p&gt;这篇文章按一次真实上线的顺序来讲，并以中国电信云 CeakE 容器服务 CKE 的控制台为例展示具体操作。不同平台的页面名称可能不同，但只要底层是 Kubernetes，工作负载、Service、Ingress、探针和滚动更新等概念都能一一对应。&lt;/p&gt;
 &lt;div class=&#34;mermaid&#34;&gt;flowchart LR
     A[代码仓库] --&gt; B[编写 Dockerfile]
     B --&gt; C[本地构建镜像]
@@ -685,7 +685,110 @@
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;推送成功后，容器云平台才能从仓库拉到这个镜像。注意：&lt;strong&gt;K8s 集群不会使用你本机 Docker 里的镜像&lt;/strong&gt;。除非是特殊的本地集群，生产平台只会从镜像仓库拉取。&lt;/p&gt;
 &lt;h2 id=&#34;三在容器云平台创建工作负载&#34;&gt;三、在容器云平台创建工作负载
-&lt;/h2&gt;&lt;p&gt;镜像准备好后，才进入平台部署阶段。不同平台页面不一样，但字段基本类似。&lt;/p&gt;
+&lt;/h2&gt;&lt;p&gt;镜像准备好后，才进入平台部署阶段。下面结合控制台截图走一遍完整流程。&lt;/p&gt;
+&lt;h3 id=&#34;1-进入集群并检查资源状态&#34;&gt;1. 进入集群并检查资源状态
+&lt;/h3&gt;&lt;p&gt;在“容器 → 集群列表”中找到目标集群。进入控制台前先确认集群状态为“运行中”，并核对集群类型、版本、节点数和所属租户，避免把服务发布到错误的环境。&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/1.Cluster.png&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/1.Cluster.png&#34; alt=&#34;CeakE CKE 集群列表&#34; width=&#34;3200&#34; height=&#34;1536&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34; class=&#34;gallery-image&#34; data-flex-grow=&#34;208&#34; data-flex-basis=&#34;500px&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;p&gt;进入集群后的“概览”页会集中展示 Deployment、StatefulSet、DaemonSet、Job、CronJob 和 Pod 数量，以及节点健康状态、CPU、内存和磁盘使用情况。&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/2.Summary.png&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/2.Summary.png&#34; alt=&#34;CeakE CKE 集群资源概览&#34; width=&#34;3200&#34; height=&#34;1536&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34; class=&#34;gallery-image&#34; data-flex-grow=&#34;208&#34; data-flex-basis=&#34;500px&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;p&gt;发布前不要只看“节点健康”，还要同时检查资源水位和事件列表。截图里 CPU、内存都已经有一定占用；如果 requests 配得过大，Pod 可能因为剩余可分配资源不足而一直处于 &lt;code&gt;Pending&lt;/code&gt;。事件列表中的 Warning 也应在发布前确认是否与目标项目或网络入口有关。&lt;/p&gt;
+&lt;h3 id=&#34;2-先选对工作负载类型&#34;&gt;2. 先选对工作负载类型
+&lt;/h3&gt;&lt;p&gt;左侧“工作负载”菜单并不只有 Deployment。平台把常见控制器和 Pod 分开列出，选择时可以按运行模式判断：&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;控制台入口&lt;/th&gt;
+&lt;th&gt;Kubernetes 对象&lt;/th&gt;
+&lt;th&gt;适用场景&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;无状态负载&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;Deployment&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;Web、API 等可横向扩容、实例可替换的服务&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;守护进程集&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;DaemonSet&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;每个节点运行一个实例，如日志采集、监控 Agent&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;有状态负载&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;StatefulSet&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;需要稳定网络标识、顺序发布或持久存储的服务&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;普通任务&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;Job&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;数据迁移、一次性计算等执行完成即退出的任务&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;定时任务&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;CronJob&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;按 Cron 表达式周期执行的任务&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;容器组&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;Pod&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;查看实际运行实例和排错，一般不直接创建长期业务 Pod&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/3.Deployment.png&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/3.Deployment.png&#34; alt=&#34;无状态负载 Deployment 列表&#34; width=&#34;3200&#34; height=&#34;1536&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34; class=&#34;gallery-image&#34; data-flex-grow=&#34;208&#34; data-flex-basis=&#34;500px&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;p&gt;Deployment 列表中的“容器组（运行/期望）”、副本数和状态可以快速判断发布是否完成。比如 &lt;code&gt;0/1&lt;/code&gt; 且状态为 &lt;code&gt;Updating&lt;/code&gt;，说明新 Pod 还没有达到期望状态。&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/4.DaemonSets.png&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/4.DaemonSets.png&#34; alt=&#34;守护进程集 DaemonSet 列表&#34; width=&#34;3200&#34; height=&#34;1536&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34; class=&#34;gallery-image&#34; data-flex-grow=&#34;208&#34; data-flex-basis=&#34;500px&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/5.StatefulSet.png&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/5.StatefulSet.png&#34; alt=&#34;有状态负载 StatefulSet 列表&#34; width=&#34;3200&#34; height=&#34;1536&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34; class=&#34;gallery-image&#34; data-flex-grow=&#34;208&#34; data-flex-basis=&#34;500px&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/6.Job.png&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/6.Job.png&#34; alt=&#34;普通任务 Job 列表&#34; width=&#34;3200&#34; height=&#34;1536&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34; class=&#34;gallery-image&#34; data-flex-grow=&#34;208&#34; data-flex-basis=&#34;500px&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/7.CronJob.png&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/7.CronJob.png&#34; alt=&#34;定时任务 CronJob 列表&#34; width=&#34;3200&#34; height=&#34;1536&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34; class=&#34;gallery-image&#34; data-flex-grow=&#34;208&#34; data-flex-basis=&#34;500px&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/8.Pod.png&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/8.Pod.png&#34; alt=&#34;容器组 Pod 列表&#34; width=&#34;3200&#34; height=&#34;1536&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34; class=&#34;gallery-image&#34; data-flex-grow=&#34;208&#34; data-flex-basis=&#34;500px&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;p&gt;Pod 页面尤其适合排错：它同时展示状态、就绪容器数、重启次数、Pod IP 和所在节点。截图中的 &lt;code&gt;CrashLoopBackOff&lt;/code&gt; 和异常高的重启次数就是明确的故障信号，此时应优先查看容器日志、上一轮日志和 Pod 事件，而不是先改 Service 或 Route。&lt;/p&gt;
+&lt;h3 id=&#34;3-按四步向导创建-deployment&#34;&gt;3. 按四步向导创建 Deployment
+&lt;/h3&gt;&lt;p&gt;在“无状态负载”页面点击“新建无状态工作负载”，控制台会依次进入基本信息、容器配置、服务配置和高级配置四个步骤。&lt;/p&gt;
+&lt;h4 id=&#34;第一步基本信息&#34;&gt;第一步：基本信息
+&lt;/h4&gt;&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/3.1.Basic-Info.png&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/3.1.Basic-Info.png&#34; alt=&#34;新建 Deployment 的基本信息&#34; width=&#34;3200&#34; height=&#34;1536&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34; class=&#34;gallery-image&#34; data-flex-grow=&#34;208&#34; data-flex-basis=&#34;500px&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;p&gt;填写名称、项目（对应 Namespace）、实例数量和描述。测试环境可以先用 1 个实例验证；生产环境通常至少 2 个实例，并结合滚动更新策略保证发布期间仍有可用 Pod。&lt;/p&gt;
+&lt;h4 id=&#34;第二步容器配置&#34;&gt;第二步：容器配置
+&lt;/h4&gt;&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/3.2.Container-Setting-1.png&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/3.2.Container-Setting-1.png&#34; alt=&#34;Deployment 容器镜像与资源配置&#34; width=&#34;3200&#34; height=&#34;1536&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34; class=&#34;gallery-image&#34; data-flex-grow=&#34;208&#34; data-flex-basis=&#34;500px&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;p&gt;容器镜像既可以从平台镜像仓库选择，也可以直接输入完整镜像地址。需要重点核对镜像 Tag、拉取策略以及 vCPU/内存的请求和限制：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;使用不可变 Tag 时可以选 &lt;code&gt;IfNotPresent&lt;/code&gt;；截图中的默认值是 &lt;code&gt;Always&lt;/code&gt;，它适合同一 Tag 可能被覆盖的场景，但生产发布仍建议使用唯一 Tag；&lt;/li&gt;
+&lt;li&gt;不建议把 CPU、内存请求与限制都保持为“无限制”，至少要设置合理的 requests，生产环境再根据压测和监控设置 limits；&lt;/li&gt;
+&lt;li&gt;容器名称是 Pod 内的标识，不等于 Deployment 名称；一个 Pod 也可以配置多个容器。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/3.2.Container-Setting-2.png&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/3.2.Container-Setting-2.png&#34; alt=&#34;Deployment 环境变量、探针和存储配置&#34; width=&#34;3200&#34; height=&#34;1536&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34; class=&#34;gallery-image&#34; data-flex-grow=&#34;208&#34; data-flex-basis=&#34;500px&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;p&gt;向下滚动可以配置环境变量、启动命令、运行参数、工作目录、健康检查和存储卷。平台把 Kubernetes 的三类探针分别显示为存活检查（Liveness）、就绪检查（Readiness）和启动检查（Startup）：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Readiness 决定 Pod 是否加入 Service Endpoint，业务服务通常应该配置；&lt;/li&gt;
+&lt;li&gt;Liveness 用于判断是否需要重启容器，不要把偶发抖动的外部依赖放进检查逻辑；&lt;/li&gt;
+&lt;li&gt;启动慢的应用可使用 Startup Probe，避免还在启动时就被 Liveness 反复重启。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4 id=&#34;第三步服务配置&#34;&gt;第三步：服务配置
+&lt;/h4&gt;&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/3.3.Service-Setting.png&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/3.3.Service-Setting.png&#34; alt=&#34;Deployment 向导中的服务配置&#34; width=&#34;3200&#34; height=&#34;1536&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34; class=&#34;gallery-image&#34; data-flex-grow=&#34;208&#34; data-flex-basis=&#34;500px&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;p&gt;这里可以绑定已有 Service，也可以直接新建。若当前工作负载暂时不需要被访问，可以先跳过，后续再从“网络 → 服务”中单独创建。&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/3.3.New-Service.png&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/3.3.New-Service.png&#34; alt=&#34;Deployment 向导中新建 Service&#34; width=&#34;3200&#34; height=&#34;1536&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34; class=&#34;gallery-image&#34; data-flex-grow=&#34;208&#34; data-flex-basis=&#34;500px&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;p&gt;新建 Service 时要填写访问类型、服务端口、容器端口和协议。对普通内部服务优先使用 &lt;code&gt;ClusterIP&lt;/code&gt;；&lt;code&gt;NodePort&lt;/code&gt; 会在节点上开放端口；&lt;code&gt;LoadBalancer&lt;/code&gt; 是否可用取决于云平台和负载均衡配置。最关键的是把 Service 正确绑定到工作负载标签，否则 Service 不会产生 Endpoint。&lt;/p&gt;
+&lt;h4 id=&#34;第四步高级配置&#34;&gt;第四步：高级配置
+&lt;/h4&gt;&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/3.4.Advanced-Settings-1.png&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/3.4.Advanced-Settings-1.png&#34; alt=&#34;Deployment 网络与滚动更新配置&#34; width=&#34;3200&#34; height=&#34;1536&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34; class=&#34;gallery-image&#34; data-flex-grow=&#34;208&#34; data-flex-basis=&#34;500px&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;p&gt;高级配置上半部分包括 DNS 策略、额外 Hosts/网络，以及升级策略。常规场景保持 &lt;code&gt;ClusterFirst&lt;/code&gt;；升级方式使用 &lt;code&gt;RollingUpdate&lt;/code&gt; 时，需要结合副本数设置最大扩容 Pod 数（&lt;code&gt;maxSurge&lt;/code&gt;）和最大不可用 Pod 数（&lt;code&gt;maxUnavailable&lt;/code&gt;）。单副本服务若允许 &lt;code&gt;maxUnavailable: 1&lt;/code&gt;，发布过程中会短暂不可用。&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/3.4.Advanced-Settings-2.png&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/3.4.Advanced-Settings-2.png&#34; alt=&#34;Deployment 调度、标签和镜像密钥配置&#34; width=&#34;3200&#34; height=&#34;1536&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34; class=&#34;gallery-image&#34; data-flex-grow=&#34;208&#34; data-flex-basis=&#34;500px&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;p&gt;高级配置下半部分可以设置节点亲和性、工作负载亲和/反亲和、污点容忍、标签、注解、应用监控和私有镜像密钥。只有在确实需要指定节点、跨节点分散副本或访问私有仓库时再修改；不清楚含义时，先保留平台默认的调度配置。&lt;/p&gt;
+&lt;p&gt;四步表单最终仍会生成 Kubernetes Deployment。填写时可以用下面这张表快速对照：&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
 &lt;tr&gt;
@@ -895,7 +998,50 @@
     S --&gt; P1[Pod 1]
     S --&gt; P2[Pod 2]
     S --&gt; P3[Pod 3]
-&lt;/div&gt;&lt;p&gt;集群内访问一般用 &lt;code&gt;Service&lt;/code&gt;：&lt;/p&gt;
+&lt;/div&gt;&lt;h3 id=&#34;1-创建-service&#34;&gt;1. 创建 Service
+&lt;/h3&gt;&lt;p&gt;“网络 → 服务”页面会显示访问方式、Cluster IP 或外部 IP，以及“服务端口 → 容器端口/协议”的映射关系。列表中的 &lt;code&gt;ClusterIP&lt;/code&gt;、&lt;code&gt;NodePort&lt;/code&gt; 和 &lt;code&gt;LoadBalancer&lt;/code&gt; 对应三种不同暴露范围，不能只根据端口号判断服务是否能从公网访问。&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/9.Service.png&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/9.Service.png&#34; alt=&#34;Service 列表与端口映射&#34; width=&#34;3200&#34; height=&#34;1536&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34; class=&#34;gallery-image&#34; data-flex-grow=&#34;208&#34; data-flex-basis=&#34;500px&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/9.1.New-Service.png&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/9.1.New-Service.png&#34; alt=&#34;新建 Service 表单&#34; width=&#34;3200&#34; height=&#34;1536&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34; class=&#34;gallery-image&#34; data-flex-grow=&#34;208&#34; data-flex-basis=&#34;500px&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;p&gt;新建 Service 时先选择项目和名称，再选择访问类型并配置端口：&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;表单字段&lt;/th&gt;
+&lt;th&gt;Kubernetes 字段&lt;/th&gt;
+&lt;th&gt;说明&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;服务端口&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;spec.ports[].port&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;客户端访问 Service 使用的端口&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;容器端口&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;spec.ports[].targetPort&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;流量最终转发到 Pod 的端口&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;访问类型&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;spec.type&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;ClusterIP&lt;/code&gt;、&lt;code&gt;NodePort&lt;/code&gt; 或 &lt;code&gt;LoadBalancer&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;绑定工作负载/标签&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;spec.selector&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;必须能匹配目标 Pod 的 labels&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Session Hold&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;sessionAffinity&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;只有业务确实需要会话粘性时才开启&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;集群内访问一般用 &lt;code&gt;Service&lt;/code&gt;：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
@@ -980,7 +1126,14 @@
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;                  &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;number&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;m&#34;&gt;80&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;平台页面里可能不会叫 Ingress，而是叫“域名”“路由”“七层负载均衡”“应用入口”。核心字段仍然是：域名、路径、后端 Service、端口、证书。&lt;/p&gt;
+&lt;/div&gt;&lt;h3 id=&#34;2-创建-routeingress&#34;&gt;2. 创建 Route（Ingress）
+&lt;/h3&gt;&lt;p&gt;该平台把 Ingress 放在“网络 → 路由”中。路由列表展示名称、绑定的 Service、项目和类型；一个路由可以包含多条后端规则。&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/10.Route.png&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/10.Route.png&#34; alt=&#34;Route 列表&#34; width=&#34;3200&#34; height=&#34;1536&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34; class=&#34;gallery-image&#34; data-flex-grow=&#34;208&#34; data-flex-basis=&#34;500px&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/10.1.New-Route.png&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/10.1.New-Route.png&#34; alt=&#34;新建 Route 表单&#34; width=&#34;3200&#34; height=&#34;1536&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34; class=&#34;gallery-image&#34; data-flex-grow=&#34;208&#34; data-flex-basis=&#34;500px&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;p&gt;新建路由时依次填写路由名称、项目、Ingress 类型、协议、域名、路径匹配方式、目标 Service 和目标端口。截图中的类型为 &lt;code&gt;nginx&lt;/code&gt;、匹配方式为 &lt;code&gt;Prefix&lt;/code&gt;，它们分别对应 Ingress Controller 和 &lt;code&gt;pathType: Prefix&lt;/code&gt;。如果选择 HTTPS，还需要按平台要求配置 TLS 证书或 Secret。&lt;/p&gt;
+&lt;p&gt;平台页面里可能不会叫 Ingress，而是叫“域名”“路由”“七层负载均衡”或“应用入口”。无论名称如何，排错时都沿着 &lt;strong&gt;Route/Ingress → Service → Endpoint → Pod&lt;/strong&gt; 这条链路逐层检查。&lt;/p&gt;
 &lt;h2 id=&#34;五发布验证和回滚&#34;&gt;五、发布、验证和回滚
 &lt;/h2&gt;&lt;p&gt;如果平台支持直接应用 YAML，可以这样发布：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
