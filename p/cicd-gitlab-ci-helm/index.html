@@ -1,0 +1,1334 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="Understand feedback, artifacts, and desired state through GitLab Runner, pipeline dependencies, image digests, Helm releases, deployment checks, rollback, and GitOps, with a complete example.">
+<title>CI/CD, GitLab CI, and Helm: From Commit to Kubernetes Delivery</title>
+
+<link rel='canonical' href='https://SymphonyW.github.io/p/cicd-gitlab-ci-helm/'>
+<link rel="stylesheet" href="/scss/custom.min.bf7995e62147d50e1276b97e61d2c8120b52dfef9e32fbaed4e22d2affbd1b2b.css">
+<script>
+(() => {
+    let preference = 'auto';
+    try { preference = localStorage.getItem('StackColorScheme') || preference; } catch (_) {}
+    document.documentElement.dataset.scheme = preference === 'dark' || (preference === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+})();
+</script>
+
+<meta property='og:title' content="CI/CD, GitLab CI, and Helm: From Commit to Kubernetes Delivery">
+<meta property='og:description' content="Understand feedback, artifacts, and desired state through GitLab Runner, pipeline dependencies, image digests, Helm releases, deployment checks, rollback, and GitOps, with a complete example.">
+<meta property='og:url' content='https://SymphonyW.github.io/p/cicd-gitlab-ci-helm/'>
+<meta property='og:site_name' content='Snow'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='CI/CD' /><meta property='article:tag' content='GitLab CI' /><meta property='article:tag' content='Helm' /><meta property='article:tag' content='Kubernetes' /><meta property='article:tag' content='DevOps' /><meta property='article:published_time' content='2026-10-17T10:00:00&#43;08:00'/><meta property='article:modified_time' content='2026-10-17T10:00:00&#43;08:00'/><meta property='og:image' content='https://SymphonyW.github.io/p/cicd-gitlab-ci-helm/bg.png' />
+<meta name="twitter:title" content="CI/CD, GitLab CI, and Helm: From Commit to Kubernetes Delivery">
+<meta name="twitter:description" content="Understand feedback, artifacts, and desired state through GitLab Runner, pipeline dependencies, image digests, Helm releases, deployment checks, rollback, and GitOps, with a complete example."><meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content='https://SymphonyW.github.io/p/cicd-gitlab-ci-helm/bg.png' />
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    
+    <noscript><style>@media(max-width:760px){.site-header{position:static}.site-header__inner{height:auto;min-height:66px;flex-wrap:wrap}.site-nav{position:static;display:grid;order:3;flex-basis:100%;padding:8px 0 18px}.menu-toggle,.theme-toggle{display:none}}</style></noscript>
+</head>
+<body id="top" class="article-page">
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    
+<header class="site-header">
+    <div class="site-header__inner">
+        <a class="site-brand" href="/" aria-label="Snow — Home">S<span>now.</span></a>
+        <nav class="site-nav" id="site-navigation" aria-label="Main navigation">
+            
+            
+                
+                    
+                    
+                    <a href="/">Home</a>
+                
+            
+                
+                    
+                    
+                    <a href="/post/" aria-current="page">Blog</a>
+                
+            
+                
+                    
+                    
+                    <a href="/archives/">Archives</a>
+                
+            
+                
+                    
+                    
+                    <a href="/diary/">Diary</a>
+                
+            
+                
+                    
+                    
+                    <a href="/stats/">Stats</a>
+                
+            
+                
+            
+                
+                    
+                    
+                    <a href="/links/">Links</a>
+                
+            
+        </nav>
+        <div class="header-tools">
+            
+                <a class="language-link" href="/zh-cn/p/cicd-gitlab-ci-helm/" lang="zh-cn" hreflang="zh-cn" aria-label="切换到中文">中</a>
+            
+            <button type="button" id="dark-mode-toggle" class="icon-button theme-toggle" aria-label="Toggle color theme" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><path d="M12 4.5a7.5 7.5 0 0 1 0 15z" fill="currentColor" stroke="none"/></svg></button>
+            <a class="icon-button search-link" href="/search/" aria-label="Search articles"><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+</a>
+            <button class="icon-button menu-toggle" type="button" aria-expanded="false" aria-controls="site-navigation" aria-label="Open navigation"><span></span><span></span></button>
+        </div>
+    </div>
+    <div class="reading-progress" aria-hidden="true"></div>
+</header>
+
+    <main id="main-content" class="site-main main" tabindex="-1">
+        
+    <div class="reading-page">
+        <article class="main-article has-toc">
+    <header class="article-header">
+    <div class="article-wayfinding">
+        
+            <a href="/post/"><span aria-hidden="true">←</span> All writing</a>
+        
+        <span class="article-kind">Notes & observations</span>
+    </div>
+    <div class="article-details">
+    
+    <h1 class="article-title">CI/CD, GitLab CI, and Helm: From Commit to Kubernetes Delivery</h1>
+    <p class="article-subtitle">Understand feedback, artifacts, and desired state through GitLab Runner, pipeline dependencies, image digests, Helm releases, deployment checks, rollback, and GitOps, with a complete example.</p>
+    <div class="article-meta">
+        
+            <time datetime="2026-10-17T10:00:00&#43;08:00">October 17, 2026</time>
+            <span class="meta-divider" aria-hidden="true">/</span>
+            <span>19 min read</span>
+        
+        
+            <div class="article-translations"><a href="/zh-cn/p/cicd-gitlab-ci-helm/" hreflang="zh-cn" lang="zh-cn">阅读中文版 <span aria-hidden="true">↗</span></a></div>
+        
+    </div>
+</div>
+
+</header>
+
+    <div class="reading-layout">
+        
+            <aside class="reading-margin" aria-label="Article contents">
+                <details class="article-toc" open>
+                    <summary><span>On this page</span><span class="toc-indicator" aria-hidden="true">+</span></summary>
+                    <nav id="TableOfContents">
+  <ol>
+    <li><a href="#1-cicd-makes-feedback-a-continuous-part-of-change">1. CI/CD makes feedback a continuous part of change</a></li>
+    <li><a href="#2-how-the-delivery-components-fit-together">2. How the delivery components fit together</a></li>
+    <li><a href="#3-gitlab-ci-turns-configuration-into-scheduled-jobs">3. GitLab CI turns configuration into scheduled jobs</a></li>
+    <li><a href="#4-helm-organizes-resources-into-a-manageable-release">4. Helm organizes resources into a manageable release</a></li>
+    <li><a href="#5-a-complete-pipeline-verify-package-stage-and-promote">5. A complete pipeline: verify, package, stage, and promote</a></li>
+    <li><a href="#6-failure-handling-health-concurrency-and-rollback-boundaries">6. Failure handling: health, concurrency, and rollback boundaries</a></li>
+    <li><a href="#7-moving-from-deployment-scripts-toward-gitops">7. Moving from deployment scripts toward GitOps</a></li>
+  </ol>
+</nav>
+                </details>
+            </aside>
+        
+        <div class="reading-body">
+            <div class="article-content"><p>How does a <code>git push</code> become a tested application running in Kubernetes? GitLab CI, container builders, registries, and Helm often appear in the same pipeline, but each owns a different part of the delivery process.</p>
+<p>Three questions connect them: <strong>Is this change trustworthy? Which exact artifact are we delivering? Has the environment reached the intended state?</strong> CI provides feedback, artifacts preserve build results, and deployment tools cooperate with the cluster to change running state. A dependable delivery process also records how to recover when those steps fail.</p>
+<p>This article follows GitLab CI → container image → Helm → Kubernetes. The earlier <a class="link" href="/p/ci/cd-complete-guidefrom-principles-to-practice/" >CI/CD introduction</a> focuses on GitHub Actions; this article extends the discussion to containerized services. For the underlying platform concepts, see <a class="link" href="/p/docker-k8s-openshift/" >Docker, Kubernetes, and OpenShift</a>.</p>
+<blockquote>
+<p><strong>Example scope:</strong> Linux container runners, Node.js 22, Helm <strong>3</strong>, and Kubernetes <code>apps/v1</code> Deployments. Major image tags keep the example readable; use reviewed versions or digests in production. Helm 4 uses a different failure rollback option, discussed below.</p>
+</blockquote>
+<h2 id="1-cicd-makes-feedback-a-continuous-part-of-change">1. CI/CD makes feedback a continuous part of change
+</h2><p>Manual releases leave difficult questions unanswered: which commit passed the tests, whether the deployed binary is the tested artifact, and whether an earlier working state can still be restored.</p>
+<p>CI/CD turns those questions into repeatable checks, identifiable artifacts, and explicit conditions for moving between environments.</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Practice</th>
+<th>Focus</th>
+<th>Result</th>
+<th>Human production trigger?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Continuous integration</td>
+<td>Integrate small changes frequently and check them automatically</td>
+<td>Fast feedback on the integrated code</td>
+<td>Separate concern</td>
+</tr>
+<tr>
+<td>Continuous delivery</td>
+<td>Keep validated changes deployable through a reliable process</td>
+<td>A release candidate ready for deployment</td>
+<td>May remain</td>
+</tr>
+<tr>
+<td>Continuous deployment</td>
+<td>Automate the production deployment decision</td>
+<td>Changes meeting the gates enter production automatically</td>
+<td>Normally unnecessary</td>
+</tr>
+</tbody>
+</table></div>
+<p>A manual production job is compatible with continuous delivery. Automating that final step does not, by itself, establish good tests, permission boundaries, or recovery procedures.</p>
+<p>CI also requires working habits. Running nightly builds while developers keep separate changes for weeks still allows integration risk to accumulate. Frequent integration, useful checks, and prompt repairs to broken builds make the feedback loop effective.</p>
+<p><strong>Deployment</strong> puts a version into an environment. <strong>Release</strong> exposes functionality to users. Feature flags allow those decisions to happen at different times: deploy the code first, then expose a capability to selected users.</p>
+<p>A practical feedback sequence is syntax and static checks → unit tests → artifact and dependency checks → integration testing → staging → production observation. Expensive checks can come later, but their blocking conditions should be explicit. Slow, unreliable checks eventually teach people to ignore the pipeline.</p>
+<h2 id="2-how-the-delivery-components-fit-together">2. How the delivery components fit together
+</h2><p><a href="/p/cicd-gitlab-ci-helm/delivery-flow.svg" target="_blank" rel="noopener noreferrer"><img src="/p/cicd-gitlab-ci-helm/delivery-flow.svg" alt="GitLab schedules jobs, Runner executes them, Helm manages a release, and Kubernetes reconciles workloads" loading="lazy" decoding="async"></a>
+</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Responsibility</th>
+<th>Output passed onward</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Git repository</td>
+<td>Version source, tests, and delivery configuration</td>
+<td>An exact commit</td>
+</tr>
+<tr>
+<td>GitLab CI</td>
+<td>Evaluate rules and schedule dependent jobs</td>
+<td>Jobs, metadata, and execution records</td>
+</tr>
+<tr>
+<td>GitLab Runner</td>
+<td>Execute jobs in an actual environment</td>
+<td>Exit status, logs, reports, and artifacts</td>
+</tr>
+<tr>
+<td>Image builder</td>
+<td>Build a container image from declared inputs</td>
+<td>An OCI image</td>
+</tr>
+<tr>
+<td>Container registry</td>
+<td>Store and distribute images</td>
+<td>Repository, tags, and content digests</td>
+</tr>
+<tr>
+<td>Helm</td>
+<td>Manage templated Kubernetes resources and release revisions</td>
+<td>Manifests and release records</td>
+</tr>
+<tr>
+<td>Kubernetes</td>
+<td>Reconcile workloads toward desired state</td>
+<td>Running Pods, Services, health, and events</td>
+</tr>
+</tbody>
+</table></div>
+<p>Runner executes the commands. GitLab coordinates them. Container executors supply the job images and services used here; a Shell executor needs a different setup. <a class="link" href="https://docs.gitlab.com/runner/"  target="_blank" rel="noopener"
+    >GitLab Runner documentation</a></p>
+<p>After an update, Kubernetes controllers, the scheduler, and node runtimes cooperate to start the intended workload. API acceptance is only one step toward availability. A Deployment controller manages replicas and rollouts; it does not automatically choose a previous Helm revision when business error rates rise. <a class="link" href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"  target="_blank" rel="noopener"
+    >Kubernetes Deployments</a></p>
+<p>A release record should connect these identities:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">Source              = full Git commit SHA
+</span></span><span class="line"><span class="cl">Execution           = project ID + pipeline ID
+</span></span><span class="line"><span class="cl">Application image   = registry.example.com/team/demo@sha256:...
+</span></span><span class="line"><span class="cl">Deployment package  = demo-0.1.0.tgz + package checksum
+</span></span><span class="line"><span class="cl">Environment config  = commit containing values-production.yaml
+</span></span><span class="line"><span class="cl">Installed release   = cluster + namespace + name + revision
+</span></span><span class="line"><span class="cl">Verification        = test results + smoke checks + runtime metrics
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Build once and promote the <strong>same image digest and chart package</strong> through staging and production. Rebuilding separately for each environment can resolve different dependencies or base images even when the source commit is unchanged. Record the environment values that intentionally differ.</p>
+<p>A Git SHA tag is readable, but a tag can still be overwritten. A digest identifies content. It does not prove that the content is safe, tested, signed, or produced by a trusted builder.</p>
+<h2 id="3-gitlab-ci-turns-configuration-into-scheduled-jobs">3. GitLab CI turns configuration into scheduled jobs
+</h2><p>The root <code>.gitlab-ci.yml</code> describes a pipeline rather than a single sequential shell script. GitLab parses the configuration, evaluates rules, and creates the dependency graph. Runner prepares an execution environment, checks out source, retrieves requested artifacts, runs commands, and uploads results.</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Keyword</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>workflow: rules</code></td>
+<td>Decide whether to create a pipeline</td>
+</tr>
+<tr>
+<td>Job <code>rules</code></td>
+<td>Decide whether and how a job is included; first match wins</td>
+</tr>
+<tr>
+<td><code>stages</code> / <code>stage</code></td>
+<td>Establish default phase ordering</td>
+</tr>
+<tr>
+<td><code>needs</code></td>
+<td>Declare explicit dependencies, potentially bypassing stage barriers</td>
+</tr>
+<tr>
+<td><code>image</code> / <code>services</code></td>
+<td>Define a job container and companion services</td>
+</tr>
+<tr>
+<td><code>tags</code></td>
+<td>Select eligible runners</td>
+</tr>
+<tr>
+<td><code>environment</code></td>
+<td>Record a deployment target; does not provision infrastructure</td>
+</tr>
+<tr>
+<td><code>resource_group</code></td>
+<td>Serialize jobs using a shared resource</td>
+</tr>
+</tbody>
+</table></div>
+<p>Jobs in one stage can run concurrently when runner capacity permits. With <code>needs</code>, explicitly preserve every required gate. Validate the final configuration with the target instance&rsquo;s CI Lint, particularly when using includes or inheritance. <a class="link" href="https://docs.gitlab.com/ci/yaml/"  target="_blank" rel="noopener"
+    >GitLab YAML reference</a></p>
+<p><strong>Choose the events first.</strong> This example creates MR validation pipelines and default-branch push pipelines. Ordinary feature-branch pushes, tag events, and schedules are excluded:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">workflow</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">rules</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="s1">&#39;$CI_PIPELINE_SOURCE == &#34;merge_request_event&#34;&#39;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="s1">&#39;$CI_PIPELINE_SOURCE == &#34;push&#34; &amp;&amp; $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH&#39;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="nt">when</span><span class="p">:</span><span class="w"> </span><span class="l">never</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>For branch validation before an MR exists, consider switching between branch and MR pipelines with <code>CI_OPEN_MERGE_REQUESTS</code> to avoid duplicate runs. An MR pipeline also does not inherently test the final merged result; configure merged results pipelines when required and supported. <a class="link" href="https://docs.gitlab.com/ci/yaml/workflow/"  target="_blank" rel="noopener"
+    >Workflow documentation</a>, <a class="link" href="https://docs.gitlab.com/ci/pipelines/merged_results_pipelines/"  target="_blank" rel="noopener"
+    >merged results pipelines</a></p>
+<p><strong>Jobs should not rely on a shared filesystem.</strong> Choose an explicit handoff:</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Mechanism</th>
+<th>Appropriate contents</th>
+<th>Reliability expectation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Cache</td>
+<td>Downloaded dependencies and regenerable build data</td>
+<td>A miss must remain safe</td>
+</tr>
+<tr>
+<td>Artifacts</td>
+<td>Reports, build outputs, chart packages</td>
+<td>Account for expiry, access, and download dependencies</td>
+</tr>
+<tr>
+<td>Registry</td>
+<td>Container images and distributable OCI artifacts</td>
+<td>Preserve required content and pull access</td>
+</tr>
+<tr>
+<td>dotenv report</td>
+<td>Small non-secret metadata such as image digest</td>
+<td>Available to dependent jobs; unsuitable for secrets</td>
+</tr>
+</tbody>
+</table></div>
+<p>Cache accelerates work; artifacts transmit results. Do not put the only copy of a release package in a cache. Jobs using <code>needs</code> should name the producers whose artifacts they require. <a class="link" href="https://docs.gitlab.com/ci/caching/"  target="_blank" rel="noopener"
+    >Caching documentation</a>, <a class="link" href="https://docs.gitlab.com/ci/jobs/job_artifacts/"  target="_blank" rel="noopener"
+    >job artifacts</a></p>
+<p>For an application with npm dependencies, cache downloads while retaining lockfile-based installation:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="c"># Standalone illustration; the dependency-free demo below needs no npm install.</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">cache</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">key</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">files</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="l">package-lock.json]</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">paths</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="l">.npm/]</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">script</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span>- <span class="l">npm ci --cache .npm --prefer-offline</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span>- <span class="l">npm test</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p><code>npm ci</code> defines installation behavior; the download cache only reduces repeated work. A runner&rsquo;s leftover <code>node_modules</code> directory is not a reliable dependency contract.</p>
+<p><strong>Credentials need a separate control path.</strong> Masking helps prevent accidental log disclosure, protected variables restrict eligible refs, environment scopes separate targets, and file variables supply temporary file paths. Code running inside a trusted job can still read its variables. Protect branches, review CI changes, and restrict runner privileges accordingly. <a class="link" href="https://docs.gitlab.com/ci/variables/"  target="_blank" rel="noopener"
+    >CI/CD variables</a></p>
+<h2 id="4-helm-organizes-resources-into-a-manageable-release">4. Helm organizes resources into a manageable release
+</h2><p>A service usually needs several resources, with environment-specific parameters. Helm packages their templates and records installations and upgrades.</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Concept</th>
+<th>Meaning</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Chart</td>
+<td>Distributable application templates</td>
+<td><code>demo-0.1.0.tgz</code></td>
+</tr>
+<tr>
+<td>Values</td>
+<td>Inputs used to render templates</td>
+<td>Replica count and image digest</td>
+</tr>
+<tr>
+<td>Release</td>
+<td>A named installation in a namespace</td>
+<td><code>demo</code> in staging</td>
+</tr>
+<tr>
+<td>Revision</td>
+<td>A release&rsquo;s historical revision number</td>
+<td>Revision 1 → 2</td>
+</tr>
+<tr>
+<td>Repository / OCI registry</td>
+<td>Distribution location for charts</td>
+<td>A team&rsquo;s chart registry</td>
+</tr>
+</tbody>
+</table></div>
+<p>One chart can produce many releases. Always identify the cluster context, namespace, and release name when inspecting an installation.</p>
+<p>The example contains a Deployment, a Service, and a Helm test Pod:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span><span class="lnt">9
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">chart/
+</span></span><span class="line"><span class="cl">├── Chart.yaml
+</span></span><span class="line"><span class="cl">├── values.yaml
+</span></span><span class="line"><span class="cl">└── templates/
+</span></span><span class="line"><span class="cl">    ├── deployment.yaml
+</span></span><span class="line"><span class="cl">    ├── service.yaml
+</span></span><span class="line"><span class="cl">    └── tests/smoke.yaml
+</span></span><span class="line"><span class="cl">values-staging.yaml
+</span></span><span class="line"><span class="cl">values-production.yaml
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>The chart metadata is straightforward:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">v2</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">demo</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l">application</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="m">0.1.0</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">appVersion</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;1.0.0&#34;</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p><code>version</code> identifies the chart package; <code>appVersion</code> describes the application. Changing <code>appVersion</code> alone does not select another container image. Templates must actually consume the relevant value. <a class="link" href="https://helm.sh/docs/topics/charts/"  target="_blank" rel="noopener"
+    >Helm chart format</a></p>
+<p>Default values establish the structure; environment files change replica counts, and CI supplies the real image identity:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">replicaCount</span><span class="p">:</span><span class="w"> </span><span class="m">1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">image</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">repository</span><span class="p">:</span><span class="w"> </span><span class="l">registry.example.com/team/demo</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">digest</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">imagePullSecrets</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">registry-pull</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">appVersion</span><span class="p">:</span><span class="w"> </span><span class="l">local</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="c"># values-production.yaml</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">replicaCount</span><span class="p">:</span><span class="w"> </span><span class="m">3</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>The following Deployment excerpt omits resource and security settings included in the downloadable project:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span><span class="lnt">25
+</span><span class="lnt">26
+</span><span class="lnt">27
+</span><span class="lnt">28
+</span><span class="lnt">29
+</span><span class="lnt">30
+</span><span class="lnt">31
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">apps/v1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">Deployment</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span>{{<span class="w"> </span><span class="l">.Release.Name }}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">spec</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span>{{<span class="w"> </span><span class="l">.Values.replicaCount }}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">strategy</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l">RollingUpdate</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">rollingUpdate</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">maxUnavailable</span><span class="p">:</span><span class="w"> </span><span class="m">0</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">maxSurge</span><span class="p">:</span><span class="w"> </span><span class="m">1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">selector</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">matchLabels</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">app.kubernetes.io/instance</span><span class="p">:</span><span class="w"> </span>{{<span class="w"> </span><span class="l">.Release.Name }}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">template</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">labels</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">app.kubernetes.io/instance</span><span class="p">:</span><span class="w"> </span>{{<span class="w"> </span><span class="l">.Release.Name }}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">spec</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">imagePullSecrets</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span>{{- <span class="l">toYaml .Values.imagePullSecrets | nindent 8 }}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">containers</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">app</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;{{ .Values.image.repository }}@{{ required &#34;</span><span class="l">image.digest is required&#34; .Values.image.digest }}&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">ports</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">http</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">containerPort</span><span class="p">:</span><span class="w"> </span><span class="m">3000</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">readinessProbe</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">httpGet</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l">/readyz</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l">http</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>The transformation is:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">Templates + defaults + environment values + selected image digest
+</span></span><span class="line"><span class="cl">                          ↓ Helm rendering
+</span></span><span class="line"><span class="cl">               Kubernetes resource manifests
+</span></span><span class="line"><span class="cl">                          ↓ cluster reconciliation
+</span></span><span class="line"><span class="cl">               Running Pods and Services
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Later <code>-f</code> files override earlier ones; command-line settings can override values again. Use <code>--set-string</code> for identities such as commit SHAs and digests. This example passes explicit environment inputs instead of relying on <code>--reuse-values</code>. <a class="link" href="https://helm.sh/docs/v3/intro/using_helm/"  target="_blank" rel="noopener"
+    >Using Helm values</a></p>
+<p><strong>Where does release state live?</strong> Helm 3 uses kubeconfig to contact Kubernetes directly, without Helm 2&rsquo;s Tiller. Release records default to Secrets in the target namespace and contain chart, values, manifests, and status. Read access can expose configuration; design secret management separately.</p>
+<p>For ordinary updates to built-in resources such as Deployments, Helm 3 generates three-way merge patches from the previous manifest, live state, and proposed manifest. It updates resources rather than recreating the namespace. Hooks, revision recording, and optional readiness waiting surround the operation. Immutable fields and partial failures still prevent treating the whole update as one transaction. <a class="link" href="https://helm.sh/docs/v3/faq/changes_since_helm2/"  target="_blank" rel="noopener"
+    >Helm 3 storage and upgrade mechanisms</a></p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Command</th>
+<th>What it checks or does</th>
+<th>Remaining uncertainty</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>helm lint chart</code></td>
+<td>Common chart and template issues</td>
+<td>Cluster access and image availability</td>
+</tr>
+<tr>
+<td><code>helm template demo chart ...</code></td>
+<td>Render manifests locally</td>
+<td>Admission rules and runtime behavior</td>
+</tr>
+<tr>
+<td><code>helm upgrade --install ...</code></td>
+<td>Create or update a release</td>
+<td>Whether users can complete real requests</td>
+</tr>
+<tr>
+<td><code>helm test demo ...</code></td>
+<td>Execute chart-defined test hooks</td>
+<td>Untested behavior and long-term health</td>
+</tr>
+<tr>
+<td><code>helm history</code> / <code>helm get values</code></td>
+<td>Inspect revisions and inputs</td>
+<td>External system state</td>
+</tr>
+</tbody>
+</table></div>
+<p>Local linting and rendering do not replace server-side validation. API compatibility, admission policies, RBAC, quotas, and runtime dependencies remain environment concerns. Avoid exposing Secret-bearing rendered manifests in public logs or artifacts.</p>
+<h2 id="5-a-complete-pipeline-verify-package-stage-and-promote">5. A complete pipeline: verify, package, stage, and promote
+</h2><p>Download the <a class="link" href="gitlab-helm-demo.zip" >complete GitLab CI + Helm example</a>. Copy <strong>all files, including dotfiles</strong>, into a new GitLab repository and configure the prerequisites in its README. The example has its own pipeline, separate from this blog&rsquo;s GitHub Actions deployment.</p>
+<p>The dependency-free Node.js service exposes <code>/</code>, <code>/healthz</code>, and <code>/readyz</code>, returning its <code>APP_VERSION</code>. Its test makes actual HTTP requests and checks successful responses, the version field, and a missing route:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">node --test server.test.mjs
+</span></span><span class="line"><span class="cl">node server.mjs
+</span></span><span class="line"><span class="cl"><span class="c1"># Visit http://localhost:3000/ from another terminal or browser.</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>There is no compilation phase in this small application. The container image is the deployable artifact. Java, Go, or TypeScript projects can add compilation while retaining the same artifact identity and promotion rules.</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-dockerfile" data-lang="dockerfile"><span class="line"><span class="cl"><span class="k">FROM</span><span class="s"> node:22-bookworm-slim</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">WORKDIR</span><span class="s"> /app</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">COPY</span> --chown<span class="o">=</span>node:node server.mjs ./<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">USER</span><span class="s"> node</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">EXPOSE</span><span class="s"> 3000</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">CMD</span> <span class="p">[</span><span class="s2">&#34;node&#34;</span><span class="p">,</span> <span class="s2">&#34;server.mjs&#34;</span><span class="p">]</span><span class="err">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p><strong>Prepare the execution environment first:</strong></p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Prerequisite</th>
+<th>Required setup</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Repository</td>
+<td>Enable Container Registry, protect the default branch, and review merges</td>
+</tr>
+<tr>
+<td><code>container</code> runner</td>
+<td>Linux container executor for application and chart checks</td>
+</tr>
+<tr>
+<td><code>docker-build</code> runner</td>
+<td>Isolated, protected Docker executor with privileged TLS DinD and shared <code>/certs/client</code></td>
+</tr>
+<tr>
+<td><code>deploy</code> runner</td>
+<td>Protected runner with access to the cluster API</td>
+</tr>
+<tr>
+<td><code>DEPLOY_TOOLS_IMAGE</code></td>
+<td>Project variable pointing to a reviewed Linux image with Helm 3, <code>/bin/sh</code>, <code>chmod</code>, and <code>mkdir</code>; validation runners must also be able to pull it</td>
+</tr>
+<tr>
+<td>Namespaces</td>
+<td>Precreate <code>demo-staging</code> and <code>demo-production</code></td>
+</tr>
+<tr>
+<td><code>KUBE_CONFIG</code></td>
+<td>Two protected file variables with this name, scoped to <code>staging</code> and <code>production</code>, each using a separate limited identity</td>
+</tr>
+<tr>
+<td>Pull credentials</td>
+<td>A <code>registry-pull</code> Secret in each namespace, using dedicated <code>read_registry</code> credentials</td>
+</tr>
+<tr>
+<td>Deployment controls</td>
+<td>Prevent outdated deployments and restrict production access using available protected-environment features</td>
+</tr>
+</tbody>
+</table></div>
+<p>Privileged DinD broadens runner privileges. Keep that runner isolated and protected; untrusted MR jobs must not use it. Configure its TLS endpoint, shared certificates, and executor settings together. Where privileged execution is unsuitable, evaluate a verified alternative such as rootless BuildKit. <a class="link" href="https://docs.gitlab.com/ci/docker/using_docker_build/"  target="_blank" rel="noopener"
+    >GitLab Docker build documentation</a></p>
+<p>CI push credentials are not automatically available to Kubernetes. Pods need their own pull access, and an expiring job token is unsuitable as a long-lived cluster pull credential. Both the Deployment and test Pod reference the precreated pull Secret. <a class="link" href="https://docs.gitlab.com/user/packages/container_registry/authenticate_with_container_registry/"  target="_blank" rel="noopener"
+    >Registry authentication</a></p>
+<p>The pipeline follows this dependency graph:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">MR:
+</span></span><span class="line"><span class="cl">  verify_app ───┐
+</span></span><span class="line"><span class="cl">  verify_chart ─┴─ validation only; no deployment credentials
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">Default-branch push:
+</span></span><span class="line"><span class="cl">  verify_app ───┐
+</span></span><span class="line"><span class="cl">  verify_chart ─┴─ build_image
+</span></span><span class="line"><span class="cl">                       ↓
+</span></span><span class="line"><span class="cl">                deploy_staging + helm test
+</span></span><span class="line"><span class="cl">                       ↓
+</span></span><span class="line"><span class="cl">                manual deploy_production + helm test
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">One chart package from verify_chart ───→ both deployment jobs
+</span></span><span class="line"><span class="cl">One image digest from build_image ────→ both deployment jobs
+</span></span></code></pre></td></tr></table>
+</div>
+</div><details>
+<summary>Complete .gitlab-ci.yml, identical to the downloadable project</summary>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">  1
+</span><span class="lnt">  2
+</span><span class="lnt">  3
+</span><span class="lnt">  4
+</span><span class="lnt">  5
+</span><span class="lnt">  6
+</span><span class="lnt">  7
+</span><span class="lnt">  8
+</span><span class="lnt">  9
+</span><span class="lnt"> 10
+</span><span class="lnt"> 11
+</span><span class="lnt"> 12
+</span><span class="lnt"> 13
+</span><span class="lnt"> 14
+</span><span class="lnt"> 15
+</span><span class="lnt"> 16
+</span><span class="lnt"> 17
+</span><span class="lnt"> 18
+</span><span class="lnt"> 19
+</span><span class="lnt"> 20
+</span><span class="lnt"> 21
+</span><span class="lnt"> 22
+</span><span class="lnt"> 23
+</span><span class="lnt"> 24
+</span><span class="lnt"> 25
+</span><span class="lnt"> 26
+</span><span class="lnt"> 27
+</span><span class="lnt"> 28
+</span><span class="lnt"> 29
+</span><span class="lnt"> 30
+</span><span class="lnt"> 31
+</span><span class="lnt"> 32
+</span><span class="lnt"> 33
+</span><span class="lnt"> 34
+</span><span class="lnt"> 35
+</span><span class="lnt"> 36
+</span><span class="lnt"> 37
+</span><span class="lnt"> 38
+</span><span class="lnt"> 39
+</span><span class="lnt"> 40
+</span><span class="lnt"> 41
+</span><span class="lnt"> 42
+</span><span class="lnt"> 43
+</span><span class="lnt"> 44
+</span><span class="lnt"> 45
+</span><span class="lnt"> 46
+</span><span class="lnt"> 47
+</span><span class="lnt"> 48
+</span><span class="lnt"> 49
+</span><span class="lnt"> 50
+</span><span class="lnt"> 51
+</span><span class="lnt"> 52
+</span><span class="lnt"> 53
+</span><span class="lnt"> 54
+</span><span class="lnt"> 55
+</span><span class="lnt"> 56
+</span><span class="lnt"> 57
+</span><span class="lnt"> 58
+</span><span class="lnt"> 59
+</span><span class="lnt"> 60
+</span><span class="lnt"> 61
+</span><span class="lnt"> 62
+</span><span class="lnt"> 63
+</span><span class="lnt"> 64
+</span><span class="lnt"> 65
+</span><span class="lnt"> 66
+</span><span class="lnt"> 67
+</span><span class="lnt"> 68
+</span><span class="lnt"> 69
+</span><span class="lnt"> 70
+</span><span class="lnt"> 71
+</span><span class="lnt"> 72
+</span><span class="lnt"> 73
+</span><span class="lnt"> 74
+</span><span class="lnt"> 75
+</span><span class="lnt"> 76
+</span><span class="lnt"> 77
+</span><span class="lnt"> 78
+</span><span class="lnt"> 79
+</span><span class="lnt"> 80
+</span><span class="lnt"> 81
+</span><span class="lnt"> 82
+</span><span class="lnt"> 83
+</span><span class="lnt"> 84
+</span><span class="lnt"> 85
+</span><span class="lnt"> 86
+</span><span class="lnt"> 87
+</span><span class="lnt"> 88
+</span><span class="lnt"> 89
+</span><span class="lnt"> 90
+</span><span class="lnt"> 91
+</span><span class="lnt"> 92
+</span><span class="lnt"> 93
+</span><span class="lnt"> 94
+</span><span class="lnt"> 95
+</span><span class="lnt"> 96
+</span><span class="lnt"> 97
+</span><span class="lnt"> 98
+</span><span class="lnt"> 99
+</span><span class="lnt">100
+</span><span class="lnt">101
+</span><span class="lnt">102
+</span><span class="lnt">103
+</span><span class="lnt">104
+</span><span class="lnt">105
+</span><span class="lnt">106
+</span><span class="lnt">107
+</span><span class="lnt">108
+</span><span class="lnt">109
+</span><span class="lnt">110
+</span><span class="lnt">111
+</span><span class="lnt">112
+</span><span class="lnt">113
+</span><span class="lnt">114
+</span><span class="lnt">115
+</span><span class="lnt">116
+</span><span class="lnt">117
+</span><span class="lnt">118
+</span><span class="lnt">119
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">workflow</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">rules</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="s1">&#39;$CI_PIPELINE_SOURCE == &#34;merge_request_event&#34;&#39;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="s1">&#39;$CI_PIPELINE_SOURCE == &#34;push&#34; &amp;&amp; $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH&#39;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="nt">when</span><span class="p">:</span><span class="w"> </span><span class="l">never</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">stages</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="l">verify, package, staging, production]</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">default</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">tags</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="l">container]</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">verify_app</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">stage</span><span class="p">:</span><span class="w"> </span><span class="l">verify</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l">node:22-bookworm-slim</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">script</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="l">node --check server.mjs</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="l">node --test server.test.mjs</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">verify_chart</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">stage</span><span class="p">:</span><span class="w"> </span><span class="l">verify</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">image</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">$DEPLOY_TOOLS_IMAGE</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">entrypoint</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&#34;&#34;</span><span class="p">]</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">variables</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">VALIDATION_DIGEST</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;sha256:0000000000000000000000000000000000000000000000000000000000000000&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">script</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="l">helm lint chart --set-string image.digest=&#34;$VALIDATION_DIGEST&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="l">helm template demo chart -f values-staging.yaml --set-string image.digest=&#34;$VALIDATION_DIGEST&#34; &gt; /tmp/staging.yaml</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="l">helm template demo chart -f values-production.yaml --set-string image.digest=&#34;$VALIDATION_DIGEST&#34; &gt; /tmp/production.yaml</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="l">mkdir -p out</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="l">helm package chart --destination out</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">artifacts</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">paths</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="l">out/demo-0.1.0.tgz]</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">expire_in</span><span class="p">:</span><span class="w"> </span><span class="m">30</span><span class="w"> </span><span class="l">days</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">build_image</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">stage</span><span class="p">:</span><span class="w"> </span><span class="l">package</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">tags</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="l">docker-build]</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l">docker:28-cli</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">services</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">docker:28-dind</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">alias</span><span class="p">:</span><span class="w"> </span><span class="l">docker</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">variables</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">DOCKER_HOST</span><span class="p">:</span><span class="w"> </span><span class="l">tcp://docker:2376</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">DOCKER_TLS_CERTDIR</span><span class="p">:</span><span class="w"> </span><span class="l">/certs</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">DOCKER_TLS_VERIFY</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;1&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">DOCKER_CERT_PATH</span><span class="p">:</span><span class="w"> </span><span class="l">/certs/client</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="l">verify_app, verify_chart]</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">rules</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="s1">&#39;$CI_PIPELINE_SOURCE == &#34;push&#34; &amp;&amp; $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH&#39;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">script</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="l">echo &#34;$CI_REGISTRY_PASSWORD&#34; | docker login &#34;$CI_REGISTRY&#34; -u &#34;$CI_REGISTRY_USER&#34; --password-stdin</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="l">docker build --pull -t &#34;$CI_REGISTRY_IMAGE:$CI_COMMIT_SHA-$CI_PIPELINE_ID&#34; .</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="l">docker push &#34;$CI_REGISTRY_IMAGE:$CI_COMMIT_SHA-$CI_PIPELINE_ID&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="l">docker pull &#34;$CI_REGISTRY_IMAGE:$CI_COMMIT_SHA-$CI_PIPELINE_ID&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="l">IMAGE_REF=$(docker image inspect --format=&#39;{{index .RepoDigests 0}}&#39; &#34;$CI_REGISTRY_IMAGE:$CI_COMMIT_SHA-$CI_PIPELINE_ID&#34;)</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="l">IMAGE_DIGEST=&#34;${IMAGE_REF##*@}&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="l">test -n &#34;$IMAGE_DIGEST&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="l">printf &#39;IMAGE_DIGEST=%s\n&#39; &#34;$IMAGE_DIGEST&#34; &gt; image.env</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">artifacts</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">reports</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">dotenv</span><span class="p">:</span><span class="w"> </span><span class="l">image.env</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">expire_in</span><span class="p">:</span><span class="w"> </span><span class="m">30</span><span class="w"> </span><span class="l">days</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">.deploy</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">tags</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="l">deploy]</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">image</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">$DEPLOY_TOOLS_IMAGE</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">entrypoint</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&#34;&#34;</span><span class="p">]</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">before_script</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="l">test -f &#34;$KUBE_CONFIG&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="l">export KUBECONFIG=&#34;$KUBE_CONFIG&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="l">chmod 600 &#34;$KUBECONFIG&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">script</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="p">&gt;-</span><span class="sd">
+</span></span></span><span class="line"><span class="cl"><span class="sd">      helm upgrade --install demo out/demo-0.1.0.tgz
+</span></span></span><span class="line"><span class="cl"><span class="sd">      --namespace &#34;$TARGET_NAMESPACE&#34;
+</span></span></span><span class="line"><span class="cl"><span class="sd">      -f &#34;values-$CI_ENVIRONMENT_NAME.yaml&#34;
+</span></span></span><span class="line"><span class="cl"><span class="sd">      --set-string image.repository=&#34;$CI_REGISTRY_IMAGE&#34;
+</span></span></span><span class="line"><span class="cl"><span class="sd">      --set-string image.digest=&#34;$IMAGE_DIGEST&#34;
+</span></span></span><span class="line"><span class="cl"><span class="sd">      --set-string appVersion=&#34;$CI_COMMIT_SHA&#34;
+</span></span></span><span class="line"><span class="cl"><span class="sd">      --atomic --wait --timeout 5m --history-max 10</span><span class="w">      
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="l">helm test demo --namespace &#34;$TARGET_NAMESPACE&#34; --logs --timeout 2m</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">deploy_staging</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">extends</span><span class="p">:</span><span class="w"> </span><span class="l">.deploy</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">stage</span><span class="p">:</span><span class="w"> </span><span class="l">staging</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">needs</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="nt">job</span><span class="p">:</span><span class="w"> </span><span class="l">verify_chart</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">artifacts</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="nt">job</span><span class="p">:</span><span class="w"> </span><span class="l">build_image</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">artifacts</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">rules</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="s1">&#39;$CI_PIPELINE_SOURCE == &#34;push&#34; &amp;&amp; $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH&#39;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">variables</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">TARGET_NAMESPACE</span><span class="p">:</span><span class="w"> </span><span class="l">demo-staging</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">environment</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">staging</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">resource_group</span><span class="p">:</span><span class="w"> </span><span class="l">demo-staging</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">deploy_production</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">extends</span><span class="p">:</span><span class="w"> </span><span class="l">.deploy</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">stage</span><span class="p">:</span><span class="w"> </span><span class="l">production</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">needs</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="nt">job</span><span class="p">:</span><span class="w"> </span><span class="l">verify_chart</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">artifacts</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="nt">job</span><span class="p">:</span><span class="w"> </span><span class="l">build_image</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">artifacts</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="nt">job</span><span class="p">:</span><span class="w"> </span><span class="l">deploy_staging</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">artifacts</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">rules</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="s1">&#39;$CI_PIPELINE_SOURCE == &#34;push&#34; &amp;&amp; $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH&#39;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">when</span><span class="p">:</span><span class="w"> </span><span class="l">manual</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">allow_failure</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">variables</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">TARGET_NAMESPACE</span><span class="p">:</span><span class="w"> </span><span class="l">demo-production</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">environment</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">production</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">resource_group</span><span class="p">:</span><span class="w"> </span><span class="l">demo-production</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div></details>
+<p>Five constraints make the handoffs explicit:</p>
+<ol>
+<li><strong>Validation precedes image building.</strong> Both application and chart checks are required. The all-zero digest is a rendering placeholder and is never deployed. MR pipelines contain neither image building nor deployment jobs.</li>
+<li><strong>Image identity is transferred explicitly.</strong> The full commit SHA and pipeline ID form a readable tag. After pushing, the builder obtains the registry digest and publishes it through a dotenv report. A new pipeline for the same commit has another tag; retries within a pipeline still require care.</li>
+<li><strong>The chart is packaged once.</strong> Both environments fetch the same chart artifact. Rendering then combines that package with recorded environment values and runtime inputs.</li>
+<li><strong>Production explicitly depends on staging.</strong> Its <code>needs</code> includes <code>deploy_staging</code>, preserving the smoke-test gate. <code>when: manual</code> plus <code>allow_failure: false</code> makes the human trigger blocking. <a class="link" href="https://docs.gitlab.com/ci/jobs/job_control/"  target="_blank" rel="noopener"
+    >Manual job behavior</a></li>
+<li><strong>The deployment lock covers upgrade and smoke testing.</strong> Both commands run inside one job with a <code>resource_group</code>. This protects against competing jobs in that project, not unrelated projects, manual changes, or other controllers.</li>
+</ol>
+<p>The environment-scoped kubeconfig is used only by its deployment job, not in rule evaluation. Set the correct current context and restrict each identity to its target namespace. Helm also needs access to release Secrets, workload resources, test Pods, and their logs.</p>
+<p>The build is single-platform and assumes matching builder and node CPU architectures. For mixed architectures, use a tested multi-platform build, record its image index digest, and verify the target platforms.</p>
+<p><strong>Verification has several layers.</strong> Liveness checks process health; readiness determines whether a Pod should receive traffic. The sample has no external dependencies, so both endpoints simply succeed. A real application&rsquo;s probes must represent its actual startup and dependency behavior.</p>
+<p>Helm waits for the resource readiness it understands. The subsequent <code>helm test</code> creates an in-cluster Pod that calls the Service and checks the returned commit version. That does not test an external Ingress, TLS, user authentication, or a complete business transaction; add those checks where they matter.</p>
+<p>Helm tests use resources annotated <code>helm.sh/hook: test</code>, with container exit status determining success. The sample keeps test Pods for <code>--logs</code> and inspection, then removes the previous Pod before the next test run. <a class="link" href="https://helm.sh/docs/v3/topics/chart_tests/"  target="_blank" rel="noopener"
+    >Helm chart tests</a></p>
+<h2 id="6-failure-handling-health-concurrency-and-rollback-boundaries">6. Failure handling: health, concurrency, and rollback boundaries
+</h2><p>A green pipeline proves that its defined checks passed. Recovery still depends on locating the failed layer.</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>First investigation</th>
+<th>Typical causes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Job remains pending</td>
+<td>Runner tags, protection, availability, capacity</td>
+<td>No eligible runner</td>
+</tr>
+<tr>
+<td>Docker daemon unreachable</td>
+<td>DinD service, TLS endpoint, shared certificates</td>
+<td>Client-only environment or TLS mismatch</td>
+</tr>
+<tr>
+<td><code>ImagePullBackOff</code></td>
+<td>Image digest, pull Secret, registry connectivity</td>
+<td>Missing image, credentials, or platform mismatch</td>
+</tr>
+<tr>
+<td><code>CrashLoopBackOff</code></td>
+<td>Container logs, command, configuration, limits</td>
+<td>Startup failure, process exit, OOM</td>
+</tr>
+<tr>
+<td>Upgrade never becomes ready</td>
+<td>Probes, scheduling events, quotas</td>
+<td>Unready or unschedulable Pods</td>
+</tr>
+<tr>
+<td><code>helm test</code> fails</td>
+<td>Test logs, Service selector, response version</td>
+<td>Routing or application behavior</td>
+</tr>
+<tr>
+<td>Users fail after rollout</td>
+<td>Ingress, actual traffic, latency, error rates</td>
+<td>Missing test coverage or business defects</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Rolling updates require spare capacity.</strong> <code>maxUnavailable: 0</code> and <code>maxSurge: 1</code> retain old replicas while a replacement becomes ready, but insufficient capacity can still block the rollout. The policy does not guarantee database compatibility or error-free long-lived connections.</p>
+<p><strong>Helm 3 <code>--atomic</code> is not a business transaction.</strong> Failed upgrades attempt rollback and enable waiting. A failed first installation follows install cleanup behavior; there is no previous release to restore. <a class="link" href="https://helm.sh/docs/v3/helm/helm_upgrade/"  target="_blank" rel="noopener"
+    >Helm 3 upgrade reference</a></p>
+<p>The later <code>helm test</code> command is outside that upgrade operation. If upgrade succeeds and smoke testing fails, the job fails while the new release remains installed. Choose an explicit recovery policy: manual rollback, tested automatic compensation, or a progressive delivery controller with broader release evaluation.</p>
+<p>Helm 4 uses <code>--rollback-on-failure</code> and changes waiting strategies. Pin the major version, inspect <code>helm upgrade --help</code>, and test failure paths when migrating. <a class="link" href="https://helm.sh/docs/helm/helm_upgrade/"  target="_blank" rel="noopener"
+    >Helm 4 upgrade reference</a></p>
+<p>Choose a <strong>known-good</strong> revision after inspection:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">helm <span class="nb">history</span> demo -n demo-production
+</span></span><span class="line"><span class="cl">helm status demo -n demo-production
+</span></span><span class="line"><span class="cl">helm get values demo -n demo-production
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># Replace the placeholder with a verified working revision.</span>
+</span></span><span class="line"><span class="cl">helm rollback demo &lt;KNOWN_GOOD_REVISION&gt; -n demo-production --wait --timeout 5m
+</span></span><span class="line"><span class="cl">helm <span class="nb">test</span> demo -n demo-production --logs --timeout 2m
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Rollback changes the cluster again and belongs inside the same concurrency and audit controls. Retain the old images and charts: a historical digest is useless for recovery if the registry has garbage-collected its content.</p>
+<p>Helm does not undo database migrations, emitted messages, external API calls, or every CRD change. For schema evolution, use expand → migrate → contract: add a compatible structure, migrate data and callers, then remove the old structure once older versions no longer need it. Irreversible deletion in the deployment step makes recovery fragile.</p>
+<p><strong>Serialization also needs stale-deployment protection.</strong> A resource group prevents simultaneous jobs but does not inherently enforce commit order. Even newest-first scheduling requires care because an older queued job may still execute later. <a class="link" href="https://docs.gitlab.com/ci/resource_groups/"  target="_blank" rel="noopener"
+    >Resource group documentation</a></p>
+<p>Combine queue policy with outdated-deployment prevention and artifact identity checks before manual promotion. Automatically cancel only work that is safe to interrupt; stopping an in-progress deployment can leave state requiring inspection. <a class="link" href="https://docs.gitlab.com/ci/environments/deployment_safety/"  target="_blank" rel="noopener"
+    >Deployment safety</a></p>
+<p>A manual job is an execution gate, not an independent approval policy. Protected environments and deployment approvals can restrict production actors and reviewers where the instance&rsquo;s tier and version support them. <a class="link" href="https://docs.gitlab.com/ci/environments/deployment_approvals/"  target="_blank" rel="noopener"
+    >Deployment approvals</a></p>
+<h2 id="7-moving-from-deployment-scripts-toward-gitops">7. Moving from deployment scripts toward GitOps
+</h2><p>This example uses a push model: a CI job holds deployment credentials and invokes Helm against Kubernetes. It is direct, but Helm CLI does not remain running after the job to detect later configuration drift.</p>
+<p><a href="/p/cicd-gitlab-ci-helm/push-vs-gitops.svg" target="_blank" rel="noopener noreferrer"><img src="/p/cicd-gitlab-ci-helm/push-vs-gitops.svg" alt="CI push deployment versus GitOps reconciliation through a desired-state repository" loading="lazy" decoding="async"></a>
+</p>
+<p>GitOps stores desired state in version control. CI publishes an image and updates a digest in a configuration repository; a controller such as Argo CD or Flux reconciles the reviewed state into the cluster. This separates build permissions from production change authority. <a class="link" href="https://argo-cd.readthedocs.io/en/stable/"  target="_blank" rel="noopener"
+    >Argo CD documentation</a></p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>CI invokes Helm</th>
+<th>GitOps controller</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Deployment actor</td>
+<td>CI job</td>
+<td>Persistent controller</td>
+</tr>
+<tr>
+<td>Desired-state record</td>
+<td>Commit, chart, values, pipeline inputs</td>
+<td>Configuration repository and versioned references</td>
+</tr>
+<tr>
+<td>Cluster write identity</td>
+<td>Deployment runner identity</td>
+<td>Restricted controller identity</td>
+</tr>
+<tr>
+<td>Drift handling</td>
+<td>Additional detection or another deployment</td>
+<td>Continuous detection; correction depends on policy</td>
+</tr>
+<tr>
+<td>Recovery expression</td>
+<td>Restore an explicitly selected release</td>
+<td>Revert desired state and reconcile</td>
+</tr>
+<tr>
+<td>Operational cost</td>
+<td>Runners and deployment scripts</td>
+<td>Controllers, repository access, sync and health policies</td>
+</tr>
+</tbody>
+</table></div>
+<p>Helm and GitOps can work together, but a controller rendering a chart does not necessarily execute <code>helm install</code> or maintain ordinary Helm release history. Argo CD uses Helm for template rendering and manages the application lifecycle itself. <a class="link" href="https://argo-cd.readthedocs.io/en/stable/user-guide/helm/"  target="_blank" rel="noopener"
+    >Argo CD Helm integration</a></p>
+<p>Give each resource a clear owner. Direct CI upgrades and continuous GitOps synchronization against different desired states can overwrite one another.</p>
+<p>Release strategies can grow with actual requirements:</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Strategy</th>
+<th>Risk reduction mechanism</th>
+<th>Cost or prerequisite</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Rolling update</td>
+<td>Replace replicas gradually</td>
+<td>Mixed-version compatibility and spare capacity</td>
+</tr>
+<tr>
+<td>Blue-green</td>
+<td>Verify a parallel environment, then switch traffic</td>
+<td>Duplicate capacity, traffic switching, data compatibility</td>
+</tr>
+<tr>
+<td>Canary</td>
+<td>Evaluate a smaller traffic share before promotion</td>
+<td>Traffic control, metric evaluation, recovery policy</td>
+</tr>
+<tr>
+<td>Feature flags</td>
+<td>Control exposure after deployment</td>
+<td>Flag lifecycle and additional test combinations</td>
+</tr>
+</tbody>
+</table></div>
+<p>Helm can describe the resources involved, but a plain upgrade does not perform error-rate-based canary analysis. Add traffic management and progressive delivery controls when that requirement exists.</p>
+<p>Artifact assurance can also evolve. Scanning checks known risks, an SBOM records components, provenance describes build inputs and process, and signature verification can constrain accepted publishers. Reports become deployment controls only when policies actually enforce them. <a class="link" href="https://docs.docker.com/build/metadata/attestations/"  target="_blank" rel="noopener"
+    >Docker build attestations</a></p>
+<p>Observe more than pipeline success rate: time from commit to production, release-related failures, recovery time, flaky checks, and execution-environment failures all help identify where delivery needs improvement.</p>
+<p>The example&rsquo;s artifacts expire after 30 days. Long approval windows and recovery requirements need durable storage for chart packages, image digests, configuration commits, and verification results, plus a compatible registry retention policy. A complete delivery record should answer <strong>why this version was allowed, which artifact reached production, and how a working state can be restored.</strong></p>
+<p>Official links support the mechanisms and parameters described here. For self-managed GitLab, verify availability against the actual instance version, tier, and CI Lint results.</p>
+
+</div>
+
+            <footer class="article-footer">
+    
+        <div class="article-tags" aria-label="Article tags"><span class="article-footer-label">Filed under</span><a href="/tags/ci/cd/">CI/CD</a><a href="/tags/gitlab-ci/">GitLab CI</a><a href="/tags/helm/">Helm</a><a href="/tags/kubernetes/">Kubernetes</a><a href="/tags/devops/">DevOps</a></div>
+    
+    
+    
+    <div class="article-endnote"><span>Thanks for reading.</span><a href="#top">Back to top <span aria-hidden="true">↑</span></a></div>
+</footer>
+
+        </div>
+    </div>
+    
+</article>
+
+        <div class="reading-afterword">
+            
+            
+    <aside class="reading-related">
+        <div class="reading-section-heading"><span class="article-footer-label">Keep reading</span><span aria-hidden="true">↘</span></div>
+        
+            <a class="reading-related-link" href="/p/k8s-automated-deployment/"><span class="related-number">01</span><span class="related-title">Automating Kubernetes Deployments: From Git Push to Verification and Recovery</span><time datetime="2026-10-17">2026.10.17</time><span class="related-arrow" aria-hidden="true">↗</span></a>
+        
+            <a class="reading-related-link" href="/p/k8s-container-cloud-deployment/"><span class="related-number">02</span><span class="related-title">K8s Container Cloud Deployment: From Dockerfile Image Build to Release</span><time datetime="2026-09-03">2026.09.03</time><span class="related-arrow" aria-hidden="true">↗</span></a>
+        
+            <a class="reading-related-link" href="/p/kubernetes-from-docker/"><span class="related-number">03</span><span class="related-title">从 Docker 到 Kubernetes：面向 Docker 用户的 K8s 从 0 到 1 教程</span><time datetime="2026-08-08">2026.08.08</time><span class="related-arrow" aria-hidden="true">↗</span></a>
+        
+    </aside>
+
+
+            
+        </div>
+    </div>
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+    </main>
+    
+<footer class="site-footer">
+    <div class="footer-top"><a class="footer-wordmark" href="/" aria-label="Snow">Sno<span>w</span></a><p>A place to think. A space to grow.</p><a href="#main-content" class="back-top">Back to top <span aria-hidden="true">↑</span></a></div>
+    <div class="footer-bottom"><span>© 2026 Snow</span><nav aria-label="More links"><a href="/about/">About</a><a href="https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0" target="_blank" rel="noopener noreferrer me">Bilibili <span aria-hidden="true">↗</span></a><a href="https://github.com/SymphonyW" target="_blank" rel="noopener noreferrer me">GitHub <span aria-hidden="true">↗</span></a><a href="https://twitter.com" target="_blank" rel="noopener noreferrer me">Twitter <span aria-hidden="true">↗</span></a><a href="/index.xml">RSS ↗</a></nav><span class="footer-colophon">Built with Hugo · Always in progress</span></div>
+</footer>
+
+    
+
+<script src="/ts/main.c86029ddb4aad8364879723acaf7efcd526e724d2381088d445aaf6f3ab1bfdf.js" defer></script>
+
+
+<script src="/ts/custom.6c99a7b037ac7e2bde801fbad26b9c20b3b18707868c164174142870ef3bc309.js" defer></script>
+
+
+
+
+
+<script>
+window.MathJax = {
+  tex: {
+    
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  svg: {
+    fontCache: 'global'
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
+
+</body>
+</html>

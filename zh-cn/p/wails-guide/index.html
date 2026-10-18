@@ -1,0 +1,1283 @@
+<!DOCTYPE html>
+<html lang="zh-cn" dir="ltr">
+<head>
+    <meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="从系统 WebView、Go 与 JavaScript 桥接到 Vue + TypeScript 实战，详细理解 Wails 的架构、开发流程、打包发布、选型边界与 v3 的变化。">
+<title>Wails 详解：用 Go 和 Web 技术构建跨平台桌面应用</title>
+
+<link rel='canonical' href='https://SymphonyW.github.io/zh-cn/p/wails-guide/'>
+<link rel="stylesheet" href="/scss/custom.min.bf7995e62147d50e1276b97e61d2c8120b52dfef9e32fbaed4e22d2affbd1b2b.css">
+<script>
+(() => {
+    let preference = 'auto';
+    try { preference = localStorage.getItem('StackColorScheme') || preference; } catch (_) {}
+    document.documentElement.dataset.scheme = preference === 'dark' || (preference === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+})();
+</script>
+
+<meta property='og:title' content="Wails 详解：用 Go 和 Web 技术构建跨平台桌面应用">
+<meta property='og:description' content="从系统 WebView、Go 与 JavaScript 桥接到 Vue + TypeScript 实战，详细理解 Wails 的架构、开发流程、打包发布、选型边界与 v3 的变化。">
+<meta property='og:url' content='https://SymphonyW.github.io/zh-cn/p/wails-guide/'>
+<meta property='og:site_name' content='Snow'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='Wails' /><meta property='article:tag' content='Go' /><meta property='article:tag' content='Vue' /><meta property='article:tag' content='TypeScript' /><meta property='article:tag' content='桌面开发' /><meta property='article:published_time' content='2026-10-17T10:00:00&#43;08:00'/><meta property='article:modified_time' content='2026-10-17T10:00:00&#43;08:00'/><meta property='og:image' content='https://SymphonyW.github.io/zh-cn/p/wails-guide/bg.png' />
+<meta name="twitter:title" content="Wails 详解：用 Go 和 Web 技术构建跨平台桌面应用">
+<meta name="twitter:description" content="从系统 WebView、Go 与 JavaScript 桥接到 Vue + TypeScript 实战，详细理解 Wails 的架构、开发流程、打包发布、选型边界与 v3 的变化。"><meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content='https://SymphonyW.github.io/zh-cn/p/wails-guide/bg.png' />
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    
+    <noscript><style>@media(max-width:760px){.site-header{position:static}.site-header__inner{height:auto;min-height:66px;flex-wrap:wrap}.site-nav{position:static;display:grid;order:3;flex-basis:100%;padding:8px 0 18px}.menu-toggle,.theme-toggle{display:none}}</style></noscript>
+</head>
+<body id="top" class="article-page">
+    <a class="skip-link" href="#main-content">跳至正文</a>
+    
+<header class="site-header">
+    <div class="site-header__inner">
+        <a class="site-brand" href="/zh-cn/" aria-label="Snow — 主页">S<span>now.</span></a>
+        <nav class="site-nav" id="site-navigation" aria-label="主导航">
+            
+            
+                
+                    
+                    
+                    <a href="/zh-cn/">主页</a>
+                
+            
+                
+                    
+                    
+                    <a href="/zh-cn/post/" aria-current="page">博客</a>
+                
+            
+                
+                    
+                    
+                    <a href="/zh-cn/archives/">归档</a>
+                
+            
+                
+                    
+                    
+                    <a href="/zh-cn/stats/">写作记录</a>
+                
+            
+                
+                    
+                    
+                    <a href="/zh-cn/diary/">日记</a>
+                
+            
+                
+            
+                
+                    
+                    
+                    <a href="/zh-cn/links/">链接</a>
+                
+            
+        </nav>
+        <div class="header-tools">
+            
+                <a class="language-link" href="/p/wails-guide/" lang="en" hreflang="en" aria-label="Switch to English">EN</a>
+            
+            <button type="button" id="dark-mode-toggle" class="icon-button theme-toggle" aria-label="切换明暗主题" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><path d="M12 4.5a7.5 7.5 0 0 1 0 15z" fill="currentColor" stroke="none"/></svg></button>
+            <a class="icon-button search-link" href="/zh-cn/search/" aria-label="搜索文章"><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+</a>
+            <button class="icon-button menu-toggle" type="button" aria-expanded="false" aria-controls="site-navigation" aria-label="展开导航"><span></span><span></span></button>
+        </div>
+    </div>
+    <div class="reading-progress" aria-hidden="true"></div>
+</header>
+
+    <main id="main-content" class="site-main main" tabindex="-1">
+        
+    <div class="reading-page">
+        <article class="main-article has-toc">
+    <header class="article-header">
+    <div class="article-wayfinding">
+        
+            <a href="/zh-cn/post/"><span aria-hidden="true">←</span> 全部文章</a>
+        
+        <span class="article-kind">笔记与思考</span>
+    </div>
+    <div class="article-details">
+    
+    <h1 class="article-title">Wails 详解：用 Go 和 Web 技术构建跨平台桌面应用</h1>
+    <p class="article-subtitle">从系统 WebView、Go 与 JavaScript 桥接到 Vue &#43; TypeScript 实战，详细理解 Wails 的架构、开发流程、打包发布、选型边界与 v3 的变化。</p>
+    <div class="article-meta">
+        
+            <time datetime="2026-10-17T10:00:00&#43;08:00">2026 年 10 月 17 日</time>
+            <span class="meta-divider" aria-hidden="true">/</span>
+            <span>约 8 分钟</span>
+        
+        
+            <div class="article-translations"><a href="/p/wails-guide/" hreflang="en" lang="en">Read in English <span aria-hidden="true">↗</span></a></div>
+        
+    </div>
+</div>
+
+</header>
+
+    <div class="reading-layout">
+        
+            <aside class="reading-margin" aria-label="文章目录">
+                <details class="article-toc" open>
+                    <summary><span>本文目录</span><span class="toc-indicator" aria-hidden="true">+</span></summary>
+                    <nav id="TableOfContents">
+  <ol>
+    <li><a href="#wails-在桌面应用里负责什么">Wails 在桌面应用里负责什么</a></li>
+    <li><a href="#系统-webview-与-go-桥接是怎样工作的">系统 WebView 与 Go 桥接是怎样工作的</a></li>
+    <li><a href="#从零做一个文件信息查看器">从零做一个文件信息查看器</a></li>
+    <li><a href="#方法调用之外事件任务与数据边界">方法调用之外：事件、任务与数据边界</a></li>
+    <li><a href="#从开发窗口走到可分发的软件">从开发窗口走到可分发的软件</a></li>
+    <li><a href="#wailselectrontauri-与-go-gui-框架怎么选">Wails、Electron、Tauri 与 Go GUI 框架怎么选</a></li>
+    <li><a href="#真正需要留意的边界以及-v3-的变化">真正需要留意的边界，以及 v3 的变化</a></li>
+    <li><a href="#官方资料">官方资料</a></li>
+  </ol>
+</nav>
+                </details>
+            </aside>
+        
+        <div class="reading-body">
+            <div class="article-content"><p>如果已经会用 Go 写业务逻辑，也会用 Vue、React 写网页，那么开发桌面应用时，一个很自然的问题是：能不能继续使用这些技术，同时获得本地文件访问、系统窗口和原生对话框？</p>
+<p><a class="link" href="https://wails.io/docs/introduction/"  target="_blank" rel="noopener"
+    >Wails</a> 就是为这类需求设计的开源框架。它用 <strong>Go 承担应用逻辑，用 HTML、CSS 和 JavaScript 构建界面，通过操作系统的 WebView 显示界面，再把两边连接起来</strong>。它面向的是装在用户电脑上的桌面软件，例如数据库工具、文件管理器、开发者工具和本地数据处理客户端。</p>
+<blockquote>
+<p><strong>版本说明，核对于 2026 年 10 月 17 日：</strong> Wails v2 仍是当前稳定版本，v3 已进入 Beta。本文用 v2 API 讲解原理和完整示例，最后介绍 v3 的变化。示例以本机可验证的 <strong>Wails CLI v2.12.0</strong> 为复现基线；这不是“当前最新小版本”的声明。新项目应结合能力需求评估 v3，已有 v2 项目也不必仅因新版本出现就立即迁移。版本状态见 <a class="link" href="https://v3.wails.io/status/"  target="_blank" rel="noopener"
+    >v3 官方路线图</a> 和 <a class="link" href="https://v3.wails.io/faq/"  target="_blank" rel="noopener"
+    >FAQ</a>。</p>
+</blockquote>
+<h2 id="wails-在桌面应用里负责什么">Wails 在桌面应用里负责什么
+</h2><p>Wails 可以看成一个桌面应用的连接层：一边接 Go 程序，一边接 Web 界面，向下对接操作系统。</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>组成部分</th>
+<th>使用的技术</th>
+<th>主要职责</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>界面层</td>
+<td>HTML、CSS、JavaScript / TypeScript，或 Vue、React、Svelte 等</td>
+<td>页面布局、交互、表单和可视化</td>
+</tr>
+<tr>
+<td>应用逻辑层</td>
+<td>Go</td>
+<td>文件处理、数据库访问、网络请求、任务调度和业务规则</td>
+</tr>
+<tr>
+<td>桥接层</td>
+<td>Wails 生成的绑定与运行时</td>
+<td>前端调用 Go、传递数据、收发事件</td>
+</tr>
+<tr>
+<td>桌面宿主</td>
+<td>平台窗口与系统 WebView</td>
+<td>显示窗口、加载页面，对接系统能力</td>
+</tr>
+<tr>
+<td>开发和构建工具</td>
+<td>Wails CLI、Go 工具链、前端构建工具</td>
+<td>创建工程、开发调试、生成绑定、打包资源</td>
+</tr>
+</tbody>
+</table></div>
+<p>前端框架不是硬性要求。简单工具可以使用原生 JavaScript；复杂表单或多页面应用再选择熟悉的组件框架。Wails 不会替你提供一整套业务 UI 组件，也不会把 HTML 按钮自动变成系统原生按钮。</p>
+<p>这里还需要区分三个容易混淆的概念：</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>常见理解</th>
+<th>更准确的说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>“Go 被编译成 JavaScript 在网页里运行”</td>
+<td>Go 作为本机程序运行，JavaScript 通过桥接调用 Go 方法</td>
+</tr>
+<tr>
+<td>“前端页面旁边必须启动一个 Gin 服务”</td>
+<td>本地界面可以直接调用生成的 Go 绑定，通常无须自己搭建 REST 服务</td>
+</tr>
+<tr>
+<td>“用户电脑必须安装 Node.js 才能启动应用”</td>
+<td>常规打包场景中，Node.js 用于开发与构建；用户运行的是编译后的程序和目标系统依赖</td>
+</tr>
+</tbody>
+</table></div>
+<p>Wails 提供窗口、事件、菜单、剪贴板、对话框等桌面能力，但业务上的持久化、账户、同步、更新策略和插件机制仍需要自行设计。具体平台支持以对应版本的 <a class="link" href="https://wails.io/docs/reference/runtime/intro/"  target="_blank" rel="noopener"
+    >Runtime 文档</a> 为准。</p>
+<h2 id="系统-webview-与-go-桥接是怎样工作的">系统 WebView 与 Go 桥接是怎样工作的
+</h2><p>先看一个简化的逻辑架构。图中箭头表示调用关系，不代表所有组件都在同一个操作系统进程中：</p>
+<div class="mermaid">flowchart TB
+    UI["Web 界面：Vue / React / 原生 JS"]
+    Bridge["Wails 桥接：方法绑定、数据传递、事件"]
+    Logic["Go 应用逻辑"]
+    Native["桌面运行时：窗口、菜单、对话框"]
+    OS["文件系统、数据库、网络与操作系统"]
+    UI <-->|"请求结果 / 异步通知"| Bridge
+    Bridge <--> Logic
+    Logic --> Native
+    Logic --> OS
+    Native --> OS
+</div><p><strong>界面为什么通常能少带一个浏览器引擎？</strong></p>
+<p>Wails 使用平台提供的 WebView，而不是为每个应用附带一套完整的 Chromium 分发包。这也是它常被关注的体积优势来源。但“小安装包”并不意味着“没有渲染引擎”，引擎由系统组件或已安装的运行时提供。<a class="link" href="https://wails.io/docs/introduction/"  target="_blank" rel="noopener"
+    >官方介绍</a> 解释了这一设计。</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>平台</th>
+<th>Wails v2 使用的界面基础</th>
+<th>对开发和分发的影响</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Windows</td>
+<td>WebView2，基于 Microsoft Edge / Chromium</td>
+<td>检查目标机器的 WebView2 Runtime，不能只看有没有 Edge 图标</td>
+</tr>
+<tr>
+<td>macOS</td>
+<td>系统 WebKit / WKWebView</td>
+<td>Web 能力受系统版本影响，开发需要 Xcode Command Line Tools</td>
+</tr>
+<tr>
+<td>Linux</td>
+<td>GTK3 + WebKitGTK</td>
+<td>需要开发包和运行时库，注意发行版及 WebKitGTK 版本差异</td>
+</tr>
+</tbody>
+</table></div>
+<p>依赖与 Linux 的 <code>webkit2_41</code> 构建标签见 <a class="link" href="https://wails.io/docs/gettingstarted/installation/"  target="_blank" rel="noopener"
+    >v2 安装文档</a>。v3 的 Linux 默认栈已经变化，不能直接照搬这张 v2 表。</p>
+<p>系统 WebView 带来一个实际取舍：分发时可以复用环境，测试时却要面对不同环境。一个页面在最新 Edge 中正常，不代表它在旧版 macOS WebKit 中也完全一致。CSS、输入法、字体、文件拖放、下载和媒体格式都值得在目标平台上实际验证。</p>
+<p><strong>一次前端调用，最终如何进入 Go？</strong></p>
+<p>在 v2 中，把结构体实例放进 <code>options.App.Bind</code> 后，Wails 会为其可导出方法生成 JavaScript 包装函数和 TypeScript 声明。例如，Go 方法的形状可以是：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">a</span> <span class="o">*</span><span class="nx">App</span><span class="p">)</span> <span class="nf">Greet</span><span class="p">(</span><span class="nx">name</span> <span class="kt">string</span><span class="p">)</span> <span class="p">(</span><span class="kt">string</span><span class="p">,</span> <span class="kt">error</span><span class="p">)</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>前端使用生成的函数时，得到的是 Promise：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-typescript" data-lang="typescript"><span class="line"><span class="cl"><span class="kr">import</span> <span class="p">{</span> <span class="nx">Greet</span> <span class="p">}</span> <span class="kr">from</span> <span class="s1">&#39;../wailsjs/go/main/App&#39;</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="k">try</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="kr">const</span> <span class="nx">message</span> <span class="o">=</span> <span class="k">await</span> <span class="nx">Greet</span><span class="p">(</span><span class="s1">&#39;Snow&#39;</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="nx">message</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span> <span class="k">catch</span> <span class="p">(</span><span class="nx">error</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">console</span><span class="p">.</span><span class="nx">error</span><span class="p">(</span><span class="s1">&#39;调用失败：&#39;</span><span class="p">,</span> <span class="nx">error</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这个片段用于说明调用方式，后面的实战会换成文件选择方法。Go 返回正常结果时，Promise 完成；Go 的第二个返回值是非空 <code>error</code> 时，Promise 拒绝。前端写法看起来像本地函数，但<strong>调用跨越了语言和运行环境边界</strong>，仍需处理异步、序列化和失败。绑定机制与返回值规则见 <a class="link" href="https://wails.io/docs/howdoesitwork/"  target="_blank" rel="noopener"
+    >How does it work?</a>。</p>
+<div class="mermaid">sequenceDiagram
+    participant U as 用户
+    participant F as 前端组件
+    participant B as Wails 绑定
+    participant G as Go 方法
+    U->>F: 点击按钮
+    F->>B: await PickFile()
+    B->>G: 调用绑定方法
+    G-->>B: 数据或 error
+    B-->>F: Promise 完成或拒绝
+    F-->>U: 显示结果、取消状态或错误
+</div><p>我更倾向于把桥接接口设计成少量、有明确目的的业务动作，例如 <code>ImportCSV</code>、<code>ListConnections</code>、<code>StartExport</code>，而不是暴露通用的 <code>ExecuteCommand</code> 或任意路径文件操作。接口越贴近业务，前端越容易使用，权限边界也越容易检查。</p>
+<h2 id="从零做一个文件信息查看器">从零做一个文件信息查看器
+</h2><p>这个例子完成一条完整链路：点击按钮 → 弹出系统文件选择框 → Go 读取元数据 → 前端显示文件名、字节数和修改时间。它不读文件内容，不需要数据库或额外 Go 依赖。</p>
+<p><strong>准备环境并创建工程。</strong> 先安装满足所选 Wails 版本要求的 Go、Node.js / npm，以及对应平台依赖。Node.js 版本还需要满足模板中 Vite 等工具的要求；实际开发应选仍受支持且与项目兼容的版本，不能只照着旧教程的最低版本号安装。</p>
+<p>下面的命令固定 CLI 版本便于复现；如果使用当前 v2 版本，可把 <code>@v2.12.0</code> 换成 <code>@latest</code>，同时核对生成项目的 <code>go.mod</code>。</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-powershell" data-lang="powershell"><span class="line"><span class="cl"><span class="n">go</span> <span class="n">version</span>
+</span></span><span class="line"><span class="cl"><span class="n">node</span> <span class="p">-</span><span class="n">-version</span>
+</span></span><span class="line"><span class="cl"><span class="n">npm</span> <span class="p">-</span><span class="n">-version</span>
+</span></span><span class="line"><span class="cl"><span class="n">go</span> <span class="n">install</span> <span class="n">github</span><span class="p">.</span><span class="n">com</span><span class="p">/</span><span class="n">wailsapp</span><span class="p">/</span><span class="n">wails</span><span class="p">/</span><span class="n">v2</span><span class="p">/</span><span class="n">cmd</span><span class="p">/</span><span class="n">wails</span><span class="nv">@v2</span><span class="p">.</span><span class="py">12</span><span class="p">.</span><span class="py">0</span>
+</span></span><span class="line"><span class="cl"><span class="n">wails</span> <span class="n">doctor</span>
+</span></span><span class="line"><span class="cl"><span class="n">wails</span> <span class="n">init</span> <span class="n">-n</span> <span class="nb">wails-file</span><span class="n">-info</span> <span class="n">-t</span> <span class="nb">vue-ts</span>
+</span></span><span class="line"><span class="cl"><span class="nb">cd wails-file</span><span class="n">-info</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>如果系统找不到 <code>wails</code>，先检查 <code>go env GOBIN</code>；未自定义时，可执行文件通常位于 <code>GOPATH/bin</code>，需要加入 <code>PATH</code>。macOS / Linux 也可执行同样的 Go 和 Wails 命令，只需按当前 Shell 处理路径。</p>
+<p>工程中与本例相关的文件如下。<code>wailsjs</code> 由工具生成；修改 Go 方法之后，应重新生成绑定，不要手工编辑生成文件。<a class="link" href="https://wails.io/docs/gettingstarted/firstproject/"  target="_blank" rel="noopener"
+    >项目模板与目录说明</a> 中列出了更多模板。</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">wails-file-info/
+</span></span><span class="line"><span class="cl">├── app.go                       # 提供给前端的 Go 方法
+</span></span><span class="line"><span class="cl">├── main.go                      # 窗口、资源、生命周期与绑定
+</span></span><span class="line"><span class="cl">├── go.mod
+</span></span><span class="line"><span class="cl">├── wails.json                   # 前端构建命令等工程配置
+</span></span><span class="line"><span class="cl">├── build/                       # 图标与平台构建配置
+</span></span><span class="line"><span class="cl">└── frontend/
+</span></span><span class="line"><span class="cl">    ├── src/App.vue              # 本例的界面
+</span></span><span class="line"><span class="cl">    ├── wailsjs/                 # 自动生成的绑定、模型与运行时
+</span></span><span class="line"><span class="cl">    └── dist/                    # 前端构建产物
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p><strong>替换 <code>app.go</code>，让 Go 负责文件选择和元数据读取。</strong></p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span><span class="lnt">25
+</span><span class="lnt">26
+</span><span class="lnt">27
+</span><span class="lnt">28
+</span><span class="lnt">29
+</span><span class="lnt">30
+</span><span class="lnt">31
+</span><span class="lnt">32
+</span><span class="lnt">33
+</span><span class="lnt">34
+</span><span class="lnt">35
+</span><span class="lnt">36
+</span><span class="lnt">37
+</span><span class="lnt">38
+</span><span class="lnt">39
+</span><span class="lnt">40
+</span><span class="lnt">41
+</span><span class="lnt">42
+</span><span class="lnt">43
+</span><span class="lnt">44
+</span><span class="lnt">45
+</span><span class="lnt">46
+</span><span class="lnt">47
+</span><span class="lnt">48
+</span><span class="lnt">49
+</span><span class="lnt">50
+</span><span class="lnt">51
+</span><span class="lnt">52
+</span><span class="lnt">53
+</span><span class="lnt">54
+</span><span class="lnt">55
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kn">package</span> <span class="nx">main</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kn">import</span> <span class="p">(</span>
+</span></span><span class="line"><span class="cl">	<span class="s">&#34;context&#34;</span>
+</span></span><span class="line"><span class="cl">	<span class="s">&#34;fmt&#34;</span>
+</span></span><span class="line"><span class="cl">	<span class="s">&#34;os&#34;</span>
+</span></span><span class="line"><span class="cl">	<span class="s">&#34;strconv&#34;</span>
+</span></span><span class="line"><span class="cl">	<span class="s">&#34;time&#34;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="s">&#34;github.com/wailsapp/wails/v2/pkg/runtime&#34;</span>
+</span></span><span class="line"><span class="cl"><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">App</span> <span class="kd">struct</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">type</span> <span class="nx">FileInfo</span> <span class="kd">struct</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">Name</span>       <span class="kt">string</span> <span class="s">`json:&#34;name&#34;`</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">SizeBytes</span>  <span class="kt">string</span> <span class="s">`json:&#34;sizeBytes&#34;`</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">ModifiedAt</span> <span class="kt">string</span> <span class="s">`json:&#34;modifiedAt&#34;`</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">NewApp</span><span class="p">()</span> <span class="o">*</span><span class="nx">App</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="o">&amp;</span><span class="nx">App</span><span class="p">{}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">a</span> <span class="o">*</span><span class="nx">App</span><span class="p">)</span> <span class="nf">startup</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">a</span><span class="p">.</span><span class="nx">ctx</span> <span class="p">=</span> <span class="nx">ctx</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">a</span> <span class="o">*</span><span class="nx">App</span><span class="p">)</span> <span class="nf">PickFile</span><span class="p">()</span> <span class="p">(</span><span class="o">*</span><span class="nx">FileInfo</span><span class="p">,</span> <span class="kt">error</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">path</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">runtime</span><span class="p">.</span><span class="nf">OpenFileDialog</span><span class="p">(</span><span class="nx">a</span><span class="p">.</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">runtime</span><span class="p">.</span><span class="nx">OpenDialogOptions</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">Title</span><span class="p">:</span> <span class="s">&#34;Select a file&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">	<span class="p">})</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="kc">nil</span><span class="p">,</span> <span class="nx">fmt</span><span class="p">.</span><span class="nf">Errorf</span><span class="p">(</span><span class="s">&#34;open file dialog: %w&#34;</span><span class="p">,</span> <span class="nx">err</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">path</span> <span class="o">==</span> <span class="s">&#34;&#34;</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="kc">nil</span><span class="p">,</span> <span class="kc">nil</span> <span class="c1">// 用户取消，前端收到 null。
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span>	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="nx">info</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">os</span><span class="p">.</span><span class="nf">Stat</span><span class="p">(</span><span class="nx">path</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="kc">nil</span><span class="p">,</span> <span class="nx">fmt</span><span class="p">.</span><span class="nf">Errorf</span><span class="p">(</span><span class="s">&#34;read file metadata: %w&#34;</span><span class="p">,</span> <span class="nx">err</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="p">!</span><span class="nx">info</span><span class="p">.</span><span class="nf">Mode</span><span class="p">().</span><span class="nf">IsRegular</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">return</span> <span class="kc">nil</span><span class="p">,</span> <span class="nx">fmt</span><span class="p">.</span><span class="nf">Errorf</span><span class="p">(</span><span class="s">&#34;please select a regular file&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="o">&amp;</span><span class="nx">FileInfo</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">Name</span><span class="p">:</span>       <span class="nx">info</span><span class="p">.</span><span class="nf">Name</span><span class="p">(),</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">SizeBytes</span><span class="p">:</span>  <span class="nx">strconv</span><span class="p">.</span><span class="nf">FormatInt</span><span class="p">(</span><span class="nx">info</span><span class="p">.</span><span class="nf">Size</span><span class="p">(),</span> <span class="mi">10</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">ModifiedAt</span><span class="p">:</span> <span class="nx">info</span><span class="p">.</span><span class="nf">ModTime</span><span class="p">().</span><span class="nf">Format</span><span class="p">(</span><span class="nx">time</span><span class="p">.</span><span class="nx">RFC3339</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl">	<span class="p">},</span> <span class="kc">nil</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这里有几个刻意保留的细节：用户取消不是错误；文件被选中后仍可能被删除，因此 <code>os.Stat</code> 的错误不能忽略；目录和设备等特殊文件应明确排除。字节数使用十进制字符串传到前端，避免把 Go 的 64 位整数无条件当作 JavaScript 可精确表示的 <code>number</code>。</p>
+<p><code>ctx</code> 来自 Wails 的启动回调，用于调用桌面运行时。它不是随便创建一个 <code>context.Background()</code> 就能替代的普通业务上下文。v2 的文件对话框从 Go 侧调用，取消时返回空路径，具体语义见 <a class="link" href="https://wails.io/docs/reference/runtime/dialog/"  target="_blank" rel="noopener"
+    >Dialog 文档</a>。</p>
+<p><strong>替换 <code>main.go</code>，连接资源、启动回调和方法绑定。</strong></p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span><span class="lnt">25
+</span><span class="lnt">26
+</span><span class="lnt">27
+</span><span class="lnt">28
+</span><span class="lnt">29
+</span><span class="lnt">30
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kn">package</span> <span class="nx">main</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kn">import</span> <span class="p">(</span>
+</span></span><span class="line"><span class="cl">	<span class="s">&#34;embed&#34;</span>
+</span></span><span class="line"><span class="cl">	<span class="s">&#34;log&#34;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">	<span class="s">&#34;github.com/wailsapp/wails/v2&#34;</span>
+</span></span><span class="line"><span class="cl">	<span class="s">&#34;github.com/wailsapp/wails/v2/pkg/options&#34;</span>
+</span></span><span class="line"><span class="cl">	<span class="s">&#34;github.com/wailsapp/wails/v2/pkg/options/assetserver&#34;</span>
+</span></span><span class="line"><span class="cl"><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1">//go:embed all:frontend/dist
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">var</span> <span class="nx">assets</span> <span class="nx">embed</span><span class="p">.</span><span class="nx">FS</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">app</span> <span class="o">:=</span> <span class="nf">NewApp</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">err</span> <span class="o">:=</span> <span class="nx">wails</span><span class="p">.</span><span class="nf">Run</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">options</span><span class="p">.</span><span class="nx">App</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">Title</span><span class="p">:</span>  <span class="s">&#34;File Info&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">Width</span><span class="p">:</span>  <span class="mi">900</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">Height</span><span class="p">:</span> <span class="mi">620</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">AssetServer</span><span class="p">:</span> <span class="o">&amp;</span><span class="nx">assetserver</span><span class="p">.</span><span class="nx">Options</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">Assets</span><span class="p">:</span> <span class="nx">assets</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">		<span class="p">},</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">OnStartup</span><span class="p">:</span> <span class="nx">app</span><span class="p">.</span><span class="nx">startup</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">Bind</span><span class="p">:</span>      <span class="p">[]</span><span class="kd">interface</span><span class="p">{}{</span><span class="nx">app</span><span class="p">},</span>
+</span></span><span class="line"><span class="cl">	<span class="p">})</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">log</span><span class="p">.</span><span class="nf">Fatal</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p><code>Bind</code> 中放的是已经创建好的实例。<code>startup</code> 小写，因此不属于暴露给前端的业务方法。<code>FileInfo</code> 的字段使用 JSON 标签，便于生成前端模型。</p>
+<p><code>//go:embed</code> 把构建好的页面资源嵌入程序。这里的 <code>frontend/dist</code> 应由前端构建生成，不应当作手工维护的源码目录。窗口和生命周期选项可查阅 <a class="link" href="https://wails.io/docs/reference/options/"  target="_blank" rel="noopener"
+    >Options 文档</a>。</p>
+<p><strong>替换 <code>frontend/src/App.vue</code>，使用生成的绑定。</strong></p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span><span class="lnt">25
+</span><span class="lnt">26
+</span><span class="lnt">27
+</span><span class="lnt">28
+</span><span class="lnt">29
+</span><span class="lnt">30
+</span><span class="lnt">31
+</span><span class="lnt">32
+</span><span class="lnt">33
+</span><span class="lnt">34
+</span><span class="lnt">35
+</span><span class="lnt">36
+</span><span class="lnt">37
+</span><span class="lnt">38
+</span><span class="lnt">39
+</span><span class="lnt">40
+</span><span class="lnt">41
+</span><span class="lnt">42
+</span><span class="lnt">43
+</span><span class="lnt">44
+</span><span class="lnt">45
+</span><span class="lnt">46
+</span><span class="lnt">47
+</span><span class="lnt">48
+</span><span class="lnt">49
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-vue" data-lang="vue"><span class="line"><span class="cl"><span class="p">&lt;</span><span class="nt">script</span> <span class="na">setup</span> <span class="na">lang</span><span class="o">=</span><span class="s">&#34;ts&#34;</span><span class="p">&gt;</span>
+</span></span><span class="line"><span class="cl"><span class="kr">import</span> <span class="p">{</span> <span class="nx">ref</span> <span class="p">}</span> <span class="nx">from</span> <span class="s1">&#39;vue&#39;</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl"><span class="kr">import</span> <span class="p">{</span> <span class="nx">PickFile</span> <span class="p">}</span> <span class="nx">from</span> <span class="s1">&#39;../wailsjs/go/main/App&#39;</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl"><span class="kr">import</span> <span class="nx">type</span> <span class="p">{</span> <span class="nx">main</span> <span class="p">}</span> <span class="nx">from</span> <span class="s1">&#39;../wailsjs/go/models&#39;</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kr">const</span> <span class="nx">file</span> <span class="o">=</span> <span class="nx">ref</span><span class="p">&lt;</span><span class="nt">main</span><span class="na">.FileInfo</span> <span class="err">|</span> <span class="na">null</span><span class="p">&gt;(</span><span class="kc">null</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl"><span class="kr">const</span> <span class="nx">busy</span> <span class="o">=</span> <span class="nx">ref</span><span class="p">(</span><span class="kc">false</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl"><span class="kr">const</span> <span class="nx">message</span> <span class="o">=</span> <span class="nx">ref</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="nx">async</span> <span class="kd">function</span> <span class="nx">chooseFile</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="k">if</span> <span class="p">(</span><span class="nx">busy</span><span class="p">.</span><span class="nx">value</span><span class="p">)</span> <span class="k">return</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">busy</span><span class="p">.</span><span class="nx">value</span> <span class="o">=</span> <span class="kc">true</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">message</span><span class="p">.</span><span class="nx">value</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">file</span><span class="p">.</span><span class="nx">value</span> <span class="o">=</span> <span class="kc">null</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">  <span class="k">try</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">file</span><span class="p">.</span><span class="nx">value</span> <span class="o">=</span> <span class="nx">await</span> <span class="nx">PickFile</span><span class="p">();</span>
+</span></span><span class="line"><span class="cl">    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="nx">file</span><span class="p">.</span><span class="nx">value</span><span class="p">)</span> <span class="nx">message</span><span class="p">.</span><span class="nx">value</span> <span class="o">=</span> <span class="s1">&#39;No file selected.&#39;</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">  <span class="p">}</span> <span class="k">catch</span> <span class="p">(</span><span class="nx">error</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">message</span><span class="p">.</span><span class="nx">value</span> <span class="o">=</span> <span class="nb">String</span><span class="p">(</span><span class="nx">error</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl">  <span class="p">}</span> <span class="k">finally</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">busy</span><span class="p">.</span><span class="nx">value</span> <span class="o">=</span> <span class="kc">false</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">  <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">&lt;/</span><span class="nt">script</span><span class="p">&gt;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="p">&lt;</span><span class="nt">template</span><span class="p">&gt;</span>
+</span></span><span class="line"><span class="cl">  <span class="p">&lt;</span><span class="nt">main</span> <span class="na">class</span><span class="o">=</span><span class="s">&#34;file-info&#34;</span><span class="p">&gt;</span>
+</span></span><span class="line"><span class="cl">    <span class="p">&lt;</span><span class="nt">h1</span><span class="p">&gt;</span><span class="nx">File</span> <span class="nx">Info</span><span class="p">&lt;/</span><span class="nt">h1</span><span class="p">&gt;</span>
+</span></span><span class="line"><span class="cl">    <span class="p">&lt;</span><span class="nt">p</span><span class="p">&gt;</span><span class="nx">Select</span> <span class="nx">a</span> <span class="nx">local</span> <span class="nx">file</span> <span class="nx">to</span> <span class="nx">view</span> <span class="nx">its</span> <span class="nx">metadata</span><span class="p">.&lt;/</span><span class="nt">p</span><span class="p">&gt;</span>
+</span></span><span class="line"><span class="cl">    <span class="p">&lt;</span><span class="nt">button</span> <span class="nt">:disabled</span><span class="s">=&#34;busy&#34;</span> <span class="nt">@click</span><span class="s">=&#34;chooseFile&#34;</span><span class="p">&gt;</span>
+</span></span><span class="line"><span class="cl">      <span class="p">{{</span> <span class="na">busy</span> <span class="err">?</span> <span class="err">&#39;</span><span class="na">Selecting</span><span class="err">…&#39;</span> <span class="o">:</span> <span class="err">&#39;</span><span class="na">Choose</span> <span class="na">file</span><span class="err">&#39;</span> <span class="p">}}</span>
+</span></span><span class="line"><span class="cl">    <span class="p">&lt;/</span><span class="nt">button</span><span class="p">&gt;</span>
+</span></span><span class="line"><span class="cl">    <span class="p">&lt;</span><span class="nt">p</span> <span class="na">role</span><span class="o">=</span><span class="s">&#34;status&#34;</span> <span class="na">aria</span><span class="nt">-live</span><span class="err">=&#34;</span><span class="na">polite</span><span class="err">&#34;</span><span class="p">&gt;{{</span> <span class="nx">message</span> <span class="p">}}&lt;/</span><span class="nt">p</span><span class="p">&gt;</span>
+</span></span><span class="line"><span class="cl">    <span class="p">&lt;</span><span class="nt">dl</span> <span class="nt">v-if</span><span class="s">=&#34;file&#34;</span><span class="p">&gt;</span>
+</span></span><span class="line"><span class="cl">      <span class="p">&lt;</span><span class="nt">dt</span><span class="p">&gt;</span><span class="nx">Name</span><span class="p">&lt;/</span><span class="nt">dt</span><span class="p">&gt;&lt;</span><span class="nt">dd</span><span class="p">&gt;{{</span> <span class="nx">file</span><span class="p">.</span><span class="nx">name</span> <span class="p">}}&lt;/</span><span class="nt">dd</span><span class="p">&gt;</span>
+</span></span><span class="line"><span class="cl">      <span class="p">&lt;</span><span class="nt">dt</span><span class="p">&gt;</span><span class="nx">Size</span> <span class="p">(</span><span class="nx">bytes</span><span class="p">)&lt;/</span><span class="nt">dt</span><span class="p">&gt;&lt;</span><span class="nt">dd</span><span class="p">&gt;{{</span> <span class="nx">file</span><span class="p">.</span><span class="nx">sizeBytes</span> <span class="p">}}&lt;/</span><span class="nt">dd</span><span class="p">&gt;</span>
+</span></span><span class="line"><span class="cl">      <span class="p">&lt;</span><span class="nt">dt</span><span class="p">&gt;</span><span class="nx">Modified</span><span class="p">&lt;/</span><span class="nt">dt</span><span class="p">&gt;&lt;</span><span class="nt">dd</span><span class="p">&gt;{{</span> <span class="nx">file</span><span class="p">.</span><span class="nx">modifiedAt</span> <span class="p">}}&lt;/</span><span class="nt">dd</span><span class="p">&gt;</span>
+</span></span><span class="line"><span class="cl">    <span class="p">&lt;/</span><span class="nt">dl</span><span class="p">&gt;</span>
+</span></span><span class="line"><span class="cl">  <span class="p">&lt;/</span><span class="nt">main</span><span class="p">&gt;</span>
+</span></span><span class="line"><span class="cl"><span class="p">&lt;/</span><span class="nt">template</span><span class="p">&gt;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="p">&lt;</span><span class="nt">style</span> <span class="na">scoped</span><span class="p">&gt;</span>
+</span></span><span class="line"><span class="cl"><span class="p">.</span><span class="nx">file</span><span class="o">-</span><span class="nx">info</span> <span class="p">{</span> <span class="nx">max</span><span class="o">-</span><span class="nx">width</span><span class="o">:</span> <span class="mi">640</span><span class="nx">px</span><span class="p">;</span> <span class="nx">margin</span><span class="o">:</span> <span class="mi">48</span><span class="nx">px</span> <span class="nx">auto</span><span class="p">;</span> <span class="nx">padding</span><span class="o">:</span> <span class="mi">0</span> <span class="mi">24</span><span class="nx">px</span><span class="p">;</span> <span class="nx">text</span><span class="o">-</span><span class="nx">align</span><span class="o">:</span> <span class="nx">left</span><span class="p">;</span> <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="nx">button</span> <span class="p">{</span> <span class="nx">padding</span><span class="o">:</span> <span class="mi">10</span><span class="nx">px</span> <span class="mi">18</span><span class="nx">px</span><span class="p">;</span> <span class="nx">cursor</span><span class="o">:</span> <span class="nx">pointer</span><span class="p">;</span> <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="nx">button</span><span class="o">:</span><span class="nx">disabled</span> <span class="p">{</span> <span class="nx">cursor</span><span class="o">:</span> <span class="nx">wait</span><span class="p">;</span> <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="nx">dl</span> <span class="p">{</span> <span class="nx">display</span><span class="o">:</span> <span class="nx">grid</span><span class="p">;</span> <span class="nx">grid</span><span class="o">-</span><span class="nx">template</span><span class="o">-</span><span class="nx">columns</span><span class="o">:</span> <span class="mi">120</span><span class="nx">px</span> <span class="nx">minmax</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="nx">fr</span><span class="p">);</span> <span class="nx">gap</span><span class="o">:</span> <span class="mi">12</span><span class="nx">px</span><span class="p">;</span> <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="nx">dt</span> <span class="p">{</span> <span class="nx">font</span><span class="o">-</span><span class="nx">weight</span><span class="o">:</span> <span class="mi">600</span><span class="p">;</span> <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="nx">dd</span> <span class="p">{</span> <span class="nx">margin</span><span class="o">:</span> <span class="mi">0</span><span class="p">;</span> <span class="nx">overflow</span><span class="o">-</span><span class="nx">wrap</span><span class="o">:</span> <span class="nx">anywhere</span><span class="p">;</span> <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">&lt;/</span><span class="nt">style</span><span class="p">&gt;</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>本例保留英文界面，方便两种语言文章共用同一份示例代码；实际项目可替换为中文或加入国际化。前端没有提交文件路径，也没有直接接触文件系统，所有文件选择和读取都在 Go 中完成。</p>
+<p>删除模板中不再使用的 <code>frontend/src/components/HelloWorld.vue</code>：它仍然导入旧的 <code>Greet</code> 方法，即使页面已经不再引用这个组件，TypeScript 检查也可能扫描到它。</p>
+<p>先在工程根目录生成绑定，然后启动开发环境：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-powershell" data-lang="powershell"><span class="line"><span class="cl"><span class="n">go</span> <span class="n">mod</span> <span class="n">tidy</span>
+</span></span><span class="line"><span class="cl"><span class="n">wails</span> <span class="n">generate</span> <span class="n">module</span>
+</span></span><span class="line"><span class="cl"><span class="n">wails</span> <span class="n">dev</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p><code>wails dev</code> 会协调前端开发服务器、Go 构建与绑定生成。前端修改通常通过 Vite 更新，Go 修改通常需要重新构建并重启应用，并非所有变化都能原地热替换。开发行为见 <a class="link" href="https://wails.io/docs/gettingstarted/development/"  target="_blank" rel="noopener"
+    >Developing your Application</a>。</p>
+<p>可用下面这组动作验收这个小工具：</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>动作</th>
+<th>预期结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>选择一个普通文件</td>
+<td>显示文件名、准确的字节数字符串与带时区的修改时间</td>
+</tr>
+<tr>
+<td>取消选择</td>
+<td>显示未选择文件，按钮恢复可用</td>
+</tr>
+<tr>
+<td>连续点击按钮</td>
+<td>选择过程中按钮被禁用，避免重复触发</td>
+</tr>
+<tr>
+<td>文件选择后读取失败</td>
+<td>显示错误，后续仍可再次选择</td>
+</tr>
+<tr>
+<td>文件名较长或含中文</td>
+<td>文本正常显示，长文件名可以换行</td>
+</tr>
+</tbody>
+</table></div>
+<p>本文示例已在 Windows amd64、Go 1.25.6、Node.js 22.14.0 和 Wails CLI 2.12.0 环境完成 <code>wails build</code>，包含 TypeScript 检查与生产编译。前端还使用模拟 Go 桥接检查了大整数文本显示、取消、错误恢复和按钮禁用状态。这些验证不等于在三种操作系统上完成原生对话框交互测试；实际分发前仍需按上表在目标系统验收。</p>
+<h2 id="方法调用之外事件任务与数据边界">方法调用之外：事件、任务与数据边界
+</h2><p>文件元数据读取很快，可以直接等待方法返回。如果要扫描十万个文件、导出数据库或批量转换图片，就需要进一步区分“请求一次结果”和“持续接收状态”。</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>通信方式</th>
+<th>更适合表达什么</th>
+<th>设计时的重点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>绑定方法</td>
+<td>查询数据、保存配置、启动任务、取消任务</td>
+<td>参数、返回值、错误和幂等性</td>
+</tr>
+<tr>
+<td>事件</td>
+<td>进度、日志片段、状态改变通知</td>
+<td>订阅时机、任务标识、节流和取消订阅</td>
+</tr>
+<tr>
+<td>文件或独立数据通道</td>
+<td>大型二进制内容、巨量记录</td>
+<td>避免整批数据反复复制过桥</td>
+</tr>
+</tbody>
+</table></div>
+<p>例如，在已有 <code>App</code> 中可以增加一个供后台任务调用的辅助方法：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kd">func</span> <span class="p">(</span><span class="nx">a</span> <span class="o">*</span><span class="nx">App</span><span class="p">)</span> <span class="nf">reportProgress</span><span class="p">(</span><span class="nx">taskID</span> <span class="kt">string</span><span class="p">,</span> <span class="nx">percent</span> <span class="kt">int</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">runtime</span><span class="p">.</span><span class="nf">EventsEmit</span><span class="p">(</span><span class="nx">a</span><span class="p">.</span><span class="nx">ctx</span><span class="p">,</span> <span class="s">&#34;task:progress&#34;</span><span class="p">,</span> <span class="kd">map</span><span class="p">[</span><span class="kt">string</span><span class="p">]</span><span class="kd">interface</span><span class="p">{}{</span>
+</span></span><span class="line"><span class="cl">		<span class="s">&#34;taskId&#34;</span><span class="p">:</span>  <span class="nx">taskID</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">		<span class="s">&#34;percent&#34;</span><span class="p">:</span> <span class="nx">percent</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">	<span class="p">})</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>前端组件可以这样订阅。它是独立的事件示意片段，需要放进任务组件的 <code>&lt;script setup&gt;</code>，不属于上面文件查看器的必需代码：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-typescript" data-lang="typescript"><span class="line"><span class="cl"><span class="kr">import</span> <span class="p">{</span> <span class="nx">onMounted</span><span class="p">,</span> <span class="nx">onUnmounted</span><span class="p">,</span> <span class="nx">ref</span> <span class="p">}</span> <span class="kr">from</span> <span class="s1">&#39;vue&#39;</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl"><span class="kr">import</span> <span class="p">{</span> <span class="nx">EventsOn</span> <span class="p">}</span> <span class="kr">from</span> <span class="s1">&#39;../wailsjs/runtime/runtime&#39;</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kr">const</span> <span class="nx">progress</span> <span class="o">=</span> <span class="nx">ref</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
+</span></span><span class="line"><span class="cl"><span class="kr">const</span> <span class="nx">taskID</span> <span class="o">=</span> <span class="nx">ref</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">);</span> <span class="c1">// 启动任务后保存服务端返回的标识。
+</span></span></span><span class="line"><span class="cl"><span class="c1"></span><span class="kd">let</span> <span class="nx">unsubscribe</span><span class="o">:</span> <span class="p">(()</span> <span class="o">=&gt;</span> <span class="k">void</span><span class="p">)</span> <span class="o">|</span> <span class="kc">undefined</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="nx">onMounted</span><span class="p">(()</span> <span class="o">=&gt;</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nx">unsubscribe</span> <span class="o">=</span> <span class="nx">EventsOn</span><span class="p">(</span><span class="s1">&#39;task:progress&#39;</span><span class="p">,</span> <span class="p">(</span><span class="nx">data</span>: <span class="kt">unknown</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="k">if</span> <span class="p">(</span><span class="o">!</span><span class="nx">data</span> <span class="o">||</span> <span class="k">typeof</span> <span class="nx">data</span> <span class="o">!==</span> <span class="s1">&#39;object&#39;</span><span class="p">)</span> <span class="k">return</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="kr">const</span> <span class="nx">event</span> <span class="o">=</span> <span class="nx">data</span> <span class="kr">as</span> <span class="nx">Record</span><span class="p">&lt;</span><span class="nt">string</span><span class="err">,</span> <span class="na">unknown</span><span class="p">&gt;;</span>
+</span></span><span class="line"><span class="cl">    <span class="k">if</span> <span class="p">(</span><span class="nx">event</span><span class="p">.</span><span class="nx">taskId</span> <span class="o">!==</span> <span class="nx">taskID</span><span class="p">.</span><span class="nx">value</span><span class="p">)</span> <span class="k">return</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="k">if</span> <span class="p">(</span><span class="k">typeof</span> <span class="nx">event</span><span class="p">.</span><span class="nx">percent</span> <span class="o">!==</span> <span class="s1">&#39;number&#39;</span> <span class="o">||</span> <span class="o">!</span><span class="nb">Number</span><span class="p">.</span><span class="nb">isFinite</span><span class="p">(</span><span class="nx">event</span><span class="p">.</span><span class="nx">percent</span><span class="p">))</span> <span class="k">return</span><span class="p">;</span>
+</span></span><span class="line"><span class="cl">    <span class="nx">progress</span><span class="p">.</span><span class="nx">value</span> <span class="o">=</span> <span class="nb">Math</span><span class="p">.</span><span class="nx">min</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="nb">Math</span><span class="p">.</span><span class="nx">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nx">event</span><span class="p">.</span><span class="nx">percent</span><span class="p">));</span>
+</span></span><span class="line"><span class="cl">  <span class="p">});</span>
+</span></span><span class="line"><span class="cl"><span class="p">});</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="nx">onUnmounted</span><span class="p">(()</span> <span class="o">=&gt;</span> <span class="nx">unsubscribe</span><span class="o">?</span><span class="p">.());</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p><code>EventsOn</code> 返回取消该订阅的函数，组件卸载时调用它，可以避免重复订阅及回调残留。<a class="link" href="https://wails.io/docs/reference/runtime/events/"  target="_blank" rel="noopener"
+    >Events 文档</a> 列出了 Go 和 JavaScript 两侧的对应接口。</p>
+<p>这个片段不包含任务执行器。设计真正的长任务时，我会明确以下规则：先建立监听，再启动工作；避免任务在前端保存 ID 前就发出无法匹配的首个事件，必要时拆成“创建任务”和“开始执行”；同时提供查询任务快照的接口。事件用于通知，不应充当唯一的状态存储。</p>
+<p>后台工作可以放进 goroutine，但 goroutine 本身不解决取消、资源清理和共享状态问题。任务需要自己的取消上下文；退出时通过 <code>OnShutdown</code> 停止工作并关闭资源；共享 map、连接状态或缓存需要锁或其他同步方式。原生 UI 操作还需要遵守对应平台和框架的线程要求，不能把所有工作随意丢到 goroutine。</p>
+<p>跨语言的数据也应当专门设计：</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>数据情况</th>
+<th>推荐的接口处理</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Go <code>int64</code> / <code>uint64</code> 标识符或大数</td>
+<td>需要精确保真时使用十进制字符串，别依赖 JS <code>number</code> 覆盖整个范围</td>
+</tr>
+<tr>
+<td>时间</td>
+<td>明确使用 RFC 3339 字符串或约定的时间戳，并写清单位和时区</td>
+</tr>
+<tr>
+<td>指针、可空字段、空结果</td>
+<td>在前端按可能出现 <code>null</code> 处理；生成声明不能代替运行时检查</td>
+</tr>
+<tr>
+<td>slice / 列表</td>
+<td>明确空列表与 <code>null</code> 的语义，前端不要盲目调用 <code>.map()</code></td>
+</tr>
+<tr>
+<td>大文件和大列表</td>
+<td>分块、分页或按需读取，避免一次把几百 MB 内容塞进返回值</td>
+</tr>
+<tr>
+<td>错误</td>
+<td>前端显示用户能理解的信息，内部日志保留诊断上下文</td>
+</tr>
+</tbody>
+</table></div>
+<p>生成 TypeScript 类型的价值是减少日常接口写错的机会，不是把所有外部输入都变成可信数据。</p>
+<h2 id="从开发窗口走到可分发的软件">从开发窗口走到可分发的软件
+</h2><p>生产构建从工程根目录执行：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-powershell" data-lang="powershell"><span class="line"><span class="cl"><span class="n">wails</span> <span class="n">build</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>构建会按项目配置处理前端资源并编译 Go，产物位于 <code>build/bin</code>。使用 WebKitGTK 4.1 的 v2 Linux 环境，通常需要 <code>wails build -tags webkit2_41</code>；开发时也应使用匹配的标签。相关行为见 <a class="link" href="https://wails.io/docs/gettingstarted/building/"  target="_blank" rel="noopener"
+    >Compiling your Project</a> 和 <a class="link" href="https://wails.io/docs/reference/cli/"  target="_blank" rel="noopener"
+    >CLI 参数说明</a>。</p>
+<div class="mermaid">flowchart LR
+    Src["前端源码"] --> Dist["前端构建：dist"]
+    Dist --> Embed["go:embed"]
+    Go["Go 源码与依赖"] --> Compile["目标平台编译"]
+    Embed --> Compile
+    Compile --> App["桌面程序"]
+    App --> Release["打包、签名与分发"]
+</div><p><strong>嵌入资源解决了“页面文件怎么带走”，却不解决所有部署问题。</strong> 用户通常不需要安装 Go、Node.js 或 npm，但仍需要目标平台的 WebView 和系统依赖。如果应用调用外部命令、读取额外配置或加载动态库，这些依赖也要一并考虑。</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>平台</th>
+<th>编译以后还需要考虑什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Windows</td>
+<td>WebView2 检测与安装策略、图标、版本信息、安装目录、代码签名</td>
+</tr>
+<tr>
+<td>macOS</td>
+<td><code>.app</code> 结构、签名、公证、权限声明，以及 Intel / Apple Silicon 目标</td>
+</tr>
+<tr>
+<td>Linux</td>
+<td>系统库兼容、桌面入口、安装包格式、目标发行版和显示环境</td>
+</tr>
+</tbody>
+</table></div>
+<p>Windows 可安装 NSIS 后使用 <code>wails build -nsis</code> 生成安装程序；如何携带或引导安装 WebView2，应依据分发环境选择方案。具体步骤见 <a class="link" href="https://wails.io/docs/guides/windows-installer/"  target="_blank" rel="noopener"
+    >NSIS installer 文档</a>。生成安装包和签名是不同环节，不能因为有安装程序就认为签名已经完成。</p>
+<p>“跨平台框架”也不等于“在一台机器上改一下 <code>GOOS</code> 就能无条件完成所有构建”。Windows 的 v2 框架部分不要求 CGO，但 macOS、Linux 的原生依赖，以及应用自己引入的 SQLite / C 库等，都可能增加交叉编译要求。实践中，在 Windows、macOS、Linux CI runner 上分别构建和测试，通常更容易维护；具体参数以 <a class="link" href="https://wails.io/docs/reference/cli/"  target="_blank" rel="noopener"
+    >v2 CLI 文档</a> 为准。</p>
+<p><strong>数据该存在哪里？</strong> 嵌入的静态资源是应用内容，不能当用户数据库使用。配置可以基于 Go 的 <code>os.UserConfigDir()</code> 组织；数据库、缓存和日志应按目标系统约定选择可写目录。不要假设程序工作目录等于安装目录，更不要假设安装目录可写。普通配置可用 JSON；只有出现查询、事务或大量结构化数据需求时，再引入 SQLite 等存储。</p>
+<p>开发环境能够联网、读取源码目录，不代表发布后的程序也能。一个合理的发布验收应在干净环境中检查：首次启动、离线启动、中文路径、只读安装目录、配置迁移以及所需系统组件是否齐全。</p>
+<h2 id="wailselectrontauri-与-go-gui-框架怎么选">Wails、Electron、Tauri 与 Go GUI 框架怎么选
+</h2><p>这几类方案都能做桌面应用，差别主要在业务语言、界面渲染和生态。下表是架构比较，不是性能测试：</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>维度</th>
+<th>Wails</th>
+<th>Electron</th>
+<th>Tauri 2</th>
+<th>Fyne</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>常见应用逻辑语言</td>
+<td>Go</td>
+<td>JavaScript / TypeScript，依托 Node.js</td>
+<td>Rust 核心命令，可集成其他组件</td>
+<td>Go</td>
+</tr>
+<tr>
+<td>界面方式</td>
+<td>Web 前端</td>
+<td>Web 前端</td>
+<td>Web 前端</td>
+<td>Go 编写组件与布局</td>
+</tr>
+<tr>
+<td>渲染基础</td>
+<td>系统 WebView</td>
+<td>随应用分发的 Chromium</td>
+<td>系统 WebView</td>
+<td>自身的跨平台图形与控件体系</td>
+</tr>
+<tr>
+<td>更容易复用的积累</td>
+<td>Go 业务代码 + Web UI</td>
+<td>Node.js 生态 + Web UI</td>
+<td>Rust 生态 + Web UI</td>
+<td>Go 代码与 Go GUI 经验</td>
+</tr>
+<tr>
+<td>主要评估点</td>
+<td>WebView 兼容性、桌面能力版本差异</td>
+<td>分发体积、运行资源、进程与安全配置</td>
+<td>Rust 接入成本、权限配置与平台集成</td>
+<td>控件能力、视觉定制和现有 Web UI 能否复用</td>
+</tr>
+</tbody>
+</table></div>
+<p>架构依据分别见 <a class="link" href="https://wails.io/docs/introduction/"  target="_blank" rel="noopener"
+    >Wails 介绍</a>、<a class="link" href="https://www.electronjs.org/docs/latest/tutorial/process-model"  target="_blank" rel="noopener"
+    >Electron 进程模型</a>、<a class="link" href="https://v2.tauri.app/start/"  target="_blank" rel="noopener"
+    >Tauri 介绍</a> 与 <a class="link" href="https://docs.fyne.io/"  target="_blank" rel="noopener"
+    >Fyne 文档</a>。具体选型判断是基于这些架构特点的工程分析。</p>
+<p>对已经有 Go 服务代码和 Web 前端经验的团队，Wails 的吸引力很直接：可以继续使用已有语言和库，把精力放在桌面交互上。对于大量依赖 npm 原生模块或 Electron API 的项目，迁移则不只是替换一个窗口壳，主进程逻辑通常需要重新整理。</p>
+<p>不要根据空白窗口的截图就得出“内存固定只有多少 MB”“一定比另一个框架快几倍”的结论。真实资源消耗还受页面复杂度、WebView 子进程、数据规模、Go 堆、缓存、系统版本和统计口径影响。评估时应使用同一功能原型，统计整个进程树，并分别测安装包大小、启动时间、空闲占用和实际任务峰值。</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>你的需求</th>
+<th>对 Wails 的判断</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>给已有 Go 命令行工具加可视化界面</td>
+<td>很值得做原型，业务代码通常容易复用</td>
+</tr>
+<tr>
+<td>文件处理、数据库管理、运维或本地 API 客户端</td>
+<td>与 Go + Web UI 的组合较契合</td>
+</tr>
+<tr>
+<td>特别依赖完全一致的浏览器内核行为</td>
+<td>需要认真测试系统 WebView 差异，并比较其他方案</td>
+</tr>
+<tr>
+<td>大量系统级桌面集成、多个独立窗口</td>
+<td>优先核查 v3 能力和 Beta 风险，不要假设 v2 已覆盖</td>
+</tr>
+<tr>
+<td>主要目标是手机 App</td>
+<td>本文 v2 方案不适用；v3 移动端仍属实验范围</td>
+</tr>
+<tr>
+<td>不想维护任何 HTML / CSS / JS</td>
+<td>可以先评估 Fyne 等使用 Go 构建界面的方案</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="真正需要留意的边界以及-v3-的变化">真正需要留意的边界，以及 v3 的变化
+</h2><p>桌面应用拥有本地能力，所以前端内容与 Go 方法之间的边界尤其值得认真设计。这不是加上一个前端确认弹窗就能完成的事情：前端校验改善体验，Go 侧校验约束实际行为。</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>风险或误区</th>
+<th>更稳妥的做法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>把带 Go 绑定的窗口当普通网页，随意加载远程内容</td>
+<td>明确可信内容范围；外部链接优先交给系统浏览器打开</td>
+</tr>
+<tr>
+<td>提供任意命令执行、任意文件读写的通用接口</td>
+<td>暴露有限业务动作，校验参数、目录边界和操作权限</td>
+</tr>
+<tr>
+<td>用字符串拼接命令</td>
+<td>优先 Go 库；确需调用程序时使用明确的可执行文件和参数，谨慎处理 Shell</td>
+</tr>
+<tr>
+<td>认为密钥编进二进制就不会泄漏</td>
+<td>不在客户端嵌入长期服务端密钥；按需求使用用户凭证和系统凭证存储</td>
+</tr>
+<tr>
+<td>认为前端换页会自动清理任务和监听</td>
+<td>明确组件与应用生命周期，取消订阅、停止任务并释放资源</td>
+</tr>
+<tr>
+<td>无边框窗口只追求外观</td>
+<td>同时检查拖动区域、键盘操作、缩放、输入法与可访问性</td>
+</tr>
+</tbody>
+</table></div>
+<p>这些是基于桌面程序权限模型的接口设计建议；具体 API 要按所用 Wails 版本验证。初期保持应用壳、业务逻辑、持久化职责清楚即可，不需要一开始就搭建庞大的插件和抽象体系。</p>
+<p><strong>v3 改变的不只是安装命令。</strong> 官方 Beta 公告介绍了新的应用和窗口模型、服务绑定，以及显式的构建流程。下面只列出概念映射，不提供一套混入本文 v2 示例的 v3 代码：</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>方面</th>
+<th>本文使用的 v2 模型</th>
+<th>v3 的方向</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CLI</td>
+<td><code>wails</code></td>
+<td><code>wails3</code></td>
+</tr>
+<tr>
+<td>Go 模块路径</td>
+<td><code>github.com/wailsapp/wails/v2</code></td>
+<td><code>github.com/wailsapp/wails/v3</code></td>
+</tr>
+<tr>
+<td>应用入口</td>
+<td><code>wails.Run</code> + <code>options.App</code></td>
+<td>显式应用对象与生命周期</td>
+</tr>
+<tr>
+<td>前后端连接</td>
+<td><code>Bind</code> 注册结构体实例</td>
+<td>Services 与基于源码静态分析的绑定生成</td>
+</tr>
+<tr>
+<td>窗口</td>
+<td>围绕单主窗口的模型</td>
+<td>一等多窗口能力与窗口对象</td>
+</tr>
+<tr>
+<td>构建</td>
+<td>CLI 协调工程配置</td>
+<td>更明确、可定制的 Taskfile 构建流程</td>
+</tr>
+<tr>
+<td>扩展目标</td>
+<td>主要面向桌面</td>
+<td>另有 Server 模式，移动端仍为实验能力</td>
+</tr>
+</tbody>
+</table></div>
+<p>这一比较依据 <a class="link" href="https://v3.wails.io/blog/wails-v3-beta/"  target="_blank" rel="noopener"
+    >v3 Beta 公告</a>；具体迁移步骤见 <a class="link" href="https://v3.wails.io/migration/v2-to-v3/"  target="_blank" rel="noopener"
+    >v2 → v3 官方迁移指南</a>。迁移需要重新梳理生命周期、运行时调用与绑定，不能只改 <code>go.mod</code> 的版本号。</p>
+<p>安装 v3 时要使用独立的模块路径和 CLI。当前官方安装文档要求 Go 1.25 或更新版本，Linux 默认使用 GTK4 + WebKitGTK 6.0；这与本文 v2 的依赖不同。参见 <a class="link" href="https://v3.wails.io/quick-start/installation/"  target="_blank" rel="noopener"
+    >v3 安装指南</a>。如果准备做依赖多窗口、托盘等能力的新项目，应先用目标平台上的真实流程验证 v3，再决定采用与否。</p>
+<p>理解 Wails 之后，最有价值的练习通常是把一个已有 Go 小工具搬到桌面：保留可独立测试的业务函数，用少量绑定连接界面，在目标系统上完成一次打包。这样既能看到它省下了哪些工作，也能尽早暴露 WebView、原生集成和分发方面的成本。</p>
+<h2 id="官方资料">官方资料
+</h2><p>文中的链接按具体话题指向官方文档。继续学习时，可以沿下面的路线阅读：</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>想继续了解什么</th>
+<th>资料</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>v2 架构与方法绑定</td>
+<td><a class="link" href="https://wails.io/docs/howdoesitwork/"  target="_blank" rel="noopener"
+    >How does it work?</a></td>
+</tr>
+<tr>
+<td>开发环境与平台依赖</td>
+<td><a class="link" href="https://wails.io/docs/gettingstarted/installation/"  target="_blank" rel="noopener"
+    >v2 Installation</a></td>
+</tr>
+<tr>
+<td>窗口生命周期和应用选项</td>
+<td><a class="link" href="https://wails.io/docs/reference/options/"  target="_blank" rel="noopener"
+    >v2 Options</a></td>
+</tr>
+<tr>
+<td>桌面能力与事件</td>
+<td><a class="link" href="https://wails.io/docs/reference/runtime/intro/"  target="_blank" rel="noopener"
+    >Runtime</a>、<a class="link" href="https://wails.io/docs/reference/runtime/events/"  target="_blank" rel="noopener"
+    >Events</a>、<a class="link" href="https://wails.io/docs/reference/runtime/dialog/"  target="_blank" rel="noopener"
+    >Dialog</a></td>
+</tr>
+<tr>
+<td>构建与 Windows 安装包</td>
+<td><a class="link" href="https://wails.io/docs/gettingstarted/building/"  target="_blank" rel="noopener"
+    >Building</a>、<a class="link" href="https://wails.io/docs/guides/windows-installer/"  target="_blank" rel="noopener"
+    >NSIS installer</a></td>
+</tr>
+<tr>
+<td>v3 状态与迁移</td>
+<td><a class="link" href="https://v3.wails.io/status/"  target="_blank" rel="noopener"
+    >Roadmap</a>、<a class="link" href="https://v3.wails.io/migration/v2-to-v3/"  target="_blank" rel="noopener"
+    >Migration</a></td>
+</tr>
+</tbody>
+</table></div>
+
+</div>
+
+            <footer class="article-footer">
+    
+        <div class="article-tags" aria-label="文章标签"><span class="article-footer-label">相关主题</span><a href="/zh-cn/tags/wails/">Wails</a><a href="/zh-cn/tags/go/">Go</a><a href="/zh-cn/tags/vue/">Vue</a><a href="/zh-cn/tags/typescript/">TypeScript</a><a href="/zh-cn/tags/%E6%A1%8C%E9%9D%A2%E5%BC%80%E5%8F%91/">桌面开发</a></div>
+    
+    
+    
+    <div class="article-endnote"><span>感谢读到这里。</span><a href="#top">回到开头 <span aria-hidden="true">↑</span></a></div>
+</footer>
+
+        </div>
+    </div>
+    
+</article>
+
+        <div class="reading-afterword">
+            
+            
+
+            
+        </div>
+    </div>
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+    </main>
+    
+<footer class="site-footer">
+    <div class="footer-top"><a class="footer-wordmark" href="/zh-cn/" aria-label="Snow">Sno<span>w</span></a><p>认真记录，自由生长。</p><a href="#main-content" class="back-top">回到顶部 <span aria-hidden="true">↑</span></a></div>
+    <div class="footer-bottom"><span>© 2026 Snow</span><nav aria-label="更多链接"><a href="/zh-cn/about/">关于</a><a href="https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0" target="_blank" rel="noopener noreferrer me">Bilibili <span aria-hidden="true">↗</span></a><a href="https://github.com/SymphonyW" target="_blank" rel="noopener noreferrer me">GitHub <span aria-hidden="true">↗</span></a><a href="https://twitter.com" target="_blank" rel="noopener noreferrer me">Twitter <span aria-hidden="true">↗</span></a><a href="/zh-cn/index.xml">RSS ↗</a></nav><span class="footer-colophon">由 Hugo 构建 · 持续书写</span></div>
+</footer>
+
+    
+
+<script src="/ts/main.c86029ddb4aad8364879723acaf7efcd526e724d2381088d445aaf6f3ab1bfdf.js" defer></script>
+
+
+<script src="/ts/custom.6c99a7b037ac7e2bde801fbad26b9c20b3b18707868c164174142870ef3bc309.js" defer></script>
+
+
+
+
+
+<script>
+window.MathJax = {
+  tex: {
+    
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  svg: {
+    fontCache: 'global'
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
+<script type="module">
+  import('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs').then(({ default: mermaid }) => {
+    const diagrams = Array.from(document.querySelectorAll('.mermaid'));
+
+    diagrams.forEach((el) => {
+      el.dataset.mermaidSource = el.textContent.trim();
+    });
+
+    const renderMermaid = () => {
+      const scheme = document.documentElement.getAttribute('data-scheme');
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: scheme === 'dark' ? 'dark' : 'default',
+        securityLevel: 'loose',
+        fontFamily: 'inherit'
+      });
+
+      diagrams.forEach((el) => {
+        el.removeAttribute('data-processed');
+        el.textContent = el.dataset.mermaidSource;
+      });
+
+      return mermaid.run({ nodes: diagrams });
+    };
+
+    renderMermaid().catch((error) => console.error('Mermaid render failed:', error));
+
+    
+    const observer = new MutationObserver(() => {
+      renderMermaid().catch((error) => console.error('Mermaid render failed:', error));
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-scheme'] });
+  }).catch((error) => console.error('Mermaid failed to load:', error));
+</script>
+</body>
+</html>

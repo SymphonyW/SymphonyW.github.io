@@ -1,0 +1,1864 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="A complete Go service example connecting GitHub Actions, GHCR, Kubernetes release permissions, rolling updates, smoke tests, and recovery, building on the earlier Docker and K8s guides.">
+<title>Automating Kubernetes Deployments: From Git Push to Verification and Recovery</title>
+
+<link rel='canonical' href='https://SymphonyW.github.io/p/k8s-automated-deployment/'>
+<link rel="stylesheet" href="/scss/custom.min.bf7995e62147d50e1276b97e61d2c8120b52dfef9e32fbaed4e22d2affbd1b2b.css">
+<script>
+(() => {
+    let preference = 'auto';
+    try { preference = localStorage.getItem('StackColorScheme') || preference; } catch (_) {}
+    document.documentElement.dataset.scheme = preference === 'dark' || (preference === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+})();
+</script>
+
+<meta property='og:title' content="Automating Kubernetes Deployments: From Git Push to Verification and Recovery">
+<meta property='og:description' content="A complete Go service example connecting GitHub Actions, GHCR, Kubernetes release permissions, rolling updates, smoke tests, and recovery, building on the earlier Docker and K8s guides.">
+<meta property='og:url' content='https://SymphonyW.github.io/p/k8s-automated-deployment/'>
+<meta property='og:site_name' content='Snow'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='Kubernetes' /><meta property='article:tag' content='K8s' /><meta property='article:tag' content='CI/CD' /><meta property='article:tag' content='GitHub Actions' /><meta property='article:tag' content='DevOps' /><meta property='article:tag' content='GitOps' /><meta property='article:published_time' content='2026-10-17T10:00:00&#43;08:00'/><meta property='article:modified_time' content='2026-10-17T10:00:00&#43;08:00'/><meta property='og:image' content='https://SymphonyW.github.io/p/k8s-automated-deployment/bg.svg' />
+<meta name="twitter:title" content="Automating Kubernetes Deployments: From Git Push to Verification and Recovery">
+<meta name="twitter:description" content="A complete Go service example connecting GitHub Actions, GHCR, Kubernetes release permissions, rolling updates, smoke tests, and recovery, building on the earlier Docker and K8s guides."><meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content='https://SymphonyW.github.io/p/k8s-automated-deployment/bg.svg' />
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    
+    <noscript><style>@media(max-width:760px){.site-header{position:static}.site-header__inner{height:auto;min-height:66px;flex-wrap:wrap}.site-nav{position:static;display:grid;order:3;flex-basis:100%;padding:8px 0 18px}.menu-toggle,.theme-toggle{display:none}}</style></noscript>
+</head>
+<body id="top" class="article-page">
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    
+<header class="site-header">
+    <div class="site-header__inner">
+        <a class="site-brand" href="/" aria-label="Snow — Home">S<span>now.</span></a>
+        <nav class="site-nav" id="site-navigation" aria-label="Main navigation">
+            
+            
+                
+                    
+                    
+                    <a href="/">Home</a>
+                
+            
+                
+                    
+                    
+                    <a href="/post/" aria-current="page">Blog</a>
+                
+            
+                
+                    
+                    
+                    <a href="/archives/">Archives</a>
+                
+            
+                
+                    
+                    
+                    <a href="/diary/">Diary</a>
+                
+            
+                
+                    
+                    
+                    <a href="/stats/">Stats</a>
+                
+            
+                
+            
+                
+                    
+                    
+                    <a href="/links/">Links</a>
+                
+            
+        </nav>
+        <div class="header-tools">
+            
+                <a class="language-link" href="/zh-cn/p/k8s-automated-deployment/" lang="zh-cn" hreflang="zh-cn" aria-label="切换到中文">中</a>
+            
+            <button type="button" id="dark-mode-toggle" class="icon-button theme-toggle" aria-label="Toggle color theme" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><path d="M12 4.5a7.5 7.5 0 0 1 0 15z" fill="currentColor" stroke="none"/></svg></button>
+            <a class="icon-button search-link" href="/search/" aria-label="Search articles"><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+</a>
+            <button class="icon-button menu-toggle" type="button" aria-expanded="false" aria-controls="site-navigation" aria-label="Open navigation"><span></span><span></span></button>
+        </div>
+    </div>
+    <div class="reading-progress" aria-hidden="true"></div>
+</header>
+
+    <main id="main-content" class="site-main main" tabindex="-1">
+        
+    <div class="reading-page">
+        <article class="main-article has-toc">
+    <header class="article-header">
+    <div class="article-wayfinding">
+        
+            <a href="/post/"><span aria-hidden="true">←</span> All writing</a>
+        
+        <span class="article-kind">Notes & observations</span>
+    </div>
+    <div class="article-details">
+    
+    <h1 class="article-title">Automating Kubernetes Deployments: From Git Push to Verification and Recovery</h1>
+    <p class="article-subtitle">A complete Go service example connecting GitHub Actions, GHCR, Kubernetes release permissions, rolling updates, smoke tests, and recovery, building on the earlier Docker and K8s guides.</p>
+    <div class="article-meta">
+        
+            <time datetime="2026-10-17T10:00:00&#43;08:00">October 17, 2026</time>
+            <span class="meta-divider" aria-hidden="true">/</span>
+            <span>21 min read</span>
+        
+        
+            <div class="article-translations"><a href="/zh-cn/p/k8s-automated-deployment/" hreflang="zh-cn" lang="zh-cn">阅读中文版 <span aria-hidden="true">↗</span></a></div>
+        
+    </div>
+</div>
+
+</header>
+
+    <div class="reading-layout">
+        
+            <aside class="reading-margin" aria-label="Article contents">
+                <details class="article-toc" open>
+                    <summary><span>On this page</span><span class="toc-indicator" aria-hidden="true">+</span></summary>
+                    <nav id="TableOfContents">
+  <ol>
+    <li><a href="#1-turn-deployment-into-a-sequence-of-checks">1. Turn deployment into a sequence of checks</a></li>
+    <li><a href="#2-prepare-a-service-that-identifies-its-source-version">2. Prepare a service that identifies its source version</a></li>
+    <li><a href="#3-save-the-deployment-specification-in-git">3. Save the deployment specification in Git</a></li>
+    <li><a href="#4-establish-identities-and-release-permissions">4. Establish identities and release permissions</a></li>
+    <li><a href="#5-connect-tests-builds-deployment-and-acceptance">5. Connect tests, builds, deployment, and acceptance</a></li>
+    <li><a href="#6-run-a-successful-release-then-rehearse-recovery">6. Run a successful release, then rehearse recovery</a></li>
+    <li><a href="#7-evolve-toward-a-maintainable-release-system">7. Evolve toward a maintainable release system</a></li>
+  </ol>
+</nav>
+                </details>
+            </aside>
+        
+        <div class="reading-body">
+            <div class="article-content"><p>The earlier <a class="link" href="/p/kubernetes-from-docker/" >Docker to Kubernetes guide</a> introduced Pods, Deployments, and Services. The <a class="link" href="/p/k8s-container-cloud-deployment/" >container cloud deployment walkthrough</a> connected Dockerfile builds, registry uploads, and platform configuration. The <a class="link" href="/p/ci/cd-complete-guidefrom-principles-to-practice/" >CI/CD guide</a> explained the pipeline concepts.</p>
+<p>The next question follows naturally: <strong>once an application can be deployed manually, how do we make a code change trigger tests, an image build, a deployment, and checks that detect a broken release?</strong></p>
+<p>This article follows a small Go service through that entire path. The order API is an HTTP demonstration; it does not process real orders or connect to a database.</p>
+<p><a href="/p/k8s-automated-deployment/bg.svg" target="_blank" rel="noopener noreferrer"><img src="/p/k8s-automated-deployment/bg.svg" alt="The deployment lifecycle: commit, test, build, release, verify, and respond" loading="lazy" decoding="async"></a>
+</p>
+<h2 id="1-turn-deployment-into-a-sequence-of-checks">1. Turn deployment into a sequence of checks
+</h2><p>Manual releases often depend on assumptions: “this image should be current,” or “the page loads, so the deployment probably worked.” Automation needs explicit inputs, outputs, and acceptance criteria.</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>Input → output</th>
+<th>Acceptance criteria</th>
+<th>On failure</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Integration</td>
+<td>PR → checked commit</td>
+<td>Unit tests, static checks, Dockerfile build</td>
+<td>Block merge</td>
+</tr>
+<tr>
+<td>Artifact build</td>
+<td>Main commit → image</td>
+<td>Build and push succeed, digest available</td>
+<td>Do not deploy</td>
+</tr>
+<tr>
+<td>Preparation</td>
+<td>Digest + manifests → release plan</td>
+<td>API reachable, identity valid, permissions sufficient</td>
+<td>Preserve live version</td>
+</tr>
+<tr>
+<td>Deployment</td>
+<td>Plan → new Pods</td>
+<td>Rolling update completes</td>
+<td>Collect evidence and attempt recovery</td>
+</tr>
+<tr>
+<td>Acceptance</td>
+<td>Service → real responses</td>
+<td>Health, business smoke test, and source version match</td>
+<td>Restore previous Pod template</td>
+</tr>
+<tr>
+<td>Observation</td>
+<td>Logs and metrics → release decision</td>
+<td>Errors, latency, and business indicators acceptable</td>
+<td>Stop promotion and follow recovery policy</td>
+</tr>
+</tbody>
+</table></div>
+<p>The example uses <strong>GitHub Actions → GHCR → Kubernetes</strong>. Pull requests run checks. Merging into <code>main</code> builds an image and deploys to a dedicated <code>demo-prod</code> namespace. Keeping a human approval makes this continuous delivery; deployment without that approval is continuous deployment.</p>
+<p>You need an existing cluster, an application repository on GitHub, and an administrator who can initialize the namespace. Commands use Linux/Bash; Windows users can use WSL or Git Bash. Target nodes use <code>linux/amd64</code>. Cluster installation is covered in the earlier guide.</p>
+<p>Before writing the workflow, check connectivity:</p>
+<p><a href="/p/k8s-automated-deployment/trust-boundaries.svg" target="_blank" rel="noopener noreferrer"><img src="/p/k8s-automated-deployment/trust-boundaries.svg" alt="Deployment control and image pulls use separate identities and network paths" loading="lazy" decoding="async"></a>
+</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Connection</th>
+<th>Required conditions</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Runner → GitHub, GHCR, and tool download endpoints</td>
+<td>Source checkout, tool installation, image upload</td>
+</tr>
+<tr>
+<td>Runner → Kubernetes API</td>
+<td>Reachable kubeconfig endpoint and trusted TLS certificate</td>
+</tr>
+<tr>
+<td>Kubernetes nodes → GHCR</td>
+<td>Registry connectivity and credentials for private images</td>
+</tr>
+<tr>
+<td>Users → gateway → Service → Pods</td>
+<td>Working controller, DNS, TLS, and backend routing</td>
+</tr>
+</tbody>
+</table></div>
+<p>A working <code>kubectl</code> connection does not prove that nodes can pull images. Logging the Runner into GHCR does not log nodes in. GitHub-hosted Runners also cannot directly reach your computer&rsquo;s <code>127.0.0.1</code> or a private corporate API. Use a dedicated Runner on a trusted network or an approved private connectivity solution for private clusters.</p>
+<h2 id="2-prepare-a-service-that-identifies-its-source-version">2. Prepare a service that identifies its source version
+</h2><p>Create these files in a separate application repository. <strong>The workflow below belongs to that application; it does not replace this blog&rsquo;s publishing workflow.</strong></p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">order-api/
+</span></span><span class="line"><span class="cl">├── main.go
+</span></span><span class="line"><span class="cl">├── main_test.go
+</span></span><span class="line"><span class="cl">├── go.mod
+</span></span><span class="line"><span class="cl">├── Dockerfile
+</span></span><span class="line"><span class="cl">├── .dockerignore
+</span></span><span class="line"><span class="cl">├── .gitignore
+</span></span><span class="line"><span class="cl">├── bootstrap/rbac.yaml
+</span></span><span class="line"><span class="cl">├── k8s/runtime.yaml
+</span></span><span class="line"><span class="cl">├── k8s/deployment.yaml
+</span></span><span class="line"><span class="cl">└── .github/workflows/release.yaml
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>The service exposes <code>/healthz</code> for process health, <code>/readyz</code> for readiness, and <code>/version</code> for the Git SHA embedded during compilation. These health handlers have no external dependencies. When adding a database, design readiness for the workload and avoid making a shared database failure restart every instance.</p>
+<p><strong><code>go.mod</code></strong></p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="nx">module</span> <span class="nx">example</span><span class="p">.</span><span class="nx">com</span><span class="o">/</span><span class="nx">order</span><span class="o">-</span><span class="nx">api</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="k">go</span> <span class="mf">1.26.0</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p><strong><code>main.go</code></strong></p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span><span class="lnt">25
+</span><span class="lnt">26
+</span><span class="lnt">27
+</span><span class="lnt">28
+</span><span class="lnt">29
+</span><span class="lnt">30
+</span><span class="lnt">31
+</span><span class="lnt">32
+</span><span class="lnt">33
+</span><span class="lnt">34
+</span><span class="lnt">35
+</span><span class="lnt">36
+</span><span class="lnt">37
+</span><span class="lnt">38
+</span><span class="lnt">39
+</span><span class="lnt">40
+</span><span class="lnt">41
+</span><span class="lnt">42
+</span><span class="lnt">43
+</span><span class="lnt">44
+</span><span class="lnt">45
+</span><span class="lnt">46
+</span><span class="lnt">47
+</span><span class="lnt">48
+</span><span class="lnt">49
+</span><span class="lnt">50
+</span><span class="lnt">51
+</span><span class="lnt">52
+</span><span class="lnt">53
+</span><span class="lnt">54
+</span><span class="lnt">55
+</span><span class="lnt">56
+</span><span class="lnt">57
+</span><span class="lnt">58
+</span><span class="lnt">59
+</span><span class="lnt">60
+</span><span class="lnt">61
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kn">package</span> <span class="nx">main</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kn">import</span> <span class="p">(</span>
+</span></span><span class="line"><span class="cl">	<span class="s">&#34;context&#34;</span>
+</span></span><span class="line"><span class="cl">	<span class="s">&#34;errors&#34;</span>
+</span></span><span class="line"><span class="cl">	<span class="s">&#34;fmt&#34;</span>
+</span></span><span class="line"><span class="cl">	<span class="s">&#34;log&#34;</span>
+</span></span><span class="line"><span class="cl">	<span class="s">&#34;net/http&#34;</span>
+</span></span><span class="line"><span class="cl">	<span class="s">&#34;os&#34;</span>
+</span></span><span class="line"><span class="cl">	<span class="s">&#34;os/signal&#34;</span>
+</span></span><span class="line"><span class="cl">	<span class="s">&#34;sync/atomic&#34;</span>
+</span></span><span class="line"><span class="cl">	<span class="s">&#34;syscall&#34;</span>
+</span></span><span class="line"><span class="cl">	<span class="s">&#34;time&#34;</span>
+</span></span><span class="line"><span class="cl"><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">var</span> <span class="nx">version</span> <span class="p">=</span> <span class="s">&#34;dev&#34;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">routes</span><span class="p">(</span><span class="nx">ready</span> <span class="o">*</span><span class="nx">atomic</span><span class="p">.</span><span class="nx">Bool</span><span class="p">)</span> <span class="nx">http</span><span class="p">.</span><span class="nx">Handler</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">mux</span> <span class="o">:=</span> <span class="nx">http</span><span class="p">.</span><span class="nf">NewServeMux</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">mux</span><span class="p">.</span><span class="nf">HandleFunc</span><span class="p">(</span><span class="s">&#34;GET /healthz&#34;</span><span class="p">,</span> <span class="kd">func</span><span class="p">(</span><span class="nx">w</span> <span class="nx">http</span><span class="p">.</span><span class="nx">ResponseWriter</span><span class="p">,</span> <span class="nx">r</span> <span class="o">*</span><span class="nx">http</span><span class="p">.</span><span class="nx">Request</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">fmt</span><span class="p">.</span><span class="nf">Fprintln</span><span class="p">(</span><span class="nx">w</span><span class="p">,</span> <span class="s">&#34;ok&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">})</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">mux</span><span class="p">.</span><span class="nf">HandleFunc</span><span class="p">(</span><span class="s">&#34;GET /readyz&#34;</span><span class="p">,</span> <span class="kd">func</span><span class="p">(</span><span class="nx">w</span> <span class="nx">http</span><span class="p">.</span><span class="nx">ResponseWriter</span><span class="p">,</span> <span class="nx">r</span> <span class="o">*</span><span class="nx">http</span><span class="p">.</span><span class="nx">Request</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">if</span> <span class="p">!</span><span class="nx">ready</span><span class="p">.</span><span class="nf">Load</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">http</span><span class="p">.</span><span class="nf">Error</span><span class="p">(</span><span class="nx">w</span><span class="p">,</span> <span class="s">&#34;not ready&#34;</span><span class="p">,</span> <span class="nx">http</span><span class="p">.</span><span class="nx">StatusServiceUnavailable</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">			<span class="k">return</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">fmt</span><span class="p">.</span><span class="nf">Fprintln</span><span class="p">(</span><span class="nx">w</span><span class="p">,</span> <span class="s">&#34;ready&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">})</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">mux</span><span class="p">.</span><span class="nf">HandleFunc</span><span class="p">(</span><span class="s">&#34;GET /version&#34;</span><span class="p">,</span> <span class="kd">func</span><span class="p">(</span><span class="nx">w</span> <span class="nx">http</span><span class="p">.</span><span class="nx">ResponseWriter</span><span class="p">,</span> <span class="nx">r</span> <span class="o">*</span><span class="nx">http</span><span class="p">.</span><span class="nx">Request</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">fmt</span><span class="p">.</span><span class="nf">Fprintln</span><span class="p">(</span><span class="nx">w</span><span class="p">,</span> <span class="nx">version</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">})</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">mux</span><span class="p">.</span><span class="nf">HandleFunc</span><span class="p">(</span><span class="s">&#34;GET /{$}&#34;</span><span class="p">,</span> <span class="kd">func</span><span class="p">(</span><span class="nx">w</span> <span class="nx">http</span><span class="p">.</span><span class="nx">ResponseWriter</span><span class="p">,</span> <span class="nx">r</span> <span class="o">*</span><span class="nx">http</span><span class="p">.</span><span class="nx">Request</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">fmt</span><span class="p">.</span><span class="nf">Fprintln</span><span class="p">(</span><span class="nx">w</span><span class="p">,</span> <span class="s">&#34;order-api is running&#34;</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">})</span>
+</span></span><span class="line"><span class="cl">	<span class="k">return</span> <span class="nx">mux</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="kd">var</span> <span class="nx">ready</span> <span class="nx">atomic</span><span class="p">.</span><span class="nx">Bool</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">ready</span><span class="p">.</span><span class="nf">Store</span><span class="p">(</span><span class="kc">true</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">server</span> <span class="o">:=</span> <span class="o">&amp;</span><span class="nx">http</span><span class="p">.</span><span class="nx">Server</span><span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">Addr</span><span class="p">:</span> <span class="s">&#34;:8080&#34;</span><span class="p">,</span> <span class="nx">Handler</span><span class="p">:</span> <span class="nf">routes</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">ready</span><span class="p">),</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">ReadHeaderTimeout</span><span class="p">:</span> <span class="mi">5</span> <span class="o">*</span> <span class="nx">time</span><span class="p">.</span><span class="nx">Second</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">ctx</span><span class="p">,</span> <span class="nx">stop</span> <span class="o">:=</span> <span class="nx">signal</span><span class="p">.</span><span class="nf">NotifyContext</span><span class="p">(</span><span class="nx">context</span><span class="p">.</span><span class="nf">Background</span><span class="p">(),</span> <span class="nx">os</span><span class="p">.</span><span class="nx">Interrupt</span><span class="p">,</span> <span class="nx">syscall</span><span class="p">.</span><span class="nx">SIGTERM</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="k">defer</span> <span class="nf">stop</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">	<span class="k">go</span> <span class="kd">func</span><span class="p">()</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">server</span><span class="p">.</span><span class="nf">ListenAndServe</span><span class="p">();</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="o">&amp;&amp;</span> <span class="p">!</span><span class="nx">errors</span><span class="p">.</span><span class="nf">Is</span><span class="p">(</span><span class="nx">err</span><span class="p">,</span> <span class="nx">http</span><span class="p">.</span><span class="nx">ErrServerClosed</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">log</span><span class="p">.</span><span class="nf">Fatal</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}()</span>
+</span></span><span class="line"><span class="cl">	<span class="o">&lt;-</span><span class="nx">ctx</span><span class="p">.</span><span class="nf">Done</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">ready</span><span class="p">.</span><span class="nf">Store</span><span class="p">(</span><span class="kc">false</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">shutdownCtx</span><span class="p">,</span> <span class="nx">cancel</span> <span class="o">:=</span> <span class="nx">context</span><span class="p">.</span><span class="nf">WithTimeout</span><span class="p">(</span><span class="nx">context</span><span class="p">.</span><span class="nf">Background</span><span class="p">(),</span> <span class="mi">10</span><span class="o">*</span><span class="nx">time</span><span class="p">.</span><span class="nx">Second</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="k">defer</span> <span class="nf">cancel</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">	<span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">server</span><span class="p">.</span><span class="nf">Shutdown</span><span class="p">(</span><span class="nx">shutdownCtx</span><span class="p">);</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">log</span><span class="p">.</span><span class="nf">Print</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">os</span><span class="p">.</span><span class="nf">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>The listener binds to the container network interfaces. On termination, the application withdraws readiness and waits for active requests to finish. Real workloads also need connection draining, long connection handling, and background task coordination; these settings alone do not guarantee uninterrupted service.</p>
+<p><strong><code>main_test.go</code></strong></p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span><span class="lnt">25
+</span><span class="lnt">26
+</span><span class="lnt">27
+</span><span class="lnt">28
+</span><span class="lnt">29
+</span><span class="lnt">30
+</span><span class="lnt">31
+</span><span class="lnt">32
+</span><span class="lnt">33
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-go" data-lang="go"><span class="line"><span class="cl"><span class="kn">package</span> <span class="nx">main</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kn">import</span> <span class="p">(</span>
+</span></span><span class="line"><span class="cl">	<span class="s">&#34;net/http&#34;</span>
+</span></span><span class="line"><span class="cl">	<span class="s">&#34;net/http/httptest&#34;</span>
+</span></span><span class="line"><span class="cl">	<span class="s">&#34;strings&#34;</span>
+</span></span><span class="line"><span class="cl">	<span class="s">&#34;sync/atomic&#34;</span>
+</span></span><span class="line"><span class="cl">	<span class="s">&#34;testing&#34;</span>
+</span></span><span class="line"><span class="cl"><span class="p">)</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="kd">func</span> <span class="nf">TestReleaseContract</span><span class="p">(</span><span class="nx">t</span> <span class="o">*</span><span class="nx">testing</span><span class="p">.</span><span class="nx">T</span><span class="p">)</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">	<span class="kd">var</span> <span class="nx">ready</span> <span class="nx">atomic</span><span class="p">.</span><span class="nx">Bool</span>
+</span></span><span class="line"><span class="cl">	<span class="nx">handler</span> <span class="o">:=</span> <span class="nf">routes</span><span class="p">(</span><span class="o">&amp;</span><span class="nx">ready</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">	<span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">tc</span> <span class="o">:=</span> <span class="k">range</span> <span class="p">[]</span><span class="kd">struct</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">path</span>   <span class="kt">string</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">ready</span>  <span class="kt">bool</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">status</span> <span class="kt">int</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">body</span>   <span class="kt">string</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}{</span>
+</span></span><span class="line"><span class="cl">		<span class="p">{</span><span class="s">&#34;/healthz&#34;</span><span class="p">,</span> <span class="kc">false</span><span class="p">,</span> <span class="mi">200</span><span class="p">,</span> <span class="s">&#34;ok&#34;</span><span class="p">},</span>
+</span></span><span class="line"><span class="cl">		<span class="p">{</span><span class="s">&#34;/readyz&#34;</span><span class="p">,</span> <span class="kc">false</span><span class="p">,</span> <span class="mi">503</span><span class="p">,</span> <span class="s">&#34;not ready&#34;</span><span class="p">},</span>
+</span></span><span class="line"><span class="cl">		<span class="p">{</span><span class="s">&#34;/readyz&#34;</span><span class="p">,</span> <span class="kc">true</span><span class="p">,</span> <span class="mi">200</span><span class="p">,</span> <span class="s">&#34;ready&#34;</span><span class="p">},</span>
+</span></span><span class="line"><span class="cl">		<span class="p">{</span><span class="s">&#34;/version&#34;</span><span class="p">,</span> <span class="kc">true</span><span class="p">,</span> <span class="mi">200</span><span class="p">,</span> <span class="nx">version</span><span class="p">},</span>
+</span></span><span class="line"><span class="cl">		<span class="p">{</span><span class="s">&#34;/&#34;</span><span class="p">,</span> <span class="kc">true</span><span class="p">,</span> <span class="mi">200</span><span class="p">,</span> <span class="s">&#34;order-api is running&#34;</span><span class="p">},</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">ready</span><span class="p">.</span><span class="nf">Store</span><span class="p">(</span><span class="nx">tc</span><span class="p">.</span><span class="nx">ready</span><span class="p">)</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">recorder</span> <span class="o">:=</span> <span class="nx">httptest</span><span class="p">.</span><span class="nf">NewRecorder</span><span class="p">()</span>
+</span></span><span class="line"><span class="cl">		<span class="nx">handler</span><span class="p">.</span><span class="nf">ServeHTTP</span><span class="p">(</span><span class="nx">recorder</span><span class="p">,</span> <span class="nx">httptest</span><span class="p">.</span><span class="nf">NewRequest</span><span class="p">(</span><span class="nx">http</span><span class="p">.</span><span class="nx">MethodGet</span><span class="p">,</span> <span class="nx">tc</span><span class="p">.</span><span class="nx">path</span><span class="p">,</span> <span class="kc">nil</span><span class="p">))</span>
+</span></span><span class="line"><span class="cl">		<span class="k">if</span> <span class="nx">recorder</span><span class="p">.</span><span class="nx">Code</span> <span class="o">!=</span> <span class="nx">tc</span><span class="p">.</span><span class="nx">status</span> <span class="o">||</span> <span class="nx">strings</span><span class="p">.</span><span class="nf">TrimSpace</span><span class="p">(</span><span class="nx">recorder</span><span class="p">.</span><span class="nx">Body</span><span class="p">.</span><span class="nf">String</span><span class="p">())</span> <span class="o">!=</span> <span class="nx">tc</span><span class="p">.</span><span class="nx">body</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">			<span class="nx">t</span><span class="p">.</span><span class="nf">Errorf</span><span class="p">(</span><span class="s">&#34;%s ready=%v: status=%d body=%q&#34;</span><span class="p">,</span> <span class="nx">tc</span><span class="p">.</span><span class="nx">path</span><span class="p">,</span> <span class="nx">tc</span><span class="p">.</span><span class="nx">ready</span><span class="p">,</span> <span class="nx">recorder</span><span class="p">.</span><span class="nx">Code</span><span class="p">,</span> <span class="nx">recorder</span><span class="p">.</span><span class="nx">Body</span><span class="p">.</span><span class="nf">String</span><span class="p">())</span>
+</span></span><span class="line"><span class="cl">		<span class="p">}</span>
+</span></span><span class="line"><span class="cl">	<span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p><strong><code>Dockerfile</code></strong></p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-dockerfile" data-lang="dockerfile"><span class="line"><span class="cl"><span class="k">FROM</span><span class="s"> golang:1.26.9 AS build</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">WORKDIR</span><span class="s"> /src</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">COPY</span> go.mod main.go ./<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">ARG</span> <span class="nv">VERSION</span><span class="o">=</span>dev
+</span></span><span class="line"><span class="cl"><span class="k">RUN</span> <span class="nv">CGO_ENABLED</span><span class="o">=</span><span class="m">0</span> <span class="nv">GOOS</span><span class="o">=</span>linux go build -trimpath <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>    -ldflags<span class="o">=</span><span class="s2">&#34;-s -w -X main.version=</span><span class="si">${</span><span class="nv">VERSION</span><span class="si">}</span><span class="s2">&#34;</span> -o /out/server .<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">FROM</span><span class="s"> scratch</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">COPY</span> --from<span class="o">=</span>build /out/server /server<span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">USER</span><span class="s"> 65532:65532</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">EXPOSE</span><span class="s"> 8080</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">ENTRYPOINT</span> <span class="p">[</span><span class="s2">&#34;/server&#34;</span><span class="p">]</span><span class="err">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>Only the standard library is used, so there are no third-party modules or <code>go.sum</code>. The runtime image has no shell. Outbound HTTPS, timezone data, or dynamic libraries require additional files or a suitable runtime image. Maintain base image security updates and pin approved base images by digest in production: a version tag can still move.</p>
+<p><strong><code>.dockerignore</code></strong></p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">.git
+</span></span><span class="line"><span class="cl">.github
+</span></span><span class="line"><span class="cl">.deploy-local
+</span></span><span class="line"><span class="cl">*.kubeconfig
+</span></span><span class="line"><span class="cl">bootstrap
+</span></span><span class="line"><span class="cl">k8s
+</span></span><span class="line"><span class="cl">server
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p><strong><code>.gitignore</code></strong></p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">.deploy-local/
+</span></span><span class="line"><span class="cl">*.kubeconfig
+</span></span><span class="line"><span class="cl">server
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Check the service locally before debugging it through Kubernetes:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">gofmt -w main.go main_test.go
+</span></span><span class="line"><span class="cl">go <span class="nb">test</span> -v ./...
+</span></span><span class="line"><span class="cl">go vet ./...
+</span></span><span class="line"><span class="cl">docker build --platform linux/amd64 --build-arg <span class="nv">VERSION</span><span class="o">=</span>local-check -t order-api:local .
+</span></span><span class="line"><span class="cl">docker run --rm -p 8080:8080 order-api:local
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># In a second terminal</span>
+</span></span><span class="line"><span class="cl">curl -fsS http://localhost:8080/readyz
+</span></span><span class="line"><span class="cl">curl -fsS http://localhost:8080/version
+</span></span><span class="line"><span class="cl"><span class="c1"># Expected: ready and local-check</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>The expected responses are <code>ready</code> and <code>local-check</code>.</p>
+<h2 id="3-save-the-deployment-specification-in-git">3. Save the deployment specification in Git
+</h2><p>The image, replicas, probes, and resource settings previously entered in a platform console now become reviewable manifests.</p>
+<p><strong><code>k8s/runtime.yaml</code></strong></p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">v1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">ConfigMap</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">order-api-config-v1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l">demo-prod</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">immutable</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">data</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">APP_ENV</span><span class="p">:</span><span class="w"> </span><span class="l">production</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nn">---</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">v1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">Service</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">order-api</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l">demo-prod</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">spec</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l">ClusterIP</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">selector</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l">order-api</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">ports</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">http</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="m">80</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">targetPort</span><span class="p">:</span><span class="w"> </span><span class="l">http</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p><strong><code>k8s/deployment.yaml</code></strong></p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span><span class="lnt">25
+</span><span class="lnt">26
+</span><span class="lnt">27
+</span><span class="lnt">28
+</span><span class="lnt">29
+</span><span class="lnt">30
+</span><span class="lnt">31
+</span><span class="lnt">32
+</span><span class="lnt">33
+</span><span class="lnt">34
+</span><span class="lnt">35
+</span><span class="lnt">36
+</span><span class="lnt">37
+</span><span class="lnt">38
+</span><span class="lnt">39
+</span><span class="lnt">40
+</span><span class="lnt">41
+</span><span class="lnt">42
+</span><span class="lnt">43
+</span><span class="lnt">44
+</span><span class="lnt">45
+</span><span class="lnt">46
+</span><span class="lnt">47
+</span><span class="lnt">48
+</span><span class="lnt">49
+</span><span class="lnt">50
+</span><span class="lnt">51
+</span><span class="lnt">52
+</span><span class="lnt">53
+</span><span class="lnt">54
+</span><span class="lnt">55
+</span><span class="lnt">56
+</span><span class="lnt">57
+</span><span class="lnt">58
+</span><span class="lnt">59
+</span><span class="lnt">60
+</span><span class="lnt">61
+</span><span class="lnt">62
+</span><span class="lnt">63
+</span><span class="lnt">64
+</span><span class="lnt">65
+</span><span class="lnt">66
+</span><span class="lnt">67
+</span><span class="lnt">68
+</span><span class="lnt">69
+</span><span class="lnt">70
+</span><span class="lnt">71
+</span><span class="lnt">72
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">apps/v1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">Deployment</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">order-api</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l">demo-prod</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">spec</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span><span class="m">2</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">revisionHistoryLimit</span><span class="p">:</span><span class="w"> </span><span class="m">5</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">minReadySeconds</span><span class="p">:</span><span class="w"> </span><span class="m">5</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">progressDeadlineSeconds</span><span class="p">:</span><span class="w"> </span><span class="m">180</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">strategy</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l">RollingUpdate</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">rollingUpdate</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">maxUnavailable</span><span class="p">:</span><span class="w"> </span><span class="m">0</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">maxSurge</span><span class="p">:</span><span class="w"> </span><span class="m">1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">selector</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">matchLabels</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l">order-api</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">template</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">labels</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l">order-api</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">spec</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">automountServiceAccountToken</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">imagePullSecrets</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">ghcr-read</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">nodeSelector</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">kubernetes.io/arch</span><span class="p">:</span><span class="w"> </span><span class="l">amd64</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">terminationGracePeriodSeconds</span><span class="p">:</span><span class="w"> </span><span class="m">30</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">securityContext</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">runAsNonRoot</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">runAsUser</span><span class="p">:</span><span class="w"> </span><span class="m">65532</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">seccompProfile</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l">RuntimeDefault</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">containers</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">order-api</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="c"># Template placeholder; replaced locally with the release digest before apply.</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l">ghcr.io/your-owner/order-api:replace-before-apply</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">ports</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">http</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">containerPort</span><span class="p">:</span><span class="w"> </span><span class="m">8080</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">envFrom</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span>- <span class="nt">configMapRef</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">                </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">order-api-config-v1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">resources</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">requests</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="l">100m</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="l">64Mi</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">limits</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="l">500m</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="l">128Mi</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">securityContext</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">allowPrivilegeEscalation</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">readOnlyRootFilesystem</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">capabilities</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">drop</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&#34;ALL&#34;</span><span class="p">]</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">startupProbe</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">httpGet</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l">/healthz</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l">http</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">periodSeconds</span><span class="p">:</span><span class="w"> </span><span class="m">2</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">failureThreshold</span><span class="p">:</span><span class="w"> </span><span class="m">30</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">readinessProbe</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">httpGet</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l">/readyz</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l">http</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">periodSeconds</span><span class="p">:</span><span class="w"> </span><span class="m">3</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">livenessProbe</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">httpGet</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l">/healthz</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l">http</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">periodSeconds</span><span class="p">:</span><span class="w"> </span><span class="m">10</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p><code>APP_ENV</code> demonstrates configuration injection; the service does not change its behavior based on it. For a configuration change, create <code>order-api-config-v2</code>, update the Deployment reference, and retain the old object. Restoring an old template can then restore its configuration reference. Secrets also need a version strategy; credentials do not belong in ConfigMaps.</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Release behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>startupProbe</code></td>
+<td>Readiness and liveness do not run until startup succeeds</td>
+</tr>
+<tr>
+<td><code>readinessProbe</code></td>
+<td>Unready Pods are excluded from normal ready Service backends</td>
+</tr>
+<tr>
+<td><code>livenessProbe</code></td>
+<td>Repeated failures eventually trigger a container restart</td>
+</tr>
+<tr>
+<td><code>minReadySeconds: 5</code></td>
+<td>A new replica must remain ready before being considered available</td>
+</tr>
+<tr>
+<td><code>maxUnavailable: 0</code></td>
+<td>Planned updates do not deliberately reduce available replicas</td>
+</tr>
+<tr>
+<td><code>maxSurge: 1</code></td>
+<td>One extra update replica is allowed; spare capacity is needed</td>
+</tr>
+<tr>
+<td><code>progressDeadlineSeconds: 180</code></td>
+<td>Reports failed progress after the configured deadline</td>
+</tr>
+</tbody>
+</table></div>
+<p>See the <a class="link" href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/"  target="_blank" rel="noopener"
+    >official probe documentation</a> for exact semantics. A progress deadline does <strong>not</strong> automatically restore the previous version; recovery is an explicit workflow step below.</p>
+<p><a href="/p/k8s-automated-deployment/rolling-update.svg" target="_blank" rel="noopener noreferrer"><img src="/p/k8s-automated-deployment/rolling-update.svg" alt="An ideal rolling update: a new Pod becomes ready before an old Pod is replaced" loading="lazy" decoding="async"></a>
+</p>
+<p>The diagram shows an ideal progression. Node failures, capacity shortages, endpoint propagation, and application behavior still affect availability. Terminating Pods can temporarily consume additional resources beyond the three active slots illustrated here.</p>
+<p>The initial example uses <code>ClusterIP</code> and port forwarding. For user access, have the platform provision a Gateway/Ingress, DNS, and TLS. An Ingress object needs an actual controller, and a ClusterIP is not a public address.</p>
+<h2 id="4-establish-identities-and-release-permissions">4. Establish identities and release permissions
+</h2><p>There are three separate credentials:</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Credential</th>
+<th>Consumer</th>
+<th>Purpose</th>
+<th>Provisioning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GITHUB_TOKEN</code></td>
+<td>Build Job</td>
+<td>Publish to GHCR</td>
+<td>Job token with <code>packages: write</code></td>
+</tr>
+<tr>
+<td><code>ghcr-read</code></td>
+<td>Kubernetes nodes</td>
+<td>Pull a private image</td>
+<td>Administrator-created registry Secret</td>
+</tr>
+<tr>
+<td><code>KUBE_CONFIG</code></td>
+<td>Deploy Job</td>
+<td>Update applications in <code>demo-prod</code></td>
+<td>Restricted deployer kubeconfig</td>
+</tr>
+</tbody>
+</table></div>
+<p>New GHCR packages are private by default. Either make a demonstration image public or configure private image access as below. Write access in CI does not imply node read access. See <a class="link" href="https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry"  target="_blank" rel="noopener"
+    >GitHub&rsquo;s Container registry documentation</a>.</p>
+<p><strong>One-time administrator setup.</strong> Save the following as <code>bootstrap/rbac.yaml</code>. Administrators apply it separately from routine releases.</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span><span class="lnt">25
+</span><span class="lnt">26
+</span><span class="lnt">27
+</span><span class="lnt">28
+</span><span class="lnt">29
+</span><span class="lnt">30
+</span><span class="lnt">31
+</span><span class="lnt">32
+</span><span class="lnt">33
+</span><span class="lnt">34
+</span><span class="lnt">35
+</span><span class="lnt">36
+</span><span class="lnt">37
+</span><span class="lnt">38
+</span><span class="lnt">39
+</span><span class="lnt">40
+</span><span class="lnt">41
+</span><span class="lnt">42
+</span><span class="lnt">43
+</span><span class="lnt">44
+</span><span class="lnt">45
+</span><span class="lnt">46
+</span><span class="lnt">47
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">v1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">Namespace</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">demo-prod</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nn">---</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">v1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">ServiceAccount</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">gha-deployer</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l">demo-prod</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">automountServiceAccountToken</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nn">---</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">rbac.authorization.k8s.io/v1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">Role</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">order-api-deployer</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l">demo-prod</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">rules</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span>- <span class="nt">apiGroups</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&#34;apps&#34;</span><span class="p">]</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">resources</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&#34;deployments&#34;</span><span class="p">]</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">verbs</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&#34;get&#34;</span><span class="p">,</span><span class="w"> </span><span class="s2">&#34;list&#34;</span><span class="p">,</span><span class="w"> </span><span class="s2">&#34;watch&#34;</span><span class="p">,</span><span class="w"> </span><span class="s2">&#34;create&#34;</span><span class="p">,</span><span class="w"> </span><span class="s2">&#34;update&#34;</span><span class="p">,</span><span class="w"> </span><span class="s2">&#34;patch&#34;</span><span class="p">]</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span>- <span class="nt">apiGroups</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&#34;apps&#34;</span><span class="p">]</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">resources</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&#34;replicasets&#34;</span><span class="p">]</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">verbs</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&#34;get&#34;</span><span class="p">,</span><span class="w"> </span><span class="s2">&#34;list&#34;</span><span class="p">,</span><span class="w"> </span><span class="s2">&#34;watch&#34;</span><span class="p">]</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span>- <span class="nt">apiGroups</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&#34;&#34;</span><span class="p">]</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">resources</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&#34;services&#34;</span><span class="p">,</span><span class="w"> </span><span class="s2">&#34;configmaps&#34;</span><span class="p">]</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">verbs</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&#34;get&#34;</span><span class="p">,</span><span class="w"> </span><span class="s2">&#34;list&#34;</span><span class="p">,</span><span class="w"> </span><span class="s2">&#34;watch&#34;</span><span class="p">,</span><span class="w"> </span><span class="s2">&#34;create&#34;</span><span class="p">,</span><span class="w"> </span><span class="s2">&#34;update&#34;</span><span class="p">,</span><span class="w"> </span><span class="s2">&#34;patch&#34;</span><span class="p">]</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span>- <span class="nt">apiGroups</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&#34;&#34;</span><span class="p">]</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">resources</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&#34;pods&#34;</span><span class="p">,</span><span class="w"> </span><span class="s2">&#34;pods/log&#34;</span><span class="p">,</span><span class="w"> </span><span class="s2">&#34;events&#34;</span><span class="p">]</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">verbs</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&#34;get&#34;</span><span class="p">,</span><span class="w"> </span><span class="s2">&#34;list&#34;</span><span class="p">,</span><span class="w"> </span><span class="s2">&#34;watch&#34;</span><span class="p">]</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span>- <span class="nt">apiGroups</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&#34;&#34;</span><span class="p">]</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">resources</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&#34;pods/portforward&#34;</span><span class="p">]</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">verbs</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&#34;create&#34;</span><span class="p">]</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nn">---</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">rbac.authorization.k8s.io/v1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">RoleBinding</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">order-api-deployer</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l">demo-prod</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">subjects</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span>- <span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">ServiceAccount</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">gha-deployer</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l">demo-prod</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">roleRef</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">apiGroup</span><span class="p">:</span><span class="w"> </span><span class="l">rbac.authorization.k8s.io</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">Role</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">order-api-deployer</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl apply -f bootstrap/rbac.yaml
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># Use an account with target package access and a classic PAT (read:packages).</span>
+</span></span><span class="line"><span class="cl"><span class="c1"># Also satisfy organizational SSO and package access policies.</span>
+</span></span><span class="line"><span class="cl"><span class="nb">read</span> -r -p <span class="s1">&#39;GHCR username: &#39;</span> GHCR_USER
+</span></span><span class="line"><span class="cl"><span class="nb">read</span> -r -s -p <span class="s1">&#39;GHCR read token: &#39;</span> GHCR_READ_TOKEN
+</span></span><span class="line"><span class="cl"><span class="nb">printf</span> <span class="s1">&#39;\n&#39;</span>
+</span></span><span class="line"><span class="cl">kubectl -n demo-prod create secret docker-registry ghcr-read <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>  --docker-server<span class="o">=</span>ghcr.io <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>  --docker-username<span class="o">=</span><span class="s2">&#34;</span><span class="nv">$GHCR_USER</span><span class="s2">&#34;</span> <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>  --docker-password<span class="o">=</span><span class="s2">&#34;</span><span class="nv">$GHCR_READ_TOKEN</span><span class="s2">&#34;</span>
+</span></span><span class="line"><span class="cl"><span class="nb">unset</span> GHCR_READ_TOKEN
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Use an account with access to the target package and a classic PAT with <code>read:packages</code>; organizational SSO and package policies may impose additional authorization. The interactive initialization command briefly places the token in local process arguments. Use a controlled terminal for the exercise; shared hosts should use platform secret management or controlled Docker configuration imports. Rotate an existing Secret through the platform&rsquo;s approved process.</p>
+<p>The Role cannot manage the cluster, change RBAC, or directly read Secrets. However, an identity that can modify workloads may still cause a Pod to mount namespace Secrets. Use a dedicated namespace, trusted deployment code, and appropriate admission and workload identity policies. See <a class="link" href="https://kubernetes.io/docs/reference/access-authn-authz/rbac/"  target="_blank" rel="noopener"
+    >Kubernetes RBAC</a>.</p>
+<p><strong>Generate a short-lived kubeconfig for the exercise.</strong> Run this locally as an administrator connected to the intended cluster. It copies the endpoint and CA, not the administrator&rsquo;s credentials. A one-hour ServiceAccount token is requested; actual lifetime depends on the server.</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span><span class="lnt">25
+</span><span class="lnt">26
+</span><span class="lnt">27
+</span><span class="lnt">28
+</span><span class="lnt">29
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="nb">umask</span> <span class="m">077</span>
+</span></span><span class="line"><span class="cl">mkdir -p .deploy-local
+</span></span><span class="line"><span class="cl"><span class="nv">CLUSTER_SERVER</span><span class="o">=</span><span class="k">$(</span>kubectl config view --minify -o <span class="nv">jsonpath</span><span class="o">=</span><span class="s1">&#39;{.clusters[0].cluster.server}&#39;</span><span class="k">)</span>
+</span></span><span class="line"><span class="cl"><span class="nv">CLUSTER_CA</span><span class="o">=</span><span class="k">$(</span>kubectl config view --raw --minify --flatten -o <span class="nv">jsonpath</span><span class="o">=</span><span class="s1">&#39;{.clusters[0].cluster.certificate-authority-data}&#39;</span><span class="k">)</span>
+</span></span><span class="line"><span class="cl"><span class="nv">DEPLOY_TOKEN</span><span class="o">=</span><span class="k">$(</span>kubectl -n demo-prod create token gha-deployer --duration<span class="o">=</span>1h<span class="k">)</span>
+</span></span><span class="line"><span class="cl"><span class="nb">test</span> -n <span class="s2">&#34;</span><span class="nv">$CLUSTER_SERVER</span><span class="s2">&#34;</span> <span class="o">&amp;&amp;</span> <span class="nb">test</span> -n <span class="s2">&#34;</span><span class="nv">$CLUSTER_CA</span><span class="s2">&#34;</span> <span class="o">&amp;&amp;</span> <span class="nb">test</span> -n <span class="s2">&#34;</span><span class="nv">$DEPLOY_TOKEN</span><span class="s2">&#34;</span>
+</span></span><span class="line"><span class="cl">cat &gt; .deploy-local/ci.kubeconfig <span class="s">&lt;&lt;EOF
+</span></span></span><span class="line"><span class="cl"><span class="s">apiVersion: v1
+</span></span></span><span class="line"><span class="cl"><span class="s">kind: Config
+</span></span></span><span class="line"><span class="cl"><span class="s">clusters:
+</span></span></span><span class="line"><span class="cl"><span class="s">  - name: target
+</span></span></span><span class="line"><span class="cl"><span class="s">    cluster:
+</span></span></span><span class="line"><span class="cl"><span class="s">      server: ${CLUSTER_SERVER}
+</span></span></span><span class="line"><span class="cl"><span class="s">      certificate-authority-data: ${CLUSTER_CA}
+</span></span></span><span class="line"><span class="cl"><span class="s">users:
+</span></span></span><span class="line"><span class="cl"><span class="s">  - name: deployer
+</span></span></span><span class="line"><span class="cl"><span class="s">    user:
+</span></span></span><span class="line"><span class="cl"><span class="s">      token: ${DEPLOY_TOKEN}
+</span></span></span><span class="line"><span class="cl"><span class="s">contexts:
+</span></span></span><span class="line"><span class="cl"><span class="s">  - name: deploy
+</span></span></span><span class="line"><span class="cl"><span class="s">    context:
+</span></span></span><span class="line"><span class="cl"><span class="s">      cluster: target
+</span></span></span><span class="line"><span class="cl"><span class="s">      user: deployer
+</span></span></span><span class="line"><span class="cl"><span class="s">      namespace: demo-prod
+</span></span></span><span class="line"><span class="cl"><span class="s">current-context: deploy
+</span></span></span><span class="line"><span class="cl"><span class="s">EOF</span>
+</span></span><span class="line"><span class="cl"><span class="nb">unset</span> DEPLOY_TOKEN
+</span></span><span class="line"><span class="cl"><span class="nv">KUBECONFIG</span><span class="o">=</span>.deploy-local/ci.kubeconfig kubectl auth can-i patch deployments -n demo-prod
+</span></span><span class="line"><span class="cl"><span class="c1"># Expected: yes</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>The expected authorization result is <code>yes</code>. This assumes a standard HTTPS endpoint and CA. Platforms requiring proxies, a special TLS server name, or cloud authentication plugins should provide a suitable restricted CI kubeconfig. Do not bypass certificate verification.</p>
+<p>Create a <code>production</code> environment in the application repository&rsquo;s Settings → Environments. Restrict deployments to <code>main</code> and configure approval if desired and supported. Add environment Secret <code>KUBE_CONFIG</code> containing this file. With an authenticated GitHub CLI:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">gh secret <span class="nb">set</span> KUBE_CONFIG --env production &lt; .deploy-local/ci.kubeconfig
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Also create environment Variable <code>KUBECTL_VERSION</code> containing a compatible explicit patch version. <code>v1.35.0</code> illustrates the format, not a version recommendation. Keep kubectl within one minor version of the API Server. The workflow follows the checksum verification described in the <a class="link" href="https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/"  target="_blank" rel="noopener"
+    >official Linux installation guide</a>.</p>
+<p><strong>Storing a one-hour token in a Secret does not renew it.</strong> Expiration, including time spent waiting for approval, requires a new token and Secret update. Long-lived production automation should exchange platform-supported OIDC/workload identity for short-lived credentials or use managed rotation. GitHub OIDC tokens are not automatically accepted by arbitrary Kubernetes clusters: trust configuration or an identity exchange is required. See <a class="link" href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/"  target="_blank" rel="noopener"
+    >ServiceAccount token documentation</a>.</p>
+<h2 id="5-connect-tests-builds-deployment-and-acceptance">5. Connect tests, builds, deployment, and acceptance
+</h2><p>Save this in the <strong>application repository</strong> as <code>.github/workflows/release.yaml</code>. The example uses GitHub-hosted Runners, so the API must be reachable through an approved network path. For a private cluster, use the organization&rsquo;s dedicated Runner labels for the deployment Job; keep public PR tests isolated from the production network.</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">  1
+</span><span class="lnt">  2
+</span><span class="lnt">  3
+</span><span class="lnt">  4
+</span><span class="lnt">  5
+</span><span class="lnt">  6
+</span><span class="lnt">  7
+</span><span class="lnt">  8
+</span><span class="lnt">  9
+</span><span class="lnt"> 10
+</span><span class="lnt"> 11
+</span><span class="lnt"> 12
+</span><span class="lnt"> 13
+</span><span class="lnt"> 14
+</span><span class="lnt"> 15
+</span><span class="lnt"> 16
+</span><span class="lnt"> 17
+</span><span class="lnt"> 18
+</span><span class="lnt"> 19
+</span><span class="lnt"> 20
+</span><span class="lnt"> 21
+</span><span class="lnt"> 22
+</span><span class="lnt"> 23
+</span><span class="lnt"> 24
+</span><span class="lnt"> 25
+</span><span class="lnt"> 26
+</span><span class="lnt"> 27
+</span><span class="lnt"> 28
+</span><span class="lnt"> 29
+</span><span class="lnt"> 30
+</span><span class="lnt"> 31
+</span><span class="lnt"> 32
+</span><span class="lnt"> 33
+</span><span class="lnt"> 34
+</span><span class="lnt"> 35
+</span><span class="lnt"> 36
+</span><span class="lnt"> 37
+</span><span class="lnt"> 38
+</span><span class="lnt"> 39
+</span><span class="lnt"> 40
+</span><span class="lnt"> 41
+</span><span class="lnt"> 42
+</span><span class="lnt"> 43
+</span><span class="lnt"> 44
+</span><span class="lnt"> 45
+</span><span class="lnt"> 46
+</span><span class="lnt"> 47
+</span><span class="lnt"> 48
+</span><span class="lnt"> 49
+</span><span class="lnt"> 50
+</span><span class="lnt"> 51
+</span><span class="lnt"> 52
+</span><span class="lnt"> 53
+</span><span class="lnt"> 54
+</span><span class="lnt"> 55
+</span><span class="lnt"> 56
+</span><span class="lnt"> 57
+</span><span class="lnt"> 58
+</span><span class="lnt"> 59
+</span><span class="lnt"> 60
+</span><span class="lnt"> 61
+</span><span class="lnt"> 62
+</span><span class="lnt"> 63
+</span><span class="lnt"> 64
+</span><span class="lnt"> 65
+</span><span class="lnt"> 66
+</span><span class="lnt"> 67
+</span><span class="lnt"> 68
+</span><span class="lnt"> 69
+</span><span class="lnt"> 70
+</span><span class="lnt"> 71
+</span><span class="lnt"> 72
+</span><span class="lnt"> 73
+</span><span class="lnt"> 74
+</span><span class="lnt"> 75
+</span><span class="lnt"> 76
+</span><span class="lnt"> 77
+</span><span class="lnt"> 78
+</span><span class="lnt"> 79
+</span><span class="lnt"> 80
+</span><span class="lnt"> 81
+</span><span class="lnt"> 82
+</span><span class="lnt"> 83
+</span><span class="lnt"> 84
+</span><span class="lnt"> 85
+</span><span class="lnt"> 86
+</span><span class="lnt"> 87
+</span><span class="lnt"> 88
+</span><span class="lnt"> 89
+</span><span class="lnt"> 90
+</span><span class="lnt"> 91
+</span><span class="lnt"> 92
+</span><span class="lnt"> 93
+</span><span class="lnt"> 94
+</span><span class="lnt"> 95
+</span><span class="lnt"> 96
+</span><span class="lnt"> 97
+</span><span class="lnt"> 98
+</span><span class="lnt"> 99
+</span><span class="lnt">100
+</span><span class="lnt">101
+</span><span class="lnt">102
+</span><span class="lnt">103
+</span><span class="lnt">104
+</span><span class="lnt">105
+</span><span class="lnt">106
+</span><span class="lnt">107
+</span><span class="lnt">108
+</span><span class="lnt">109
+</span><span class="lnt">110
+</span><span class="lnt">111
+</span><span class="lnt">112
+</span><span class="lnt">113
+</span><span class="lnt">114
+</span><span class="lnt">115
+</span><span class="lnt">116
+</span><span class="lnt">117
+</span><span class="lnt">118
+</span><span class="lnt">119
+</span><span class="lnt">120
+</span><span class="lnt">121
+</span><span class="lnt">122
+</span><span class="lnt">123
+</span><span class="lnt">124
+</span><span class="lnt">125
+</span><span class="lnt">126
+</span><span class="lnt">127
+</span><span class="lnt">128
+</span><span class="lnt">129
+</span><span class="lnt">130
+</span><span class="lnt">131
+</span><span class="lnt">132
+</span><span class="lnt">133
+</span><span class="lnt">134
+</span><span class="lnt">135
+</span><span class="lnt">136
+</span><span class="lnt">137
+</span><span class="lnt">138
+</span><span class="lnt">139
+</span><span class="lnt">140
+</span><span class="lnt">141
+</span><span class="lnt">142
+</span><span class="lnt">143
+</span><span class="lnt">144
+</span><span class="lnt">145
+</span><span class="lnt">146
+</span><span class="lnt">147
+</span><span class="lnt">148
+</span><span class="lnt">149
+</span><span class="lnt">150
+</span><span class="lnt">151
+</span><span class="lnt">152
+</span><span class="lnt">153
+</span><span class="lnt">154
+</span><span class="lnt">155
+</span><span class="lnt">156
+</span><span class="lnt">157
+</span><span class="lnt">158
+</span><span class="lnt">159
+</span><span class="lnt">160
+</span><span class="lnt">161
+</span><span class="lnt">162
+</span><span class="lnt">163
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">order-api-release</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">on</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">pull_request</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">branches</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="l">main]</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">push</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">branches</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="l">main]</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">permissions</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">contents</span><span class="p">:</span><span class="w"> </span><span class="l">read</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">jobs</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">test</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l">ubuntu-24.04</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">steps</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l">actions/checkout@v7</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">with</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">persist-credentials</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l">actions/setup-go@v7</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">with</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">go-version</span><span class="p">:</span><span class="w"> </span><span class="s1">&#39;1.26.9&#39;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">cache</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l">go vet ./...</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l">go test -race -v ./...</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">Check Dockerfile on PR</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l">github.event_name == &#39;pull_request&#39;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l">docker build --build-arg VERSION=pr-check -t order-api:pr .</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">build</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l">github.event_name == &#39;push&#39; &amp;&amp; github.ref == &#39;refs/heads/main&#39;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="l">test</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l">ubuntu-24.04</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">permissions</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">contents</span><span class="p">:</span><span class="w"> </span><span class="l">read</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">packages</span><span class="p">:</span><span class="w"> </span><span class="l">write</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">outputs</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l">${{ steps.name.outputs.image }}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">digest</span><span class="p">:</span><span class="w"> </span><span class="l">${{ steps.push.outputs.digest }}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">steps</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l">actions/checkout@v7</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">with</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">persist-credentials</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l">name</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">shell</span><span class="p">:</span><span class="w"> </span><span class="l">bash</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l">echo &#34;image=ghcr.io/${GITHUB_REPOSITORY,,}&#34; &gt;&gt; &#34;$GITHUB_OUTPUT&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l">docker/login-action@v4</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">with</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">registry</span><span class="p">:</span><span class="w"> </span><span class="l">ghcr.io</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">username</span><span class="p">:</span><span class="w"> </span><span class="l">${{ github.actor }}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="l">${{ secrets.GITHUB_TOKEN }}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l">docker/setup-buildx-action@v4</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l">push</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l">docker/build-push-action@v7</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">with</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">context</span><span class="p">:</span><span class="w"> </span><span class="l">.</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">push</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">platforms</span><span class="p">:</span><span class="w"> </span><span class="l">linux/amd64</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">tags</span><span class="p">:</span><span class="w"> </span><span class="l">${{ steps.name.outputs.image }}:sha-${{ github.sha }}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">build-args</span><span class="p">:</span><span class="w"> </span><span class="l">VERSION=${{ github.sha }}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">labels</span><span class="p">:</span><span class="w"> </span><span class="l">org.opencontainers.image.source=https://github.com/${{ github.repository }}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">deploy</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="l">build</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l">ubuntu-24.04</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">environment</span><span class="p">:</span><span class="w"> </span><span class="l">production</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">concurrency</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">group</span><span class="p">:</span><span class="w"> </span><span class="l">order-api-production</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">cancel-in-progress</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">env</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">KUBECTL_VERSION</span><span class="p">:</span><span class="w"> </span><span class="l">${{ vars.KUBECTL_VERSION }}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">IMAGE_REF</span><span class="p">:</span><span class="w"> </span><span class="l">${{ needs.build.outputs.image }}@${{ needs.build.outputs.digest }}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">steps</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l">actions/checkout@v7</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">with</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">persist-credentials</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">Install compatible kubectl</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">shell</span><span class="p">:</span><span class="w"> </span><span class="l">bash</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p">|</span><span class="sd">
+</span></span></span><span class="line"><span class="cl"><span class="sd">          set -euo pipefail
+</span></span></span><span class="line"><span class="cl"><span class="sd">          test -n &#34;$KUBECTL_VERSION&#34;
+</span></span></span><span class="line"><span class="cl"><span class="sd">          url=&#34;https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl&#34;
+</span></span></span><span class="line"><span class="cl"><span class="sd">          curl -fsSL &#34;$url&#34; -o &#34;$RUNNER_TEMP/kubectl&#34;
+</span></span></span><span class="line"><span class="cl"><span class="sd">          curl -fsSL &#34;$url.sha256&#34; -o &#34;$RUNNER_TEMP/kubectl.sha256&#34;
+</span></span></span><span class="line"><span class="cl"><span class="sd">          expected=$(cat &#34;$RUNNER_TEMP/kubectl.sha256&#34;)
+</span></span></span><span class="line"><span class="cl"><span class="sd">          printf &#39;%s  %s\n&#39; &#34;$expected&#34; &#34;$RUNNER_TEMP/kubectl&#34; | sha256sum --check
+</span></span></span><span class="line"><span class="cl"><span class="sd">          chmod +x &#34;$RUNNER_TEMP/kubectl&#34;
+</span></span></span><span class="line"><span class="cl"><span class="sd">          echo &#34;$RUNNER_TEMP&#34; &gt;&gt; &#34;$GITHUB_PATH&#34;</span><span class="w">          
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">Configure cluster access</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">env</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">KUBE_CONFIG</span><span class="p">:</span><span class="w"> </span><span class="l">${{ secrets.KUBE_CONFIG }}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">shell</span><span class="p">:</span><span class="w"> </span><span class="l">bash</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p">|</span><span class="sd">
+</span></span></span><span class="line"><span class="cl"><span class="sd">          set -euo pipefail
+</span></span></span><span class="line"><span class="cl"><span class="sd">          test -n &#34;$KUBE_CONFIG&#34;
+</span></span></span><span class="line"><span class="cl"><span class="sd">          export KUBECONFIG=&#34;$RUNNER_TEMP/order-api.kubeconfig&#34;
+</span></span></span><span class="line"><span class="cl"><span class="sd">          umask 077
+</span></span></span><span class="line"><span class="cl"><span class="sd">          printf &#39;%s&#39; &#34;$KUBE_CONFIG&#34; &gt; &#34;$KUBECONFIG&#34;
+</span></span></span><span class="line"><span class="cl"><span class="sd">          echo &#34;KUBECONFIG=$KUBECONFIG&#34; &gt;&gt; &#34;$GITHUB_ENV&#34;
+</span></span></span><span class="line"><span class="cl"><span class="sd">          kubectl auth can-i patch deployments -n demo-prod | grep -qx yes</span><span class="w">          
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">Reject stale release</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">env</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">GH_TOKEN</span><span class="p">:</span><span class="w"> </span><span class="l">${{ github.token }}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">shell</span><span class="p">:</span><span class="w"> </span><span class="l">bash</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p">|</span><span class="sd">
+</span></span></span><span class="line"><span class="cl"><span class="sd">          set -euo pipefail
+</span></span></span><span class="line"><span class="cl"><span class="sd">          latest=$(gh api &#34;repos/$GITHUB_REPOSITORY/git/ref/heads/main&#34; --jq &#39;.object.sha&#39;)
+</span></span></span><span class="line"><span class="cl"><span class="sd">          test &#34;$latest&#34; = &#34;$GITHUB_SHA&#34;</span><span class="w">          
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">Save previous Pod template</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">shell</span><span class="p">:</span><span class="w"> </span><span class="l">bash</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p">|</span><span class="sd">
+</span></span></span><span class="line"><span class="cl"><span class="sd">          set -euo pipefail
+</span></span></span><span class="line"><span class="cl"><span class="sd">          kubectl -n demo-prod get deployment order-api --ignore-not-found -o json \
+</span></span></span><span class="line"><span class="cl"><span class="sd">            | jq -c &#39;.spec.template // empty&#39; &gt; &#34;$RUNNER_TEMP/previous-template.json&#34;</span><span class="w">          
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">Apply release and wait</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l">release</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">shell</span><span class="p">:</span><span class="w"> </span><span class="l">bash</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p">|</span><span class="sd">
+</span></span></span><span class="line"><span class="cl"><span class="sd">          set -euo pipefail
+</span></span></span><span class="line"><span class="cl"><span class="sd">          kubectl apply -f k8s/runtime.yaml
+</span></span></span><span class="line"><span class="cl"><span class="sd">          kubectl set image --local -f k8s/deployment.yaml \
+</span></span></span><span class="line"><span class="cl"><span class="sd">            &#34;order-api=$IMAGE_REF&#34; -o yaml &gt; &#34;$RUNNER_TEMP/rendered-deployment.yaml&#34;
+</span></span></span><span class="line"><span class="cl"><span class="sd">          kubectl apply -f &#34;$RUNNER_TEMP/rendered-deployment.yaml&#34;
+</span></span></span><span class="line"><span class="cl"><span class="sd">          kubectl -n demo-prod rollout status deployment/order-api --timeout=240s</span><span class="w">          
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">Verify response and source version</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l">verify</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">shell</span><span class="p">:</span><span class="w"> </span><span class="l">bash</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p">|</span><span class="sd">
+</span></span></span><span class="line"><span class="cl"><span class="sd">          set -euo pipefail
+</span></span></span><span class="line"><span class="cl"><span class="sd">          kubectl -n demo-prod port-forward service/order-api 18080:80 \
+</span></span></span><span class="line"><span class="cl"><span class="sd">            &gt; &#34;$RUNNER_TEMP/port-forward.log&#34; 2&gt;&amp;1 &amp;
+</span></span></span><span class="line"><span class="cl"><span class="sd">          forward_pid=$!
+</span></span></span><span class="line"><span class="cl"><span class="sd">          trap &#39;kill &#34;$forward_pid&#34; 2&gt;/dev/null || true&#39; EXIT
+</span></span></span><span class="line"><span class="cl"><span class="sd">          actual=$(curl -fsS --retry 12 --retry-connrefused --retry-delay 1 \
+</span></span></span><span class="line"><span class="cl"><span class="sd">            --max-time 5 http://127.0.0.1:18080/version)
+</span></span></span><span class="line"><span class="cl"><span class="sd">          test &#34;$actual&#34; = &#34;$GITHUB_SHA&#34;
+</span></span></span><span class="line"><span class="cl"><span class="sd">          curl -fsS --max-time 5 http://127.0.0.1:18080/readyz
+</span></span></span><span class="line"><span class="cl"><span class="sd">          test &#34;$(curl -fsS --max-time 5 http://127.0.0.1:18080/)&#34; = &#34;order-api is running&#34;
+</span></span></span><span class="line"><span class="cl"><span class="sd">          printf &#39;Verified commit: `%s`\n\nImage: `%s`\n&#39; \
+</span></span></span><span class="line"><span class="cl"><span class="sd">            &#34;$GITHUB_SHA&#34; &#34;$IMAGE_REF&#34; &gt;&gt; &#34;$GITHUB_STEP_SUMMARY&#34;</span><span class="w">          
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">Collect failure evidence</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l">${{ failure() &amp;&amp; (steps.release.outcome == &#39;failure&#39; || steps.verify.outcome == &#39;failure&#39;) }}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">shell</span><span class="p">:</span><span class="w"> </span><span class="l">bash</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p">|</span><span class="sd">
+</span></span></span><span class="line"><span class="cl"><span class="sd">          kubectl -n demo-prod get deployment,replicaset,pods -l app=order-api -o wide || true
+</span></span></span><span class="line"><span class="cl"><span class="sd">          kubectl -n demo-prod describe deployment order-api || true
+</span></span></span><span class="line"><span class="cl"><span class="sd">          kubectl -n demo-prod get events --sort-by=.lastTimestamp || true
+</span></span></span><span class="line"><span class="cl"><span class="sd">          kubectl -n demo-prod logs -l app=order-api --all-containers --prefix --tail=100 || true</span><span class="w">          
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">Restore previous Pod template</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l">${{ failure() &amp;&amp; (steps.release.outcome == &#39;failure&#39; || steps.verify.outcome == &#39;failure&#39;) }}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">shell</span><span class="p">:</span><span class="w"> </span><span class="l">bash</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p">|</span><span class="sd">
+</span></span></span><span class="line"><span class="cl"><span class="sd">          set -euo pipefail
+</span></span></span><span class="line"><span class="cl"><span class="sd">          if [ ! -s &#34;$RUNNER_TEMP/previous-template.json&#34; ]; then
+</span></span></span><span class="line"><span class="cl"><span class="sd">            echo &#39;First deployment: no previous template. Manual investigation required.&#39;
+</span></span></span><span class="line"><span class="cl"><span class="sd">            exit 1
+</span></span></span><span class="line"><span class="cl"><span class="sd">          fi
+</span></span></span><span class="line"><span class="cl"><span class="sd">          patch=$(jq -c &#39;[{op:&#34;replace&#34;,path:&#34;/spec/template&#34;,value:.}]&#39; &#34;$RUNNER_TEMP/previous-template.json&#34;)
+</span></span></span><span class="line"><span class="cl"><span class="sd">          kubectl -n demo-prod patch deployment order-api --type=json -p &#34;$patch&#34;
+</span></span></span><span class="line"><span class="cl"><span class="sd">          kubectl -n demo-prod rollout status deployment/order-api --timeout=240s</span><span class="w">          
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">Remove temporary kubeconfig</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l">always()</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">shell</span><span class="p">:</span><span class="w"> </span><span class="l">bash</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l">rm -f -- &#34;$RUNNER_TEMP/order-api.kubeconfig&#34;</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>The publishing pattern is documented in <a class="link" href="https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images"  target="_blank" rel="noopener"
+    >GitHub&rsquo;s image publishing tutorial</a> and <a class="link" href="https://github.com/docker/build-push-action"  target="_blank" rel="noopener"
+    >Docker build-push-action</a>. Major Action tags improve readability here. Production should pin reviewed full commit SHAs and maintain them with dependency updates. A tag such as <code>@v7</code> is mutable; self-hosted Runners must also meet each Action&rsquo;s runtime requirements.</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Design choice</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PRs only run checks; main pushes build and deploy</td>
+<td>Unmerged code does not receive production deployment credentials</td>
+</tr>
+<tr>
+<td>Explicit <code>needs</code> dependencies</td>
+<td>Failed prerequisites block later stages</td>
+</tr>
+<tr>
+<td>Lowercase repository name</td>
+<td>Produces a valid GHCR path such as <code>ghcr.io/symphonyw/order-api</code></td>
+</tr>
+<tr>
+<td>SHA tag plus deployment by digest</td>
+<td>Human-readable traceability and an exact artifact identity</td>
+</tr>
+<tr>
+<td><code>context: .</code></td>
+<td>Uses the checked-out directory for Docker&rsquo;s build context</td>
+</tr>
+<tr>
+<td>No rebuild during deployment</td>
+<td>The artifact being released is the one already produced</td>
+</tr>
+<tr>
+<td>Local image substitution before apply</td>
+<td>Avoids deploying the placeholder and applies other Git-managed settings too</td>
+</tr>
+<tr>
+<td>Main SHA checked immediately before deployment</td>
+<td>Reduces the risk of delayed releases overwriting newer work</td>
+</tr>
+<tr>
+<td>Deployment concurrency group</td>
+<td>Prevents overlapping deployment Jobs for this application/environment</td>
+</tr>
+<tr>
+<td>Explicit <code>failure()</code> recovery conditions</td>
+<td>Diagnostics and restoration can run after a failed step</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>cancel-in-progress: false</code> preserves a running deployment. However, GitHub concurrency groups are not strict FIFO release queues: pending work can be replaced and execution ordering is not guaranteed. The main SHA check reduces stale releases but is not a transaction lock; another commit may arrive between the check and apply. This suits a “deploy the latest main” policy. Strictly ordered release requirements need a dedicated queue or controller. See <a class="link" href="https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency"  target="_blank" rel="noopener"
+    >GitHub concurrency control</a>.</p>
+<p>There are three different completion signals: <code>apply</code> means the API accepted the resources; <code>rollout status</code> means the controller finished the rollout; an expected SHA from <code>/version</code> demonstrates that the responding application matches the intended source. The business smoke request adds a check beyond process health.</p>
+<p>Port forwarding a Service selects a Pod. It checks that application&rsquo;s response, but does <strong>not</strong> exercise normal Service forwarding, every replica, DNS, the gateway, or TLS. When a real entry point exists, also check <code>https://your-domain/version</code> and run suitable business requests through it. One HTTP 200 is not complete user-path validation.</p>
+<h2 id="6-run-a-successful-release-then-rehearse-recovery">6. Run a successful release, then rehearse recovery
+</h2><div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Action</th>
+<th>Expected result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Initialize namespace, RBAC, pull Secret, and production environment</td>
+<td>Deployer authorization returns yes</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Commit application files and open a PR</td>
+<td>Tests and Dockerfile build pass</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Require the test check for main, then merge</td>
+<td>Build produces SHA tag and image digest</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Check first-publish package access</td>
+<td>The pull account can read the package; pause approval and fix it if necessary</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Approve production if configured</td>
+<td>Deploy updates the application using that digest</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Inspect Workflow Summary and the cluster</td>
+<td>Source SHA matches and two replicas are available</td>
+</tr>
+</tbody>
+</table></div>
+<p>An existing package may also need to grant Actions write access to the repository. Branch and environment protection availability depends on repository type and organizational policies.</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl -n demo-prod get deployment order-api
+</span></span><span class="line"><span class="cl">kubectl -n demo-prod get pods -l <span class="nv">app</span><span class="o">=</span>order-api
+</span></span><span class="line"><span class="cl">kubectl -n demo-prod get deployment order-api <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>  -o <span class="nv">jsonpath</span><span class="o">=</span><span class="s1">&#39;{.spec.template.spec.containers[0].image}&#39;</span>
+</span></span><span class="line"><span class="cl"><span class="c1"># Expected: 2 available replicas; image is ghcr.io/...@sha256:...</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Expect two available replicas and an image reference ending in <code>@sha256:...</code>.</p>
+<p><strong>Rehearse a failure only in the dedicated exercise environment.</strong> After a successful baseline release, change the readiness path to <code>/not-ready</code>, pass the PR checks, and merge. The application returns 404 at that path, so new Pods cannot become ready. The rollout fails; CI collects evidence and restores the saved Pod template. After observing recovery, immediately fix the path back to <code>/readyz</code> through a new commit so Git is correct too.</p>
+<p><a href="/p/k8s-automated-deployment/failure-recovery.svg" target="_blank" rel="noopener noreferrer"><img src="/p/k8s-automated-deployment/failure-recovery.svg" alt="Recovery decisions: keep build failures out of the cluster, collect evidence, and restore an existing template" loading="lazy" decoding="async"></a>
+</p>
+<p>Restoring a snapshot of the actual previous template avoids assuming that the previous rollout history entry is the desired recovery target. The strategy still has limits:</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Situation</th>
+<th>Example behavior</th>
+<th>Additional action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Tests or image build fail</td>
+<td>Cluster unchanged</td>
+<td>Fix source and retry</td>
+</tr>
+<tr>
+<td>Authentication, permission, or stale-release check fails</td>
+<td>No apply performed</td>
+<td>Fix access or release the current commit</td>
+</tr>
+<tr>
+<td>New Pods fail and an old template exists</td>
+<td>Restore template and wait for rollout</td>
+<td>Validate business behavior and the external path</td>
+</tr>
+<tr>
+<td>First deployment fails</td>
+<td>Explicit failure, no old template</td>
+<td>Investigate and clean failed resources if necessary</td>
+</tr>
+<tr>
+<td>Recovery rollout also times out</td>
+<td>Job stays failed</td>
+<td>Operator intervention</td>
+</tr>
+<tr>
+<td>Runner disappears, Job is cancelled, or API is unreachable</td>
+<td>Recovery may not execute</td>
+<td>Independent monitoring and operational response</td>
+</tr>
+<tr>
+<td>Service changed, Secret overwritten, or database migrated</td>
+<td>Template restoration is insufficient</td>
+<td>Separate configuration/data recovery strategy</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Recovery does not turn a failed release green.</strong> The workflow remains failed even when the restoration step succeeds. A recovered rollout also needs business verification and metric observation. Deployment history rollback concerns the Pod template, not an entire application transaction; see the <a class="link" href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"  target="_blank" rel="noopener"
+    >Deployment documentation</a>.</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Check first</th>
+<th>Useful evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GHCR push returns 403</td>
+<td>Package permissions, repository association, organization policy</td>
+<td>Build logs and package access settings</td>
+</tr>
+<tr>
+<td>Unauthorized / Forbidden</td>
+<td>Expiration, context, RoleBinding</td>
+<td>Authorization checks and API response</td>
+</tr>
+<tr>
+<td>API connection timeout</td>
+<td>Runner network, endpoint, firewall, CA</td>
+<td>Connection errors; never print full kubeconfig</td>
+</tr>
+<tr>
+<td>ImagePullBackOff</td>
+<td>Digest existence, pull credentials, node egress</td>
+<td><code>kubectl describe pod &lt;pod&gt; -n demo-prod</code></td>
+</tr>
+<tr>
+<td>Pending Pods</td>
+<td>Resource requests, amd64 node selector, quotas</td>
+<td>Scheduling events</td>
+</tr>
+<tr>
+<td>CrashLoopBackOff</td>
+<td>Startup, configuration, permissions, OOM</td>
+<td><code>kubectl logs &lt;pod&gt; -p -n demo-prod</code></td>
+</tr>
+<tr>
+<td>Running but not Ready</td>
+<td>Probe path, listening address, dependencies</td>
+<td>Pod description and application logs</td>
+</tr>
+<tr>
+<td>Internal checks pass but domain fails</td>
+<td>Controller, Service, DNS, TLS</td>
+<td>Gateway logs and real entry-point requests</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Database migrations need a separate release design.</strong> A common approach is expand–migrate–contract: introduce backward-compatible structures, support old and new application versions, migrate data, then remove old structures after observation. Migration Jobs need idempotency, concurrency control, and failure handling. Do not have every application Pod race to execute irreversible DDL. Restoring an image also does not undo messages, external calls, or modified records.</p>
+<h2 id="7-evolve-toward-a-maintainable-release-system">7. Evolve toward a maintainable release system
+</h2><p>Once the basic path works, add controls according to the workload&rsquo;s needs.</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Starting point here</th>
+<th>Production evolution</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Environments</td>
+<td>Dedicated exercise namespace</td>
+<td>Isolated dev/staging/prod and production identities</td>
+</tr>
+<tr>
+<td>Artifacts</td>
+<td>SHA tag and digest</td>
+<td>History retention, scanning, SBOM, signature verification</td>
+</tr>
+<tr>
+<td>Credentials</td>
+<td>Short-lived exercise kubeconfig</td>
+<td>Per-Job identity exchange, rotation, audit</td>
+</tr>
+<tr>
+<td>Validation</td>
+<td>Readiness, source version, one business request</td>
+<td>Integration tests, external E2E, environment acceptance</td>
+</tr>
+<tr>
+<td>Observation</td>
+<td>Failure logs and manual checks</td>
+<td>Error rate, P95/P99 latency, restarts, business indicators, alerts</td>
+</tr>
+<tr>
+<td>Release policy</td>
+<td>Two-replica rolling update</td>
+<td>Canary or blue/green where risk justifies it</td>
+</tr>
+<tr>
+<td>Records</td>
+<td>SHA, digest, Actions execution</td>
+<td>Environment, config versions, approvals, recovery outcome</td>
+</tr>
+</tbody>
+</table></div>
+<p>Promote <strong>the same digest</strong> between environments: build once, validate in staging, then release that artifact to production. Inject environment differences through configuration instead of rebuilding nominally identical versions.</p>
+<p>A standard Deployment rolling update does not automatically make metric-based canary decisions. Sending limited traffic, observing results, and expanding exposure requires traffic control and progressive delivery tooling.</p>
+<p><strong>GitOps changes who performs deployment.</strong> This example is push deployment: CI holds an identity that calls the API. With GitOps, an environment repository records the desired state, and Argo CD or Flux reconciles it from the cluster side or a controlled network.</p>
+<p><a href="/p/k8s-automated-deployment/gitops.svg" target="_blank" rel="noopener noreferrer"><img src="/p/k8s-automated-deployment/gitops.svg" alt="Push CD compared with GitOps: CI-driven changes versus Git-backed reconciliation" loading="lazy" decoding="async"></a>
+</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Push CD in this example</th>
+<th>GitOps</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Cluster changes initiated by</td>
+<td>CI deployment Job</td>
+<td>Reconciler</td>
+</tr>
+<tr>
+<td>Desired image recorded in</td>
+<td>Source template plus CI digest output</td>
+<td>Environment manifests containing the exact digest</td>
+</tr>
+<tr>
+<td>Cluster deployment credentials</td>
+<td>Used by CI</td>
+<td>Held by the reconciler</td>
+</tr>
+<tr>
+<td>Manual drift</td>
+<td>No continuous correction by default</td>
+<td>Detection and optional correction</td>
+</tr>
+<tr>
+<td>Version recovery</td>
+<td>Restore snapshot, then fix source</td>
+<td>Change desired digest in the deployment repository</td>
+</tr>
+</tbody>
+</table></div>
+<p>With Argo CD automatic sync, update Git before relying on a manual cluster change: self-healing can restore the Git version. Pruning resources is also an explicit policy. See <a class="link" href="https://argo-cd.readthedocs.io/en/stable/user-guide/auto_sync/"  target="_blank" rel="noopener"
+    >Argo CD automated sync</a>.</p>
+<p>A release is accountable when its records answer four questions: <strong>which commit, which artifact and configuration, which checks, and which recovery target?</strong> That is the foundation for adding more environments, progressive delivery, or GitOps.</p>
+
+</div>
+
+            <footer class="article-footer">
+    
+        <div class="article-tags" aria-label="Article tags"><span class="article-footer-label">Filed under</span><a href="/tags/kubernetes/">Kubernetes</a><a href="/tags/k8s/">K8s</a><a href="/tags/ci/cd/">CI/CD</a><a href="/tags/github-actions/">GitHub Actions</a><a href="/tags/devops/">DevOps</a><a href="/tags/gitops/">GitOps</a></div>
+    
+    
+    
+    <div class="article-endnote"><span>Thanks for reading.</span><a href="#top">Back to top <span aria-hidden="true">↑</span></a></div>
+</footer>
+
+        </div>
+    </div>
+    
+</article>
+
+        <div class="reading-afterword">
+            
+            
+    <aside class="reading-related">
+        <div class="reading-section-heading"><span class="article-footer-label">Keep reading</span><span aria-hidden="true">↘</span></div>
+        
+            <a class="reading-related-link" href="/p/cicd-gitlab-ci-helm/"><span class="related-number">01</span><span class="related-title">CI/CD, GitLab CI, and Helm: From Commit to Kubernetes Delivery</span><time datetime="2026-10-17">2026.10.17</time><span class="related-arrow" aria-hidden="true">↗</span></a>
+        
+            <a class="reading-related-link" href="/p/k8s-container-cloud-deployment/"><span class="related-number">02</span><span class="related-title">K8s Container Cloud Deployment: From Dockerfile Image Build to Release</span><time datetime="2026-09-03">2026.09.03</time><span class="related-arrow" aria-hidden="true">↗</span></a>
+        
+            <a class="reading-related-link" href="/p/kubernetes-from-docker/"><span class="related-number">03</span><span class="related-title">从 Docker 到 Kubernetes：面向 Docker 用户的 K8s 从 0 到 1 教程</span><time datetime="2026-08-08">2026.08.08</time><span class="related-arrow" aria-hidden="true">↗</span></a>
+        
+    </aside>
+
+
+            
+        </div>
+    </div>
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+    </main>
+    
+<footer class="site-footer">
+    <div class="footer-top"><a class="footer-wordmark" href="/" aria-label="Snow">Sno<span>w</span></a><p>A place to think. A space to grow.</p><a href="#main-content" class="back-top">Back to top <span aria-hidden="true">↑</span></a></div>
+    <div class="footer-bottom"><span>© 2026 Snow</span><nav aria-label="More links"><a href="/about/">About</a><a href="https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0" target="_blank" rel="noopener noreferrer me">Bilibili <span aria-hidden="true">↗</span></a><a href="https://github.com/SymphonyW" target="_blank" rel="noopener noreferrer me">GitHub <span aria-hidden="true">↗</span></a><a href="https://twitter.com" target="_blank" rel="noopener noreferrer me">Twitter <span aria-hidden="true">↗</span></a><a href="/index.xml">RSS ↗</a></nav><span class="footer-colophon">Built with Hugo · Always in progress</span></div>
+</footer>
+
+    
+
+<script src="/ts/main.c86029ddb4aad8364879723acaf7efcd526e724d2381088d445aaf6f3ab1bfdf.js" defer></script>
+
+
+<script src="/ts/custom.6c99a7b037ac7e2bde801fbad26b9c20b3b18707868c164174142870ef3bc309.js" defer></script>
+
+
+
+
+
+<script>
+window.MathJax = {
+  tex: {
+    
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  svg: {
+    fontCache: 'global'
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
+
+</body>
+</html>

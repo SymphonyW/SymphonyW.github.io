@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ .Release.Name }}-smoke
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  imagePullSecrets:
+    {{- toYaml .Values.imagePullSecrets | nindent 4 }}
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: smoke
+      image: "{{ .Values.image.repository }}@{{ required "image.digest is required" .Values.image.digest }}"
+      command: ["node", "--input-type=module", "-e"]
+      args:
+        - |
+          const r = await fetch('http://{{ .Release.Name }}/', { signal: AbortSignal.timeout(10000) });
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          const body = await r.json();
+          if (body.version !== process.env.EXPECTED_VERSION) throw new Error('Unexpected version');
+          console.log('Smoke test passed:', body.version);
+      env:
+        - name: EXPECTED_VERSION
+          value: {{ .Values.appVersion | quote }}
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 200m
+          memory: 128Mi
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: ["ALL"]
