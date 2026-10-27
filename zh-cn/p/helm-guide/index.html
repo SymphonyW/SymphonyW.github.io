@@ -1,0 +1,1319 @@
+<!DOCTYPE html>
+<html lang="zh-cn" dir="ltr">
+<head>
+    <meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="用图解讲清 Helm、Chart、values 与 Release 的关系，从零编写 Nginx Chart，完成预览、安装、多环境配置、升级、回滚与打包，并说明 Helm 3/4 差异和常见误区。">
+<title>Helm 详解：从一堆 Kubernetes YAML 到可升级、可回滚的应用包</title>
+
+<link rel='canonical' href='https://SymphonyW.github.io/zh-cn/p/helm-guide/'>
+<link rel="stylesheet" href="/scss/custom.min.919cf0d34f895fec4bc36912621fd0297f1439e1574bdf28d3195939a83690e8.css">
+<script>
+(() => {
+    let preference = 'auto';
+    try { preference = localStorage.getItem('StackColorScheme') || preference; } catch (_) {}
+    document.documentElement.dataset.scheme = preference === 'dark' || (preference === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+})();
+</script>
+
+<meta property='og:title' content="Helm 详解：从一堆 Kubernetes YAML 到可升级、可回滚的应用包">
+<meta property='og:description' content="用图解讲清 Helm、Chart、values 与 Release 的关系，从零编写 Nginx Chart，完成预览、安装、多环境配置、升级、回滚与打包，并说明 Helm 3/4 差异和常见误区。">
+<meta property='og:url' content='https://SymphonyW.github.io/zh-cn/p/helm-guide/'>
+<meta property='og:site_name' content='Snow'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='Helm' /><meta property='article:tag' content='Kubernetes' /><meta property='article:tag' content='DevOps' /><meta property='article:tag' content='Cloud Native' /><meta property='article:published_time' content='2026-10-23T10:00:00&#43;08:00'/><meta property='article:modified_time' content='2026-10-23T10:00:00&#43;08:00'/><meta property='og:image' content='https://SymphonyW.github.io/zh-cn/p/helm-guide/bg.svg' />
+<meta name="twitter:title" content="Helm 详解：从一堆 Kubernetes YAML 到可升级、可回滚的应用包">
+<meta name="twitter:description" content="用图解讲清 Helm、Chart、values 与 Release 的关系，从零编写 Nginx Chart，完成预览、安装、多环境配置、升级、回滚与打包，并说明 Helm 3/4 差异和常见误区。"><meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content='https://SymphonyW.github.io/zh-cn/p/helm-guide/bg.svg' />
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    
+    <noscript><style>@media(max-width:760px){.site-header{position:static}.site-header__inner{height:auto;min-height:66px;flex-wrap:wrap}.site-nav{position:static;display:grid;order:3;flex-basis:100%;padding:8px 0 18px}.menu-toggle,.theme-toggle{display:none}}</style></noscript>
+</head>
+<body id="top" class="article-page">
+    <a class="skip-link" href="#main-content">跳至正文</a>
+    
+<header class="site-header">
+    <div class="site-header__inner">
+        <a class="site-brand" href="/zh-cn/" aria-label="Snow — 主页">S<span>now.</span></a>
+        <nav class="site-nav" id="site-navigation" aria-label="主导航">
+            
+            
+                
+                    
+                    
+                    <a href="/zh-cn/">主页</a>
+                
+            
+                
+                    
+                    
+                    <a href="/zh-cn/post/" aria-current="page">博客</a>
+                
+            
+                
+                    
+                    
+                    <a href="/zh-cn/archives/">归档</a>
+                
+            
+                
+                    
+                    
+                    <a href="/zh-cn/stats/">写作记录</a>
+                
+            
+                
+                    
+                    
+                    <a href="/zh-cn/diary/">日记</a>
+                
+            
+                
+            
+                
+                    
+                    
+                    <a href="/zh-cn/links/">链接</a>
+                
+            
+        </nav>
+        <div class="header-tools">
+            
+                <a class="language-link" href="/p/helm-guide/" lang="en" hreflang="en" aria-label="Switch to English">EN</a>
+            
+            <button type="button" id="dark-mode-toggle" class="icon-button theme-toggle" aria-label="切换明暗主题" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><path d="M12 4.5a7.5 7.5 0 0 1 0 15z" fill="currentColor" stroke="none"/></svg></button>
+            <a class="icon-button search-link" href="/zh-cn/search/" aria-label="搜索文章"><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+</a>
+            <button class="icon-button menu-toggle" type="button" aria-expanded="false" aria-controls="site-navigation" aria-label="展开导航"><span></span><span></span></button>
+        </div>
+    </div>
+    <div class="reading-progress" aria-hidden="true"></div>
+</header>
+
+    <main id="main-content" class="site-main main" tabindex="-1">
+        
+    <div class="reading-page">
+        <article class="main-article has-toc">
+    <header class="article-header">
+    <div class="article-wayfinding">
+        
+            <a href="/zh-cn/post/"><span aria-hidden="true">←</span> 全部文章</a>
+        
+        <span class="article-kind">笔记与思考</span>
+    </div>
+    <div class="article-details">
+    
+    <h1 class="article-title">Helm 详解：从一堆 Kubernetes YAML 到可升级、可回滚的应用包</h1>
+    <p class="article-subtitle">用图解讲清 Helm、Chart、values 与 Release 的关系，从零编写 Nginx Chart，完成预览、安装、多环境配置、升级、回滚与打包，并说明 Helm 3/4 差异和常见误区。</p>
+    <div class="article-meta">
+        
+            <time datetime="2026-10-23T10:00:00&#43;08:00">2026 年 10 月 23 日</time>
+            <span class="meta-divider" aria-hidden="true">/</span>
+            <span>约 8 分钟</span>
+        
+        
+            <div class="article-translations"><a href="/p/helm-guide/" hreflang="en" lang="en">Read in English <span aria-hidden="true">↗</span></a></div>
+        
+    </div>
+</div>
+
+</header>
+
+    <div class="reading-layout">
+        
+            <aside class="reading-margin" aria-label="文章目录">
+                <details class="article-toc" open>
+                    <summary><span>本文目录</span><span class="toc-indicator" aria-hidden="true">+</span></summary>
+                    <nav id="TableOfContents">
+  <ol>
+    <li><a href="#1-为什么有了-kubectl还需要-helm">1. 为什么有了 kubectl，还需要 Helm？</a></li>
+    <li><a href="#2-先分清四个词chartvaluesrelease仓库">2. 先分清四个词：Chart、values、Release、仓库</a></li>
+    <li><a href="#3-敲下-helm-install-后发生了什么">3. 敲下 helm install 后，发生了什么？</a></li>
+    <li><a href="#4-动手从零部署一个-nginx-网站">4. 动手：从零部署一个 Nginx 网站</a>
+      <ol>
+        <li><a href="#准备工具与四个文件">准备工具与四个文件</a></li>
+        <li><a href="#先检查再安装再访问">先检查，再安装，再访问</a></li>
+      </ol>
+    </li>
+    <li><a href="#5-同一个-chart怎样部署多套环境">5. 同一个 Chart，怎样部署多套环境？</a></li>
+    <li><a href="#6-升级失败和回滚helm-能恢复到哪里">6. 升级、失败和回滚：Helm 能恢复到哪里？</a></li>
+    <li><a href="#7-使用现成-chart以及分发自己的-chart">7. 使用现成 Chart，以及分发自己的 Chart</a></li>
+    <li><a href="#8-常见问题以及什么时候该用别的工具">8. 常见问题，以及什么时候该用别的工具</a></li>
+  </ol>
+</nav>
+                </details>
+            </aside>
+        
+        <div class="reading-body">
+            <div class="article-content"><p>学过 Kubernetes 以后，你大概已经会写 Deployment 和 Service，也知道用 <code>kubectl apply</code> 把它们交给集群。但当一个应用变成十几个资源，还需要分别部署到开发、测试和生产环境时，“复制一份 YAML 再改几个字段”就开始让人头疼了。</p>
+<p><strong>Helm 解决的，就是如何把一组 Kubernetes 资源整理成可复用、可配置、可发布的应用包，并记录每一次安装和升级。</strong></p>
+<p><a href="/zh-cn/p/helm-guide/bg.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/helm-guide/bg.svg" alt="Helm：从模板和配置到 Kubernetes 应用" loading="lazy" decoding="async"></a>
+</p>
+<p>本文默认你知道 Pod、Deployment、Service 的基本作用。如果还不熟悉，可以先看 <a class="link" href="/zh-cn/p/kubernetes-from-docker/" >从 Docker 到 Kubernetes</a>。这里围绕一个 Nginx 网站，把概念与命令连成一条能动手实践的路线。</p>
+<blockquote>
+<p><strong>版本与示例范围</strong>：本文使用 Helm 3、Helm 4 均支持的 <code>apiVersion: v2</code> Chart。基础操作共用，失败恢复参数单独对照。示例使用 Linux 容器、已有的 Kubernetes 集群；命令按单行编写，可在常见 Shell 和 PowerShell 中执行。镜像标签只为教学固定，不表示生产版本建议。Helm 4 仍支持 v2 Chart，不能把 Helm 主版本与 Chart 格式版本混为一谈。<a class="link" href="https://helm.sh/docs/overview/"  target="_blank" rel="noopener"
+    >Helm 4 官方说明</a></p>
+</blockquote>
+<h2 id="1-为什么有了-kubectl还需要-helm">1. 为什么有了 kubectl，还需要 Helm？
+</h2><p>假设你维护一个网站，最初只有两个文件：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">website/
+</span></span><span class="line"><span class="cl">├── deployment.yaml
+</span></span><span class="line"><span class="cl">└── service.yaml
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>后来加上配置文件、入口路由、存储和权限，目录越来越长。紧接着，你又需要三套环境：</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>配置</th>
+<th>开发环境</th>
+<th>测试环境</th>
+<th>生产环境</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>副本数</td>
+<td>1</td>
+<td>2</td>
+<td>3</td>
+</tr>
+<tr>
+<td>镜像版本</td>
+<td>开发版本</td>
+<td>候选版本</td>
+<td>已验证版本</td>
+</tr>
+<tr>
+<td>域名</td>
+<td>dev.example.com</td>
+<td>staging.example.com</td>
+<td>example.com</td>
+</tr>
+<tr>
+<td>资源额度</td>
+<td>小</td>
+<td>接近生产</td>
+<td>按实际负载设置</td>
+</tr>
+</tbody>
+</table></div>
+<p>直接复制目录当然能工作。但改一次健康检查，要同步修改三份；上线以后，还得另外记录“当时用了哪些 YAML、哪些参数，以及上一个可用版本是什么”。</p>
+<p>Helm 把这些问题分成两部分：</p>
+<ol>
+<li><strong>描述怎么部署</strong>：把共同结构写成模板，把环境差异放进配置文件。</li>
+<li><strong>管理部署记录</strong>：为每次安装、升级保存配置、资源清单和状态，支持查看历史与回滚。</li>
+</ol>
+<p>这也解释了它和其他工具的分工：</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>工具</th>
+<th>主要负责什么</th>
+<th>在网站例子中做什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Docker / 镜像构建工具</td>
+<td>把程序和运行依赖制成镜像</td>
+<td>产出网站镜像</td>
+</tr>
+<tr>
+<td>Kubernetes</td>
+<td>调度资源，持续维护期望状态</td>
+<td>保持需要的 Pod 运行</td>
+</tr>
+<tr>
+<td>kubectl</td>
+<td>与 Kubernetes API 交互</td>
+<td>提交 YAML、查日志、看事件</td>
+</tr>
+<tr>
+<td>Helm</td>
+<td>打包配置、渲染模板、管理发布</td>
+<td>用同一份 Chart 安装和升级网站</td>
+</tr>
+</tbody>
+</table></div>
+<p>Helm 经常被比作 Kubernetes 的 <code>apt</code> 或 <code>brew</code>，这个类比适合帮助入门。不过它管理的核心是一组集群资源和发布记录，并不会直接替你编译代码或构建镜像。</p>
+<p>如果你只有两个不怎么变化的 YAML，继续用 <code>kubectl apply</code> 很合理。<strong>当重复配置、多环境部署和版本管理成为日常工作，Helm 的价值才会明显起来。</strong></p>
+<h2 id="2-先分清四个词chartvaluesrelease仓库">2. 先分清四个词：Chart、values、Release、仓库
+</h2><p><a href="/zh-cn/p/helm-guide/concepts.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/helm-guide/concepts.svg" alt="Chart、values、Release 与仓库之间的关系" loading="lazy" decoding="async"></a>
+</p>
+<p>可以把部署网站想象成按菜谱做菜，但记住类比之后，还要落回具体对象：</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>名词</th>
+<th>通俗理解</th>
+<th>实际内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Chart</td>
+<td>一份可复用的部署方案</td>
+<td>模板、默认配置、包信息和可选依赖</td>
+</tr>
+<tr>
+<td>values</td>
+<td>这次部署要填入的参数</td>
+<td>镜像、副本数、端口等配置</td>
+</tr>
+<tr>
+<td>Release</td>
+<td>按这份方案安装出来的一套应用</td>
+<td>有名字、namespace、历史修订和状态的安装实例</td>
+</tr>
+<tr>
+<td>Repository / Registry</td>
+<td>存放部署包的地方</td>
+<td>传统 Chart 仓库，或支持 OCI 的制品仓库</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>同一个 Chart 可以安装出多个 Release。</strong> 比如把 <code>web-demo</code> Chart 安装为 <code>web-dev</code> 和 <code>web-prod</code>，它们可以使用不同参数，分别升级。Release 名在对应 namespace 中区分；查询时也要带对 namespace。</p>
+<p>还要特别分清三个“版本”：</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>字段</th>
+<th>例子</th>
+<th>表示什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Chart 的 <code>version</code></td>
+<td><code>0.1.0</code></td>
+<td>部署包自己的版本</td>
+</tr>
+<tr>
+<td>Chart 的 <code>appVersion</code></td>
+<td><code>&quot;1.28.0&quot;</code></td>
+<td>描述应用版本的元数据</td>
+</tr>
+<tr>
+<td>Release 的 revision</td>
+<td><code>1</code>、<code>2</code>、<code>3</code></td>
+<td>某次安装实例的历史修订编号</td>
+</tr>
+</tbody>
+</table></div>
+<p>例如：你只调整了资源额度，可以发布 <code>0.1.1</code> 的 Chart，应用版本不必变化；再把它升级到已有 Release，这个 Release 就会产生新的 revision。</p>
+<p><strong>修改 <code>appVersion</code> 不会自动更新镜像。</strong> 本文模板从 <code>.Values.image.tag</code> 读取镜像标签，因此只有修改这个输入，镜像字段才会变。其他 Chart 如果显式使用 <code>.Chart.AppVersion</code>，行为又会不同。<a class="link" href="https://helm.sh/docs/topics/charts/"  target="_blank" rel="noopener"
+    >Chart 格式说明</a></p>
+<h2 id="3-敲下-helm-install-后发生了什么">3. 敲下 helm install 后，发生了什么？
+</h2><p><a href="/zh-cn/p/helm-guide/render-flow.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/helm-guide/render-flow.svg" alt="Helm 渲染资源、提交 API，并由 Kubernetes 控制器维护应用" loading="lazy" decoding="async"></a>
+</p>
+<p>主线可以这样理解：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">Chart 模板 + 合并后的 values + Release 等上下文
+</span></span><span class="line"><span class="cl">                       ↓
+</span></span><span class="line"><span class="cl">                普通 Kubernetes YAML
+</span></span><span class="line"><span class="cl">                       ↓
+</span></span><span class="line"><span class="cl">               Kubernetes API Server
+</span></span><span class="line"><span class="cl">                       ↓
+</span></span><span class="line"><span class="cl">        Deployment 等控制器持续维护实际资源
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>例如模板里写：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span>{{<span class="w"> </span><span class="l">.Values.replicaCount }}</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>配置里写：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">replicaCount</span><span class="p">:</span><span class="w"> </span><span class="m">2</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>渲染出来的资源就是：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span><span class="m">2</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>Kubernetes 最终接收的是渲染后的资源，不负责理解 <code>{{ ... }}</code>。Helm 还会处理发布记录、资源更新及可选的 hooks；它并非只是对文件做字符串替换。</p>
+<p>Helm 3、4 的常规 CLI 使用不需要在集群额外安装 Helm 服务端。老文章里的 <strong>Tiller 属于 Helm 2 的架构</strong>，不要照着部署。安装完成后，即使你退出终端，维持副本、重建 Pod 的工作仍由 Kubernetes 承担。</p>
+<p>默认情况下，Release 信息保存在它所属 namespace 的 Kubernetes Secret 中，包括 Chart 和配置等内容。<code>helm history</code> 能看到历史，并不是因为你本地保留了一个终端窗口；同时，这些记录可能含敏感配置，需要合理控制访问权限。<a class="link" href="https://helm.sh/docs/topics/advanced/"  target="_blank" rel="noopener"
+    >Release 存储说明</a></p>
+<p>Helm 也不是持续同步 Git 的控制器。你手动改了线上资源，Helm 不会自己定时发现并修复；需要下一次操作或额外的 GitOps 控制器参与。资源更新细节也有版本差异：Helm 4 新安装的 Release 默认使用服务端应用，已有 Release 的升级通常沿用之前的应用方式。<a class="link" href="https://helm.sh/docs/overview/#server-side-apply"  target="_blank" rel="noopener"
+    >Helm 4 更新机制</a></p>
+<h2 id="4-动手从零部署一个-nginx-网站">4. 动手：从零部署一个 Nginx 网站
+</h2><p>这部分只包含一个 Deployment 和一个 Service。先把主流程跑通，再增加入口路由、存储和其他能力。</p>
+<p>可以下载 <a class="link" href="helm-web-demo.zip" >完整示例工程</a>，解压后进入 <code>helm-web-demo</code> 目录；也可以按下面的目录与代码自行创建。后续命令都在<strong>包含 <code>web-demo/</code> 和 <code>values-dev.yaml</code> 的目录</strong>执行。</p>
+<h3 id="准备工具与四个文件">准备工具与四个文件
+</h3><p>你需要安装 Helm、kubectl，并准备一个可访问的练习集群。Windows、macOS、Linux 都可以从 <a class="link" href="https://helm.sh/docs/intro/install/"  target="_blank" rel="noopener"
+    >Helm 官方安装文档</a> 选择对应平台的二进制包；安装后确认 <code>helm</code> 已加入 PATH。</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">helm version --short
+</span></span><span class="line"><span class="cl">kubectl config current-context
+</span></span><span class="line"><span class="cl">kubectl get nodes
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>第二条确认当前指向哪个集群，第三条确认可以连接。<strong>后续安装命令会修改当前 context 指向的集群，请使用练习环境。</strong> Helm 不会自动替你创建 Kubernetes 集群。</p>
+<p>创建下面的结构。这里手写四个文件，方便理解；<code>helm create</code> 虽然能生成脚手架，但会带来更多暂时用不到的模板。</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span><span class="lnt">9
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">helm-web-demo/
+</span></span><span class="line"><span class="cl">├── web-demo/
+</span></span><span class="line"><span class="cl">│   ├── Chart.yaml
+</span></span><span class="line"><span class="cl">│   ├── values.yaml
+</span></span><span class="line"><span class="cl">│   └── templates/
+</span></span><span class="line"><span class="cl">│       ├── deployment.yaml
+</span></span><span class="line"><span class="cl">│       └── service.yaml
+</span></span><span class="line"><span class="cl">├── values-dev.yaml
+</span></span><span class="line"><span class="cl">└── values-prod.yaml
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p><strong><code>web-demo/Chart.yaml</code>：描述这个包。</strong></p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">v2</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">web-demo</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l">A small Nginx website for learning Helm</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l">application</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="m">0.1.0</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">appVersion</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;1.28.0&#34;</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p><strong><code>web-demo/values.yaml</code>：提供默认参数。</strong></p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">replicaCount</span><span class="p">:</span><span class="w"> </span><span class="m">1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">image</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">repository</span><span class="p">:</span><span class="w"> </span><span class="l">nginx</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">tag</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;1.28.0-alpine&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">pullPolicy</span><span class="p">:</span><span class="w"> </span><span class="l">IfNotPresent</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">service</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="m">80</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">resources</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">requests</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="l">50m</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="l">32Mi</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">limits</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="l">200m</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="l">128Mi</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>这些键名不是 Kubernetes 的固定规范，而是这个 Chart 自己约定的输入。<strong>往 values 里随意添加一个 <code>domain</code>，并不会自动产生域名或 Ingress，必须有模板读取并使用它。</strong></p>
+<p><strong><code>web-demo/templates/deployment.yaml</code>：描述网站怎么运行。</strong></p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span><span class="lnt">25
+</span><span class="lnt">26
+</span><span class="lnt">27
+</span><span class="lnt">28
+</span><span class="lnt">29
+</span><span class="lnt">30
+</span><span class="lnt">31
+</span><span class="lnt">32
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">apps/v1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">Deployment</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span>{{<span class="w"> </span><span class="l">.Release.Name }}-web</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span>{{<span class="w"> </span><span class="l">.Release.Namespace }}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">spec</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span>{{<span class="w"> </span><span class="l">.Values.replicaCount }}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">selector</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">matchLabels</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">app.kubernetes.io/name</span><span class="p">:</span><span class="w"> </span><span class="l">web-demo</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">app.kubernetes.io/instance</span><span class="p">:</span><span class="w"> </span>{{<span class="w"> </span><span class="l">.Release.Name }}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">template</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">labels</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">app.kubernetes.io/name</span><span class="p">:</span><span class="w"> </span><span class="l">web-demo</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">app.kubernetes.io/instance</span><span class="p">:</span><span class="w"> </span>{{<span class="w"> </span><span class="l">.Release.Name }}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">spec</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">containers</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">nginx</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;{{ .Values.image.repository }}:{{ .Values.image.tag }}&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">imagePullPolicy</span><span class="p">:</span><span class="w"> </span>{{<span class="w"> </span><span class="l">.Values.image.pullPolicy }}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">ports</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">http</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">containerPort</span><span class="p">:</span><span class="w"> </span><span class="m">80</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">readinessProbe</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">httpGet</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l">/</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l">http</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">initialDelaySeconds</span><span class="p">:</span><span class="w"> </span><span class="m">2</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">periodSeconds</span><span class="p">:</span><span class="w"> </span><span class="m">5</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">resources</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span>{{- <span class="l">toYaml .Values.resources | nindent 12 }}</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p><strong><code>web-demo/templates/service.yaml</code>：提供稳定的集群内入口。</strong></p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">v1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">Service</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span>{{<span class="w"> </span><span class="l">.Release.Name }}-web</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span>{{<span class="w"> </span><span class="l">.Release.Namespace }}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">spec</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l">ClusterIP</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">selector</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">app.kubernetes.io/name</span><span class="p">:</span><span class="w"> </span><span class="l">web-demo</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">app.kubernetes.io/instance</span><span class="p">:</span><span class="w"> </span>{{<span class="w"> </span><span class="l">.Release.Name }}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">ports</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">http</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span>{{<span class="w"> </span><span class="l">.Values.service.port }}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">targetPort</span><span class="p">:</span><span class="w"> </span><span class="l">http</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>现在只需要看懂几种模板写法：</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>写法</th>
+<th>作用</th>
+<th>本文中的效果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>.Values.xxx</code></td>
+<td>读取合并后的配置</td>
+<td>决定副本数、镜像和服务端口</td>
+</tr>
+<tr>
+<td><code>.Release.Name</code></td>
+<td>读取安装实例的名字</td>
+<td>Release 叫 <code>demo</code>，资源就叫 <code>demo-web</code></td>
+</tr>
+<tr>
+<td><code>.Release.Namespace</code></td>
+<td>读取目标 namespace</td>
+<td>将资源放到 <code>helm-lab</code></td>
+</tr>
+<tr>
+<td><code>toYaml</code></td>
+<td>把对象转回 YAML</td>
+<td>输出整段 resources 配置</td>
+</tr>
+<tr>
+<td><code>nindent 12</code></td>
+<td>换行并缩进 12 个空格</td>
+<td>把 resources 内容放在正确层级</td>
+</tr>
+<tr>
+<td><code>{{-</code></td>
+<td>去掉左侧紧邻的空白</td>
+<td>避免插入模板时出现多余空行</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>instance</code> 标签很关键：同一个 namespace 安装两套网站时，Service 要选中属于自己 Release 的 Pod。只用相同的应用名，可能把两套 Pod 混在一起。模板上下文和管道语法可查 <a class="link" href="https://helm.sh/docs/chart_template_guide/builtin_objects/"  target="_blank" rel="noopener"
+    >内置对象</a> 与 <a class="link" href="https://helm.sh/docs/chart_template_guide/functions_and_pipelines/"  target="_blank" rel="noopener"
+    >函数和管道</a>。</p>
+<h3 id="先检查再安装再访问">先检查，再安装，再访问
+</h3><p>先在本地检查结构和渲染结果，这两步不需要集群：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">helm lint ./web-demo
+</span></span><span class="line"><span class="cl">helm template demo ./web-demo -n helm-lab
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>第二条输出中应该看到一个 Service、一个 Deployment，资源名都是 <code>demo-web</code>，Deployment 的 <code>replicas</code> 是 <code>1</code>。正常渲染后，资源中不会再残留 <code>{{ ... }}</code>。</p>
+<blockquote>
+<p><strong>示例验证范围</strong>：附带工程已用 Helm 3.19.0、4.0.0 检查 Chart 结构和本地渲染。实际安装、镜像拉取、页面访问、升级与回滚，需要在你自己的练习集群继续验证。</p>
+</blockquote>
+<p><strong><code>helm template</code> 只生成 YAML，不会创建 Release。</strong> 想把渲染过程与部署过程分开时，它很有用，但这不等于已经验证了集群权限、准入策略或镜像能否下载。</p>
+<p>安装：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">helm install demo ./web-demo -n helm-lab --create-namespace --wait --timeout 3m
+</span></span></code></pre></td></tr></table>
+</div>
+</div><div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>参数</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>demo</code></td>
+<td>这次安装的 Release 名称</td>
+</tr>
+<tr>
+<td><code>./web-demo</code></td>
+<td>Chart 所在路径</td>
+</tr>
+<tr>
+<td><code>-n helm-lab</code></td>
+<td>安装到这个 namespace</td>
+</tr>
+<tr>
+<td><code>--create-namespace</code></td>
+<td>namespace 不存在时创建它</td>
+</tr>
+<tr>
+<td><code>--wait</code></td>
+<td>等待资源达到相应的就绪条件</td>
+</tr>
+<tr>
+<td><code>--timeout 3m</code></td>
+<td>设置等待相关操作的超时时间</td>
+</tr>
+</tbody>
+</table></div>
+<p>这里显式写 <code>--wait</code>，避免把“请求已提交”理解为“应用已就绪”。Helm 4 的等待策略与 Helm 3 不完全相同；就绪检查也不能覆盖所有业务功能。<a class="link" href="https://helm.sh/docs/helm/helm_install/"  target="_blank" rel="noopener"
+    >安装命令说明</a></p>
+<p>检查结果：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">helm list -n helm-lab
+</span></span><span class="line"><span class="cl">helm status demo -n helm-lab
+</span></span><span class="line"><span class="cl">kubectl get deployment,pods,service -n helm-lab
+</span></span><span class="line"><span class="cl">kubectl port-forward svc/demo-web 8080:80 -n helm-lab
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>保持最后一条命令运行，用浏览器打开 <code>http://localhost:8080</code>，应看到 Nginx 欢迎页面。前面的检查回答“资源是否存在、是否就绪”，浏览器访问进一步验证“请求能否得到响应”。按 <code>Ctrl+C</code> 停止端口转发，集群里的网站仍继续运行。</p>
+<h2 id="5-同一个-chart怎样部署多套环境">5. 同一个 Chart，怎样部署多套环境？
+</h2><p><a href="/zh-cn/p/helm-guide/values-layers.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/helm-guide/values-layers.svg" alt="values 的覆盖顺序与多环境配置" loading="lazy" decoding="async"></a>
+</p>
+<p>不要复制三套模板，先把差异放进文件。</p>
+<p><strong><code>values-dev.yaml</code>：</strong></p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">replicaCount</span><span class="p">:</span><span class="w"> </span><span class="m">1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">resources</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">requests</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="l">25m</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="l">32Mi</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p><strong><code>values-prod.yaml</code>：</strong></p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">replicaCount</span><span class="p">:</span><span class="w"> </span><span class="m">3</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">resources</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">requests</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="l">100m</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="l">64Mi</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">limits</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="l">500m</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="l">256Mi</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>这只是演示配置差异，文件名叫 <code>prod</code> 不代表已经具备生产环境需要的全部能力。</p>
+<p>对于本文没有子 Chart 的例子，配置优先级从低到高是：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">Chart 自带的 values.yaml
+</span></span><span class="line"><span class="cl">         ↓ 被覆盖
+</span></span><span class="line"><span class="cl">第一个 -f 文件
+</span></span><span class="line"><span class="cl">         ↓ 被覆盖
+</span></span><span class="line"><span class="cl">后续 -f 文件（越靠右优先级越高）
+</span></span><span class="line"><span class="cl">         ↓ 被覆盖
+</span></span><span class="line"><span class="cl">命令行 --set / --set-string 等显式参数
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>字典通常按键合并：开发配置只覆盖 <code>requests</code>，默认 <code>limits</code> 仍保留。列表通常整体替换，不要假设两个文件中的列表会自动追加。涉及依赖时，还要考虑父 Chart 对子 Chart 的覆盖。<a class="link" href="https://helm.sh/docs/chart_template_guide/values_files/"  target="_blank" rel="noopener"
+    >values 文件说明</a></p>
+<p>可以先验证覆盖效果：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">helm template demo ./web-demo -n helm-lab -f values-dev.yaml -f values-prod.yaml --set <span class="nv">replicaCount</span><span class="o">=</span><span class="m">2</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>最终副本数是 <strong>2</strong>，而资源配置来自生产文件覆盖后的结果。<code>--set</code> 适合数字、布尔值；镜像标签、版本号等希望严格按字符串处理的内容，使用 <code>--set-string</code> 更清楚。</p>
+<p>真正安装两套独立环境时，可以这样做：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">helm upgrade --install web-dev ./web-demo -n helm-dev --create-namespace -f values-dev.yaml --wait --timeout 3m
+</span></span><span class="line"><span class="cl">helm upgrade --install web-prod ./web-demo -n helm-prod --create-namespace -f values-prod.yaml --wait --timeout 3m
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p><code>upgrade --install</code> 表示有这个 Release 就升级，没有就安装，适合放进发布脚本。namespace 是逻辑划分；是否需要独立集群和更强的环境隔离，还要按实际要求决定。</p>
+<p><strong>每次发布应明确提供希望生效的环境配置。</strong> <code>--reuse-values</code> 可以继承已有 Release 的配置再合并新值，但也可能把早已忘记的旧参数带进来。团队交付时，把环境文件纳入版本管理，通常更容易追溯。<a class="link" href="https://helm.sh/docs/helm/helm_upgrade/"  target="_blank" rel="noopener"
+    >升级参数说明</a></p>
+<h2 id="6-升级失败和回滚helm-能恢复到哪里">6. 升级、失败和回滚：Helm 能恢复到哪里？
+</h2><p>回到第四节安装的 <code>demo</code>，把副本数改成 2：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">helm upgrade demo ./web-demo -n helm-lab --set <span class="nv">replicaCount</span><span class="o">=</span><span class="m">2</span> --wait --timeout 3m
+</span></span><span class="line"><span class="cl">kubectl get deployment demo-web -n helm-lab
+</span></span><span class="line"><span class="cl">helm <span class="nb">history</span> demo -n helm-lab
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>如果此前只安装过一次，这次成功升级后会产生 revision 2。这次只改副本数，Kubernetes 会调整 Pod 数量；以后如果修改的是 Pod 模板中的镜像等字段，则会触发 Deployment 的更新流程。Helm 并不是先删掉整个 namespace 再重装。</p>
+<p>排查“到底部署了什么”时，这两条很有用：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">helm get values demo -n helm-lab --all
+</span></span><span class="line"><span class="cl">helm get manifest demo -n helm-lab
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>前者查看包含默认值的计算后配置，后者查看 Release 保存的资源清单。<strong>保存的清单与集群当前对象不是一回事</strong>，其他控制器或人工操作可能已经改变了现场；看现场仍要用 <code>kubectl get</code>、<code>describe</code> 等命令。</p>
+<p><a href="/zh-cn/p/helm-guide/release-history.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/helm-guide/release-history.svg" alt="Release 修订历史与回滚：回到旧配置会产生新的 revision" loading="lazy" decoding="async"></a>
+</p>
+<p>先看历史，确认 revision 1 是要恢复的版本，再执行：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">helm rollback demo <span class="m">1</span> -n helm-lab --wait --timeout 3m
+</span></span><span class="line"><span class="cl">helm <span class="nb">history</span> demo -n helm-lab
+</span></span><span class="line"><span class="cl">kubectl get deployment demo-web -n helm-lab
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>按照上面的顺序，回滚后副本数恢复为 1，但最新历史编号是 <strong>revision 3</strong>。回滚的意思是把旧修订对应的配置重新应用到现在，并记录一次新的变更，而不是把历史编号倒退回 1。<a class="link" href="https://helm.sh/docs/helm/helm_rollback/"  target="_blank" rel="noopener"
+    >回滚命令说明</a></p>
+<p>失败时，先区分默认行为和额外选项：</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>场景</th>
+<th>应该怎样理解</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>普通升级失败</td>
+<td>不能假设自动恢复；可能已更新一部分资源，要检查状态</td>
+</tr>
+<tr>
+<td>Helm 3 使用 <code>--atomic</code></td>
+<td>失败升级会尝试回滚，并自动启用等待</td>
+</tr>
+<tr>
+<td>Helm 4 使用 <code>--rollback-on-failure</code></td>
+<td>明确表达失败恢复意图，并结合相应等待策略</td>
+</tr>
+<tr>
+<td>首次安装失败并启用上述选项</td>
+<td>没有旧版本可回，走失败安装的卸载或清理逻辑</td>
+</tr>
+</tbody>
+</table></div>
+<p>两种版本分别写成：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="c1"># Helm 3</span>
+</span></span><span class="line"><span class="cl">helm upgrade --install demo ./web-demo -n helm-lab --create-namespace --set <span class="nv">replicaCount</span><span class="o">=</span><span class="m">2</span> --atomic --wait --timeout 3m
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># Helm 4：上面命令的对应写法，按实际版本二选一</span>
+</span></span><span class="line"><span class="cl">helm upgrade --install demo ./web-demo -n helm-lab --create-namespace --set <span class="nv">replicaCount</span><span class="o">=</span><span class="m">2</span> --rollback-on-failure --wait --timeout 3m
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Helm 4 将 <code>--atomic</code> 更名为 <code>--rollback-on-failure</code>，旧名称属于弃用兼容项；新脚本使用新名称，并以所安装版本的 <code>helm upgrade --help</code> 为准。<strong>自动回滚也是一个可能失败的操作</strong>，例如权限不足、旧镜像不可下载或旧 API 已不可用。<a class="link" href="https://helm.sh/docs/overview/#cli-flags-renamed"  target="_blank" rel="noopener"
+    >Helm 4 参数变更</a></p>
+<p>更要紧的是，<strong>Helm 回滚不等于整个业务系统“时间倒流”。</strong></p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>通常可以恢复或尝试恢复</th>
+<th>不会顺带恢复</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>旧资源清单里的镜像引用</td>
+<td>已删除或被覆盖的镜像内容</td>
+</tr>
+<tr>
+<td>旧副本数、端口、环境参数</td>
+<td>数据库里已经写入或迁移的数据</td>
+</tr>
+<tr>
+<td>Helm 管理的资源配置</td>
+<td>外部服务状态、消息队列内容</td>
+</tr>
+<tr>
+<td>Chart 中的期望状态</td>
+<td>所有 hook 脚本造成的外部副作用</td>
+</tr>
+</tbody>
+</table></div>
+<p>数据库迁移需要兼容策略和备份，镜像需要可追溯的版本或 digest。Helm 管的是发布资源，不能替代这些恢复设计。</p>
+<p>另外，<code>helm test</code> 执行 Chart 定义的测试 hook，并不是 Helm 自带的一整套应用测试。本文最小 Chart 没有定义测试 hook，因此用浏览器访问验证。即使别的 Chart 定义了测试，如果在升级成功之后单独执行 <code>helm test</code> 才失败，前一条升级命令的失败回滚选项也不会追溯触发。<a class="link" href="https://helm.sh/docs/topics/chart_tests/"  target="_blank" rel="noopener"
+    >Chart 测试说明</a></p>
+<h2 id="7-使用现成-chart以及分发自己的-chart">7. 使用现成 Chart，以及分发自己的 Chart
+</h2><p>学习时手写最小 Chart 能看清原理，工作中也经常直接使用项目维护者提供的 Chart。基本路线是：<strong>确认来源 → 查看说明与参数 → 固定版本 → 预览资源 → 安装验证</strong>。</p>
+<p>分发通常有两种方式：</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>方式</th>
+<th>包存在哪里</th>
+<th>使用特点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>传统 Chart 仓库</td>
+<td>提供 <code>index.yaml</code> 和 Chart 包的 HTTP 服务</td>
+<td>用 <code>helm repo add</code> 注册，再搜索和安装</td>
+</tr>
+<tr>
+<td>OCI Registry</td>
+<td>支持 OCI 制品的仓库</td>
+<td>用 <code>oci://</code> 引用，可与镜像共用仓库服务</td>
+</tr>
+</tbody>
+</table></div>
+<p>如果维护者提供的是传统仓库，下面是命令形状。<code>example.com</code> 是占位域名，需要换成真实仓库；<code>--version</code> 固定的是 <strong>Chart 版本</strong>：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">helm repo add vendor https://charts.example.com
+</span></span><span class="line"><span class="cl">helm repo update
+</span></span><span class="line"><span class="cl">helm search repo vendor
+</span></span><span class="line"><span class="cl">helm show values vendor/example-app --version 1.2.3
+</span></span><span class="line"><span class="cl">helm template demo vendor/example-app --version 1.2.3 -f my-values.yaml
+</span></span><span class="line"><span class="cl">helm install demo vendor/example-app --version 1.2.3 -f my-values.yaml -n app-space --create-namespace --wait
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>不要把“某篇博客常用的镜像、仓库地址”当成永久有效的接口。Chart 仍在不在维护、镜像是否需要认证、许可证与默认配置是什么，都应该回到维护者文档确认。<a class="link" href="https://helm.sh/docs/intro/using_helm/"  target="_blank" rel="noopener"
+    >使用仓库中的 Chart</a></p>
+<p>自己的示例可以先在本地打包并预览，无需上传：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">helm package ./web-demo
+</span></span><span class="line"><span class="cl">helm show chart ./web-demo-0.1.0.tgz
+</span></span><span class="line"><span class="cl">helm template demo ./web-demo-0.1.0.tgz -n helm-lab
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>打包生成的 <code>.tgz</code> 就是可分发的 Chart 包。模板或默认配置发生变化后，应递增 Chart 的 <code>version</code>，避免相同版本号对应不同包内容。</p>
+<p>下面展示 OCI 推送与安装的形状，同样需要把占位地址替换为自己的仓库，并确保有权限：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">helm registry login registry.example.com
+</span></span><span class="line"><span class="cl">helm push web-demo-0.1.0.tgz oci://registry.example.com/charts
+</span></span><span class="line"><span class="cl">helm show values oci://registry.example.com/charts/web-demo --version 0.1.0
+</span></span><span class="line"><span class="cl">helm install demo oci://registry.example.com/charts/web-demo --version 0.1.0 -n helm-lab --create-namespace --wait
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>登录只写仓库主机名；推送目标不加 Chart 名和版本，Helm 会从包信息中推导它们。传统 <code>helm repo add</code> 和 OCI 引用是两套访问方式，不需要先把 OCI 地址加成传统仓库。<a class="link" href="https://helm.sh/docs/topics/registries/"  target="_blank" rel="noopener"
+    >OCI 官方说明</a></p>
+<p>Chart 如果还有依赖，会在 <code>Chart.yaml</code> 中声明 <code>dependencies</code>。开发时用 <code>helm dependency update</code> 解析依赖并生成或更新 <code>Chart.lock</code>，后续构建用 <code>helm dependency build</code> 根据锁文件还原依赖。锁定 Chart 依赖也不等于锁定所有容器镜像，镜像仍要单独管理。<a class="link" href="https://helm.sh/docs/topics/charts/#chart-dependencies"  target="_blank" rel="noopener"
+    >Chart 依赖说明</a></p>
+<h2 id="8-常见问题以及什么时候该用别的工具">8. 常见问题，以及什么时候该用别的工具
+</h2><p>先把几种检查的边界放在一起：</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>检查</th>
+<th>回答的问题</th>
+<th>仍然不能证明什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>helm lint</code></td>
+<td>Chart 结构、模板有没有常见问题</td>
+<td>真实权限和运行环境没问题</td>
+</tr>
+<tr>
+<td><code>helm template</code></td>
+<td>本次输入生成什么资源</td>
+<td>资源已经装到集群</td>
+</tr>
+<tr>
+<td>安装或升级时 <code>--wait</code></td>
+<td>资源是否满足相应就绪条件</td>
+<td>外部入口和完整业务都可用</td>
+</tr>
+<tr>
+<td>浏览器访问 / 冒烟测试</td>
+<td>某条请求链路是否工作</td>
+<td>所有业务路径都正确</td>
+</tr>
+<tr>
+<td>监控与持续探测</td>
+<td>上线后是否持续正常</td>
+<td>未来永远不会故障</td>
+</tr>
+</tbody>
+</table></div>
+<p>遇到问题，先定位停在哪一层：</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>现象</th>
+<th>优先看什么</th>
+<th>常见原因</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>YAML parse error</code></td>
+<td><code>helm template --debug</code> 的输出</td>
+<td>缩进、引号、模板生成了错误类型</td>
+</tr>
+<tr>
+<td><code>cannot re-use a name</code></td>
+<td>对应 namespace 的 <code>helm list --all</code></td>
+<td>同名 Release 已存在，可能应该升级</td>
+</tr>
+<tr>
+<td><code>release not found</code></td>
+<td>context、namespace、Release 名</td>
+<td>查错了集群或安装位置</td>
+</tr>
+<tr>
+<td><code>resource already exists</code></td>
+<td>现有对象的归属信息</td>
+<td>对象属于其他 Release 或由其他工具创建</td>
+</tr>
+<tr>
+<td>等待超时</td>
+<td>Pod 事件、镜像拉取、探针、配额</td>
+<td>应用没能达到就绪条件</td>
+</tr>
+<tr>
+<td>Service 没有可用后端</td>
+<td>selector、Pod 标签和 readiness</td>
+<td>路由没选中 Pod，或 Pod 尚未就绪</td>
+</tr>
+<tr>
+<td>配置修改没效果</td>
+<td><code>helm get values --all</code> 与渲染清单</td>
+<td>值被覆盖，或模板根本没使用它</td>
+</tr>
+</tbody>
+</table></div>
+<p>本文例子可以用这些命令定位：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">helm status demo -n helm-lab
+</span></span><span class="line"><span class="cl">helm <span class="nb">history</span> demo -n helm-lab
+</span></span><span class="line"><span class="cl">kubectl get pods -n helm-lab -l app.kubernetes.io/instance<span class="o">=</span>demo
+</span></span><span class="line"><span class="cl">kubectl describe deployment demo-web -n helm-lab
+</span></span><span class="line"><span class="cl">kubectl describe pods -n helm-lab -l app.kubernetes.io/instance<span class="o">=</span>demo
+</span></span><span class="line"><span class="cl">kubectl logs deployment/demo-web -n helm-lab --tail<span class="o">=</span><span class="m">100</span>
+</span></span><span class="line"><span class="cl">kubectl get events -n helm-lab --sort-by<span class="o">=</span>.metadata.creationTimestamp
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>还有几件容易被忽略的事：</p>
+<ul>
+<li><strong>values 文件不等于密钥保险箱。</strong> 敏感值可能进入 Release 记录、渲染输出和 CI 日志。不要把真实密码直接提交到公开仓库；根据环境使用外部 Secret 管理或经过设计的密文流程。安装、升级预演可能输出 Secret，注意输出范围。<a class="link" href="https://helm.sh/docs/helm/helm_upgrade/"  target="_blank" rel="noopener"
+    >命令输出说明</a></li>
+<li><strong>不要为了消除冲突就盲目接管资源。</strong> Helm 的归属检查是在防止误覆盖其他系统的对象。<code>--take-ownership</code> 会影响后续升级和卸载的管理范围，应该先弄清资源的负责人。<a class="link" href="https://helm.sh/docs/topics/advanced/#allow-helm-to-take-ownership-of-existing-resources"  target="_blank" rel="noopener"
+    >资源归属说明</a></li>
+<li><strong>卸载不保证所有东西都清空。</strong> <code>crds/</code> 中的 CRD 有特殊生命周期，hook 创建的对象也需要自己的删除策略；存储是否保留还受模板和存储回收策略影响。不要拿卸载作为数据备份或彻底擦除方案。<a class="link" href="https://helm.sh/docs/chart_best_practices/custom_resource_definitions/"  target="_blank" rel="noopener"
+    >CRD 说明</a>、<a class="link" href="https://helm.sh/docs/topics/charts_hooks/"  target="_blank" rel="noopener"
+    >Hook 生命周期</a></li>
+</ul>
+<p>完成练习后，按实际安装过的 Release 清理：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">helm uninstall demo -n helm-lab
+</span></span><span class="line"><span class="cl"><span class="c1"># 只有第五节也安装过这两套环境，才需要下面两条</span>
+</span></span><span class="line"><span class="cl">helm uninstall web-dev -n helm-dev
+</span></span><span class="line"><span class="cl">helm uninstall web-prod -n helm-prod
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这里移除的是 Release 管理的资源；通过 <code>--create-namespace</code> 创建的 namespace 不会因此自动删除。本文不包含持久化存储，涉及数据库的 Chart 则要先确认数据保留策略。<a class="link" href="https://helm.sh/docs/helm/helm_uninstall/"  target="_blank" rel="noopener"
+    >卸载命令说明</a></p>
+<p>最后，选工具可以看你主要在解决什么问题：</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>需求</th>
+<th>可以优先考虑</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>少量资源，配置很稳定</td>
+<td>原生 YAML + kubectl</td>
+</tr>
+<tr>
+<td>一组现有 YAML，需要对不同环境做补丁</td>
+<td>Kustomize</td>
+</tr>
+<tr>
+<td>把应用封装成可配置的包，重复安装与管理发布</td>
+<td>Helm</td>
+</tr>
+<tr>
+<td>持续让集群与 Git 中的配置保持一致</td>
+<td>Argo CD / Flux 等 GitOps 控制器</td>
+</tr>
+<tr>
+<td>数据库备份、故障切换等领域运维自动化</td>
+<td>对应的 Operator</td>
+</tr>
+</tbody>
+</table></div>
+<p>它们可以配合使用。<a class="link" href="https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/"  target="_blank" rel="noopener"
+    >Kustomize</a> 用于变换资源配置，<a class="link" href="https://kubernetes.io/docs/concepts/extend-kubernetes/operator/"  target="_blank" rel="noopener"
+    >Operator</a> 则把特定领域的运维知识写进控制器。例如 GitOps 控制器可以读取 Chart 和 values，但具体由谁维护发布状态，要看集成方式：<a class="link" href="https://argo-cd.readthedocs.io/en/stable/user-guide/helm/"  target="_blank" rel="noopener"
+    >Argo CD 主要让 Helm 渲染模板，应用生命周期由 Argo CD 管理</a>，不能默认都有相同的 <code>helm history</code>。</p>
+<p>把本文例子走一遍以后，再去看 <a class="link" href="/zh-cn/p/cicd-gitlab-ci-helm/" >CI/CD、GitLab CI 与 Helm</a>，就更容易理解为什么流水线要固定镜像、传入环境参数、检查部署结果，并明确失败时怎样恢复。</p>
+<p>继续阅读时，建议从 <a class="link" href="https://helm.sh/docs/"  target="_blank" rel="noopener"
+    >Helm 官方文档</a>、<a class="link" href="https://helm.sh/docs/chart_template_guide/"  target="_blank" rel="noopener"
+    >模板编写指南</a>、<a class="link" href="https://helm.sh/docs/overview/"  target="_blank" rel="noopener"
+    >Helm 4 迁移相关说明</a> 开始，特别注意文档显示的版本与本机 <code>helm version</code> 是否一致。</p>
+
+</div>
+
+            <footer class="article-footer">
+    
+        <div class="article-tags" aria-label="文章标签"><span class="article-footer-label">相关主题</span><a href="/zh-cn/tags/helm/">Helm</a><a href="/zh-cn/tags/kubernetes/">Kubernetes</a><a href="/zh-cn/tags/devops/">DevOps</a><a href="/zh-cn/tags/cloud-native/">Cloud Native</a></div>
+    
+    
+    
+    <div class="article-endnote"><span>感谢读到这里。</span><a href="#top">回到开头 <span aria-hidden="true">↑</span></a></div>
+</footer>
+
+        </div>
+    </div>
+    
+</article>
+
+        <div class="reading-afterword">
+            
+            
+    <aside class="reading-related">
+        <div class="reading-section-heading"><span class="article-footer-label">延伸阅读</span><span aria-hidden="true">↘</span></div>
+        
+            <a class="reading-related-link" href="/zh-cn/p/cicd-gitlab-ci-helm/"><span class="related-number">01</span><span class="related-title">CI/CD、GitLab CI 与 Helm：从代码提交到 Kubernetes 交付</span><time datetime="2026-10-17">2026.10.17</time><span class="related-arrow" aria-hidden="true">↗</span></a>
+        
+            <a class="reading-related-link" href="/zh-cn/p/k8s-container-cloud-deployment/"><span class="related-number">02</span><span class="related-title">K8s 容器云平台服务部署流程：从 Dockerfile 打包镜像到上线</span><time datetime="2026-09-03">2026.09.03</time><span class="related-arrow" aria-hidden="true">↗</span></a>
+        
+            <a class="reading-related-link" href="/zh-cn/p/kubernetes-from-docker/"><span class="related-number">03</span><span class="related-title">从 Docker 到 Kubernetes：面向 Docker 用户的 K8s 从 0 到 1 教程</span><time datetime="2026-08-08">2026.08.08</time><span class="related-arrow" aria-hidden="true">↗</span></a>
+        
+    </aside>
+
+
+            
+        </div>
+    </div>
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+    </main>
+    
+<footer class="site-footer">
+    <div class="footer-top"><a class="footer-wordmark" href="/zh-cn/" aria-label="Snow">Sno<span>w</span></a><p>认真记录，自由生长。</p><a href="#main-content" class="back-top">回到顶部 <span aria-hidden="true">↑</span></a></div>
+    <div class="footer-bottom"><span>© 2026 Snow</span><nav aria-label="更多链接"><a href="/zh-cn/about/">关于</a><a href="https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0" target="_blank" rel="noopener noreferrer me">Bilibili <span aria-hidden="true">↗</span></a><a href="https://github.com/SymphonyW" target="_blank" rel="noopener noreferrer me">GitHub <span aria-hidden="true">↗</span></a><a href="https://twitter.com" target="_blank" rel="noopener noreferrer me">Twitter <span aria-hidden="true">↗</span></a><a href="/zh-cn/index.xml">RSS ↗</a></nav><span class="footer-colophon">由 Hugo 构建 · 持续书写</span></div>
+</footer>
+
+    
+
+<script src="/ts/main.c86029ddb4aad8364879723acaf7efcd526e724d2381088d445aaf6f3ab1bfdf.js" defer></script>
+
+
+<script src="/ts/custom.6c99a7b037ac7e2bde801fbad26b9c20b3b18707868c164174142870ef3bc309.js" defer></script>
+
+
+
+
+
+<script>
+window.MathJax = {
+  tex: {
+    
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  svg: {
+    fontCache: 'global'
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
+
+</body>
+</html>

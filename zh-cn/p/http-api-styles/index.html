@@ -1,0 +1,1252 @@
+<!DOCTYPE html>
+<html lang="zh-cn" dir="ltr">
+<head>
+    <meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="用订单系统的请求示例和六张示意图，讲清 HTTP API 的基本结构、REST、RPC、JSON-RPC、gRPC、GraphQL、SOAP，以及 SSE、WebSocket、Webhook 的区别与适用场景。">
+<title>HTTP API 都有哪些设计方式？一文讲清 REST、RPC、GraphQL 与 SOAP</title>
+
+<link rel='canonical' href='https://SymphonyW.github.io/zh-cn/p/http-api-styles/'>
+<link rel="stylesheet" href="/scss/custom.min.919cf0d34f895fec4bc36912621fd0297f1439e1574bdf28d3195939a83690e8.css">
+<script>
+(() => {
+    let preference = 'auto';
+    try { preference = localStorage.getItem('StackColorScheme') || preference; } catch (_) {}
+    document.documentElement.dataset.scheme = preference === 'dark' || (preference === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+})();
+</script>
+
+<meta property='og:title' content="HTTP API 都有哪些设计方式？一文讲清 REST、RPC、GraphQL 与 SOAP">
+<meta property='og:description' content="用订单系统的请求示例和六张示意图，讲清 HTTP API 的基本结构、REST、RPC、JSON-RPC、gRPC、GraphQL、SOAP，以及 SSE、WebSocket、Webhook 的区别与适用场景。">
+<meta property='og:url' content='https://SymphonyW.github.io/zh-cn/p/http-api-styles/'>
+<meta property='og:site_name' content='Snow'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='HTTP' /><meta property='article:tag' content='API' /><meta property='article:tag' content='REST' /><meta property='article:tag' content='RPC' /><meta property='article:tag' content='GraphQL' /><meta property='article:tag' content='后端' /><meta property='article:published_time' content='2026-10-22T10:00:00&#43;08:00'/><meta property='article:modified_time' content='2026-10-22T10:00:00&#43;08:00'/><meta property='og:image' content='https://SymphonyW.github.io/zh-cn/p/http-api-styles/bg.png' />
+<meta name="twitter:title" content="HTTP API 都有哪些设计方式？一文讲清 REST、RPC、GraphQL 与 SOAP">
+<meta name="twitter:description" content="用订单系统的请求示例和六张示意图，讲清 HTTP API 的基本结构、REST、RPC、JSON-RPC、gRPC、GraphQL、SOAP，以及 SSE、WebSocket、Webhook 的区别与适用场景。"><meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content='https://SymphonyW.github.io/zh-cn/p/http-api-styles/bg.png' />
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    
+    <noscript><style>@media(max-width:760px){.site-header{position:static}.site-header__inner{height:auto;min-height:66px;flex-wrap:wrap}.site-nav{position:static;display:grid;order:3;flex-basis:100%;padding:8px 0 18px}.menu-toggle,.theme-toggle{display:none}}</style></noscript>
+</head>
+<body id="top" class="article-page">
+    <a class="skip-link" href="#main-content">跳至正文</a>
+    
+<header class="site-header">
+    <div class="site-header__inner">
+        <a class="site-brand" href="/zh-cn/" aria-label="Snow — 主页">S<span>now.</span></a>
+        <nav class="site-nav" id="site-navigation" aria-label="主导航">
+            
+            
+                
+                    
+                    
+                    <a href="/zh-cn/">主页</a>
+                
+            
+                
+                    
+                    
+                    <a href="/zh-cn/post/" aria-current="page">博客</a>
+                
+            
+                
+                    
+                    
+                    <a href="/zh-cn/archives/">归档</a>
+                
+            
+                
+                    
+                    
+                    <a href="/zh-cn/stats/">写作记录</a>
+                
+            
+                
+                    
+                    
+                    <a href="/zh-cn/diary/">日记</a>
+                
+            
+                
+            
+                
+                    
+                    
+                    <a href="/zh-cn/links/">链接</a>
+                
+            
+        </nav>
+        <div class="header-tools">
+            
+                <a class="language-link" href="/p/http-api-styles/" lang="en" hreflang="en" aria-label="Switch to English">EN</a>
+            
+            <button type="button" id="dark-mode-toggle" class="icon-button theme-toggle" aria-label="切换明暗主题" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><path d="M12 4.5a7.5 7.5 0 0 1 0 15z" fill="currentColor" stroke="none"/></svg></button>
+            <a class="icon-button search-link" href="/zh-cn/search/" aria-label="搜索文章"><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+</a>
+            <button class="icon-button menu-toggle" type="button" aria-expanded="false" aria-controls="site-navigation" aria-label="展开导航"><span></span><span></span></button>
+        </div>
+    </div>
+    <div class="reading-progress" aria-hidden="true"></div>
+</header>
+
+    <main id="main-content" class="site-main main" tabindex="-1">
+        
+    <div class="reading-page">
+        <article class="main-article has-toc">
+    <header class="article-header">
+    <div class="article-wayfinding">
+        
+            <a href="/zh-cn/post/"><span aria-hidden="true">←</span> 全部文章</a>
+        
+        <span class="article-kind">笔记与思考</span>
+    </div>
+    <div class="article-details">
+    
+    <h1 class="article-title">HTTP API 都有哪些设计方式？一文讲清 REST、RPC、GraphQL 与 SOAP</h1>
+    <p class="article-subtitle">用订单系统的请求示例和六张示意图，讲清 HTTP API 的基本结构、REST、RPC、JSON-RPC、gRPC、GraphQL、SOAP，以及 SSE、WebSocket、Webhook 的区别与适用场景。</p>
+    <div class="article-meta">
+        
+            <time datetime="2026-10-22T10:00:00&#43;08:00">2026 年 10 月 22 日</time>
+            <span class="meta-divider" aria-hidden="true">/</span>
+            <span>约 6 分钟</span>
+        
+        
+            <div class="article-translations"><a href="/p/http-api-styles/" hreflang="en" lang="en">Read in English <span aria-hidden="true">↗</span></a></div>
+        
+    </div>
+</div>
+
+</header>
+
+    <div class="reading-layout">
+        
+            <aside class="reading-margin" aria-label="文章目录">
+                <details class="article-toc" open>
+                    <summary><span>本文目录</span><span class="toc-indicator" aria-hidden="true">+</span></summary>
+                    <nav id="TableOfContents">
+  <ol>
+    <li><a href="#先把格式分清设计方式数据编码通信方式">先把“格式”分清：设计方式、数据编码、通信方式</a></li>
+    <li><a href="#rest把接口组织成对资源做操作">REST：把接口组织成“对资源做操作”</a></li>
+    <li><a href="#rpc把接口组织成调用远处的方法">RPC：把接口组织成“调用远处的方法”</a></li>
+    <li><a href="#graphql由客户端描述要哪些字段">GraphQL：由客户端描述“要哪些字段”</a></li>
+    <li><a href="#soap把消息装进有规则的-xml-信封">SOAP：把消息装进有规则的 XML 信封</a></li>
+    <li><a href="#持续更新与事件通知ssewebsocketwebhook">持续更新与事件通知：SSE、WebSocket、Webhook</a></li>
+    <li><a href="#实际项目怎么选还要约定哪些事">实际项目怎么选，还要约定哪些事？</a></li>
+    <li><a href="#参考资料">参考资料</a></li>
+  </ol>
+</nav>
+                </details>
+            </aside>
+        
+        <div class="reading-body">
+            <div class="article-content"><p>写前后端项目时，经常会遇到这些说法：“这个接口是 RESTful 的”“内部服务走 RPC”“前端用 GraphQL”“结果通过 SSE 流式返回”。它们都在描述程序之间的通信，但描述的并不是同一件事。</p>
+<p>要看懂这些名词，可以先抓住三个问题：<strong>请求是围绕资源组织，还是围绕动作组织？数据用什么格式表示？结果是一次返回，还是持续传递？</strong></p>
+<p><a href="/zh-cn/p/http-api-styles/bg.png" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/http-api-styles/bg.png" alt="HTTP API 设计概览：资源、远程方法和字段选择，都可以通过 HTTP 通信" width="1600" height="900" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="177" data-flex-basis="426px"></a>
+</p>
+<p>本文用一个订单系统贯穿讲解：查订单、创建订单、取消订单，以及接收订单状态变化。文中的域名和业务字段都是教学示例，不对应真实服务；除特别说明外，HTTP 示例采用便于阅读的 HTTP/1.1 文本写法，并省略长度等与讲解无关的字段。</p>
+<h2 id="先把格式分清设计方式数据编码通信方式">先把“格式”分清：设计方式、数据编码、通信方式
+</h2><p>严格说，REST、RPC、GraphQL、SOAP 并不是几种平级的“HTTP 数据格式”。日常把它们叫作 API 类型方便交流，但理解原理时，需要拆开来看。</p>
+<p><a href="/zh-cn/p/http-api-styles/api-layers.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/http-api-styles/api-layers.svg" alt="HTTP API 的几个维度：接口如何组织、消息如何传递、数据如何编码，以及如何描述契约" loading="lazy" decoding="async"></a>
+</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>你想知道什么</th>
+<th>对应概念</th>
+<th>具体例子</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>接口围绕什么组织</td>
+<td>设计思路</td>
+<td>REST 围绕资源，RPC 围绕远程方法</td>
+</tr>
+<tr>
+<td>客户端如何表达要取的数据</td>
+<td>查询语言与执行模型</td>
+<td>GraphQL 的字段选择、类型与执行规则</td>
+</tr>
+<tr>
+<td>消息遵循什么规则</td>
+<td>消息协议、框架</td>
+<td>JSON-RPC、SOAP；gRPC 还提供生成代码等配套能力</td>
+</tr>
+<tr>
+<td>消息如何传递</td>
+<td>通信协议或交互方式</td>
+<td>HTTP 请求响应、SSE、WebSocket、Webhook 回调</td>
+</tr>
+<tr>
+<td>消息中的数据如何表示</td>
+<td>数据格式与编码</td>
+<td>JSON、XML、Protocol Buffers</td>
+</tr>
+<tr>
+<td>双方如何约定参数和返回值</td>
+<td>接口描述与契约</td>
+<td>OpenAPI、<code>.proto</code>、GraphQL Schema、WSDL</td>
+</tr>
+</tbody>
+</table></div>
+<p>这些维度可以组合。例如，一个 API 可以采用<strong>资源式设计 + HTTP + JSON + OpenAPI 文档</strong>；另一个可以采用 <strong>RPC 思路 + gRPC + HTTP/2 + Protocol Buffers</strong>。JSON-RPC 本身也不绑定 HTTP，可以通过其他通道传递。</p>
+<p>其中，JSON 是一种文本数据交换格式，不负责规定 URL、调用方法或错误语义；OpenAPI 则用来描述 HTTP 接口，不能据此判断接口一定符合 REST。<a class="link" href="https://www.rfc-editor.org/rfc/rfc8259.html"  target="_blank" rel="noopener"
+    >JSON 标准</a>、<a class="link" href="https://spec.openapis.org/oas/latest.html"  target="_blank" rel="noopener"
+    >OpenAPI 规范</a></p>
+<p><strong>HTTP 请求先长什么样？</strong></p>
+<p>不管上层如何设计，只要通过 HTTP 调用，通常都要面对方法、地址、请求头和消息体这些元素：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-http" data-lang="http"><span class="line"><span class="cl"><span class="nf">POST</span> <span class="nn">/orders</span> <span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span>
+</span></span><span class="line"><span class="cl"><span class="n">Host</span><span class="o">:</span> <span class="l">api.example.com</span>
+</span></span><span class="line"><span class="cl"><span class="n">Authorization</span><span class="o">:</span> <span class="l">Bearer example-token</span>
+</span></span><span class="line"><span class="cl"><span class="n">Content-Type</span><span class="o">:</span> <span class="l">application/json</span>
+</span></span><span class="line"><span class="cl"><span class="n">Accept</span><span class="o">:</span> <span class="l">application/json</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;product_id&#34;</span><span class="p">:</span> <span class="s2">&#34;P100&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;quantity&#34;</span><span class="p">:</span> <span class="mi">2</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>部分</th>
+<th>示例</th>
+<th>负责什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>方法</td>
+<td><code>POST</code></td>
+<td>表达这次 HTTP 请求的语义</td>
+</tr>
+<tr>
+<td>路径</td>
+<td><code>/orders</code></td>
+<td>定位接口或资源</td>
+</tr>
+<tr>
+<td>查询参数</td>
+<td><code>?status=paid&amp;limit=20</code></td>
+<td>这里约定用于筛选、分页等</td>
+</tr>
+<tr>
+<td>请求头</td>
+<td><code>Authorization</code>、<code>Content-Type</code></td>
+<td>携带身份、消息体格式等信息</td>
+</tr>
+<tr>
+<td>消息体</td>
+<td>产品编号、数量</td>
+<td>携带本次提交的数据</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>Content-Type</code> 表示“我发来的内容是什么格式”，<code>Accept</code> 表示“我希望收到什么格式”。API 的请求体也可以是表单、上传文件用的 <code>multipart/form-data</code>、XML 或二进制数据，并不一定是 JSON。</p>
+<p>服务器可以返回：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-http" data-lang="http"><span class="line"><span class="cl"><span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span> <span class="m">201</span> <span class="ne">Created</span>
+</span></span><span class="line"><span class="cl"><span class="n">Content-Type</span><span class="o">:</span> <span class="l">application/json</span>
+</span></span><span class="line"><span class="cl"><span class="n">Location</span><span class="o">:</span> <span class="l">/orders/1001</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;id&#34;</span><span class="p">:</span> <span class="s2">&#34;1001&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;status&#34;</span><span class="p">:</span> <span class="s2">&#34;pending&#34;</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这里的 <code>201</code> 说明创建成功，<code>Location</code> 指向新建的订单。HTTP/2、HTTP/3 在线路上的报文组织方式与上面的文本不同，但方法、状态码等语义仍然适用。HTTP 是应用层协议；下面说它“承载 API”，是在描述它与接口设计之间的关系。<a class="link" href="https://www.rfc-editor.org/rfc/rfc9110.html"  target="_blank" rel="noopener"
+    >HTTP 语义标准</a></p>
+<h2 id="rest把接口组织成对资源做操作">REST：把接口组织成“对资源做操作”
+</h2><p>REST 的全称是 Representational State Transfer，通常译为“表述性状态转移”。初学时，可以先理解为：<strong>用地址标识资源，通过资源的表示来读取或改变它的状态，并遵循统一的交互规则。</strong></p>
+<p>订单、用户、商品都可以是资源。客户端拿到的 JSON，是订单在这次响应中的一种表示，并不等于数据库表本身。</p>
+<p><a href="/zh-cn/p/http-api-styles/request-styles.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/http-api-styles/request-styles.svg" alt="同一个订单需求的不同表达：REST 访问资源，RPC 调用方法，GraphQL 选择字段" loading="lazy" decoding="async"></a>
+</p>
+<p><strong>最常见的资源式 HTTP API</strong></p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>需求</th>
+<th>常见写法</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>查询订单列表</td>
+<td><code>GET /orders?status=paid</code></td>
+<td>在集合上筛选</td>
+</tr>
+<tr>
+<td>查询订单详情</td>
+<td><code>GET /orders/1001</code></td>
+<td>读取一个订单</td>
+</tr>
+<tr>
+<td>创建订单</td>
+<td><code>POST /orders</code></td>
+<td>向集合提交创建请求</td>
+</tr>
+<tr>
+<td>整体替换订单表示</td>
+<td><code>PUT /orders/1001</code></td>
+<td>按接口约定提交完整的可写表示</td>
+</tr>
+<tr>
+<td>修改部分字段</td>
+<td><code>PATCH /orders/1001</code></td>
+<td>使用约定的补丁格式</td>
+</tr>
+<tr>
+<td>删除订单资源</td>
+<td><code>DELETE /orders/1001</code></td>
+<td>请求删除，不代表业务上允许删除</td>
+</tr>
+</tbody>
+</table></div>
+<p>这里的重点是<strong>地址负责标识资源，方法表达操作语义</strong>。但 REST 并不规定 URL 必须用英文复数，也不要求响应必须是 JSON；这些是常见工程约定。</p>
+<p><strong>REST 不只是给 URL 换成名词</strong></p>
+<p>Fielding 提出的 REST 有一组架构约束，下面用日常开发中的说法解释：</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>约束</th>
+<th>通俗理解</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>客户端与服务器分离</td>
+<td>展示界面与服务端实现可以分别演进</td>
+</tr>
+<tr>
+<td>无状态通信</td>
+<td>每个请求带齐理解它所需的信息，不依赖上一次请求留下的会话上下文</td>
+</tr>
+<tr>
+<td>可缓存性</td>
+<td>响应应表明能否缓存、如何复用，不是所有响应都要缓存</td>
+</tr>
+<tr>
+<td>统一接口</td>
+<td>识别资源、通过表示操作资源，消息能被理解，并提供可推进业务的超媒体控制</td>
+</tr>
+<tr>
+<td>分层系统</td>
+<td>客户端可以通过网关等中间层访问服务</td>
+</tr>
+<tr>
+<td>按需代码，可选</td>
+<td>必要时向客户端提供可执行代码</td>
+</tr>
+</tbody>
+</table></div>
+<p>“无状态”不等于“服务器不能用数据库”，也不等于“必须用 JWT”。订单数据当然可以保存在服务器；约束关注的是通信所依赖的会话状态。</p>
+<p>统一接口里的<strong>超媒体控制</strong>，可以理解成：返回结果不仅给数据，还告诉客户端接下来可以做什么。例如，一个订单表示可以带上取消操作的链接。链接的含义、允许的方法和提交格式也要由双方理解的媒体类型或契约约定。</p>
+<p>很多工程里的“REST API”，实际上主要实现了资源命名、HTTP 方法和状态码。称为“资源式 HTTP API”往往更准确。判断是否符合完整 REST，不能只检查路径里有没有动词。<a class="link" href="https://ics.uci.edu/~fielding/pubs/dissertation/rest_arch_style.htm"  target="_blank" rel="noopener"
+    >REST 原始论述，第 5 章</a></p>
+<p><strong>取消订单，究竟该怎么写？</strong></p>
+<p>取消订单通常不是删除订单。订单还要保留，以便展示历史、退款或审计。可以有几种合理设计：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-http" data-lang="http"><span class="line"><span class="cl"><span class="nf">POST</span> <span class="nn">/orders/1001/cancellations</span> <span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span>
+</span></span><span class="line"><span class="cl"><span class="n">Host</span><span class="o">:</span> <span class="l">api.example.com</span>
+</span></span><span class="line"><span class="cl"><span class="n">Content-Type</span><span class="o">:</span> <span class="l">application/json</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;reason&#34;</span><span class="p">:</span> <span class="s2">&#34;ordered_by_mistake&#34;</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这里把“取消申请”建模成子资源，便于给它单独的编号、状态和审核过程。</p>
+<p>如果取消只是简单的状态变更，也可以提供明确约定的补丁：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-http" data-lang="http"><span class="line"><span class="cl"><span class="nf">PATCH</span> <span class="nn">/orders/1001</span> <span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span>
+</span></span><span class="line"><span class="cl"><span class="n">Host</span><span class="o">:</span> <span class="l">api.example.com</span>
+</span></span><span class="line"><span class="cl"><span class="n">Content-Type</span><span class="o">:</span> <span class="l">application/merge-patch+json</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;status&#34;</span><span class="p">:</span> <span class="s2">&#34;cancelled&#34;</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>服务端仍然要检查当前状态是否允许取消，不能把客户端提交的状态直接写入数据库。如果你采用 <code>POST /orders/1001/cancel</code> 这种动作接口，也应把它的业务含义讲清楚，不必为“URL 看起来纯不纯”牺牲可读性。<code>PATCH</code> 的含义是应用局部修改，具体如何修改由补丁格式决定。<a class="link" href="https://www.rfc-editor.org/rfc/rfc5789.html"  target="_blank" rel="noopener"
+    >PATCH 标准</a>、<a class="link" href="https://www.rfc-editor.org/rfc/rfc7396.html"  target="_blank" rel="noopener"
+    >JSON Merge Patch 标准</a></p>
+<p><strong>安全、幂等、缓存，是三回事</strong></p>
+<p>“安全”在 HTTP 方法语义里指客户端不请求改变服务器状态，并不是说接口没有安全漏洞。查询仍然可能产生日志等附带效果。</p>
+<p>“幂等”指同一个请求执行一次和多次，预期对服务器产生的效果相同。例如，重复请求删除同一个订单，第一次返回 <code>204</code>，第二次返回 <code>404</code>，仍然可以是幂等的，因为订单最终都处于不存在的状态。</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>方法</th>
+<th>安全</th>
+<th>按方法定义是否幂等</th>
+<th>需要注意</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET</code></td>
+<td>是</td>
+<td>是</td>
+<td>不应用于触发取消、转账等操作</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td>否</td>
+<td>不保证</td>
+<td>可以通过业务机制实现重复请求去重</td>
+</tr>
+<tr>
+<td><code>PUT</code></td>
+<td>否</td>
+<td>是</td>
+<td>表达创建或替换目标资源的状态</td>
+</tr>
+<tr>
+<td><code>PATCH</code></td>
+<td>否</td>
+<td>不保证</td>
+<td>“设为 2”与“增加 2”的重复执行效果不同</td>
+</tr>
+<tr>
+<td><code>DELETE</code></td>
+<td>否</td>
+<td>是</td>
+<td>幂等不要求每次响应完全相同</td>
+</tr>
+</tbody>
+</table></div>
+<p>幂等性来自操作语义和服务端实现，不能靠把方法名改成 <code>PUT</code> 就获得。网络超时后也不能不加区分地重试所有请求。<a class="link" href="https://www.rfc-editor.org/rfc/rfc9110.html#section-9.2"  target="_blank" rel="noopener"
+    >HTTP 安全与幂等语义</a></p>
+<p>缓存则回答“能不能复用之前的响应”。例如，某个订单响应可以按权限设计为：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-http" data-lang="http"><span class="line"><span class="cl"><span class="err">Cache-Control: private, max-age=30
+</span></span></span><span class="line"><span class="cl"><span class="err">ETag: &#34;order-1001-v3&#34;
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>客户端之后带上 <code>If-None-Match: &quot;order-1001-v3&quot;</code>，资源表示未变化时可以收到 <code>304 Not Modified</code>。<code>private</code> 表示只允许私有缓存存储，不能放进共享缓存；敏感数据是否应存储，还要由具体策略决定。使用 <code>GET</code> 并不意味着响应自动可以被任意 CDN 缓存。<a class="link" href="https://www.rfc-editor.org/rfc/rfc9111.html"  target="_blank" rel="noopener"
+    >HTTP 缓存标准</a></p>
+<h2 id="rpc把接口组织成调用远处的方法">RPC：把接口组织成“调用远处的方法”
+</h2><p>RPC 是 Remote Procedure Call，也就是远程过程调用。它更接近这样的表达：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">GetOrder(id=&#34;1001&#34;)
+</span></span><span class="line"><span class="cl">CreateOrder(product_id=&#34;P100&#34;, quantity=2)
+</span></span><span class="line"><span class="cl">CancelOrder(id=&#34;1001&#34;, reason=&#34;ordered_by_mistake&#34;)
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>REST 让你先想“资源是什么”，RPC 让你先想“需要执行什么动作”。在“计算运费”“生成报表”“审核申请”这类业务里，方法式表达往往很直观。</p>
+<p><strong>普通的 HTTP RPC</strong></p>
+<p>RPC 不一定需要专门的框架。下面就是一种常见的、由团队自行约定的 HTTP RPC：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-http" data-lang="http"><span class="line"><span class="cl"><span class="nf">POST</span> <span class="nn">/rpc/order.cancel</span> <span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span>
+</span></span><span class="line"><span class="cl"><span class="n">Host</span><span class="o">:</span> <span class="l">api.example.com</span>
+</span></span><span class="line"><span class="cl"><span class="n">Content-Type</span><span class="o">:</span> <span class="l">application/json</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;order_id&#34;</span><span class="p">:</span> <span class="s2">&#34;1001&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;reason&#34;</span><span class="p">:</span> <span class="s2">&#34;ordered_by_mistake&#34;</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>也可以设计成 <code>/OrderService/CancelOrder</code>。RPC 这个概念本身没有规定 URL 的唯一写法，更没有规定一定走 TCP、一定用二进制或一定比 REST 快。</p>
+<p>当所有请求都走一个入口时，网关和监控通常还需要读取方法名，才能区分“查询订单”和“取消订单”，为不同操作分别限流、授权和统计错误。</p>
+<p><strong>JSON-RPC：把方法调用的消息结构标准化</strong></p>
+<p>普通 HTTP RPC 的字段可能每家都不同。JSON-RPC 2.0 则规定了请求和响应的消息结构。例如：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-http" data-lang="http"><span class="line"><span class="cl"><span class="nf">POST</span> <span class="nn">/rpc</span> <span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span>
+</span></span><span class="line"><span class="cl"><span class="n">Host</span><span class="o">:</span> <span class="l">api.example.com</span>
+</span></span><span class="line"><span class="cl"><span class="n">Content-Type</span><span class="o">:</span> <span class="l">application/json</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;jsonrpc&#34;</span><span class="p">:</span> <span class="s2">&#34;2.0&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;method&#34;</span><span class="p">:</span> <span class="s2">&#34;order.cancel&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;params&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;order_id&#34;</span><span class="p">:</span> <span class="s2">&#34;1001&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;reason&#34;</span><span class="p">:</span> <span class="s2">&#34;ordered_by_mistake&#34;</span>
+</span></span><span class="line"><span class="cl">  <span class="p">},</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;id&#34;</span><span class="p">:</span> <span class="mi">7</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>成功响应：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;jsonrpc&#34;</span><span class="p">:</span> <span class="s2">&#34;2.0&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;result&#34;</span><span class="p">:</span> <span class="p">{</span> <span class="nt">&#34;order_id&#34;</span><span class="p">:</span> <span class="s2">&#34;1001&#34;</span><span class="p">,</span> <span class="nt">&#34;status&#34;</span><span class="p">:</span> <span class="s2">&#34;cancelled&#34;</span> <span class="p">},</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;id&#34;</span><span class="p">:</span> <span class="mi">7</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>失败响应，例如参数不符合方法要求：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;jsonrpc&#34;</span><span class="p">:</span> <span class="s2">&#34;2.0&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;error&#34;</span><span class="p">:</span> <span class="p">{</span> <span class="nt">&#34;code&#34;</span><span class="p">:</span> <span class="mi">-32602</span><span class="p">,</span> <span class="nt">&#34;message&#34;</span><span class="p">:</span> <span class="s2">&#34;Invalid params&#34;</span> <span class="p">},</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;id&#34;</span><span class="p">:</span> <span class="mi">7</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>其中，<code>id</code> 用来把响应对应到请求；它不是业务去重键。成功用 <code>result</code>，失败用 <code>error</code>，两者不能同时出现。省略 <code>id</code> 的调用称为 notification，服务端不返回 JSON-RPC 响应；如果通过 HTTP 传递，仍然需要结束这次 HTTP 交互，只是不携带 JSON-RPC 响应对象。</p>
+<p>JSON-RPC 还定义了批量调用。需要注意，批量不代表事务，也不保证按数组顺序执行或返回；要用 <code>id</code> 关联结果。HTTP 状态码如何映射也不是 JSON-RPC 核心规范统一规定的。<a class="link" href="https://www.jsonrpc.org/specification"  target="_blank" rel="noopener"
+    >JSON-RPC 2.0 规范</a></p>
+<p><strong>gRPC：围绕契约生成调用代码</strong></p>
+<p>gRPC 是 RPC 框架。典型用法是先写 <code>.proto</code> 文件，约定服务、方法和消息字段，再生成客户端与服务端代码。例如：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-protobuf" data-lang="protobuf"><span class="line"><span class="cl"><span class="n">syntax</span> <span class="o">=</span> <span class="s">&#34;proto3&#34;</span><span class="p">;</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="kn">package</span> <span class="nn">shop</span><span class="p">;</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="kd">service</span> <span class="n">OrderService</span> <span class="p">{</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span>  <span class="k">rpc</span> <span class="n">GetOrder</span> <span class="p">(</span><span class="n">GetOrderRequest</span><span class="p">)</span> <span class="k">returns</span> <span class="p">(</span><span class="n">Order</span><span class="p">);</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span>  <span class="k">rpc</span> <span class="n">CancelOrder</span> <span class="p">(</span><span class="n">CancelOrderRequest</span><span class="p">)</span> <span class="k">returns</span> <span class="p">(</span><span class="n">Order</span><span class="p">);</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="p">}</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="kd">message</span> <span class="nc">GetOrderRequest</span> <span class="p">{</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span>  <span class="kt">string</span> <span class="n">order_id</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="p">}</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="kd">message</span> <span class="nc">CancelOrderRequest</span> <span class="p">{</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span>  <span class="kt">string</span> <span class="n">order_id</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span>  <span class="kt">string</span> <span class="n">reason</span> <span class="o">=</span> <span class="mi">2</span><span class="p">;</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="p">}</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="kd">message</span> <span class="nc">Order</span> <span class="p">{</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span>  <span class="kt">string</span> <span class="n">id</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span>  <span class="kt">string</span> <span class="n">status</span> <span class="o">=</span> <span class="mi">2</span><span class="p">;</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="p">}</span><span class="err">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>这里 <code>= 1</code>、<code>= 2</code> 是字段编号，不是默认值。双方通过同一份定义理解字段，Protocol Buffers 默认用二进制编码消息。</p>
+<p><a href="/zh-cn/p/http-api-styles/grpc-flow.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/http-api-styles/grpc-flow.svg" alt="gRPC 调用流程：共享 proto 契约、生成两端代码，经 HTTP/2 传递编码后的消息" loading="lazy" decoding="async"></a>
+</p>
+<p>原生 gRPC 的常见协议映射使用 HTTP/2，方法路径类似 <code>/shop.OrderService/GetOrder</code>，内容类型常见为 <code>application/grpc</code>。它支持四种调用：一次请求一次响应、服务端流、客户端流、双向流。<a class="link" href="https://grpc.io/docs/what-is-grpc/core-concepts/"  target="_blank" rel="noopener"
+    >gRPC 核心概念</a></p>
+<p>因此，<strong>“RPC 和 HTTP 是二选一”不成立，gRPC 本身就是反例</strong>。但原生 gRPC 也不是往普通 URL 发一段 JSON 就能调用：消息有分帧规则，调用结果通常还要读取结尾元数据中的 <code>grpc-status</code>。收到 HTTP <code>200</code>，不代表远程方法执行成功。<a class="link" href="https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md"  target="_blank" rel="noopener"
+    >gRPC 的 HTTP/2 协议映射</a></p>
+<p>浏览器接入时通常要用 gRPC-Web 或适配网关，不能直接把浏览器支持 HTTP/2 等同于支持原生 gRPC 的所有能力。具体流式能力取决于所选客户端和部署方式。<a class="link" href="https://github.com/grpc/grpc-web"  target="_blank" rel="noopener"
+    >gRPC-Web 项目说明</a></p>
+<p>它适合需要明确契约、跨语言协作和代码生成的服务通信；代价是要维护生成流程、兼容性和对应的调试工具。性能是否更好，要用真实消息大小、网络和调用链测试，不能只根据名字判断。</p>
+<p><strong>远程方法长得像本地方法，但会跨网络</strong></p>
+<p>设想你发送取消请求，服务端已经完成取消，但响应在网络中丢了。客户端看到的只是超时，不能据此断言“服务端没有执行”。</p>
+<p>如果操作是扣款，直接重试可能产生重复扣款。业务可以约定一个幂等键，并由服务端持久化去重和结果；还要定义键的作用范围、有效期、并发处理方式，以及同一个键对应不同参数时怎么办。这个问题同样存在于 REST、GraphQL 和 SOAP 中。</p>
+<h2 id="graphql由客户端描述要哪些字段">GraphQL：由客户端描述“要哪些字段”
+</h2><p>假设订单详情页需要订单编号、状态和收货人姓名。一个固定字段的 REST 接口可能返回大量暂时用不到的数据，也可能需要客户端再请求用户信息。</p>
+<p>GraphQL 允许客户端按照服务端定义的类型和关系，选择这次需要的字段：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span><span class="lnt">9
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-graphql" data-lang="graphql"><span class="line"><span class="cl"><span class="kd">query</span><span class="w"> </span><span class="nc">OrderDetail</span><span class="p">(</span><span class="nv">$id</span><span class="p">:</span><span class="w"> </span><span class="nc">ID</span><span class="p">!)</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="py">order</span><span class="p">(</span><span class="py">id</span><span class="p">:</span><span class="w"> </span><span class="nv">$id</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nc">id</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="py">status</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="py">customer</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="py">name</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="p">}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="p">}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">}</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>这里假设服务端的 Schema 已经定义了 <code>order</code> 和 <code>customer</code> 等字段。GraphQL 不是客户端随意执行的 SQL，客户端只能访问 Schema 暴露且权限允许的数据。</p>
+<p>通过 HTTP 发送时，常见写法是：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-http" data-lang="http"><span class="line"><span class="cl"><span class="nf">POST</span> <span class="nn">/graphql</span> <span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span>
+</span></span><span class="line"><span class="cl"><span class="n">Host</span><span class="o">:</span> <span class="l">api.example.com</span>
+</span></span><span class="line"><span class="cl"><span class="n">Content-Type</span><span class="o">:</span> <span class="l">application/json</span>
+</span></span><span class="line"><span class="cl"><span class="n">Accept</span><span class="o">:</span> <span class="l">application/graphql-response+json</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;query&#34;</span><span class="p">:</span> <span class="s2">&#34;query OrderDetail($id: ID!) { order(id: $id) { id status customer { name } } }&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;variables&#34;</span><span class="p">:</span> <span class="p">{</span> <span class="nt">&#34;id&#34;</span><span class="p">:</span> <span class="s2">&#34;1001&#34;</span> <span class="p">},</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;operationName&#34;</span><span class="p">:</span> <span class="s2">&#34;OrderDetail&#34;</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>GraphQL 通常使用单个入口，但 <code>/graphql</code> 只是惯例。查询可以通过 <code>POST</code> 传递，服务端也可以支持 <code>GET</code> 查询；修改操作 mutation 不能通过 <code>GET</code> 执行。GraphQL 本身不绑定 HTTP，而 GraphQL over HTTP 对它在 HTTP 上的使用作进一步约定；截至本文写作时，后者仍标为草案。<a class="link" href="https://graphql.org/learn/serving-over-http/"  target="_blank" rel="noopener"
+    >GraphQL over HTTP 官方说明</a></p>
+<p>典型返回如下，形状与选择的字段相对应：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span><span class="lnt">9
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;data&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;order&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">      <span class="nt">&#34;id&#34;</span><span class="p">:</span> <span class="s2">&#34;1001&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">      <span class="nt">&#34;status&#34;</span><span class="p">:</span> <span class="s2">&#34;paid&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">      <span class="nt">&#34;customer&#34;</span><span class="p">:</span> <span class="p">{</span> <span class="nt">&#34;name&#34;</span><span class="p">:</span> <span class="s2">&#34;小林&#34;</span> <span class="p">}</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl">  <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>修改订单则使用 <code>mutation</code>，例如在服务端已定义相应字段的前提下：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-graphql" data-lang="graphql"><span class="line"><span class="cl"><span class="kd">mutation</span><span class="w"> </span><span class="nc">CancelOrder</span><span class="p">(</span><span class="nv">$id</span><span class="p">:</span><span class="w"> </span><span class="nc">ID</span><span class="p">!)</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="py">cancelOrder</span><span class="p">(</span><span class="py">id</span><span class="p">:</span><span class="w"> </span><span class="nv">$id</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nc">id</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="py">status</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="p">}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">}</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>可以看到，GraphQL 的查询很强调数据形状，mutation 又常常采用动作式表达。它和 REST、RPC 的关系，不是简单地把 URL 换个写法。</p>
+<p><strong>一次 HTTP 请求，不等于后端只查一次</strong></p>
+<p>如果查询 20 个订单，每个订单再取一个客户，而服务端逐个查询客户，就可能执行 1 次订单查询加 20 次客户查询，这就是常说的 N+1 问题。减少浏览器请求次数，未必减少数据库访问次数。</p>
+<p>工程上通常需要批量加载、合理分页、查询复杂度控制和逐字段授权。GraphQL 不会自动解决这些问题。<a class="link" href="https://graphql.org/learn/performance/"  target="_blank" rel="noopener"
+    >GraphQL 性能说明</a></p>
+<p><strong>也不是“所有结果都返回 200”</strong></p>
+<p>GraphQL 响应可以同时含有 <code>data</code> 和 <code>errors</code>：例如订单基本信息成功返回，而某个可空的附属字段获取失败。客户端需要检查错误及受影响字段，不能把 HTTP 成功简单当成所有数据都完整。<a class="link" href="https://graphql.org/learn/response/"  target="_blank" rel="noopener"
+    >GraphQL 响应规则</a></p>
+<p>无效请求、执行前验证失败、服务器故障和部分字段失败，处理方式不同；使用 <code>application/json</code> 还是 <code>application/graphql-response+json</code> 也会影响状态码约定。接入时应以服务端的媒体类型、实现和契约为准。<a class="link" href="https://graphql.org/learn/debug-errors/"  target="_blank" rel="noopener"
+    >GraphQL HTTP 错误说明</a></p>
+<p>如果不同客户端对字段组合的需求差异大，GraphQL 值得考虑；如果只是几个稳定的查询和提交表单，资源式 HTTP API 或简单 RPC 往往更容易维护。这是根据需求作出的工程判断，并不是协议的优劣排名。</p>
+<h2 id="soap把消息装进有规则的-xml-信封">SOAP：把消息装进有规则的 XML 信封
+</h2><p>SOAP 是一种消息协议。它常见于已有企业系统的对接，使用 XML 表示消息，并定义 Envelope、Header、Body、Fault 等结构。它可以承载 RPC 风格调用，也可以传递文档，不能简单理解为“用 XML 写的 REST”。<a class="link" href="https://www.w3.org/TR/soap12-part1/"  target="_blank" rel="noopener"
+    >SOAP 1.2 消息框架</a></p>
+<p>例如，一次 SOAP 1.2 的查询请求可以长这样：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-http" data-lang="http"><span class="line"><span class="cl"><span class="nf">POST</span> <span class="nn">/OrderService</span> <span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span>
+</span></span><span class="line"><span class="cl"><span class="n">Host</span><span class="o">:</span> <span class="l">api.example.com</span>
+</span></span><span class="line"><span class="cl"><span class="n">Content-Type</span><span class="o">:</span> <span class="l">application/soap+xml; charset=utf-8; action=&#34;urn:shop:GetOrder&#34;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="cp">&lt;?xml version=&#34;1.0&#34; encoding=&#34;utf-8&#34;?&gt;</span>
+</span></span><span class="line"><span class="cl"><span class="nt">&lt;soap:Envelope</span> <span class="na">xmlns:soap=</span><span class="s">&#34;http://www.w3.org/2003/05/soap-envelope&#34;</span>
+</span></span><span class="line"><span class="cl">               <span class="na">xmlns:shop=</span><span class="s">&#34;urn:shop&#34;</span><span class="nt">&gt;</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&lt;soap:Body&gt;</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&lt;shop:GetOrder&gt;</span>
+</span></span><span class="line"><span class="cl">      <span class="nt">&lt;shop:orderId&gt;</span>1001<span class="nt">&lt;/shop:orderId&gt;</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&lt;/shop:GetOrder&gt;</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&lt;/soap:Body&gt;</span>
+</span></span><span class="line"><span class="cl"><span class="nt">&lt;/soap:Envelope&gt;</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>可以把它理解成：HTTP 负责这次请求响应，SOAP 规定消息信封，<code>GetOrder</code> 则是这个业务契约里的内容。上面使用的是 SOAP 1.2；不要把它的命名空间、媒体类型与 SOAP 1.1 的写法混用。<a class="link" href="https://www.w3.org/TR/soap12-part2/#soapinhttp"  target="_blank" rel="noopener"
+    >SOAP 1.2 HTTP 绑定</a></p>
+<p>SOAP 服务常配合 WSDL 描述服务契约，便于生成调用代码；这属于配套体系，不代表每个 SOAP 消息都必须附带 WSDL，也不代表使用 SOAP 就自动拥有可靠投递、事务或完善的安全策略。<a class="link" href="https://www.w3.org/TR/wsdl20-primer/"  target="_blank" rel="noopener"
+    >WSDL 2.0 入门</a></p>
+<p>如果对接方已经提供 SOAP/WSDL，优先按对方契约接入。新项目是否选择它，主要取决于合作方要求、现有工具链和维护成本，不必因为消息看起来长就否定它，也不必因为规范多就认为它天然更安全。</p>
+<h2 id="持续更新与事件通知ssewebsocketwebhook">持续更新与事件通知：SSE、WebSocket、Webhook
+</h2><p>前面主要解决“如何表达一次调用”。接下来这三个概念，更多是在解决“消息什么时候发、往哪个方向发”。它们可以与前面的接口设计搭配使用。</p>
+<p><a href="/zh-cn/p/http-api-styles/event-patterns.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/http-api-styles/event-patterns.svg" alt="三种事件传递方式：SSE 在一个响应中向客户端发送事件，WebSocket 双向传递消息，Webhook 向接收方发起新请求" loading="lazy" decoding="async"></a>
+</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>方式</th>
+<th>消息怎么走</th>
+<th>典型用途</th>
+<th>需要处理什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>轮询</td>
+<td>客户端隔一段时间重新查询</td>
+<td>更新频率不高的任务状态</td>
+<td>查询间隔与额外请求量</td>
+</tr>
+<tr>
+<td>SSE</td>
+<td>客户端建立 HTTP 请求，服务端持续发送事件</td>
+<td>任务进度、消息通知、逐步生成结果</td>
+<td>断线恢复、代理缓冲、连接超时</td>
+</tr>
+<tr>
+<td>WebSocket</td>
+<td>建立连接后，双方都可以发送消息</td>
+<td>聊天、协同编辑、实时交互</td>
+<td>心跳、重连、消息语义与流量控制</td>
+</tr>
+<tr>
+<td>Webhook</td>
+<td>事件发生后，提供方请求接收方的回调地址</td>
+<td>支付结果、仓库事件、系统集成</td>
+<td>验签、重复投递、乱序、重试</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>SSE：一个响应里陆续收到多条事件</strong></p>
+<p>例如客户端订阅订单状态，服务端按 <code>text/event-stream</code> 格式返回：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-http" data-lang="http"><span class="line"><span class="cl"><span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span> <span class="m">200</span> <span class="ne">OK</span>
+</span></span><span class="line"><span class="cl"><span class="n">Content-Type</span><span class="o">:</span> <span class="l">text/event-stream</span>
+</span></span><span class="line"><span class="cl"><span class="n">Cache-Control</span><span class="o">:</span> <span class="l">no-cache</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">id: 101
+</span></span><span class="line"><span class="cl">event: order.updated
+</span></span><span class="line"><span class="cl">data: {&#34;order_id&#34;:&#34;1001&#34;,&#34;status&#34;:&#34;paid&#34;}
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">id: 102
+</span></span><span class="line"><span class="cl">event: order.updated
+</span></span><span class="line"><span class="cl">data: {&#34;order_id&#34;:&#34;1001&#34;,&#34;status&#34;:&#34;shipped&#34;}
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>每条事件用空行结束。<code>data:</code> 内部可以放 JSON，但事件流本身不是一个完整的 JSON 文档。浏览器原生 <code>EventSource</code> 提供连接和重连机制，也可以携带最近的事件编号；服务端是否能补发历史事件，需要额外实现。<a class="link" href="https://html.spec.whatwg.org/multipage/server-sent-events.html"  target="_blank" rel="noopener"
+    >SSE 标准</a></p>
+<p>另一个常见细节是：原生 <code>EventSource</code> 使用 GET，并不提供任意设置请求头或请求体的接口。如果需要 POST 请求体或自定义认证头，可以根据服务端协议使用 <code>fetch</code> 读取响应流，并自行处理事件解析与重连。<strong>只要逐段返回，就一定是 SSE</strong>，这个判断不成立；按行分隔的 JSON、二进制流等也能流式传递。</p>
+<p><strong>WebSocket：建立双向消息通道</strong></p>
+<p>WebSocket 允许客户端和服务端在连接建立后分别发送消息，消息可以是文本或二进制。它定义了连接与消息帧，但不会替应用决定“取消订单消息应该有哪些字段”“收到消息后是否需要确认”。这些仍要自己约定。</p>
+<p>经典 HTTP/1.1 场景会通过 Upgrade 握手建立 WebSocket；握手完成后，交换的是 WebSocket 消息帧，不再是每条消息一组普通 HTTP 请求响应。<a class="link" href="https://www.rfc-editor.org/rfc/rfc6455.html"  target="_blank" rel="noopener"
+    >WebSocket 协议</a></p>
+<p>因此可以在 WebSocket 上传 JSON-RPC，也可以设计自己的聊天消息。这里再次说明，通信通道和上层消息规则可以组合。</p>
+<p><strong>Webhook：由事件提供方主动调用你</strong></p>
+<p>例如，你把回调地址登记给支付平台。支付完成后，平台向你的服务发送一个新请求：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span><span class="lnt">9
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-http" data-lang="http"><span class="line"><span class="cl"><span class="nf">POST</span> <span class="nn">/webhooks/payments</span> <span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span>
+</span></span><span class="line"><span class="cl"><span class="n">Host</span><span class="o">:</span> <span class="l">merchant.example.com</span>
+</span></span><span class="line"><span class="cl"><span class="n">Content-Type</span><span class="o">:</span> <span class="l">application/json</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;id&#34;</span><span class="p">:</span> <span class="s2">&#34;evt_9001&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;type&#34;</span><span class="p">:</span> <span class="s2">&#34;payment.succeeded&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;data&#34;</span><span class="p">:</span> <span class="p">{</span> <span class="nt">&#34;order_id&#34;</span><span class="p">:</span> <span class="s2">&#34;1001&#34;</span> <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这是示意消息，真实字段、签名头和验证算法要以平台文档为准。Webhook 是回调模式，不是统一规定了这些字段的协议。</p>
+<p>接收方要验证来源、去重，并处理平台重试或事件乱序。完成可靠接收或入队后，可以尽快按对方契约响应，再异步处理耗时业务；不能还没保存事件就直接表示成功，否则后续失败可能丢消息。支付平台的实际投递规则可以参考其官方文档。<a class="link" href="https://docs.stripe.com/webhooks"  target="_blank" rel="noopener"
+    >Stripe Webhook 文档</a></p>
+<h2 id="实际项目怎么选还要约定哪些事">实际项目怎么选，还要约定哪些事？
+</h2><p>先把主要几类设计放在一起比较。下面的场景建议是本文的工程取舍，具体项目仍要看客户端能力、团队经验和现有系统。</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>类型</th>
+<th>主要围绕什么</th>
+<th>常见消息表示</th>
+<th>什么时候值得考虑</th>
+<th>主要成本</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>资源式 HTTP API / 常说的 REST API</td>
+<td>资源与 HTTP 语义</td>
+<td>JSON，也可以用其他表示</td>
+<td>用户、商品、订单等资源操作清楚，对接方较多</td>
+<td>资源建模、状态变化和响应契约</td>
+</tr>
+<tr>
+<td>普通 HTTP RPC</td>
+<td>方法与参数</td>
+<td>常见为 JSON</td>
+<td>动作明确，希望简单直接</td>
+<td>自己统一方法、错误和版本规则</td>
+</tr>
+<tr>
+<td>JSON-RPC</td>
+<td>标准化的方法调用消息</td>
+<td>JSON</td>
+<td>希望复用标准调用、通知和批量结构</td>
+<td>HTTP 映射、业务去重和方法级治理</td>
+</tr>
+<tr>
+<td>gRPC</td>
+<td>服务方法与类型契约</td>
+<td>默认 Protocol Buffers</td>
+<td>需要跨语言代码生成、类型契约或流式调用</td>
+<td>生成流程、网关和调试工具</td>
+</tr>
+<tr>
+<td>GraphQL</td>
+<td>类型关系与字段选择</td>
+<td>HTTP 上通常使用 JSON</td>
+<td>多客户端需要不同的数据组合</td>
+<td>查询成本、字段权限和缓存策略</td>
+</tr>
+<tr>
+<td>SOAP</td>
+<td>XML 消息与服务契约</td>
+<td>XML</td>
+<td>对接既有 SOAP 服务或有明确契约要求</td>
+<td>配套规范、工具与兼容性</td>
+</tr>
+</tbody>
+</table></div>
+<p><a href="/zh-cn/p/http-api-styles/selection-guide.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/http-api-styles/selection-guide.svg" alt="从需求出发选择接口设计：资源操作、动作调用、字段组合、服务契约和事件传递分别考虑" loading="lazy" decoding="async"></a>
+</p>
+<p>一套订单系统完全可以组合使用：对外提供资源式 HTTP API；内部某些服务通过 gRPC 通信；订单页用 SSE 接收状态更新；支付结果通过 Webhook 接入。每条边界选择适合它的方式，比强行全站统一更重要。</p>
+<p><strong>无论选择哪一种，下面的契约都要写清楚。</strong></p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>要约定的事情</th>
+<th>具体要回答的问题</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>身份与权限</td>
+<td>调用者是谁？是否能读取或取消这个订单？能否访问其中每个字段？</td>
+</tr>
+<tr>
+<td>错误处理</td>
+<td>哪些错误能重试？如何区分输入错误、权限不足和服务故障？</td>
+</tr>
+<tr>
+<td>超时与重试</td>
+<td>最长等多久？超时后是否能确认执行结果？是否需要幂等键？</td>
+</tr>
+<tr>
+<td>分页与边界</td>
+<td>一页最多多少条？游标如何使用？消息或请求体最大多大？</td>
+</tr>
+<tr>
+<td>兼容性</td>
+<td>新增、删除字段会不会破坏旧客户端？弃用流程是什么？</td>
+</tr>
+<tr>
+<td>可观测性</td>
+<td>如何按业务操作统计延迟、失败率，并关联请求日志？</td>
+</tr>
+</tbody>
+</table></div>
+<p>对于普通 HTTP API，可以考虑使用 Problem Details 表示错误。例如，订单已经发货，不能取消：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-http" data-lang="http"><span class="line"><span class="cl"><span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span> <span class="m">409</span> <span class="ne">Conflict</span>
+</span></span><span class="line"><span class="cl"><span class="n">Content-Type</span><span class="o">:</span> <span class="l">application/problem+json</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;type&#34;</span><span class="p">:</span> <span class="s2">&#34;https://api.example.com/problems/order-not-cancellable&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;title&#34;</span><span class="p">:</span> <span class="s2">&#34;订单无法取消&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;status&#34;</span><span class="p">:</span> <span class="mi">409</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;detail&#34;</span><span class="p">:</span> <span class="s2">&#34;订单已经发货，请使用退货流程。&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;instance&#34;</span><span class="p">:</span> <span class="s2">&#34;/requests/req-9f3a&#34;</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p><code>type</code> 用于标识问题类型，<code>detail</code> 解释本次发生了什么，<code>instance</code> 标识本次问题的具体发生实例。不要把内部堆栈、数据库语句或密钥放进错误响应。这个格式是 HTTP API 的一种标准选择，不应机械替代 JSON-RPC、GraphQL、SOAP 自己规定的错误结构。<a class="link" href="https://www.rfc-editor.org/rfc/rfc9457.html"  target="_blank" rel="noopener"
+    >Problem Details 标准</a></p>
+<p>下次看到一个新 API，可以按顺序读它：先看方法、地址和消息头，再看调用围绕资源、方法还是字段选择，接着确认消息编码，最后看错误、超时和事件传递规则。这样即使名字没见过，也能很快找到它在解决什么问题。</p>
+<h2 id="参考资料">参考资料
+</h2><p>本文的示例和选型分析为教学整理，协议细节以原始规范及所用实现为准。</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>主题</th>
+<th>原始资料</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>HTTP 语义、缓存</td>
+<td><a class="link" href="https://www.rfc-editor.org/rfc/rfc9110.html"  target="_blank" rel="noopener"
+    >RFC 9110</a>、<a class="link" href="https://www.rfc-editor.org/rfc/rfc9111.html"  target="_blank" rel="noopener"
+    >RFC 9111</a></td>
+</tr>
+<tr>
+<td>REST</td>
+<td><a class="link" href="https://ics.uci.edu/~fielding/pubs/dissertation/rest_arch_style.htm"  target="_blank" rel="noopener"
+    >Fielding 博士论文，第 5 章</a></td>
+</tr>
+<tr>
+<td>局部修改</td>
+<td><a class="link" href="https://www.rfc-editor.org/rfc/rfc5789.html"  target="_blank" rel="noopener"
+    >RFC 5789：PATCH</a>、<a class="link" href="https://www.rfc-editor.org/rfc/rfc7396.html"  target="_blank" rel="noopener"
+    >RFC 7396：JSON Merge Patch</a></td>
+</tr>
+<tr>
+<td>JSON-RPC</td>
+<td><a class="link" href="https://www.jsonrpc.org/specification"  target="_blank" rel="noopener"
+    >JSON-RPC 2.0 Specification</a></td>
+</tr>
+<tr>
+<td>gRPC</td>
+<td><a class="link" href="https://grpc.io/docs/what-is-grpc/core-concepts/"  target="_blank" rel="noopener"
+    >核心概念</a>、<a class="link" href="https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md"  target="_blank" rel="noopener"
+    >HTTP/2 协议映射</a>、<a class="link" href="https://github.com/grpc/grpc-web"  target="_blank" rel="noopener"
+    >gRPC-Web</a></td>
+</tr>
+<tr>
+<td>GraphQL</td>
+<td><a class="link" href="https://graphql.org/learn/serving-over-http/"  target="_blank" rel="noopener"
+    >HTTP 使用方式</a>、<a class="link" href="https://graphql.org/learn/response/"  target="_blank" rel="noopener"
+    >响应</a>、<a class="link" href="https://graphql.org/learn/performance/"  target="_blank" rel="noopener"
+    >性能</a>、<a class="link" href="https://graphql.org/learn/debug-errors/"  target="_blank" rel="noopener"
+    >HTTP 错误</a></td>
+</tr>
+<tr>
+<td>SOAP、WSDL</td>
+<td><a class="link" href="https://www.w3.org/TR/soap12-part1/"  target="_blank" rel="noopener"
+    >SOAP 消息框架</a>、<a class="link" href="https://www.w3.org/TR/soap12-part2/#soapinhttp"  target="_blank" rel="noopener"
+    >SOAP HTTP 绑定</a>、<a class="link" href="https://www.w3.org/TR/wsdl20-primer/"  target="_blank" rel="noopener"
+    >WSDL 入门</a></td>
+</tr>
+<tr>
+<td>事件与回调</td>
+<td><a class="link" href="https://html.spec.whatwg.org/multipage/server-sent-events.html"  target="_blank" rel="noopener"
+    >SSE 标准</a>、<a class="link" href="https://www.rfc-editor.org/rfc/rfc6455.html"  target="_blank" rel="noopener"
+    >WebSocket 标准</a>、<a class="link" href="https://docs.stripe.com/webhooks"  target="_blank" rel="noopener"
+    >Webhook 实践</a></td>
+</tr>
+<tr>
+<td>数据与契约</td>
+<td><a class="link" href="https://www.rfc-editor.org/rfc/rfc8259.html"  target="_blank" rel="noopener"
+    >JSON 标准</a>、<a class="link" href="https://spec.openapis.org/oas/latest.html"  target="_blank" rel="noopener"
+    >OpenAPI</a>、<a class="link" href="https://www.rfc-editor.org/rfc/rfc9457.html"  target="_blank" rel="noopener"
+    >HTTP 错误详情</a></td>
+</tr>
+</tbody>
+</table></div>
+
+</div>
+
+            <footer class="article-footer">
+    
+        <div class="article-tags" aria-label="文章标签"><span class="article-footer-label">相关主题</span><a href="/zh-cn/tags/http/">HTTP</a><a href="/zh-cn/tags/api/">API</a><a href="/zh-cn/tags/rest/">REST</a><a href="/zh-cn/tags/rpc/">RPC</a><a href="/zh-cn/tags/graphql/">GraphQL</a><a href="/zh-cn/tags/%E5%90%8E%E7%AB%AF/">后端</a></div>
+    
+    
+    
+    <div class="article-endnote"><span>感谢读到这里。</span><a href="#top">回到开头 <span aria-hidden="true">↑</span></a></div>
+</footer>
+
+        </div>
+    </div>
+    
+</article>
+
+        <div class="reading-afterword">
+            
+            
+
+            
+        </div>
+    </div>
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+    </main>
+    
+<footer class="site-footer">
+    <div class="footer-top"><a class="footer-wordmark" href="/zh-cn/" aria-label="Snow">Sno<span>w</span></a><p>认真记录，自由生长。</p><a href="#main-content" class="back-top">回到顶部 <span aria-hidden="true">↑</span></a></div>
+    <div class="footer-bottom"><span>© 2026 Snow</span><nav aria-label="更多链接"><a href="/zh-cn/about/">关于</a><a href="https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0" target="_blank" rel="noopener noreferrer me">Bilibili <span aria-hidden="true">↗</span></a><a href="https://github.com/SymphonyW" target="_blank" rel="noopener noreferrer me">GitHub <span aria-hidden="true">↗</span></a><a href="https://twitter.com" target="_blank" rel="noopener noreferrer me">Twitter <span aria-hidden="true">↗</span></a><a href="/zh-cn/index.xml">RSS ↗</a></nav><span class="footer-colophon">由 Hugo 构建 · 持续书写</span></div>
+</footer>
+
+    
+
+<script src="/ts/main.c86029ddb4aad8364879723acaf7efcd526e724d2381088d445aaf6f3ab1bfdf.js" defer></script>
+
+
+<script src="/ts/custom.6c99a7b037ac7e2bde801fbad26b9c20b3b18707868c164174142870ef3bc309.js" defer></script>
+
+
+
+
+
+<script>
+window.MathJax = {
+  tex: {
+    
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  svg: {
+    fontCache: 'global'
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
+
+</body>
+</html>

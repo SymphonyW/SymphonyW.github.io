@@ -1,0 +1,1300 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="An illustrated guide to charts, values, releases, and repositories. Build a small Nginx chart, deploy multiple environments, upgrade and roll back releases, and understand the limits and Helm 3/4 differences.">
+<title>Helm Explained: From Kubernetes YAML to Reusable Application Releases</title>
+
+<link rel='canonical' href='https://SymphonyW.github.io/p/helm-guide/'>
+<link rel="stylesheet" href="/scss/custom.min.919cf0d34f895fec4bc36912621fd0297f1439e1574bdf28d3195939a83690e8.css">
+<script>
+(() => {
+    let preference = 'auto';
+    try { preference = localStorage.getItem('StackColorScheme') || preference; } catch (_) {}
+    document.documentElement.dataset.scheme = preference === 'dark' || (preference === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+})();
+</script>
+
+<meta property='og:title' content="Helm Explained: From Kubernetes YAML to Reusable Application Releases">
+<meta property='og:description' content="An illustrated guide to charts, values, releases, and repositories. Build a small Nginx chart, deploy multiple environments, upgrade and roll back releases, and understand the limits and Helm 3/4 differences.">
+<meta property='og:url' content='https://SymphonyW.github.io/p/helm-guide/'>
+<meta property='og:site_name' content='Snow'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='Helm' /><meta property='article:tag' content='Kubernetes' /><meta property='article:tag' content='DevOps' /><meta property='article:tag' content='Cloud Native' /><meta property='article:published_time' content='2026-10-23T10:00:00&#43;08:00'/><meta property='article:modified_time' content='2026-10-23T10:00:00&#43;08:00'/><meta property='og:image' content='https://SymphonyW.github.io/p/helm-guide/bg.svg' />
+<meta name="twitter:title" content="Helm Explained: From Kubernetes YAML to Reusable Application Releases">
+<meta name="twitter:description" content="An illustrated guide to charts, values, releases, and repositories. Build a small Nginx chart, deploy multiple environments, upgrade and roll back releases, and understand the limits and Helm 3/4 differences."><meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content='https://SymphonyW.github.io/p/helm-guide/bg.svg' />
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    
+    <noscript><style>@media(max-width:760px){.site-header{position:static}.site-header__inner{height:auto;min-height:66px;flex-wrap:wrap}.site-nav{position:static;display:grid;order:3;flex-basis:100%;padding:8px 0 18px}.menu-toggle,.theme-toggle{display:none}}</style></noscript>
+</head>
+<body id="top" class="article-page">
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    
+<header class="site-header">
+    <div class="site-header__inner">
+        <a class="site-brand" href="/" aria-label="Snow — Home">S<span>now.</span></a>
+        <nav class="site-nav" id="site-navigation" aria-label="Main navigation">
+            
+            
+                
+                    
+                    
+                    <a href="/">Home</a>
+                
+            
+                
+                    
+                    
+                    <a href="/post/" aria-current="page">Blog</a>
+                
+            
+                
+                    
+                    
+                    <a href="/archives/">Archives</a>
+                
+            
+                
+                    
+                    
+                    <a href="/diary/">Diary</a>
+                
+            
+                
+                    
+                    
+                    <a href="/stats/">Stats</a>
+                
+            
+                
+            
+                
+                    
+                    
+                    <a href="/links/">Links</a>
+                
+            
+        </nav>
+        <div class="header-tools">
+            
+                <a class="language-link" href="/zh-cn/p/helm-guide/" lang="zh-cn" hreflang="zh-cn" aria-label="切换到中文">中</a>
+            
+            <button type="button" id="dark-mode-toggle" class="icon-button theme-toggle" aria-label="Toggle color theme" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><path d="M12 4.5a7.5 7.5 0 0 1 0 15z" fill="currentColor" stroke="none"/></svg></button>
+            <a class="icon-button search-link" href="/search/" aria-label="Search articles"><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+</a>
+            <button class="icon-button menu-toggle" type="button" aria-expanded="false" aria-controls="site-navigation" aria-label="Open navigation"><span></span><span></span></button>
+        </div>
+    </div>
+    <div class="reading-progress" aria-hidden="true"></div>
+</header>
+
+    <main id="main-content" class="site-main main" tabindex="-1">
+        
+    <div class="reading-page">
+        <article class="main-article has-toc">
+    <header class="article-header">
+    <div class="article-wayfinding">
+        
+            <a href="/post/"><span aria-hidden="true">←</span> All writing</a>
+        
+        <span class="article-kind">Notes & observations</span>
+    </div>
+    <div class="article-details">
+    
+    <h1 class="article-title">Helm Explained: From Kubernetes YAML to Reusable Application Releases</h1>
+    <p class="article-subtitle">An illustrated guide to charts, values, releases, and repositories. Build a small Nginx chart, deploy multiple environments, upgrade and roll back releases, and understand the limits and Helm 3/4 differences.</p>
+    <div class="article-meta">
+        
+            <time datetime="2026-10-23T10:00:00&#43;08:00">October 23, 2026</time>
+            <span class="meta-divider" aria-hidden="true">/</span>
+            <span>16 min read</span>
+        
+        
+            <div class="article-translations"><a href="/zh-cn/p/helm-guide/" hreflang="zh-cn" lang="zh-cn">阅读中文版 <span aria-hidden="true">↗</span></a></div>
+        
+    </div>
+</div>
+
+</header>
+
+    <div class="reading-layout">
+        
+            <aside class="reading-margin" aria-label="Article contents">
+                <details class="article-toc" open>
+                    <summary><span>On this page</span><span class="toc-indicator" aria-hidden="true">+</span></summary>
+                    <nav id="TableOfContents">
+  <ol>
+    <li><a href="#1-why-use-helm-when-kubectl-already-works">1. Why use Helm when kubectl already works?</a></li>
+    <li><a href="#2-charts-values-releases-and-repositories">2. Charts, values, releases, and repositories</a></li>
+    <li><a href="#3-what-happens-during-installation">3. What happens during installation?</a></li>
+    <li><a href="#4-build-and-install-a-small-nginx-chart">4. Build and install a small Nginx chart</a>
+      <ol>
+        <li><a href="#prepare-the-tools-and-files">Prepare the tools and files</a></li>
+        <li><a href="#inspect-install-and-open-the-website">Inspect, install, and open the website</a></li>
+      </ol>
+    </li>
+    <li><a href="#5-reuse-one-chart-across-environments">5. Reuse one chart across environments</a></li>
+    <li><a href="#6-upgrades-failures-and-the-limits-of-rollback">6. Upgrades, failures, and the limits of rollback</a></li>
+    <li><a href="#7-consume-existing-charts-and-distribute-your-own">7. Consume existing charts and distribute your own</a></li>
+    <li><a href="#8-troubleshooting-and-choosing-the-right-tool">8. Troubleshooting and choosing the right tool</a></li>
+  </ol>
+</nav>
+                </details>
+            </aside>
+        
+        <div class="reading-body">
+            <div class="article-content"><p>Once you know Kubernetes, creating a Deployment and a Service is straightforward. The difficult part comes later: the application grows into a collection of resources, development and production need different settings, and every upgrade needs a record of exactly what changed.</p>
+<p><strong>Helm packages a set of Kubernetes resources into a reusable deployment definition, accepts configuration for each installation, and keeps a history of releases.</strong></p>
+<p><a href="/p/helm-guide/bg.svg" target="_blank" rel="noopener noreferrer"><img src="/p/helm-guide/bg.svg" alt="Helm packages templates and configuration into Kubernetes application releases" loading="lazy" decoding="async"></a>
+</p>
+<p>This guide assumes you understand Pods, Deployments, and Services. If those are new, start with <a class="link" href="/p/kubernetes-from-docker/" >From Docker to Kubernetes</a>. We will use a small Nginx website to connect the concepts to an executable workflow.</p>
+<blockquote>
+<p><strong>Scope:</strong> The example uses a Chart with <code>apiVersion: v2</code>, supported by both Helm 3 and Helm 4. Shared commands are used throughout; failure recovery options are compared separately. You need an existing Kubernetes cluster capable of running Linux containers. Commands use single lines so they also work in PowerShell. The fixed image tag is a teaching choice, not a production version recommendation. The Helm CLI major version and Chart format version are different things: Helm 4 continues to support v2 charts. <a class="link" href="https://helm.sh/docs/overview/"  target="_blank" rel="noopener"
+    >Helm 4 overview</a></p>
+</blockquote>
+<h2 id="1-why-use-helm-when-kubectl-already-works">1. Why use Helm when kubectl already works?
+</h2><p>An application might start with this:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">website/
+</span></span><span class="line"><span class="cl">├── deployment.yaml
+</span></span><span class="line"><span class="cl">└── service.yaml
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Then it acquires configuration, ingress rules, storage, and permissions. Next, you need three environments:</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Development</th>
+<th>Staging</th>
+<th>Production</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Replicas</td>
+<td>1</td>
+<td>2</td>
+<td>3</td>
+</tr>
+<tr>
+<td>Image</td>
+<td>Development build</td>
+<td>Candidate</td>
+<td>Validated build</td>
+</tr>
+<tr>
+<td>Domain</td>
+<td>dev.example.com</td>
+<td>staging.example.com</td>
+<td>example.com</td>
+</tr>
+<tr>
+<td>Resource allocation</td>
+<td>Small</td>
+<td>Similar to production</td>
+<td>Sized for actual load</td>
+</tr>
+</tbody>
+</table></div>
+<p>Copying the directory works initially. But changing a health check now means editing several copies, and recording the previous deployment becomes another task.</p>
+<p>Helm addresses two related problems:</p>
+<ol>
+<li><strong>Reusable deployment definitions:</strong> templates contain shared structure, while values describe configuration differences.</li>
+<li><strong>Release management:</strong> installations and upgrades have names, revisions, saved configuration, and status.</li>
+</ol>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Main responsibility</th>
+<th>Website example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Docker / image build tools</td>
+<td>Build a runnable image</td>
+<td>Produce the website image</td>
+</tr>
+<tr>
+<td>Kubernetes</td>
+<td>Schedule workloads and reconcile desired state</td>
+<td>Keep the required Pods running</td>
+</tr>
+<tr>
+<td>kubectl</td>
+<td>Interact with the Kubernetes API</td>
+<td>Apply resources, inspect events and logs</td>
+</tr>
+<tr>
+<td>Helm</td>
+<td>Package templates and manage releases</td>
+<td>Install and upgrade the website</td>
+</tr>
+</tbody>
+</table></div>
+<p>The comparison with <code>apt</code> or <code>brew</code> is useful, but Helm manages Kubernetes resources and release records. It does not compile your application or build its image.</p>
+<p>For a couple of stable YAML files, <code>kubectl apply</code> is often sufficient. Helm becomes useful when repeated configuration, multiple installations, and release history are routine requirements.</p>
+<h2 id="2-charts-values-releases-and-repositories">2. Charts, values, releases, and repositories
+</h2><p><a href="/p/helm-guide/concepts.svg" target="_blank" rel="noopener noreferrer"><img src="/p/helm-guide/concepts.svg" alt="The relationship between a chart, values, releases, and a repository" loading="lazy" decoding="async"></a>
+</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Meaning</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Chart</td>
+<td>A reusable deployment package</td>
+<td>Templates, defaults, metadata, optional dependencies</td>
+</tr>
+<tr>
+<td>Values</td>
+<td>Inputs to a particular deployment</td>
+<td>Image tag, replica count, service port</td>
+</tr>
+<tr>
+<td>Release</td>
+<td>A named installation of a chart</td>
+<td><code>web-dev</code> in namespace <code>helm-dev</code></td>
+</tr>
+<tr>
+<td>Repository / Registry</td>
+<td>A location for distributing chart packages</td>
+<td>An HTTP chart repository or OCI registry</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>One chart can produce multiple releases.</strong> Install the same chart as <code>web-dev</code> and <code>web-prod</code>, supply different values, and upgrade them independently. Release names are scoped to namespaces, so queries must use the correct namespace too.</p>
+<p>There are also three different versions to distinguish:</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Identifier</th>
+<th>Example</th>
+<th>What it describes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Chart <code>version</code></td>
+<td><code>0.1.0</code></td>
+<td>The deployment package</td>
+</tr>
+<tr>
+<td>Chart <code>appVersion</code></td>
+<td><code>&quot;1.28.0&quot;</code></td>
+<td>Descriptive application version metadata</td>
+</tr>
+<tr>
+<td>Release revision</td>
+<td><code>1</code>, <code>2</code>, <code>3</code></td>
+<td>The history of one installation</td>
+</tr>
+</tbody>
+</table></div>
+<p>Changing resource limits can justify chart version <code>0.1.1</code> without changing the application version. Upgrading an existing release creates another release revision.</p>
+<p><strong>Changing <code>appVersion</code> does not automatically change the image.</strong> Our template reads <code>.Values.image.tag</code>; that input controls the image tag. A chart that explicitly reads <code>.Chart.AppVersion</code> would behave differently. Always inspect the template rather than assuming the metadata controls deployment behavior. <a class="link" href="https://helm.sh/docs/topics/charts/"  target="_blank" rel="noopener"
+    >Chart format</a></p>
+<h2 id="3-what-happens-during-installation">3. What happens during installation?
+</h2><p><a href="/p/helm-guide/render-flow.svg" target="_blank" rel="noopener noreferrer"><img src="/p/helm-guide/render-flow.svg" alt="Helm renders manifests and submits resources; Kubernetes controllers maintain them" loading="lazy" decoding="async"></a>
+</p>
+<p>The main flow is:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">Chart templates + merged values + release context
+</span></span><span class="line"><span class="cl">                       ↓
+</span></span><span class="line"><span class="cl">            Ordinary Kubernetes manifests
+</span></span><span class="line"><span class="cl">                       ↓
+</span></span><span class="line"><span class="cl">              Kubernetes API Server
+</span></span><span class="line"><span class="cl">                       ↓
+</span></span><span class="line"><span class="cl">          Controllers reconcile actual resources
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>For example, this template:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span>{{<span class="w"> </span><span class="l">.Values.replicaCount }}</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>combined with <code>replicaCount: 2</code> produces:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span><span class="m">2</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>Kubernetes receives the rendered resource; it does not interpret Helm&rsquo;s <code>{{ ... }}</code> expressions. Helm also manages release records, resource updates, and optional lifecycle hooks, so it is more than text substitution.</p>
+<p>Normal Helm 3 and Helm 4 CLI operation does not require a dedicated Helm server in the cluster. <strong>Tiller belongs to Helm 2</strong>, so older tutorials that ask you to install it do not apply. After the CLI exits, Kubernetes controllers continue maintaining the application.</p>
+<p>By default, release data is stored in Kubernetes Secrets in the release namespace. This includes chart and configuration content, which may contain sensitive information. Release history is not merely a local terminal log. <a class="link" href="https://helm.sh/docs/topics/advanced/"  target="_blank" rel="noopener"
+    >Release storage</a></p>
+<p>Helm itself is not a controller that continuously synchronizes the cluster with Git. A manual change is not periodically corrected by the Helm CLI. Update mechanics also vary by version: Helm 4 defaults to server-side apply for new releases, while upgrades generally retain the previous release&rsquo;s apply method. <a class="link" href="https://helm.sh/docs/overview/#server-side-apply"  target="_blank" rel="noopener"
+    >Helm 4 apply behavior</a></p>
+<h2 id="4-build-and-install-a-small-nginx-chart">4. Build and install a small Nginx chart
+</h2><p>The example contains one Deployment and one Service. Download the <a class="link" href="helm-web-demo.zip" >complete example</a>, extract it, and enter <code>helm-web-demo</code>; alternatively, create the following files. Run later commands from the directory containing <code>web-demo/</code> and the environment values files.</p>
+<h3 id="prepare-the-tools-and-files">Prepare the tools and files
+</h3><p>Install Helm and kubectl, and prepare a practice cluster. The <a class="link" href="https://helm.sh/docs/intro/install/"  target="_blank" rel="noopener"
+    >official installation guide</a> describes platform-specific binaries and other installation options. Ensure Helm is on your PATH, then check:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">helm version --short
+</span></span><span class="line"><span class="cl">kubectl config current-context
+</span></span><span class="line"><span class="cl">kubectl get nodes
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>The context identifies the target cluster. <strong>Installation commands below modify that cluster, so use a practice environment.</strong> Helm does not create Kubernetes for you.</p>
+<p>Create this layout:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span><span class="lnt">9
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">helm-web-demo/
+</span></span><span class="line"><span class="cl">├── web-demo/
+</span></span><span class="line"><span class="cl">│   ├── Chart.yaml
+</span></span><span class="line"><span class="cl">│   ├── values.yaml
+</span></span><span class="line"><span class="cl">│   └── templates/
+</span></span><span class="line"><span class="cl">│       ├── deployment.yaml
+</span></span><span class="line"><span class="cl">│       └── service.yaml
+</span></span><span class="line"><span class="cl">├── values-dev.yaml
+</span></span><span class="line"><span class="cl">└── values-prod.yaml
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>We write four chart files directly so every part is visible. <code>helm create</code> can generate a scaffold, but includes features we do not need for this first exercise.</p>
+<p><strong><code>web-demo/Chart.yaml</code> describes the package:</strong></p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">v2</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">web-demo</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l">A small Nginx website for learning Helm</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l">application</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="m">0.1.0</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">appVersion</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;1.28.0&#34;</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p><strong><code>web-demo/values.yaml</code> supplies defaults:</strong></p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">replicaCount</span><span class="p">:</span><span class="w"> </span><span class="m">1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">image</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">repository</span><span class="p">:</span><span class="w"> </span><span class="l">nginx</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">tag</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;1.28.0-alpine&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">pullPolicy</span><span class="p">:</span><span class="w"> </span><span class="l">IfNotPresent</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">service</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="m">80</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">resources</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">requests</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="l">50m</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="l">32Mi</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">limits</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="l">200m</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="l">128Mi</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>These keys are an interface defined by this chart, not a universal Kubernetes configuration format. Adding a <code>domain</code> key does nothing unless a template reads it and produces the appropriate resource.</p>
+<p><strong><code>web-demo/templates/deployment.yaml</code> describes the workload:</strong></p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span><span class="lnt">25
+</span><span class="lnt">26
+</span><span class="lnt">27
+</span><span class="lnt">28
+</span><span class="lnt">29
+</span><span class="lnt">30
+</span><span class="lnt">31
+</span><span class="lnt">32
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">apps/v1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">Deployment</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span>{{<span class="w"> </span><span class="l">.Release.Name }}-web</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span>{{<span class="w"> </span><span class="l">.Release.Namespace }}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">spec</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span>{{<span class="w"> </span><span class="l">.Values.replicaCount }}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">selector</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">matchLabels</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">app.kubernetes.io/name</span><span class="p">:</span><span class="w"> </span><span class="l">web-demo</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">app.kubernetes.io/instance</span><span class="p">:</span><span class="w"> </span>{{<span class="w"> </span><span class="l">.Release.Name }}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">template</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">labels</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">app.kubernetes.io/name</span><span class="p">:</span><span class="w"> </span><span class="l">web-demo</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">app.kubernetes.io/instance</span><span class="p">:</span><span class="w"> </span>{{<span class="w"> </span><span class="l">.Release.Name }}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">spec</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">containers</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">nginx</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;{{ .Values.image.repository }}:{{ .Values.image.tag }}&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">imagePullPolicy</span><span class="p">:</span><span class="w"> </span>{{<span class="w"> </span><span class="l">.Values.image.pullPolicy }}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">ports</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">http</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">containerPort</span><span class="p">:</span><span class="w"> </span><span class="m">80</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">readinessProbe</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">httpGet</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l">/</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l">http</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">initialDelaySeconds</span><span class="p">:</span><span class="w"> </span><span class="m">2</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">periodSeconds</span><span class="p">:</span><span class="w"> </span><span class="m">5</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">resources</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span>{{- <span class="l">toYaml .Values.resources | nindent 12 }}</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p><strong><code>web-demo/templates/service.yaml</code> provides a stable internal endpoint:</strong></p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">v1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">Service</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span>{{<span class="w"> </span><span class="l">.Release.Name }}-web</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span>{{<span class="w"> </span><span class="l">.Release.Namespace }}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">spec</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l">ClusterIP</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">selector</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">app.kubernetes.io/name</span><span class="p">:</span><span class="w"> </span><span class="l">web-demo</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">app.kubernetes.io/instance</span><span class="p">:</span><span class="w"> </span>{{<span class="w"> </span><span class="l">.Release.Name }}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">ports</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">http</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span>{{<span class="w"> </span><span class="l">.Values.service.port }}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">targetPort</span><span class="p">:</span><span class="w"> </span><span class="l">http</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>Only a few expressions are needed:</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Expression</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>.Values.xxx</code></td>
+<td>Read a merged configuration value</td>
+</tr>
+<tr>
+<td><code>.Release.Name</code></td>
+<td>Read the installation name; <code>demo</code> produces <code>demo-web</code></td>
+</tr>
+<tr>
+<td><code>.Release.Namespace</code></td>
+<td>Read the target namespace</td>
+</tr>
+<tr>
+<td><code>toYaml</code></td>
+<td>Serialize an object as YAML</td>
+</tr>
+<tr>
+<td><code>nindent 12</code></td>
+<td>Add a newline and indent by 12 spaces</td>
+</tr>
+<tr>
+<td><code>{{-</code></td>
+<td>Trim whitespace immediately to the left</td>
+</tr>
+</tbody>
+</table></div>
+<p>The <code>instance</code> label keeps each Service connected to its own release&rsquo;s Pods. Using only a shared application label could mix traffic between installations in the same namespace. See <a class="link" href="https://helm.sh/docs/chart_template_guide/builtin_objects/"  target="_blank" rel="noopener"
+    >built-in objects</a> and <a class="link" href="https://helm.sh/docs/chart_template_guide/functions_and_pipelines/"  target="_blank" rel="noopener"
+    >template functions and pipelines</a> for the syntax.</p>
+<h3 id="inspect-install-and-open-the-website">Inspect, install, and open the website
+</h3><p>These first checks run locally without a cluster:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">helm lint ./web-demo
+</span></span><span class="line"><span class="cl">helm template demo ./web-demo -n helm-lab
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Expect a Service and a Deployment named <code>demo-web</code>, with one replica. The rendered resources should contain no unresolved <code>{{ ... }}</code> expressions.</p>
+<blockquote>
+<p><strong>Verification scope:</strong> The downloadable chart has been checked with Helm 3.19.0 and 4.0.0 using linting and local rendering. Live installation, image pulling, browser access, upgrades, and rollback still need verification against your practice cluster.</p>
+</blockquote>
+<p><strong><code>helm template</code> produces YAML; it does not install a release.</strong> It also does not prove that cluster permissions, admission policies, or image downloads will work.</p>
+<p>Install the chart:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">helm install demo ./web-demo -n helm-lab --create-namespace --wait --timeout 3m
+</span></span></code></pre></td></tr></table>
+</div>
+</div><div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>demo</code></td>
+<td>Name this release</td>
+</tr>
+<tr>
+<td><code>./web-demo</code></td>
+<td>Load the chart from this directory</td>
+</tr>
+<tr>
+<td><code>-n helm-lab</code></td>
+<td>Select the namespace</td>
+</tr>
+<tr>
+<td><code>--create-namespace</code></td>
+<td>Create the namespace if necessary</td>
+</tr>
+<tr>
+<td><code>--wait</code></td>
+<td>Wait for the relevant readiness conditions</td>
+</tr>
+<tr>
+<td><code>--timeout 3m</code></td>
+<td>Set the timeout for waiting operations</td>
+</tr>
+</tbody>
+</table></div>
+<p>Explicit waiting avoids confusing submitted resources with ready resources. Helm 4&rsquo;s waiting strategies differ from Helm 3, and readiness is not a complete business acceptance test. <a class="link" href="https://helm.sh/docs/helm/helm_install/"  target="_blank" rel="noopener"
+    >Install reference</a></p>
+<p>Inspect the resources and forward the Service port:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">helm list -n helm-lab
+</span></span><span class="line"><span class="cl">helm status demo -n helm-lab
+</span></span><span class="line"><span class="cl">kubectl get deployment,pods,service -n helm-lab
+</span></span><span class="line"><span class="cl">kubectl port-forward svc/demo-web 8080:80 -n helm-lab
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Keep port forwarding running and open <code>http://localhost:8080</code> in a browser. You should see the Nginx welcome page. Resource inspection checks existence and readiness; the browser request checks a working request path. <code>Ctrl+C</code> stops port forwarding without stopping the workload.</p>
+<h2 id="5-reuse-one-chart-across-environments">5. Reuse one chart across environments
+</h2><p><a href="/p/helm-guide/values-layers.svg" target="_blank" rel="noopener noreferrer"><img src="/p/helm-guide/values-layers.svg" alt="Values precedence and environment-specific inputs" loading="lazy" decoding="async"></a>
+</p>
+<p>Keep the templates shared and move differences into values files.</p>
+<p><strong><code>values-dev.yaml</code>:</strong></p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">replicaCount</span><span class="p">:</span><span class="w"> </span><span class="m">1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">resources</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">requests</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="l">25m</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="l">32Mi</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p><strong><code>values-prod.yaml</code>:</strong></p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">replicaCount</span><span class="p">:</span><span class="w"> </span><span class="m">3</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">resources</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">requests</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="l">100m</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="l">64Mi</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">limits</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="l">500m</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="l">256Mi</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>These files demonstrate environment inputs. Naming a file <code>prod</code> does not make the workload production-ready.</p>
+<p>For this example without subcharts, precedence increases in this order:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">Chart values.yaml
+</span></span><span class="line"><span class="cl">       ↓ overridden by
+</span></span><span class="line"><span class="cl">First -f file
+</span></span><span class="line"><span class="cl">       ↓ overridden by
+</span></span><span class="line"><span class="cl">Later -f files, with the rightmost taking precedence
+</span></span><span class="line"><span class="cl">       ↓ overridden by
+</span></span><span class="line"><span class="cl">Explicit --set / --set-string arguments
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Maps generally merge by key: the development file changes requests while preserving default limits. Lists generally replace earlier lists rather than appending to them. Parent charts add another source of overrides for subcharts. <a class="link" href="https://helm.sh/docs/chart_template_guide/values_files/"  target="_blank" rel="noopener"
+    >Values files</a></p>
+<p>Preview an override:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">helm template demo ./web-demo -n helm-lab -f values-dev.yaml -f values-prod.yaml --set <span class="nv">replicaCount</span><span class="o">=</span><span class="m">2</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>The result has <strong>two replicas</strong>, while resources come from the production overrides. Use <code>--set</code> for numeric and boolean inputs; <code>--set-string</code> makes intended strings such as image tags explicit.</p>
+<p>Install two independent releases:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">helm upgrade --install web-dev ./web-demo -n helm-dev --create-namespace -f values-dev.yaml --wait --timeout 3m
+</span></span><span class="line"><span class="cl">helm upgrade --install web-prod ./web-demo -n helm-prod --create-namespace -f values-prod.yaml --wait --timeout 3m
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p><code>upgrade --install</code> upgrades an existing release or installs it if absent. Namespaces provide logical separation; requirements may call for separate clusters or stronger isolation too.</p>
+<p>Supply the intended environment inputs explicitly on each deployment. <code>--reuse-values</code> can merge new inputs with a release&rsquo;s existing configuration, but it can also preserve forgotten overrides. Version-controlled environment files usually make the deployment easier to reproduce. <a class="link" href="https://helm.sh/docs/helm/helm_upgrade/"  target="_blank" rel="noopener"
+    >Upgrade options</a></p>
+<h2 id="6-upgrades-failures-and-the-limits-of-rollback">6. Upgrades, failures, and the limits of rollback
+</h2><p>Return to the <code>demo</code> release installed earlier and scale it to two replicas:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">helm upgrade demo ./web-demo -n helm-lab --set <span class="nv">replicaCount</span><span class="o">=</span><span class="m">2</span> --wait --timeout 3m
+</span></span><span class="line"><span class="cl">kubectl get deployment demo-web -n helm-lab
+</span></span><span class="line"><span class="cl">helm <span class="nb">history</span> demo -n helm-lab
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>If the installation was revision 1, this successful upgrade creates revision 2. Changing the replica count scales the workload; changing a field in the Pod template, such as the image, triggers the Deployment&rsquo;s update process. Helm does not delete and recreate the entire namespace.</p>
+<p>To inspect deployment inputs and recorded resources:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">helm get values demo -n helm-lab --all
+</span></span><span class="line"><span class="cl">helm get manifest demo -n helm-lab
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>The first includes computed defaults. The second shows the saved release manifest, which may differ from current live objects after controller or manual changes. Inspect live state with kubectl.</p>
+<p><a href="/p/helm-guide/release-history.svg" target="_blank" rel="noopener noreferrer"><img src="/p/helm-guide/release-history.svg" alt="Rollback applies an earlier configuration as a new release revision" loading="lazy" decoding="async"></a>
+</p>
+<p>Check history, confirm revision 1 is the intended recovery target, and run:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">helm rollback demo <span class="m">1</span> -n helm-lab --wait --timeout 3m
+</span></span><span class="line"><span class="cl">helm <span class="nb">history</span> demo -n helm-lab
+</span></span><span class="line"><span class="cl">kubectl get deployment demo-web -n helm-lab
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Following the sequence above restores one replica but creates <strong>revision 3</strong>. Rollback reapplies an earlier configuration and records another operation; it does not rewind the history counter. <a class="link" href="https://helm.sh/docs/helm/helm_rollback/"  target="_blank" rel="noopener"
+    >Rollback reference</a></p>
+<p>Failure handling needs explicit intent:</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Case</th>
+<th>Behavior to plan for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A normal upgrade fails</td>
+<td>Some resources may already have changed; do not assume automatic recovery</td>
+</tr>
+<tr>
+<td>Helm 3 with <code>--atomic</code></td>
+<td>A failed upgrade attempts rollback and enables waiting</td>
+</tr>
+<tr>
+<td>Helm 4 with <code>--rollback-on-failure</code></td>
+<td>Requests failure recovery with the corresponding waiting behavior</td>
+</tr>
+<tr>
+<td>A first installation fails with recovery enabled</td>
+<td>There is no earlier release; installation cleanup/uninstall semantics apply</td>
+</tr>
+</tbody>
+</table></div>
+<p>Choose the command for your installed major version:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="c1"># Helm 3</span>
+</span></span><span class="line"><span class="cl">helm upgrade --install demo ./web-demo -n helm-lab --create-namespace --set <span class="nv">replicaCount</span><span class="o">=</span><span class="m">2</span> --atomic --wait --timeout 3m
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># Helm 4: the corresponding alternative, not a second required step</span>
+</span></span><span class="line"><span class="cl">helm upgrade --install demo ./web-demo -n helm-lab --create-namespace --set <span class="nv">replicaCount</span><span class="o">=</span><span class="m">2</span> --rollback-on-failure --wait --timeout 3m
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Helm 4 renamed <code>--atomic</code> to <code>--rollback-on-failure</code>; the old spelling is a deprecated compatibility option. Use the new spelling in new Helm 4 scripts and inspect your installed version&rsquo;s help. Recovery can itself fail because of missing permissions, unavailable old images, or removed APIs. <a class="link" href="https://helm.sh/docs/overview/#cli-flags-renamed"  target="_blank" rel="noopener"
+    >Renamed flags</a></p>
+<p><strong>Rollback restores resource configuration, not the entire business system.</strong></p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>It can restore or attempt to restore</th>
+<th>It does not automatically restore</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>An earlier image reference</td>
+<td>Deleted or overwritten image contents</td>
+</tr>
+<tr>
+<td>Replicas, ports, environment settings</td>
+<td>Database writes and schema changes</td>
+</tr>
+<tr>
+<td>Helm-managed resource definitions</td>
+<td>External services or queue contents</td>
+</tr>
+<tr>
+<td>A chart&rsquo;s declared desired state</td>
+<td>External side effects of hook scripts</td>
+</tr>
+</tbody>
+</table></div>
+<p>Database migrations need compatibility planning and backups. Images need traceable versions or digests. Those responsibilities remain even when Helm manages releases.</p>
+<p><code>helm test</code> runs tests declared as chart hooks; it is not a built-in complete application test suite. This minimal chart defines no test hooks, so the exercise uses browser access. For charts with tests, a failed standalone <code>helm test</code> after a successful upgrade does not retroactively activate the earlier upgrade command&rsquo;s failure rollback option. <a class="link" href="https://helm.sh/docs/topics/chart_tests/"  target="_blank" rel="noopener"
+    >Chart tests</a></p>
+<h2 id="7-consume-existing-charts-and-distribute-your-own">7. Consume existing charts and distribute your own
+</h2><p>Writing a minimal chart helps explain the mechanics. In practice, you will also consume charts maintained by other projects. A useful sequence is: <strong>verify the source → inspect documentation and values → pin a version → preview resources → install and validate</strong>.</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Distribution method</th>
+<th>Storage</th>
+<th>How it is addressed</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Traditional repository</td>
+<td>HTTP service with an <code>index.yaml</code> and packages</td>
+<td>Register with <code>helm repo add</code></td>
+</tr>
+<tr>
+<td>OCI registry</td>
+<td>Registry supporting OCI artifacts</td>
+<td>Reference with <code>oci://</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>The following shows the shape of traditional repository commands. <code>example.com</code>, chart names, and versions are placeholders to replace with a real maintainer&rsquo;s information. <code>--version</code> pins the <strong>chart</strong> version:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">helm repo add vendor https://charts.example.com
+</span></span><span class="line"><span class="cl">helm repo update
+</span></span><span class="line"><span class="cl">helm search repo vendor
+</span></span><span class="line"><span class="cl">helm show values vendor/example-app --version 1.2.3
+</span></span><span class="line"><span class="cl">helm template demo vendor/example-app --version 1.2.3 -f my-values.yaml
+</span></span><span class="line"><span class="cl">helm install demo vendor/example-app --version 1.2.3 -f my-values.yaml -n app-space --create-namespace --wait
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Repository locations, image access rules, and maintenance status change. Check the maintainer&rsquo;s documentation rather than treating a tutorial&rsquo;s third-party address as a permanent interface. <a class="link" href="https://helm.sh/docs/intro/using_helm/"  target="_blank" rel="noopener"
+    >Using charts from repositories</a></p>
+<p>Package and inspect our own chart locally:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">helm package ./web-demo
+</span></span><span class="line"><span class="cl">helm show chart ./web-demo-0.1.0.tgz
+</span></span><span class="line"><span class="cl">helm template demo ./web-demo-0.1.0.tgz -n helm-lab
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>The <code>.tgz</code> file is a distributable chart package. Increase the chart version when templates or defaults change instead of distributing different contents under the same version.</p>
+<p>For OCI distribution, replace the placeholder registry with a real one where you have permissions:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">helm registry login registry.example.com
+</span></span><span class="line"><span class="cl">helm push web-demo-0.1.0.tgz oci://registry.example.com/charts
+</span></span><span class="line"><span class="cl">helm show values oci://registry.example.com/charts/web-demo --version 0.1.0
+</span></span><span class="line"><span class="cl">helm install demo oci://registry.example.com/charts/web-demo --version 0.1.0 -n helm-lab --create-namespace --wait
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Login uses the registry host. The push destination omits the chart name and version because Helm derives them from the package. OCI references do not need registration with the traditional <code>helm repo add</code> workflow. <a class="link" href="https://helm.sh/docs/topics/registries/"  target="_blank" rel="noopener"
+    >OCI registries</a></p>
+<p>Charts can declare <code>dependencies</code> in <code>Chart.yaml</code>. During development, <code>helm dependency update</code> resolves dependencies and creates or updates <code>Chart.lock</code>; later, <code>helm dependency build</code> reconstructs dependencies from the lock file. This does not pin all container images, which require their own version policy. <a class="link" href="https://helm.sh/docs/topics/charts/#chart-dependencies"  target="_blank" rel="noopener"
+    >Chart dependencies</a></p>
+<h2 id="8-troubleshooting-and-choosing-the-right-tool">8. Troubleshooting and choosing the right tool
+</h2><p>Each check answers a different question:</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Check</th>
+<th>What it tells you</th>
+<th>What it does not prove</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>helm lint</code></td>
+<td>Common structural or template issues</td>
+<td>Real cluster permissions and runtime behavior</td>
+</tr>
+<tr>
+<td><code>helm template</code></td>
+<td>The manifests generated from the inputs</td>
+<td>That anything was installed</td>
+</tr>
+<tr>
+<td>Installation/upgrade with <code>--wait</code></td>
+<td>Relevant resource readiness conditions</td>
+<td>Complete business availability</td>
+</tr>
+<tr>
+<td>A browser request or smoke test</td>
+<td>A particular request path works</td>
+<td>Every workflow is correct</td>
+</tr>
+<tr>
+<td>Monitoring and ongoing probes</td>
+<td>Continued operational behavior</td>
+<td>No future failures</td>
+</tr>
+</tbody>
+</table></div>
+<p>Start troubleshooting at the failing layer:</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Inspect first</th>
+<th>Typical explanation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>YAML parse error</code></td>
+<td><code>helm template --debug</code></td>
+<td>Indentation, quoting, generated value types</td>
+</tr>
+<tr>
+<td><code>cannot re-use a name</code></td>
+<td><code>helm list --all</code> in the right namespace</td>
+<td>Existing release, possibly needing an upgrade</td>
+</tr>
+<tr>
+<td><code>release not found</code></td>
+<td>Context, namespace, release name</td>
+<td>Wrong installation location</td>
+</tr>
+<tr>
+<td>Existing resource conflicts</td>
+<td>Ownership of the live object</td>
+<td>Another release or tool owns the resource</td>
+</tr>
+<tr>
+<td>Wait timeout</td>
+<td>Pod events, image pulls, probes, quota</td>
+<td>Resources did not become ready</td>
+</tr>
+<tr>
+<td>Service has no ready backends</td>
+<td>Selectors, labels, readiness</td>
+<td>No matching ready Pods</td>
+</tr>
+<tr>
+<td>A values change has no effect</td>
+<td>Computed values and rendered resources</td>
+<td>Override precedence or an unused input</td>
+</tr>
+</tbody>
+</table></div>
+<p>For this example:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">helm status demo -n helm-lab
+</span></span><span class="line"><span class="cl">helm <span class="nb">history</span> demo -n helm-lab
+</span></span><span class="line"><span class="cl">kubectl get pods -n helm-lab -l app.kubernetes.io/instance<span class="o">=</span>demo
+</span></span><span class="line"><span class="cl">kubectl describe deployment demo-web -n helm-lab
+</span></span><span class="line"><span class="cl">kubectl describe pods -n helm-lab -l app.kubernetes.io/instance<span class="o">=</span>demo
+</span></span><span class="line"><span class="cl">kubectl logs deployment/demo-web -n helm-lab --tail<span class="o">=</span><span class="m">100</span>
+</span></span><span class="line"><span class="cl">kubectl get events -n helm-lab --sort-by<span class="o">=</span>.metadata.creationTimestamp
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>A few operational details deserve attention:</p>
+<ul>
+<li><strong>Values files are not a secret vault.</strong> Sensitive inputs can appear in release records, rendered manifests, and CI logs. Keep real credentials out of public repositories and use an appropriate secret management workflow. Dry-run output may include Secret resources. <a class="link" href="https://helm.sh/docs/helm/helm_upgrade/"  target="_blank" rel="noopener"
+    >Output behavior</a></li>
+<li><strong>Do not adopt conflicting resources blindly.</strong> Ownership validation protects resources managed elsewhere. <code>--take-ownership</code> changes the scope of later upgrades and uninstalls; establish who is responsible first. <a class="link" href="https://helm.sh/docs/topics/advanced/#allow-helm-to-take-ownership-of-existing-resources"  target="_blank" rel="noopener"
+    >Resource ownership</a></li>
+<li><strong>Uninstall is not a guarantee that everything disappears.</strong> CRDs in <code>crds/</code> have special lifecycle handling; hook resources need deletion policies, and storage retention depends on templates and reclaim policies. <a class="link" href="https://helm.sh/docs/chart_best_practices/custom_resource_definitions/"  target="_blank" rel="noopener"
+    >CRD management</a>, <a class="link" href="https://helm.sh/docs/topics/charts_hooks/"  target="_blank" rel="noopener"
+    >hook lifecycle</a></li>
+</ul>
+<p>Clean up the releases you actually installed:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">helm uninstall demo -n helm-lab
+</span></span><span class="line"><span class="cl"><span class="c1"># Only needed if you installed the two optional environment releases</span>
+</span></span><span class="line"><span class="cl">helm uninstall web-dev -n helm-dev
+</span></span><span class="line"><span class="cl">helm uninstall web-prod -n helm-prod
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Release-managed resources are removed, but the namespace created with <code>--create-namespace</code> is not automatically deleted. This chart uses no persistent storage; review data retention before uninstalling database charts. <a class="link" href="https://helm.sh/docs/helm/helm_uninstall/"  target="_blank" rel="noopener"
+    >Uninstall reference</a></p>
+<p>Choose tools based on the problem:</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Requirement</th>
+<th>Consider</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A few stable resources</td>
+<td>Plain YAML and kubectl</td>
+</tr>
+<tr>
+<td>Environment-specific patches to existing YAML</td>
+<td>Kustomize</td>
+</tr>
+<tr>
+<td>Reusable configurable packages and release operations</td>
+<td>Helm</td>
+</tr>
+<tr>
+<td>Continuous reconciliation with configuration in Git</td>
+<td>GitOps controllers such as Argo CD or Flux</td>
+</tr>
+<tr>
+<td>Domain operations such as database failover and backup</td>
+<td>A suitable Operator</td>
+</tr>
+</tbody>
+</table></div>
+<p>These approaches can work together. <a class="link" href="https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/"  target="_blank" rel="noopener"
+    >Kustomize</a> transforms resource definitions, and <a class="link" href="https://kubernetes.io/docs/concepts/extend-kubernetes/operator/"  target="_blank" rel="noopener"
+    >Operators</a> automate domain-specific operations. A GitOps controller can consume charts and values, but its integration determines who owns release state: <a class="link" href="https://argo-cd.readthedocs.io/en/stable/user-guide/helm/"  target="_blank" rel="noopener"
+    >Argo CD uses Helm for rendering and manages the lifecycle itself</a>, so identical <code>helm history</code> behavior should not be assumed.</p>
+<p>Once this example makes sense, continue with <a class="link" href="/p/cicd-gitlab-ci-helm/" >CI/CD, GitLab CI, and Helm</a> to see why a delivery pipeline pins images, supplies environment inputs, verifies outcomes, and defines recovery explicitly.</p>
+<p>For further reading, use the <a class="link" href="https://helm.sh/docs/"  target="_blank" rel="noopener"
+    >official documentation</a>, <a class="link" href="https://helm.sh/docs/chart_template_guide/"  target="_blank" rel="noopener"
+    >template guide</a>, and <a class="link" href="https://helm.sh/docs/overview/"  target="_blank" rel="noopener"
+    >Helm 4 overview</a>. Check the documentation version against your installed <code>helm version</code> before copying version-sensitive options.</p>
+
+</div>
+
+            <footer class="article-footer">
+    
+        <div class="article-tags" aria-label="Article tags"><span class="article-footer-label">Filed under</span><a href="/tags/helm/">Helm</a><a href="/tags/kubernetes/">Kubernetes</a><a href="/tags/devops/">DevOps</a><a href="/tags/cloud-native/">Cloud Native</a></div>
+    
+    
+    
+    <div class="article-endnote"><span>Thanks for reading.</span><a href="#top">Back to top <span aria-hidden="true">↑</span></a></div>
+</footer>
+
+        </div>
+    </div>
+    
+</article>
+
+        <div class="reading-afterword">
+            
+            
+    <aside class="reading-related">
+        <div class="reading-section-heading"><span class="article-footer-label">Keep reading</span><span aria-hidden="true">↘</span></div>
+        
+            <a class="reading-related-link" href="/p/cicd-gitlab-ci-helm/"><span class="related-number">01</span><span class="related-title">CI/CD, GitLab CI, and Helm: From Commit to Kubernetes Delivery</span><time datetime="2026-10-17">2026.10.17</time><span class="related-arrow" aria-hidden="true">↗</span></a>
+        
+            <a class="reading-related-link" href="/p/k8s-container-cloud-deployment/"><span class="related-number">02</span><span class="related-title">K8s Container Cloud Deployment: From Dockerfile Image Build to Release</span><time datetime="2026-09-03">2026.09.03</time><span class="related-arrow" aria-hidden="true">↗</span></a>
+        
+            <a class="reading-related-link" href="/p/kubernetes-from-docker/"><span class="related-number">03</span><span class="related-title">从 Docker 到 Kubernetes：面向 Docker 用户的 K8s 从 0 到 1 教程</span><time datetime="2026-08-08">2026.08.08</time><span class="related-arrow" aria-hidden="true">↗</span></a>
+        
+    </aside>
+
+
+            
+        </div>
+    </div>
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+    </main>
+    
+<footer class="site-footer">
+    <div class="footer-top"><a class="footer-wordmark" href="/" aria-label="Snow">Sno<span>w</span></a><p>A place to think. A space to grow.</p><a href="#main-content" class="back-top">Back to top <span aria-hidden="true">↑</span></a></div>
+    <div class="footer-bottom"><span>© 2026 Snow</span><nav aria-label="More links"><a href="/about/">About</a><a href="https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0" target="_blank" rel="noopener noreferrer me">Bilibili <span aria-hidden="true">↗</span></a><a href="https://github.com/SymphonyW" target="_blank" rel="noopener noreferrer me">GitHub <span aria-hidden="true">↗</span></a><a href="https://twitter.com" target="_blank" rel="noopener noreferrer me">Twitter <span aria-hidden="true">↗</span></a><a href="/index.xml">RSS ↗</a></nav><span class="footer-colophon">Built with Hugo · Always in progress</span></div>
+</footer>
+
+    
+
+<script src="/ts/main.c86029ddb4aad8364879723acaf7efcd526e724d2381088d445aaf6f3ab1bfdf.js" defer></script>
+
+
+<script src="/ts/custom.6c99a7b037ac7e2bde801fbad26b9c20b3b18707868c164174142870ef3bc309.js" defer></script>
+
+
+
+
+
+<script>
+window.MathJax = {
+  tex: {
+    
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  svg: {
+    fontCache: 'global'
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
+
+</body>
+</html>

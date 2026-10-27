@@ -1,0 +1,1258 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="An illustrated guide to HTTP API structure, REST, RPC, JSON-RPC, gRPC, GraphQL, SOAP, and the different roles of SSE, WebSocket, and webhooks, using an order service throughout.">
+<title>HTTP API Styles Explained: REST, RPC, GraphQL, and SOAP</title>
+
+<link rel='canonical' href='https://SymphonyW.github.io/p/http-api-styles/'>
+<link rel="stylesheet" href="/scss/custom.min.919cf0d34f895fec4bc36912621fd0297f1439e1574bdf28d3195939a83690e8.css">
+<script>
+(() => {
+    let preference = 'auto';
+    try { preference = localStorage.getItem('StackColorScheme') || preference; } catch (_) {}
+    document.documentElement.dataset.scheme = preference === 'dark' || (preference === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+})();
+</script>
+
+<meta property='og:title' content="HTTP API Styles Explained: REST, RPC, GraphQL, and SOAP">
+<meta property='og:description' content="An illustrated guide to HTTP API structure, REST, RPC, JSON-RPC, gRPC, GraphQL, SOAP, and the different roles of SSE, WebSocket, and webhooks, using an order service throughout.">
+<meta property='og:url' content='https://SymphonyW.github.io/p/http-api-styles/'>
+<meta property='og:site_name' content='Snow'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='HTTP' /><meta property='article:tag' content='API' /><meta property='article:tag' content='REST' /><meta property='article:tag' content='RPC' /><meta property='article:tag' content='GraphQL' /><meta property='article:tag' content='Backend' /><meta property='article:published_time' content='2026-10-22T10:00:00&#43;08:00'/><meta property='article:modified_time' content='2026-10-22T10:00:00&#43;08:00'/><meta property='og:image' content='https://SymphonyW.github.io/p/http-api-styles/bg.png' />
+<meta name="twitter:title" content="HTTP API Styles Explained: REST, RPC, GraphQL, and SOAP">
+<meta name="twitter:description" content="An illustrated guide to HTTP API structure, REST, RPC, JSON-RPC, gRPC, GraphQL, SOAP, and the different roles of SSE, WebSocket, and webhooks, using an order service throughout."><meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content='https://SymphonyW.github.io/p/http-api-styles/bg.png' />
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    
+    <noscript><style>@media(max-width:760px){.site-header{position:static}.site-header__inner{height:auto;min-height:66px;flex-wrap:wrap}.site-nav{position:static;display:grid;order:3;flex-basis:100%;padding:8px 0 18px}.menu-toggle,.theme-toggle{display:none}}</style></noscript>
+</head>
+<body id="top" class="article-page">
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    
+<header class="site-header">
+    <div class="site-header__inner">
+        <a class="site-brand" href="/" aria-label="Snow — Home">S<span>now.</span></a>
+        <nav class="site-nav" id="site-navigation" aria-label="Main navigation">
+            
+            
+                
+                    
+                    
+                    <a href="/">Home</a>
+                
+            
+                
+                    
+                    
+                    <a href="/post/" aria-current="page">Blog</a>
+                
+            
+                
+                    
+                    
+                    <a href="/archives/">Archives</a>
+                
+            
+                
+                    
+                    
+                    <a href="/diary/">Diary</a>
+                
+            
+                
+                    
+                    
+                    <a href="/stats/">Stats</a>
+                
+            
+                
+            
+                
+                    
+                    
+                    <a href="/links/">Links</a>
+                
+            
+        </nav>
+        <div class="header-tools">
+            
+                <a class="language-link" href="/zh-cn/p/http-api-styles/" lang="zh-cn" hreflang="zh-cn" aria-label="切换到中文">中</a>
+            
+            <button type="button" id="dark-mode-toggle" class="icon-button theme-toggle" aria-label="Toggle color theme" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><path d="M12 4.5a7.5 7.5 0 0 1 0 15z" fill="currentColor" stroke="none"/></svg></button>
+            <a class="icon-button search-link" href="/search/" aria-label="Search articles"><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+</a>
+            <button class="icon-button menu-toggle" type="button" aria-expanded="false" aria-controls="site-navigation" aria-label="Open navigation"><span></span><span></span></button>
+        </div>
+    </div>
+    <div class="reading-progress" aria-hidden="true"></div>
+</header>
+
+    <main id="main-content" class="site-main main" tabindex="-1">
+        
+    <div class="reading-page">
+        <article class="main-article has-toc">
+    <header class="article-header">
+    <div class="article-wayfinding">
+        
+            <a href="/post/"><span aria-hidden="true">←</span> All writing</a>
+        
+        <span class="article-kind">Notes & observations</span>
+    </div>
+    <div class="article-details">
+    
+    <h1 class="article-title">HTTP API Styles Explained: REST, RPC, GraphQL, and SOAP</h1>
+    <p class="article-subtitle">An illustrated guide to HTTP API structure, REST, RPC, JSON-RPC, gRPC, GraphQL, SOAP, and the different roles of SSE, WebSocket, and webhooks, using an order service throughout.</p>
+    <div class="article-meta">
+        
+            <time datetime="2026-10-22T10:00:00&#43;08:00">October 22, 2026</time>
+            <span class="meta-divider" aria-hidden="true">/</span>
+            <span>17 min read</span>
+        
+        
+            <div class="article-translations"><a href="/zh-cn/p/http-api-styles/" hreflang="zh-cn" lang="zh-cn">阅读中文版 <span aria-hidden="true">↗</span></a></div>
+        
+    </div>
+</div>
+
+</header>
+
+    <div class="reading-layout">
+        
+            <aside class="reading-margin" aria-label="Article contents">
+                <details class="article-toc" open>
+                    <summary><span>On this page</span><span class="toc-indicator" aria-hidden="true">+</span></summary>
+                    <nav id="TableOfContents">
+  <ol>
+    <li><a href="#separate-api-design-data-encoding-and-communication-patterns">Separate API design, data encoding, and communication patterns</a></li>
+    <li><a href="#rest-organize-interactions-around-resources">REST: organize interactions around resources</a></li>
+    <li><a href="#rpc-organize-interactions-around-remote-methods">RPC: organize interactions around remote methods</a></li>
+    <li><a href="#graphql-let-clients-select-the-fields-they-need">GraphQL: let clients select the fields they need</a></li>
+    <li><a href="#soap-exchange-messages-inside-an-xml-envelope">SOAP: exchange messages inside an XML envelope</a></li>
+    <li><a href="#continuous-updates-and-events-sse-websocket-and-webhooks">Continuous updates and events: SSE, WebSocket, and webhooks</a></li>
+    <li><a href="#choosing-a-design-and-completing-the-contract">Choosing a design and completing the contract</a></li>
+    <li><a href="#references">References</a></li>
+  </ol>
+</nav>
+                </details>
+            </aside>
+        
+        <div class="reading-body">
+            <div class="article-content"><p>When building a web application, you might hear that an API is RESTful, internal services use RPC, the frontend uses GraphQL, or results arrive through SSE. These terms all concern communication between programs, but they describe different aspects of that communication.</p>
+<p>Three questions help organize them: <strong>Does the interface revolve around resources or actions? How is the data encoded? Does the result arrive at once or over time?</strong></p>
+<p><a href="/p/http-api-styles/bg.png" target="_blank" rel="noopener noreferrer"><img src="/p/http-api-styles/bg.png" alt="HTTP API overview: resources, remote methods, and selected fields can all use HTTP" width="1600" height="900" loading="lazy" decoding="async" class="gallery-image" data-flex-grow="177" data-flex-basis="426px"></a>
+</p>
+<p>This article follows an order service: reading, creating, and cancelling orders, then receiving status updates. Domains and business fields are illustrative, not live services. Unless stated otherwise, HTTP examples use readable HTTP/1.1 notation and omit unrelated framing details such as content lengths.</p>
+<h2 id="separate-api-design-data-encoding-and-communication-patterns">Separate API design, data encoding, and communication patterns
+</h2><p>REST, RPC, GraphQL, and SOAP are not equivalent HTTP data formats. Calling them API types is convenient, but understanding them requires separating the questions they answer.</p>
+<p><a href="/p/http-api-styles/api-layers.svg" target="_blank" rel="noopener noreferrer"><img src="/p/http-api-styles/api-layers.svg" alt="API design, message transport, data encoding, and interface contracts are separate dimensions" loading="lazy" decoding="async"></a>
+</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Question</th>
+<th>Relevant concept</th>
+<th>Examples</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>What organizes the interface?</td>
+<td>Design approach</td>
+<td>Resources in REST; remote methods in RPC</td>
+</tr>
+<tr>
+<td>How does a client describe the data it needs?</td>
+<td>Query language and execution model</td>
+<td>GraphQL field selection, types, and execution</td>
+</tr>
+<tr>
+<td>What rules structure the messages?</td>
+<td>Message protocol or framework</td>
+<td>JSON-RPC, SOAP; gRPC adds tooling such as generated code</td>
+</tr>
+<tr>
+<td>How do messages travel?</td>
+<td>Communication protocol or interaction pattern</td>
+<td>HTTP requests, SSE, WebSocket, webhook callbacks</td>
+</tr>
+<tr>
+<td>How is message data represented?</td>
+<td>Data format and encoding</td>
+<td>JSON, XML, Protocol Buffers</td>
+</tr>
+<tr>
+<td>How do both sides agree on inputs and outputs?</td>
+<td>Interface description and contract</td>
+<td>OpenAPI, <code>.proto</code>, GraphQL Schema, WSDL</td>
+</tr>
+</tbody>
+</table></div>
+<p>These dimensions can be combined. One API might use <strong>resource-oriented design + HTTP + JSON + OpenAPI</strong>, while another uses <strong>RPC + gRPC + HTTP/2 + Protocol Buffers</strong>. JSON-RPC itself is transport independent.</p>
+<p>JSON is a text data interchange format; it does not define API URLs, method dispatch, or error semantics. OpenAPI describes HTTP interfaces, so having an OpenAPI document does not establish REST conformance. <a class="link" href="https://www.rfc-editor.org/rfc/rfc8259.html"  target="_blank" rel="noopener"
+    >JSON standard</a>, <a class="link" href="https://spec.openapis.org/oas/latest.html"  target="_blank" rel="noopener"
+    >OpenAPI Specification</a></p>
+<p><strong>What does an HTTP request contain?</strong></p>
+<p>Regardless of the higher-level design, an HTTP call involves a method, target, headers, and, where applicable, a body:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-http" data-lang="http"><span class="line"><span class="cl"><span class="nf">POST</span> <span class="nn">/orders</span> <span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span>
+</span></span><span class="line"><span class="cl"><span class="n">Host</span><span class="o">:</span> <span class="l">api.example.com</span>
+</span></span><span class="line"><span class="cl"><span class="n">Authorization</span><span class="o">:</span> <span class="l">Bearer example-token</span>
+</span></span><span class="line"><span class="cl"><span class="n">Content-Type</span><span class="o">:</span> <span class="l">application/json</span>
+</span></span><span class="line"><span class="cl"><span class="n">Accept</span><span class="o">:</span> <span class="l">application/json</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;product_id&#34;</span><span class="p">:</span> <span class="s2">&#34;P100&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;quantity&#34;</span><span class="p">:</span> <span class="mi">2</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Part</th>
+<th>Example</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Method</td>
+<td><code>POST</code></td>
+<td>Expresses HTTP request semantics</td>
+</tr>
+<tr>
+<td>Path</td>
+<td><code>/orders</code></td>
+<td>Identifies the resource or endpoint</td>
+</tr>
+<tr>
+<td>Query parameters</td>
+<td><code>?status=paid&amp;limit=20</code></td>
+<td>Filtering and pagination in this contract</td>
+</tr>
+<tr>
+<td>Headers</td>
+<td><code>Authorization</code>, <code>Content-Type</code></td>
+<td>Identity, body format, and other metadata</td>
+</tr>
+<tr>
+<td>Body</td>
+<td>Product identifier and quantity</td>
+<td>Submitted data</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>Content-Type</code> describes the content being sent; <code>Accept</code> describes acceptable response formats. A body can also contain form data, uploaded files using <code>multipart/form-data</code>, XML, or binary data.</p>
+<p>A response might be:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-http" data-lang="http"><span class="line"><span class="cl"><span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span> <span class="m">201</span> <span class="ne">Created</span>
+</span></span><span class="line"><span class="cl"><span class="n">Content-Type</span><span class="o">:</span> <span class="l">application/json</span>
+</span></span><span class="line"><span class="cl"><span class="n">Location</span><span class="o">:</span> <span class="l">/orders/1001</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;id&#34;</span><span class="p">:</span> <span class="s2">&#34;1001&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;status&#34;</span><span class="p">:</span> <span class="s2">&#34;pending&#34;</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Here, <code>201</code> reports creation and <code>Location</code> identifies the new order. HTTP/2 and HTTP/3 use different wire representations, while retaining method and status semantics. HTTP is an application-layer protocol; saying it carries an API describes its relationship to the interface design. <a class="link" href="https://www.rfc-editor.org/rfc/rfc9110.html"  target="_blank" rel="noopener"
+    >HTTP semantics</a></p>
+<h2 id="rest-organize-interactions-around-resources">REST: organize interactions around resources
+</h2><p>REST stands for Representational State Transfer. A useful starting point is: <strong>identify resources, read or change their state through representations, and follow a uniform interaction model.</strong></p>
+<p>Orders, users, and products can be resources. A returned JSON object is one representation of an order, rather than necessarily a copy of a database row.</p>
+<p><a href="/p/http-api-styles/request-styles.svg" target="_blank" rel="noopener noreferrer"><img src="/p/http-api-styles/request-styles.svg" alt="The same order operation expressed as a resource request, a remote method, or a selection of fields" loading="lazy" decoding="async"></a>
+</p>
+<p><strong>A typical resource-oriented HTTP interface</strong></p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Need</th>
+<th>Common request</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>List orders</td>
+<td><code>GET /orders?status=paid</code></td>
+<td>Filter a collection</td>
+</tr>
+<tr>
+<td>Read one order</td>
+<td><code>GET /orders/1001</code></td>
+<td>Retrieve an order</td>
+</tr>
+<tr>
+<td>Create an order</td>
+<td><code>POST /orders</code></td>
+<td>Submit to the collection</td>
+</tr>
+<tr>
+<td>Replace an order representation</td>
+<td><code>PUT /orders/1001</code></td>
+<td>Submit the complete writable representation defined by the contract</td>
+</tr>
+<tr>
+<td>Modify selected fields</td>
+<td><code>PATCH /orders/1001</code></td>
+<td>Apply a supported patch format</td>
+</tr>
+<tr>
+<td>Delete an order resource</td>
+<td><code>DELETE /orders/1001</code></td>
+<td>Request deletion, if the business permits it</td>
+</tr>
+</tbody>
+</table></div>
+<p>The address identifies the resource and the method supplies operation semantics. English plural nouns and JSON responses are conventions, not requirements of REST.</p>
+<p><strong>REST requires more than noun-shaped URLs</strong></p>
+<p>Fielding&rsquo;s architectural style includes these constraints:</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Constraint</th>
+<th>Practical interpretation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Client-server</td>
+<td>Presentation and server implementation can evolve separately</td>
+</tr>
+<tr>
+<td>Stateless communication</td>
+<td>Each request contains what is needed to understand it, without relying on stored conversational context</td>
+</tr>
+<tr>
+<td>Cacheability</td>
+<td>Responses indicate whether they can be reused; not every response must be cached</td>
+</tr>
+<tr>
+<td>Uniform interface</td>
+<td>Identify resources, manipulate them through representations, use self-descriptive messages, and expose hypermedia controls</td>
+</tr>
+<tr>
+<td>Layered system</td>
+<td>Intermediaries such as gateways can stand between clients and services</td>
+</tr>
+<tr>
+<td>Optional code on demand</td>
+<td>Supply executable client code when needed</td>
+</tr>
+</tbody>
+</table></div>
+<p>Statelessness does not prohibit databases or mandate JWT. Persistent order data is perfectly compatible with it; the constraint concerns session state used to interpret interactions.</p>
+<p>Hypermedia controls help a client discover what it can do next, such as following a cancellation link from an order representation. The meaning of that control, its method, and its submission format must also be understood through the media type or contract.</p>
+<p>Many engineering teams use “REST API” for an interface that mainly follows resource naming, HTTP methods, and status codes. “Resource-oriented HTTP API” is often a more precise description. URL spelling alone cannot establish full REST conformance. <a class="link" href="https://ics.uci.edu/~fielding/pubs/dissertation/rest_arch_style.htm"  target="_blank" rel="noopener"
+    >Fielding&rsquo;s original REST description</a></p>
+<p><strong>How should cancellation be represented?</strong></p>
+<p>Cancelling an order usually does not delete it. The record remains useful for history, refunds, and audits. One design creates a cancellation subresource:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-http" data-lang="http"><span class="line"><span class="cl"><span class="nf">POST</span> <span class="nn">/orders/1001/cancellations</span> <span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span>
+</span></span><span class="line"><span class="cl"><span class="n">Host</span><span class="o">:</span> <span class="l">api.example.com</span>
+</span></span><span class="line"><span class="cl"><span class="n">Content-Type</span><span class="o">:</span> <span class="l">application/json</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;reason&#34;</span><span class="p">:</span> <span class="s2">&#34;ordered_by_mistake&#34;</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>This works well when a cancellation has its own identifier, review process, or status. If cancellation is a simple state change, an explicitly supported patch can also work:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-http" data-lang="http"><span class="line"><span class="cl"><span class="nf">PATCH</span> <span class="nn">/orders/1001</span> <span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span>
+</span></span><span class="line"><span class="cl"><span class="n">Host</span><span class="o">:</span> <span class="l">api.example.com</span>
+</span></span><span class="line"><span class="cl"><span class="n">Content-Type</span><span class="o">:</span> <span class="l">application/merge-patch+json</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;status&#34;</span><span class="p">:</span> <span class="s2">&#34;cancelled&#34;</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>The server must still validate whether the current order state permits cancellation. It must not blindly store whatever status a client submits. An action endpoint such as <code>POST /orders/1001/cancel</code> can also be a practical design when its business meaning is explicit. PATCH applies partial modifications according to the selected patch format. <a class="link" href="https://www.rfc-editor.org/rfc/rfc5789.html"  target="_blank" rel="noopener"
+    >PATCH standard</a>, <a class="link" href="https://www.rfc-editor.org/rfc/rfc7396.html"  target="_blank" rel="noopener"
+    >JSON Merge Patch</a></p>
+<p><strong>Safety, idempotency, and caching are different properties</strong></p>
+<p>In HTTP, a safe method means the client does not request a state change. It does not mean an endpoint is free from security vulnerabilities, and incidental effects such as logging can still occur.</p>
+<p>An idempotent operation has the same intended server effect when an identical request is made once or repeatedly. Deleting an already deleted resource may return <code>404</code> after an initial <code>204</code> and still be idempotent: the final state remains the same.</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Safe</th>
+<th>Idempotent by method semantics</th>
+<th>Important detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET</code></td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Must not trigger cancellation or transfers</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td>No</td>
+<td>Not guaranteed</td>
+<td>Business logic can add deduplication</td>
+</tr>
+<tr>
+<td><code>PUT</code></td>
+<td>No</td>
+<td>Yes</td>
+<td>Creates or replaces the target resource state</td>
+</tr>
+<tr>
+<td><code>PATCH</code></td>
+<td>No</td>
+<td>Not guaranteed</td>
+<td>Setting a value and incrementing it behave differently on repetition</td>
+</tr>
+<tr>
+<td><code>DELETE</code></td>
+<td>No</td>
+<td>Yes</td>
+<td>Identical responses are not required</td>
+</tr>
+</tbody>
+</table></div>
+<p>Changing a method label to <code>PUT</code> cannot fix a non-idempotent implementation. Retry decisions need to respect actual operation semantics. <a class="link" href="https://www.rfc-editor.org/rfc/rfc9110.html#section-9.2"  target="_blank" rel="noopener"
+    >HTTP safety and idempotency</a></p>
+<p>Caching asks whether a previous response can be reused. For example:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-http" data-lang="http"><span class="line"><span class="cl"><span class="err">Cache-Control: private, max-age=30
+</span></span></span><span class="line"><span class="cl"><span class="err">ETag: &#34;order-1001-v3&#34;
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>A later request containing <code>If-None-Match: &quot;order-1001-v3&quot;</code> can receive <code>304 Not Modified</code> if the representation has not changed. <code>private</code> excludes shared caches, while permitting private caching. Sensitive data requires an appropriate storage policy. A GET response is not automatically suitable for every CDN to cache. <a class="link" href="https://www.rfc-editor.org/rfc/rfc9111.html"  target="_blank" rel="noopener"
+    >HTTP caching</a></p>
+<h2 id="rpc-organize-interactions-around-remote-methods">RPC: organize interactions around remote methods
+</h2><p>RPC means Remote Procedure Call. It expresses operations in a form such as:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">GetOrder(id=&#34;1001&#34;)
+</span></span><span class="line"><span class="cl">CreateOrder(product_id=&#34;P100&#34;, quantity=2)
+</span></span><span class="line"><span class="cl">CancelOrder(id=&#34;1001&#34;, reason=&#34;ordered_by_mistake&#34;)
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>REST starts with the resource; RPC starts with the operation. Actions such as calculating shipping, generating a report, or approving an application can be easy to express as methods.</p>
+<p><strong>Plain HTTP RPC</strong></p>
+<p>RPC does not require a specialized framework. A team-defined HTTP endpoint can implement it:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-http" data-lang="http"><span class="line"><span class="cl"><span class="nf">POST</span> <span class="nn">/rpc/order.cancel</span> <span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span>
+</span></span><span class="line"><span class="cl"><span class="n">Host</span><span class="o">:</span> <span class="l">api.example.com</span>
+</span></span><span class="line"><span class="cl"><span class="n">Content-Type</span><span class="o">:</span> <span class="l">application/json</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;order_id&#34;</span><span class="p">:</span> <span class="s2">&#34;1001&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;reason&#34;</span><span class="p">:</span> <span class="s2">&#34;ordered_by_mistake&#34;</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Another contract might use <code>/OrderService/CancelOrder</code>. RPC does not prescribe one URL structure, require binary encoding, bypass HTTP, or guarantee better performance than REST.</p>
+<p>When many methods share one entry point, gateways and monitoring often need to inspect the method name to apply operation-specific authorization, limits, and error metrics.</p>
+<p><strong>JSON-RPC standardizes the method-call envelope</strong></p>
+<p>JSON-RPC 2.0 defines request and response structures rather than leaving every field to a team&rsquo;s conventions:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-http" data-lang="http"><span class="line"><span class="cl"><span class="nf">POST</span> <span class="nn">/rpc</span> <span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span>
+</span></span><span class="line"><span class="cl"><span class="n">Host</span><span class="o">:</span> <span class="l">api.example.com</span>
+</span></span><span class="line"><span class="cl"><span class="n">Content-Type</span><span class="o">:</span> <span class="l">application/json</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;jsonrpc&#34;</span><span class="p">:</span> <span class="s2">&#34;2.0&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;method&#34;</span><span class="p">:</span> <span class="s2">&#34;order.cancel&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;params&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;order_id&#34;</span><span class="p">:</span> <span class="s2">&#34;1001&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;reason&#34;</span><span class="p">:</span> <span class="s2">&#34;ordered_by_mistake&#34;</span>
+</span></span><span class="line"><span class="cl">  <span class="p">},</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;id&#34;</span><span class="p">:</span> <span class="mi">7</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>A successful response:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;jsonrpc&#34;</span><span class="p">:</span> <span class="s2">&#34;2.0&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;result&#34;</span><span class="p">:</span> <span class="p">{</span> <span class="nt">&#34;order_id&#34;</span><span class="p">:</span> <span class="s2">&#34;1001&#34;</span><span class="p">,</span> <span class="nt">&#34;status&#34;</span><span class="p">:</span> <span class="s2">&#34;cancelled&#34;</span> <span class="p">},</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;id&#34;</span><span class="p">:</span> <span class="mi">7</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>A failure caused by invalid method parameters:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;jsonrpc&#34;</span><span class="p">:</span> <span class="s2">&#34;2.0&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;error&#34;</span><span class="p">:</span> <span class="p">{</span> <span class="nt">&#34;code&#34;</span><span class="p">:</span> <span class="mi">-32602</span><span class="p">,</span> <span class="nt">&#34;message&#34;</span><span class="p">:</span> <span class="s2">&#34;Invalid params&#34;</span> <span class="p">},</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;id&#34;</span><span class="p">:</span> <span class="mi">7</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>The <code>id</code> correlates responses with requests; it is not a business deduplication key. A response contains either <code>result</code> or <code>error</code>, never both. Omitting the request <code>id</code> creates a notification, which receives no JSON-RPC response. An HTTP transport must still finish the HTTP exchange, without a JSON-RPC response object.</p>
+<p>Batch calls do not imply a transaction or guarantee execution and response order. Match results using their identifiers. The core specification does not prescribe a universal mapping to HTTP status codes. <a class="link" href="https://www.jsonrpc.org/specification"  target="_blank" rel="noopener"
+    >JSON-RPC 2.0 Specification</a></p>
+<p><strong>gRPC builds generated calls around a contract</strong></p>
+<p>With gRPC, a typical workflow defines services, methods, and messages in a <code>.proto</code> file, then generates client and server code:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-protobuf" data-lang="protobuf"><span class="line"><span class="cl"><span class="n">syntax</span> <span class="o">=</span> <span class="s">&#34;proto3&#34;</span><span class="p">;</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="kn">package</span> <span class="nn">shop</span><span class="p">;</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="kd">service</span> <span class="n">OrderService</span> <span class="p">{</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span>  <span class="k">rpc</span> <span class="n">GetOrder</span> <span class="p">(</span><span class="n">GetOrderRequest</span><span class="p">)</span> <span class="k">returns</span> <span class="p">(</span><span class="n">Order</span><span class="p">);</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span>  <span class="k">rpc</span> <span class="n">CancelOrder</span> <span class="p">(</span><span class="n">CancelOrderRequest</span><span class="p">)</span> <span class="k">returns</span> <span class="p">(</span><span class="n">Order</span><span class="p">);</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="p">}</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="kd">message</span> <span class="nc">GetOrderRequest</span> <span class="p">{</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span>  <span class="kt">string</span> <span class="n">order_id</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="p">}</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="kd">message</span> <span class="nc">CancelOrderRequest</span> <span class="p">{</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span>  <span class="kt">string</span> <span class="n">order_id</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span>  <span class="kt">string</span> <span class="n">reason</span> <span class="o">=</span> <span class="mi">2</span><span class="p">;</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="p">}</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="kd">message</span> <span class="nc">Order</span> <span class="p">{</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span>  <span class="kt">string</span> <span class="n">id</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span>  <span class="kt">string</span> <span class="n">status</span> <span class="o">=</span> <span class="mi">2</span><span class="p">;</span><span class="err">
+</span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="p">}</span><span class="err">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>The numbers are field identifiers, not default values. Both sides use the definition to interpret messages; Protocol Buffers is the default binary message encoding.</p>
+<p><a href="/p/http-api-styles/grpc-flow.svg" target="_blank" rel="noopener noreferrer"><img src="/p/http-api-styles/grpc-flow.svg" alt="gRPC flow: a shared proto contract generates both sides, which exchange encoded messages over HTTP/2" loading="lazy" decoding="async"></a>
+</p>
+<p>The common native gRPC protocol mapping uses HTTP/2, paths such as <code>/shop.OrderService/GetOrder</code>, and a content type such as <code>application/grpc</code>. Calls can be unary, server streaming, client streaming, or bidirectional streaming. <a class="link" href="https://grpc.io/docs/what-is-grpc/core-concepts/"  target="_blank" rel="noopener"
+    >gRPC core concepts</a></p>
+<p>This makes gRPC a direct counterexample to treating HTTP and RPC as mutually exclusive. However, it is not an ordinary JSON POST endpoint: it defines message framing, and the final <code>grpc-status</code> usually arrives in trailing metadata. HTTP <code>200</code> does not by itself establish RPC success. <a class="link" href="https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md"  target="_blank" rel="noopener"
+    >gRPC HTTP/2 mapping</a></p>
+<p>Browser integrations commonly use gRPC-Web or a gateway. Browser support for HTTP/2 does not expose all native gRPC capabilities; streaming support depends on the client and deployment. <a class="link" href="https://github.com/grpc/grpc-web"  target="_blank" rel="noopener"
+    >gRPC-Web</a></p>
+<p>gRPC is useful when explicit contracts, cross-language collaboration, and generated clients matter. It also introduces code generation, compatibility, and debugging requirements. Measure performance with actual payloads, networks, and call chains rather than assuming a winner from protocol names.</p>
+<p><strong>A remote method is still a network operation</strong></p>
+<p>Suppose a cancellation completes on the server, but its response is lost. A client timeout cannot establish that the server did nothing.</p>
+<p>For an operation such as charging a payment, blindly retrying could duplicate the effect. A business contract can introduce a persistent idempotency key and result record, defining scope, retention, concurrency, and handling of different parameters with the same key. This concern also applies to REST, GraphQL, and SOAP.</p>
+<h2 id="graphql-let-clients-select-the-fields-they-need">GraphQL: let clients select the fields they need
+</h2><p>An order page might need only an order identifier, status, and customer name. A fixed response might return additional unused fields or require a separate customer request.</p>
+<p>GraphQL allows clients to select fields through types and relationships exposed by the server:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span><span class="lnt">9
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-graphql" data-lang="graphql"><span class="line"><span class="cl"><span class="kd">query</span><span class="w"> </span><span class="nc">OrderDetail</span><span class="p">(</span><span class="nv">$id</span><span class="p">:</span><span class="w"> </span><span class="nc">ID</span><span class="p">!)</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="py">order</span><span class="p">(</span><span class="py">id</span><span class="p">:</span><span class="w"> </span><span class="nv">$id</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nc">id</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="py">status</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="py">customer</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="py">name</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="p">}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="p">}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">}</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>This assumes the server Schema defines <code>order</code>, <code>customer</code>, and their fields. GraphQL does not give clients arbitrary SQL access; they are limited to the exposed schema and their permissions.</p>
+<p>A typical HTTP request is:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-http" data-lang="http"><span class="line"><span class="cl"><span class="nf">POST</span> <span class="nn">/graphql</span> <span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span>
+</span></span><span class="line"><span class="cl"><span class="n">Host</span><span class="o">:</span> <span class="l">api.example.com</span>
+</span></span><span class="line"><span class="cl"><span class="n">Content-Type</span><span class="o">:</span> <span class="l">application/json</span>
+</span></span><span class="line"><span class="cl"><span class="n">Accept</span><span class="o">:</span> <span class="l">application/graphql-response+json</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;query&#34;</span><span class="p">:</span> <span class="s2">&#34;query OrderDetail($id: ID!) { order(id: $id) { id status customer { name } } }&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;variables&#34;</span><span class="p">:</span> <span class="p">{</span> <span class="nt">&#34;id&#34;</span><span class="p">:</span> <span class="s2">&#34;1001&#34;</span> <span class="p">},</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;operationName&#34;</span><span class="p">:</span> <span class="s2">&#34;OrderDetail&#34;</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>GraphQL commonly uses one endpoint; <code>/graphql</code> is a convention. Queries can use POST, and a server may also support GET queries. Mutations must not execute through GET. GraphQL is transport independent; GraphQL over HTTP adds HTTP-specific rules and remains a draft at the time of writing. <a class="link" href="https://graphql.org/learn/serving-over-http/"  target="_blank" rel="noopener"
+    >Serving GraphQL over HTTP</a></p>
+<p>The response follows the selected shape:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span><span class="lnt">9
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;data&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;order&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">      <span class="nt">&#34;id&#34;</span><span class="p">:</span> <span class="s2">&#34;1001&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">      <span class="nt">&#34;status&#34;</span><span class="p">:</span> <span class="s2">&#34;paid&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">      <span class="nt">&#34;customer&#34;</span><span class="p">:</span> <span class="p">{</span> <span class="nt">&#34;name&#34;</span><span class="p">:</span> <span class="s2">&#34;Lin&#34;</span> <span class="p">}</span>
+</span></span><span class="line"><span class="cl">    <span class="p">}</span>
+</span></span><span class="line"><span class="cl">  <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>Writes use mutations, assuming the schema exposes the relevant field:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-graphql" data-lang="graphql"><span class="line"><span class="cl"><span class="kd">mutation</span><span class="w"> </span><span class="nc">CancelOrder</span><span class="p">(</span><span class="nv">$id</span><span class="p">:</span><span class="w"> </span><span class="nc">ID</span><span class="p">!)</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="py">cancelOrder</span><span class="p">(</span><span class="py">id</span><span class="p">:</span><span class="w"> </span><span class="nv">$id</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nc">id</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="py">status</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="p">}</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="p">}</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>Queries emphasize data shape, while mutations often use action names. GraphQL changes more than endpoint spelling.</p>
+<p><strong>One HTTP request does not mean one database query</strong></p>
+<p>If a request retrieves 20 orders and the server queries each customer separately, it can execute one order query plus 20 customer queries: the N+1 problem. Fewer browser requests do not necessarily mean fewer backend operations.</p>
+<p>Production implementations need techniques such as batch loading, pagination, query cost controls, and field-level authorization. GraphQL does not supply those outcomes automatically. <a class="link" href="https://graphql.org/learn/performance/"  target="_blank" rel="noopener"
+    >GraphQL performance</a></p>
+<p><strong>GraphQL does not always return HTTP 200</strong></p>
+<p>A response can contain both <code>data</code> and <code>errors</code>: basic order fields may succeed while a nullable related field fails. Clients need to inspect errors and affected fields instead of assuming that HTTP success means a complete result. <a class="link" href="https://graphql.org/learn/response/"  target="_blank" rel="noopener"
+    >GraphQL response rules</a></p>
+<p>Malformed requests, pre-execution validation failures, server failures, and field execution failures have different behavior. Response media types such as <code>application/json</code> and <code>application/graphql-response+json</code> also affect status conventions. Follow the server&rsquo;s contract and implementation. <a class="link" href="https://graphql.org/learn/debug-errors/"  target="_blank" rel="noopener"
+    >GraphQL HTTP errors</a></p>
+<p>GraphQL is worth considering when clients need substantially different combinations of related data. For a handful of stable queries and forms, a resource-oriented API or simple RPC interface can be easier to maintain. That is an engineering tradeoff, not a universal protocol ranking.</p>
+<h2 id="soap-exchange-messages-inside-an-xml-envelope">SOAP: exchange messages inside an XML envelope
+</h2><p>SOAP is a messaging protocol often encountered when integrating existing enterprise services. Its XML structure includes Envelope, optional Header, Body, and Fault. It can carry RPC-style calls or document messages; it is not simply REST encoded as XML. <a class="link" href="https://www.w3.org/TR/soap12-part1/"  target="_blank" rel="noopener"
+    >SOAP 1.2 messaging framework</a></p>
+<p>A SOAP 1.2 request might look like:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-http" data-lang="http"><span class="line"><span class="cl"><span class="nf">POST</span> <span class="nn">/OrderService</span> <span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span>
+</span></span><span class="line"><span class="cl"><span class="n">Host</span><span class="o">:</span> <span class="l">api.example.com</span>
+</span></span><span class="line"><span class="cl"><span class="n">Content-Type</span><span class="o">:</span> <span class="l">application/soap+xml; charset=utf-8; action=&#34;urn:shop:GetOrder&#34;</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="cp">&lt;?xml version=&#34;1.0&#34; encoding=&#34;utf-8&#34;?&gt;</span>
+</span></span><span class="line"><span class="cl"><span class="nt">&lt;soap:Envelope</span> <span class="na">xmlns:soap=</span><span class="s">&#34;http://www.w3.org/2003/05/soap-envelope&#34;</span>
+</span></span><span class="line"><span class="cl">               <span class="na">xmlns:shop=</span><span class="s">&#34;urn:shop&#34;</span><span class="nt">&gt;</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&lt;soap:Body&gt;</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&lt;shop:GetOrder&gt;</span>
+</span></span><span class="line"><span class="cl">      <span class="nt">&lt;shop:orderId&gt;</span>1001<span class="nt">&lt;/shop:orderId&gt;</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&lt;/shop:GetOrder&gt;</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&lt;/soap:Body&gt;</span>
+</span></span><span class="line"><span class="cl"><span class="nt">&lt;/soap:Envelope&gt;</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>HTTP carries the exchange, SOAP defines the envelope, and <code>GetOrder</code> belongs to the business contract. This example uses SOAP 1.2; its namespace and media type should not be mixed with SOAP 1.1 conventions. <a class="link" href="https://www.w3.org/TR/soap12-part2/#soapinhttp"  target="_blank" rel="noopener"
+    >SOAP 1.2 HTTP binding</a></p>
+<p>SOAP services often use WSDL to describe their contracts and generate client code. A SOAP message does not have to include a WSDL document, and choosing SOAP does not automatically provide reliable delivery, transactions, or complete security policies. <a class="link" href="https://www.w3.org/TR/wsdl20-primer/"  target="_blank" rel="noopener"
+    >WSDL 2.0 primer</a></p>
+<p>When a partner already exposes SOAP/WSDL, following that contract is the practical starting point. For a new system, evaluate partner requirements, existing tooling, and maintenance cost rather than treating message length or the number of specifications as a verdict.</p>
+<h2 id="continuous-updates-and-events-sse-websocket-and-webhooks">Continuous updates and events: SSE, WebSocket, and webhooks
+</h2><p>The earlier sections explain how to express a call. These mechanisms mainly address when messages are sent and in which direction. They can be combined with the preceding interface designs.</p>
+<p><a href="/p/http-api-styles/event-patterns.svg" target="_blank" rel="noopener noreferrer"><img src="/p/http-api-styles/event-patterns.svg" alt="SSE sends events in one HTTP response; WebSocket supports messages in both directions; webhooks initiate new callback requests" loading="lazy" decoding="async"></a>
+</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Mechanism</th>
+<th>Message flow</th>
+<th>Typical use</th>
+<th>Operational concerns</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Polling</td>
+<td>Client repeatedly requests the latest state</td>
+<td>Low-frequency task updates</td>
+<td>Polling interval and request volume</td>
+</tr>
+<tr>
+<td>SSE</td>
+<td>Server sends events over an open HTTP response</td>
+<td>Progress, notifications, incremental output</td>
+<td>Recovery, proxy buffering, idle timeouts</td>
+</tr>
+<tr>
+<td>WebSocket</td>
+<td>Either side sends messages after connection establishment</td>
+<td>Chat, collaboration, interactive sessions</td>
+<td>Heartbeats, reconnection, message semantics, flow control</td>
+</tr>
+<tr>
+<td>Webhook</td>
+<td>Provider sends a new request to a receiver&rsquo;s callback URL</td>
+<td>Payments, repository events, integrations</td>
+<td>Verification, duplicates, ordering, retries</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>SSE sends multiple events through one response</strong></p>
+<p>An order subscription can return an event stream:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-http" data-lang="http"><span class="line"><span class="cl"><span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span> <span class="m">200</span> <span class="ne">OK</span>
+</span></span><span class="line"><span class="cl"><span class="n">Content-Type</span><span class="o">:</span> <span class="l">text/event-stream</span>
+</span></span><span class="line"><span class="cl"><span class="n">Cache-Control</span><span class="o">:</span> <span class="l">no-cache</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">id: 101
+</span></span><span class="line"><span class="cl">event: order.updated
+</span></span><span class="line"><span class="cl">data: {&#34;order_id&#34;:&#34;1001&#34;,&#34;status&#34;:&#34;paid&#34;}
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">id: 102
+</span></span><span class="line"><span class="cl">event: order.updated
+</span></span><span class="line"><span class="cl">data: {&#34;order_id&#34;:&#34;1001&#34;,&#34;status&#34;:&#34;shipped&#34;}
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>A blank line ends each event. The <code>data:</code> field can contain JSON, but the overall response is not one JSON document. Native browser <code>EventSource</code> provides connection and reconnection behavior, including the last event identifier; replaying missed events still requires server support. <a class="link" href="https://html.spec.whatwg.org/multipage/server-sent-events.html"  target="_blank" rel="noopener"
+    >SSE standard</a></p>
+<p>Native <code>EventSource</code> uses GET and does not expose arbitrary request headers or a request body. For POST bodies or custom authentication headers, a client can use <code>fetch</code> streaming when supported by the server contract, implementing parsing and reconnection itself. Streaming alone does not make a response SSE: newline-delimited JSON and binary streams are other possibilities.</p>
+<p><strong>WebSocket establishes a bidirectional channel</strong></p>
+<p>Once established, WebSocket allows both sides to send text or binary messages. It defines connection and framing rules, not business messages such as cancellation fields or application acknowledgements.</p>
+<p>The classic HTTP/1.1 flow uses an Upgrade handshake. Subsequent communication uses WebSocket frames rather than an ordinary HTTP request/response exchange for every message. <a class="link" href="https://www.rfc-editor.org/rfc/rfc6455.html"  target="_blank" rel="noopener"
+    >WebSocket protocol</a></p>
+<p>JSON-RPC or a custom chat protocol can run over WebSocket: the channel and the higher-level message rules remain separate choices.</p>
+<p><strong>A webhook reverses who initiates the request</strong></p>
+<p>After registering a callback URL with a payment provider, a completed payment might trigger a request to your application:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span><span class="lnt">9
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-http" data-lang="http"><span class="line"><span class="cl"><span class="nf">POST</span> <span class="nn">/webhooks/payments</span> <span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span>
+</span></span><span class="line"><span class="cl"><span class="n">Host</span><span class="o">:</span> <span class="l">merchant.example.com</span>
+</span></span><span class="line"><span class="cl"><span class="n">Content-Type</span><span class="o">:</span> <span class="l">application/json</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;id&#34;</span><span class="p">:</span> <span class="s2">&#34;evt_9001&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;type&#34;</span><span class="p">:</span> <span class="s2">&#34;payment.succeeded&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;data&#34;</span><span class="p">:</span> <span class="p">{</span> <span class="nt">&#34;order_id&#34;</span><span class="p">:</span> <span class="s2">&#34;1001&#34;</span> <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>This payload is illustrative. Actual fields, signature headers, and verification algorithms are provider-specific. Webhooks are a callback pattern, not a universal message schema.</p>
+<p>Receivers need source verification, deduplication, and handling for retries and out-of-order delivery. After durably accepting or queuing an event, respond according to the provider&rsquo;s contract and process expensive work asynchronously. Acknowledging before saving the event can lose work if subsequent processing fails. <a class="link" href="https://docs.stripe.com/webhooks"  target="_blank" rel="noopener"
+    >Stripe webhook documentation</a></p>
+<h2 id="choosing-a-design-and-completing-the-contract">Choosing a design and completing the contract
+</h2><p>The following recommendations are engineering judgments based on the needs described. Client capabilities, team experience, and existing systems still matter.</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Style</th>
+<th>Main organizing idea</th>
+<th>Common representation</th>
+<th>Consider when</th>
+<th>Main cost</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Resource-oriented HTTP / commonly called REST</td>
+<td>Resources and HTTP semantics</td>
+<td>JSON or another representation</td>
+<td>Resources are clear and many parties consume the API</td>
+<td>Resource modeling, state transitions, response contracts</td>
+</tr>
+<tr>
+<td>Plain HTTP RPC</td>
+<td>Methods and arguments</td>
+<td>Often JSON</td>
+<td>Explicit actions benefit from a simple interface</td>
+<td>Team-defined method, error, and version rules</td>
+</tr>
+<tr>
+<td>JSON-RPC</td>
+<td>Standard method-call envelope</td>
+<td>JSON</td>
+<td>Standard calls, notifications, and batches help</td>
+<td>Transport mapping, deduplication, method-level controls</td>
+</tr>
+<tr>
+<td>gRPC</td>
+<td>Typed services and methods</td>
+<td>Protocol Buffers by default</td>
+<td>Generated cross-language clients or streaming matter</td>
+<td>Code generation, gateways, debugging</td>
+</tr>
+<tr>
+<td>GraphQL</td>
+<td>Types, relationships, field selection</td>
+<td>Usually JSON over HTTP</td>
+<td>Clients need different related data combinations</td>
+<td>Query costs, field permissions, caching</td>
+</tr>
+<tr>
+<td>SOAP</td>
+<td>XML messages and service contracts</td>
+<td>XML</td>
+<td>Existing services or partner contracts require it</td>
+<td>Specifications, tooling, compatibility</td>
+</tr>
+</tbody>
+</table></div>
+<p><a href="/p/http-api-styles/selection-guide.svg" target="_blank" rel="noopener noreferrer"><img src="/p/http-api-styles/selection-guide.svg" alt="Choose by need: resource operations, explicit actions, field selection, generated contracts, and event delivery" loading="lazy" decoding="async"></a>
+</p>
+<p>One order system can expose a resource-oriented public API, use gRPC for selected internal calls, send browser updates through SSE, and receive payment webhooks. Each boundary can use the mechanism that fits it.</p>
+<p><strong>Every choice still needs a complete contract.</strong></p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Questions to answer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Identity and authorization</td>
+<td>Who is calling? Can they access this order, action, and each requested field?</td>
+</tr>
+<tr>
+<td>Errors</td>
+<td>Which failures are retryable? How do clients distinguish input, permission, and service failures?</td>
+</tr>
+<tr>
+<td>Timeouts and retries</td>
+<td>How long should a client wait? Can it determine whether a timed-out operation executed? Is an idempotency key needed?</td>
+</tr>
+<tr>
+<td>Pagination and limits</td>
+<td>What are the page, cursor, message, and request-size rules?</td>
+</tr>
+<tr>
+<td>Compatibility</td>
+<td>Which changes break older clients? How are fields and methods deprecated?</td>
+</tr>
+<tr>
+<td>Observability</td>
+<td>Can latency, failures, and logs be associated with a business operation?</td>
+</tr>
+</tbody>
+</table></div>
+<p>For ordinary HTTP APIs, Problem Details provides a standard error representation. An order that has already shipped might produce:</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-http" data-lang="http"><span class="line"><span class="cl"><span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span> <span class="m">409</span> <span class="ne">Conflict</span>
+</span></span><span class="line"><span class="cl"><span class="n">Content-Type</span><span class="o">:</span> <span class="l">application/problem+json</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;type&#34;</span><span class="p">:</span> <span class="s2">&#34;https://api.example.com/problems/order-not-cancellable&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;title&#34;</span><span class="p">:</span> <span class="s2">&#34;Order cannot be cancelled&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;status&#34;</span><span class="p">:</span> <span class="mi">409</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;detail&#34;</span><span class="p">:</span> <span class="s2">&#34;The order has shipped. Use the returns process instead.&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;instance&#34;</span><span class="p">:</span> <span class="s2">&#34;/requests/req-9f3a&#34;</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p><code>type</code> identifies the problem category, <code>detail</code> explains this occurrence, and <code>instance</code> identifies the specific occurrence. Error responses should not expose internal stacks, SQL, or secrets. Problem Details is an option for HTTP APIs, not a replacement to impose on JSON-RPC, GraphQL, or SOAP error structures. <a class="link" href="https://www.rfc-editor.org/rfc/rfc9457.html"  target="_blank" rel="noopener"
+    >Problem Details standard</a></p>
+<p>When approaching an unfamiliar API, read the method, address, and headers first. Determine whether the interface revolves around resources, methods, or selected fields. Then identify its encoding and its error, timeout, and event rules. The name becomes much less mysterious once those questions are answered.</p>
+<h2 id="references">References
+</h2><p>Examples and selection advice are educational. Original specifications and the implementation in use govern protocol details.</p>
+<div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
+<thead>
+<tr>
+<th>Topic</th>
+<th>Primary references</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>HTTP semantics and caching</td>
+<td><a class="link" href="https://www.rfc-editor.org/rfc/rfc9110.html"  target="_blank" rel="noopener"
+    >RFC 9110</a>, <a class="link" href="https://www.rfc-editor.org/rfc/rfc9111.html"  target="_blank" rel="noopener"
+    >RFC 9111</a></td>
+</tr>
+<tr>
+<td>REST</td>
+<td><a class="link" href="https://ics.uci.edu/~fielding/pubs/dissertation/rest_arch_style.htm"  target="_blank" rel="noopener"
+    >Fielding&rsquo;s dissertation, Chapter 5</a></td>
+</tr>
+<tr>
+<td>Partial modification</td>
+<td><a class="link" href="https://www.rfc-editor.org/rfc/rfc5789.html"  target="_blank" rel="noopener"
+    >RFC 5789: PATCH</a>, <a class="link" href="https://www.rfc-editor.org/rfc/rfc7396.html"  target="_blank" rel="noopener"
+    >RFC 7396: JSON Merge Patch</a></td>
+</tr>
+<tr>
+<td>JSON-RPC</td>
+<td><a class="link" href="https://www.jsonrpc.org/specification"  target="_blank" rel="noopener"
+    >JSON-RPC 2.0 Specification</a></td>
+</tr>
+<tr>
+<td>gRPC</td>
+<td><a class="link" href="https://grpc.io/docs/what-is-grpc/core-concepts/"  target="_blank" rel="noopener"
+    >Core concepts</a>, <a class="link" href="https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md"  target="_blank" rel="noopener"
+    >HTTP/2 mapping</a>, <a class="link" href="https://github.com/grpc/grpc-web"  target="_blank" rel="noopener"
+    >gRPC-Web</a></td>
+</tr>
+<tr>
+<td>GraphQL</td>
+<td><a class="link" href="https://graphql.org/learn/serving-over-http/"  target="_blank" rel="noopener"
+    >HTTP</a>, <a class="link" href="https://graphql.org/learn/response/"  target="_blank" rel="noopener"
+    >Responses</a>, <a class="link" href="https://graphql.org/learn/performance/"  target="_blank" rel="noopener"
+    >Performance</a>, <a class="link" href="https://graphql.org/learn/debug-errors/"  target="_blank" rel="noopener"
+    >HTTP errors</a></td>
+</tr>
+<tr>
+<td>SOAP and WSDL</td>
+<td><a class="link" href="https://www.w3.org/TR/soap12-part1/"  target="_blank" rel="noopener"
+    >SOAP messaging framework</a>, <a class="link" href="https://www.w3.org/TR/soap12-part2/#soapinhttp"  target="_blank" rel="noopener"
+    >HTTP binding</a>, <a class="link" href="https://www.w3.org/TR/wsdl20-primer/"  target="_blank" rel="noopener"
+    >WSDL primer</a></td>
+</tr>
+<tr>
+<td>Events and callbacks</td>
+<td><a class="link" href="https://html.spec.whatwg.org/multipage/server-sent-events.html"  target="_blank" rel="noopener"
+    >SSE</a>, <a class="link" href="https://www.rfc-editor.org/rfc/rfc6455.html"  target="_blank" rel="noopener"
+    >WebSocket</a>, <a class="link" href="https://docs.stripe.com/webhooks"  target="_blank" rel="noopener"
+    >Webhook practice</a></td>
+</tr>
+<tr>
+<td>Data and contracts</td>
+<td><a class="link" href="https://www.rfc-editor.org/rfc/rfc8259.html"  target="_blank" rel="noopener"
+    >JSON</a>, <a class="link" href="https://spec.openapis.org/oas/latest.html"  target="_blank" rel="noopener"
+    >OpenAPI</a>, <a class="link" href="https://www.rfc-editor.org/rfc/rfc9457.html"  target="_blank" rel="noopener"
+    >Problem Details</a></td>
+</tr>
+</tbody>
+</table></div>
+
+</div>
+
+            <footer class="article-footer">
+    
+        <div class="article-tags" aria-label="Article tags"><span class="article-footer-label">Filed under</span><a href="/tags/http/">HTTP</a><a href="/tags/api/">API</a><a href="/tags/rest/">REST</a><a href="/tags/rpc/">RPC</a><a href="/tags/graphql/">GraphQL</a><a href="/tags/backend/">Backend</a></div>
+    
+    
+    
+    <div class="article-endnote"><span>Thanks for reading.</span><a href="#top">Back to top <span aria-hidden="true">↑</span></a></div>
+</footer>
+
+        </div>
+    </div>
+    
+</article>
+
+        <div class="reading-afterword">
+            
+            
+    <aside class="reading-related">
+        <div class="reading-section-heading"><span class="article-footer-label">Keep reading</span><span aria-hidden="true">↘</span></div>
+        
+            <a class="reading-related-link" href="/p/fastapi-tutorial/"><span class="related-number">01</span><span class="related-title">FastAPI 实战教程：面向 Python 开发者的现代 API 入门</span><time datetime="2026-09-15">2026.09.15</time><span class="related-arrow" aria-hidden="true">↗</span></a>
+        
+    </aside>
+
+
+            
+        </div>
+    </div>
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+    </main>
+    
+<footer class="site-footer">
+    <div class="footer-top"><a class="footer-wordmark" href="/" aria-label="Snow">Sno<span>w</span></a><p>A place to think. A space to grow.</p><a href="#main-content" class="back-top">Back to top <span aria-hidden="true">↑</span></a></div>
+    <div class="footer-bottom"><span>© 2026 Snow</span><nav aria-label="More links"><a href="/about/">About</a><a href="https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0" target="_blank" rel="noopener noreferrer me">Bilibili <span aria-hidden="true">↗</span></a><a href="https://github.com/SymphonyW" target="_blank" rel="noopener noreferrer me">GitHub <span aria-hidden="true">↗</span></a><a href="https://twitter.com" target="_blank" rel="noopener noreferrer me">Twitter <span aria-hidden="true">↗</span></a><a href="/index.xml">RSS ↗</a></nav><span class="footer-colophon">Built with Hugo · Always in progress</span></div>
+</footer>
+
+    
+
+<script src="/ts/main.c86029ddb4aad8364879723acaf7efcd526e724d2381088d445aaf6f3ab1bfdf.js" defer></script>
+
+
+<script src="/ts/custom.6c99a7b037ac7e2bde801fbad26b9c20b3b18707868c164174142870ef3bc309.js" defer></script>
+
+
+
+
+
+<script>
+window.MathJax = {
+  tex: {
+    
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  svg: {
+    fontCache: 'global'
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
+
+</body>
+</html>
