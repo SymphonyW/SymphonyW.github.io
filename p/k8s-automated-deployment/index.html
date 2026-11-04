@@ -6,7 +6,7 @@
 <title>Automating Kubernetes Deployments: From Git Push to Verification and Recovery</title>
 
 <link rel='canonical' href='https://SymphonyW.github.io/p/k8s-automated-deployment/'>
-<link rel="stylesheet" href="/scss/custom.min.919cf0d34f895fec4bc36912621fd0297f1439e1574bdf28d3195939a83690e8.css">
+<link rel="stylesheet" href="/scss/custom.min.876057f2db13b2c37cd2ad3c8f76274ae23bfde09c95ff8d93059f5719a1b1dc.css">
 <script>
 (() => {
     let preference = 'auto';
@@ -33,7 +33,7 @@
     
 <header class="site-header">
     <div class="site-header__inner">
-        <a class="site-brand" href="/" aria-label="Snow — Home">S<span>now.</span></a>
+        <a class="site-brand" href="/" aria-label="Snow — Home">Snow.</a>
         <nav class="site-nav" id="site-navigation" aria-label="Main navigation">
             
             
@@ -114,7 +114,7 @@
         
             <time datetime="2026-10-17T10:00:00&#43;08:00">October 17, 2026</time>
             <span class="meta-divider" aria-hidden="true">/</span>
-            <span>21 min read</span>
+            <span>22 min read</span>
         
         
             <div class="article-translations"><a href="/zh-cn/p/k8s-automated-deployment/" hreflang="zh-cn" lang="zh-cn">阅读中文版 <span aria-hidden="true">↗</span></a></div>
@@ -145,12 +145,12 @@
         
         <div class="reading-body">
             <div class="article-content"><p>The earlier <a class="link" href="/p/kubernetes-from-docker/" >Docker to Kubernetes guide</a> introduced Pods, Deployments, and Services. The <a class="link" href="/p/k8s-container-cloud-deployment/" >container cloud deployment walkthrough</a> connected Dockerfile builds, registry uploads, and platform configuration. The <a class="link" href="/p/ci/cd-complete-guidefrom-principles-to-practice/" >CI/CD guide</a> explained the pipeline concepts.</p>
-<p>The next question follows naturally: <strong>once an application can be deployed manually, how do we make a code change trigger tests, an image build, a deployment, and checks that detect a broken release?</strong></p>
-<p>This article follows a small Go service through that entire path. The order API is an HTTP demonstration; it does not process real orders or connect to a database.</p>
+<p>Once the application can be deployed manually, those steps can move into a pipeline. A code change can then trigger tests, an image build, deployment, and checks that detect a broken release.</p>
+<p>The example follows a small Go service through this process. The order API only demonstrates an HTTP service; it does not process real orders or connect to a database.</p>
 <p><a href="/p/k8s-automated-deployment/bg.svg" target="_blank" rel="noopener noreferrer"><img src="/p/k8s-automated-deployment/bg.svg" alt="The deployment lifecycle: commit, test, build, release, verify, and respond" loading="lazy" decoding="async"></a>
 </p>
 <h2 id="1-turn-deployment-into-a-sequence-of-checks">1. Turn deployment into a sequence of checks
-</h2><p>Manual releases often depend on assumptions: “this image should be current,” or “the page loads, so the deployment probably worked.” Automation needs explicit inputs, outputs, and acceptance criteria.</p>
+</h2><p>Manual releases often rely on judgments such as &ldquo;this image should be current&rdquo; or &ldquo;the page loads, so the deployment probably worked.&rdquo; A pipeline needs explicit inputs, outputs, and checks to make those decisions.</p>
 <div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
 <thead>
 <tr>
@@ -199,9 +199,9 @@
 </tr>
 </tbody>
 </table></div>
-<p>The example uses <strong>GitHub Actions → GHCR → Kubernetes</strong>. Pull requests run checks. Merging into <code>main</code> builds an image and deploys to a dedicated <code>demo-prod</code> namespace. Keeping a human approval makes this continuous delivery; deployment without that approval is continuous deployment.</p>
+<p>The example uses GitHub Actions → GHCR → Kubernetes. Pull requests run checks; merging into <code>main</code> builds an image and deploys it to a dedicated <code>demo-prod</code> namespace. Keeping human approval makes this continuous delivery. Automatically deploying after the checks pass is continuous deployment.</p>
 <p>You need an existing cluster, an application repository on GitHub, and an administrator who can initialize the namespace. Commands use Linux/Bash; Windows users can use WSL or Git Bash. Target nodes use <code>linux/amd64</code>. Cluster installation is covered in the earlier guide.</p>
-<p>Before writing the workflow, check connectivity:</p>
+<p>Check that each part of the system can reach the services it needs:</p>
 <p><a href="/p/k8s-automated-deployment/trust-boundaries.svg" target="_blank" rel="noopener noreferrer"><img src="/p/k8s-automated-deployment/trust-boundaries.svg" alt="Deployment control and image pulls use separate identities and network paths" loading="lazy" decoding="async"></a>
 </p>
 <div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
@@ -230,9 +230,9 @@
 </tr>
 </tbody>
 </table></div>
-<p>A working <code>kubectl</code> connection does not prove that nodes can pull images. Logging the Runner into GHCR does not log nodes in. GitHub-hosted Runners also cannot directly reach your computer&rsquo;s <code>127.0.0.1</code> or a private corporate API. Use a dedicated Runner on a trusted network or an approved private connectivity solution for private clusters.</p>
+<p>A working <code>kubectl</code> connection does not mean the nodes can pull images, and logging the Runner into GHCR does not log the nodes in. GitHub-hosted Runners also cannot directly reach your computer&rsquo;s <code>127.0.0.1</code> or a private corporate API. Private clusters need a dedicated Runner on a trusted network or an approved private connection.</p>
 <h2 id="2-prepare-a-service-that-identifies-its-source-version">2. Prepare a service that identifies its source version
-</h2><p>Create these files in a separate application repository. <strong>The workflow below belongs to that application; it does not replace this blog&rsquo;s publishing workflow.</strong></p>
+</h2><p>Create these files in a separate application repository.</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
 <pre tabindex="0" class="chroma"><code><span class="lnt"> 1
@@ -261,7 +261,7 @@
 </span></span><span class="line"><span class="cl">└── .github/workflows/release.yaml
 </span></span></code></pre></td></tr></table>
 </div>
-</div><p>The service exposes <code>/healthz</code> for process health, <code>/readyz</code> for readiness, and <code>/version</code> for the Git SHA embedded during compilation. These health handlers have no external dependencies. When adding a database, design readiness for the workload and avoid making a shared database failure restart every instance.</p>
+</div><p>The service exposes <code>/healthz</code> to check process health, <code>/readyz</code> to report whether it can receive traffic, and <code>/version</code> to return the Git SHA embedded during compilation. The health handlers have no external dependencies. If you add a database, design readiness around the workload so a shared database failure does not cause every instance to restart.</p>
 <p><strong><code>go.mod</code></strong></p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
@@ -404,7 +404,7 @@
 </span></span><span class="line"><span class="cl"><span class="p">}</span>
 </span></span></code></pre></td></tr></table>
 </div>
-</div><p>The listener binds to the container network interfaces. On termination, the application withdraws readiness and waits for active requests to finish. Real workloads also need connection draining, long connection handling, and background task coordination; these settings alone do not guarantee uninterrupted service.</p>
+</div><p>The service listens on the container&rsquo;s network interfaces. On termination, it marks itself unready and waits for active requests to finish. A real application also needs to drain connections, handle long-lived connections, and coordinate background tasks. These settings alone cannot guarantee uninterrupted service.</p>
 <p><strong><code>main_test.go</code></strong></p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
@@ -509,7 +509,7 @@
 </span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">ENTRYPOINT</span> <span class="p">[</span><span class="s2">&#34;/server&#34;</span><span class="p">]</span><span class="err">
 </span></span></span></code></pre></td></tr></table>
 </div>
-</div><p>Only the standard library is used, so there are no third-party modules or <code>go.sum</code>. The runtime image has no shell. Outbound HTTPS, timezone data, or dynamic libraries require additional files or a suitable runtime image. Maintain base image security updates and pin approved base images by digest in production: a version tag can still move.</p>
+</div><p>The example uses only the standard library, so it needs no third-party modules or <code>go.sum</code>. Its runtime image has no shell. If the application later needs outbound HTTPS, timezone data, or dynamic libraries, add the required files or choose a suitable runtime image. Keep base images updated with security fixes and pin approved images by digest in production, since a version tag can still point to different content.</p>
 <p><strong><code>.dockerignore</code></strong></p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
@@ -573,7 +573,7 @@
 </div>
 </div><p>The expected responses are <code>ready</code> and <code>local-check</code>.</p>
 <h2 id="3-save-the-deployment-specification-in-git">3. Save the deployment specification in Git
-</h2><p>The image, replicas, probes, and resource settings previously entered in a platform console now become reviewable manifests.</p>
+</h2><p>Save the image, replica count, probes, and resource settings from the platform console as manifests that can be reviewed in Git.</p>
 <p><strong><code>k8s/runtime.yaml</code></strong></p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
@@ -776,7 +776,7 @@
 </span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">periodSeconds</span><span class="p">:</span><span class="w"> </span><span class="m">10</span><span class="w">
 </span></span></span></code></pre></td></tr></table>
 </div>
-</div><p><code>APP_ENV</code> demonstrates configuration injection; the service does not change its behavior based on it. For a configuration change, create <code>order-api-config-v2</code>, update the Deployment reference, and retain the old object. Restoring an old template can then restore its configuration reference. Secrets also need a version strategy; credentials do not belong in ConfigMaps.</p>
+</div><p><code>APP_ENV</code> demonstrates configuration injection without changing the service&rsquo;s behavior. When changing configuration, create <code>order-api-config-v2</code>, update the Deployment reference, and keep the old object. An old template can then use the configuration it originally referenced when restored. Secrets also need a version strategy; do not put credentials in ConfigMaps.</p>
 <div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
 <thead>
 <tr>
@@ -816,11 +816,11 @@
 </tbody>
 </table></div>
 <p>See the <a class="link" href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/"  target="_blank" rel="noopener"
-    >official probe documentation</a> for exact semantics. A progress deadline does <strong>not</strong> automatically restore the previous version; recovery is an explicit workflow step below.</p>
+    >official probe documentation</a> for the detailed behavior. Setting a progress deadline does not automatically restore the previous version. The workflow below handles recovery explicitly.</p>
 <p><a href="/p/k8s-automated-deployment/rolling-update.svg" target="_blank" rel="noopener noreferrer"><img src="/p/k8s-automated-deployment/rolling-update.svg" alt="An ideal rolling update: a new Pod becomes ready before an old Pod is replaced" loading="lazy" decoding="async"></a>
 </p>
-<p>The diagram shows an ideal progression. Node failures, capacity shortages, endpoint propagation, and application behavior still affect availability. Terminating Pods can temporarily consume additional resources beyond the three active slots illustrated here.</p>
-<p>The initial example uses <code>ClusterIP</code> and port forwarding. For user access, have the platform provision a Gateway/Ingress, DNS, and TLS. An Ingress object needs an actual controller, and a ClusterIP is not a public address.</p>
+<p>The diagram shows the ideal update order. In practice, node failures, capacity shortages, endpoint propagation delays, and application behavior can affect availability. Terminating Pods may still consume resources, temporarily pushing usage beyond the three active slots shown here.</p>
+<p>The example first uses <code>ClusterIP</code> and port forwarding to check the application. To make it accessible to users, have the platform configure a Gateway/Ingress, DNS, and TLS. An Ingress object needs a running controller; a ClusterIP cannot be used as a public address.</p>
 <h2 id="4-establish-identities-and-release-permissions">4. Establish identities and release permissions
 </h2><p>There are three separate credentials:</p>
 <div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
@@ -853,9 +853,9 @@
 </tr>
 </tbody>
 </table></div>
-<p>New GHCR packages are private by default. Either make a demonstration image public or configure private image access as below. Write access in CI does not imply node read access. See <a class="link" href="https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry"  target="_blank" rel="noopener"
+<p>New GHCR packages are private by default. You can make a demonstration image public or configure private image access as shown below. CI&rsquo;s write permission does not give the nodes read permission. See <a class="link" href="https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry"  target="_blank" rel="noopener"
     >GitHub&rsquo;s Container registry documentation</a>.</p>
-<p><strong>One-time administrator setup.</strong> Save the following as <code>bootstrap/rbac.yaml</code>. Administrators apply it separately from routine releases.</p>
+<p>Save the following as <code>bootstrap/rbac.yaml</code> and have an administrator apply it once, separately from routine releases.</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
 <pre tabindex="0" class="chroma"><code><span class="lnt"> 1
@@ -986,10 +986,10 @@
 </span></span><span class="line"><span class="cl"><span class="nb">unset</span> GHCR_READ_TOKEN
 </span></span></code></pre></td></tr></table>
 </div>
-</div><p>Use an account with access to the target package and a classic PAT with <code>read:packages</code>; organizational SSO and package policies may impose additional authorization. The interactive initialization command briefly places the token in local process arguments. Use a controlled terminal for the exercise; shared hosts should use platform secret management or controlled Docker configuration imports. Rotate an existing Secret through the platform&rsquo;s approved process.</p>
-<p>The Role cannot manage the cluster, change RBAC, or directly read Secrets. However, an identity that can modify workloads may still cause a Pod to mount namespace Secrets. Use a dedicated namespace, trusted deployment code, and appropriate admission and workload identity policies. See <a class="link" href="https://kubernetes.io/docs/reference/access-authn-authz/rbac/"  target="_blank" rel="noopener"
+</div><p>Use an account that can access the target package and a classic PAT with <code>read:packages</code>. Organizational SSO and package policies may require further authorization. The initialization command briefly exposes the token in local process arguments, so run it in a controlled terminal. On shared hosts, use platform secret management or controlled Docker configuration imports. If the Secret already exists, rotate it through the platform&rsquo;s approved process.</p>
+<p>This Role cannot manage the cluster, change RBAC, or directly read Secrets. An identity allowed to modify workloads may still make a Pod mount Secrets from the namespace, though. Use a dedicated namespace, allow only trusted deployment code, and apply appropriate admission and workload identity policies. See <a class="link" href="https://kubernetes.io/docs/reference/access-authn-authz/rbac/"  target="_blank" rel="noopener"
     >Kubernetes RBAC</a>.</p>
-<p><strong>Generate a short-lived kubeconfig for the exercise.</strong> Run this locally as an administrator connected to the intended cluster. It copies the endpoint and CA, not the administrator&rsquo;s credentials. A one-hour ServiceAccount token is requested; actual lifetime depends on the server.</p>
+<p>Next, generate a short-lived kubeconfig for the exercise. Run the commands locally as an administrator connected to the intended cluster. They copy the endpoint and CA without copying the administrator&rsquo;s credentials, and request a one-hour ServiceAccount token. The server determines its actual lifetime.</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
 <pre tabindex="0" class="chroma"><code><span class="lnt"> 1
@@ -1054,7 +1054,7 @@
 </span></span><span class="line"><span class="cl"><span class="c1"># Expected: yes</span>
 </span></span></code></pre></td></tr></table>
 </div>
-</div><p>The expected authorization result is <code>yes</code>. This assumes a standard HTTPS endpoint and CA. Platforms requiring proxies, a special TLS server name, or cloud authentication plugins should provide a suitable restricted CI kubeconfig. Do not bypass certificate verification.</p>
+</div><p>The authorization check should return <code>yes</code>. These commands assume a standard HTTPS endpoint and CA. If the platform requires proxies, a special TLS server name, or cloud authentication plugins, use a suitable restricted CI kubeconfig from the platform. Do not bypass certificate verification.</p>
 <p>Create a <code>production</code> environment in the application repository&rsquo;s Settings → Environments. Restrict deployments to <code>main</code> and configure approval if desired and supported. Add environment Secret <code>KUBE_CONFIG</code> containing this file. With an authenticated GitHub CLI:</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
@@ -1064,12 +1064,12 @@
 <pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">gh secret <span class="nb">set</span> KUBE_CONFIG --env production &lt; .deploy-local/ci.kubeconfig
 </span></span></code></pre></td></tr></table>
 </div>
-</div><p>Also create environment Variable <code>KUBECTL_VERSION</code> containing a compatible explicit patch version. <code>v1.35.0</code> illustrates the format, not a version recommendation. Keep kubectl within one minor version of the API Server. The workflow follows the checksum verification described in the <a class="link" href="https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/"  target="_blank" rel="noopener"
+</div><p>Create an environment Variable named <code>KUBECTL_VERSION</code> and set it to a specific, compatible patch version. <code>v1.35.0</code> is only an example of the format. Keep kubectl within one minor version of the API Server. The workflow uses the checksum verification described in the <a class="link" href="https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/"  target="_blank" rel="noopener"
     >official Linux installation guide</a>.</p>
-<p><strong>Storing a one-hour token in a Secret does not renew it.</strong> Expiration, including time spent waiting for approval, requires a new token and Secret update. Long-lived production automation should exchange platform-supported OIDC/workload identity for short-lived credentials or use managed rotation. GitHub OIDC tokens are not automatically accepted by arbitrary Kubernetes clusters: trust configuration or an identity exchange is required. See <a class="link" href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/"  target="_blank" rel="noopener"
+<p>A one-hour token does not renew itself when stored in a Secret. If it expires, including while waiting for approval, generate a new token and update the Secret. For ongoing production use, exchange a platform-supported OIDC/workload identity for short-lived credentials or use managed rotation. GitHub OIDC tokens are not automatically accepted by every Kubernetes cluster; they need a trust configuration or an identity exchange. See <a class="link" href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/"  target="_blank" rel="noopener"
     >ServiceAccount token documentation</a>.</p>
 <h2 id="5-connect-tests-builds-deployment-and-acceptance">5. Connect tests, builds, deployment, and acceptance
-</h2><p>Save this in the <strong>application repository</strong> as <code>.github/workflows/release.yaml</code>. The example uses GitHub-hosted Runners, so the API must be reachable through an approved network path. For a private cluster, use the organization&rsquo;s dedicated Runner labels for the deployment Job; keep public PR tests isolated from the production network.</p>
+</h2><p>Save the following as <code>.github/workflows/release.yaml</code> in the application repository. The example uses GitHub-hosted Runners, which need an approved network path to the API. For a private cluster, assign the deployment Job to the organization&rsquo;s dedicated Runner labels. Keep public PR tests isolated from the production network.</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
 <pre tabindex="0" class="chroma"><code><span class="lnt">  1
@@ -1402,9 +1402,9 @@
 </span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l">rm -f -- &#34;$RUNNER_TEMP/order-api.kubeconfig&#34;</span><span class="w">
 </span></span></span></code></pre></td></tr></table>
 </div>
-</div><p>The publishing pattern is documented in <a class="link" href="https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images"  target="_blank" rel="noopener"
+</div><p>The image publishing setup follows <a class="link" href="https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images"  target="_blank" rel="noopener"
     >GitHub&rsquo;s image publishing tutorial</a> and <a class="link" href="https://github.com/docker/build-push-action"  target="_blank" rel="noopener"
-    >Docker build-push-action</a>. Major Action tags improve readability here. Production should pin reviewed full commit SHAs and maintain them with dependency updates. A tag such as <code>@v7</code> is mutable; self-hosted Runners must also meet each Action&rsquo;s runtime requirements.</p>
+    >Docker build-push-action</a>. The example uses major Action tags for readability. In production, pin reviewed full commit SHAs and maintain them with dependency updates. A tag such as <code>@v7</code> can point to a different commit later. Self-hosted Runners must also meet each Action&rsquo;s runtime requirements.</p>
 <div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
 <thead>
 <tr>
@@ -1455,10 +1455,10 @@
 </tr>
 </tbody>
 </table></div>
-<p><code>cancel-in-progress: false</code> preserves a running deployment. However, GitHub concurrency groups are not strict FIFO release queues: pending work can be replaced and execution ordering is not guaranteed. The main SHA check reduces stale releases but is not a transaction lock; another commit may arrive between the check and apply. This suits a “deploy the latest main” policy. Strictly ordered release requirements need a dedicated queue or controller. See <a class="link" href="https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency"  target="_blank" rel="noopener"
+<p><code>cancel-in-progress: false</code> prevents newer work in the concurrency group from cancelling a running deployment, but GitHub concurrency groups are not strict FIFO release queues. Pending work can be replaced, and execution order is not guaranteed. The main SHA check helps reject stale releases, but another commit can arrive between that check and apply. It is not a transaction lock. This approach suits a &ldquo;deploy the latest main&rdquo; policy; strictly ordered releases need a dedicated queue or controller. See <a class="link" href="https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency"  target="_blank" rel="noopener"
     >GitHub concurrency control</a>.</p>
-<p>There are three different completion signals: <code>apply</code> means the API accepted the resources; <code>rollout status</code> means the controller finished the rollout; an expected SHA from <code>/version</code> demonstrates that the responding application matches the intended source. The business smoke request adds a check beyond process health.</p>
-<p>Port forwarding a Service selects a Pod. It checks that application&rsquo;s response, but does <strong>not</strong> exercise normal Service forwarding, every replica, DNS, the gateway, or TLS. When a real entry point exists, also check <code>https://your-domain/version</code> and run suitable business requests through it. One HTTP 200 is not complete user-path validation.</p>
+<p><code>apply</code> confirms that the API accepted the resources, while <code>rollout status</code> confirms that the controller finished the update. Check the SHA from <code>/version</code> as well to confirm that the responding application is the intended version. The business smoke request then checks more than process health.</p>
+<p>Port forwarding a Service selects one Pod and checks its application response. It does <strong>not</strong> test normal Service forwarding, every replica, DNS, the gateway, or TLS. If a real entry point is available, also check <code>https://your-domain/version</code> and send appropriate business requests through it. One HTTP 200 cannot validate the whole user path.</p>
 <h2 id="6-run-a-successful-release-then-rehearse-recovery">6. Run a successful release, then rehearse recovery
 </h2><div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
 <thead>
@@ -1501,7 +1501,7 @@
 </tr>
 </tbody>
 </table></div>
-<p>An existing package may also need to grant Actions write access to the repository. Branch and environment protection availability depends on repository type and organizational policies.</p>
+<p>If the package already exists, check that the repository&rsquo;s Actions are allowed to write to it. Available branch and environment protections depend on repository type and organizational policies.</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
 <pre tabindex="0" class="chroma"><code><span class="lnt">1
@@ -1519,10 +1519,10 @@
 </span></span></code></pre></td></tr></table>
 </div>
 </div><p>Expect two available replicas and an image reference ending in <code>@sha256:...</code>.</p>
-<p><strong>Rehearse a failure only in the dedicated exercise environment.</strong> After a successful baseline release, change the readiness path to <code>/not-ready</code>, pass the PR checks, and merge. The application returns 404 at that path, so new Pods cannot become ready. The rollout fails; CI collects evidence and restores the saved Pod template. After observing recovery, immediately fix the path back to <code>/readyz</code> through a new commit so Git is correct too.</p>
+<p>After one successful release, rehearse a failure in the dedicated exercise environment only. Change the readiness path to <code>/not-ready</code>, pass the PR checks, and merge. The application returns 404 at that path, leaving the new Pods unready. When the rollout fails, CI collects diagnostic information and restores the saved Pod template. Once you have observed recovery, immediately submit a fix that changes the path back to <code>/readyz</code> so Git is correct too.</p>
 <p><a href="/p/k8s-automated-deployment/failure-recovery.svg" target="_blank" rel="noopener noreferrer"><img src="/p/k8s-automated-deployment/failure-recovery.svg" alt="Recovery decisions: keep build failures out of the cluster, collect evidence, and restore an existing template" loading="lazy" decoding="async"></a>
 </p>
-<p>Restoring a snapshot of the actual previous template avoids assuming that the previous rollout history entry is the desired recovery target. The strategy still has limits:</p>
+<p>The snapshot preserves the template that was running before deployment, which may differ from the previous rollout history entry. Restoring it has the following limits:</p>
 <div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
 <thead>
 <tr>
@@ -1569,7 +1569,7 @@
 </tr>
 </tbody>
 </table></div>
-<p><strong>Recovery does not turn a failed release green.</strong> The workflow remains failed even when the restoration step succeeds. A recovered rollout also needs business verification and metric observation. Deployment history rollback concerns the Pod template, not an entire application transaction; see the <a class="link" href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"  target="_blank" rel="noopener"
+<p>The workflow stays failed even if restoration succeeds. Recovery is an attempt to restore service, not evidence that the release passed. Check business behavior and metrics after the recovery rollout as well. Deployment history rollback restores a Pod template; it does not reverse an entire application transaction. See the <a class="link" href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"  target="_blank" rel="noopener"
     >Deployment documentation</a>.</p>
 <div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
 <thead>
@@ -1622,9 +1622,9 @@
 </tr>
 </tbody>
 </table></div>
-<p><strong>Database migrations need a separate release design.</strong> A common approach is expand–migrate–contract: introduce backward-compatible structures, support old and new application versions, migrate data, then remove old structures after observation. Migration Jobs need idempotency, concurrency control, and failure handling. Do not have every application Pod race to execute irreversible DDL. Restoring an image also does not undo messages, external calls, or modified records.</p>
+<p>Plan database migrations separately. A common approach is to expand, migrate, then contract: add backward-compatible structures so old and new application versions can run, migrate the data, observe the results, and only then remove the old structures. Migration Jobs need idempotency, concurrency control, and failure handling. Do not let every application Pod race to execute irreversible DDL at startup. Restoring an image does not undo messages already sent, external calls, or changes to records.</p>
 <h2 id="7-evolve-toward-a-maintainable-release-system">7. Evolve toward a maintainable release system
-</h2><p>Once the basic path works, add controls according to the workload&rsquo;s needs.</p>
+</h2><p>Once the basic workflow works, add the checks and release controls the workload needs.</p>
 <div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
 <thead>
 <tr>
@@ -1671,9 +1671,9 @@
 </tr>
 </tbody>
 </table></div>
-<p>Promote <strong>the same digest</strong> between environments: build once, validate in staging, then release that artifact to production. Inject environment differences through configuration instead of rebuilding nominally identical versions.</p>
-<p>A standard Deployment rolling update does not automatically make metric-based canary decisions. Sending limited traffic, observing results, and expanding exposure requires traffic control and progressive delivery tooling.</p>
-<p><strong>GitOps changes who performs deployment.</strong> This example is push deployment: CI holds an identity that calls the API. With GitOps, an environment repository records the desired state, and Argo CD or Flux reconciles it from the cluster side or a controlled network.</p>
+<p>Use the same digest across environments: build once, validate in staging, then deploy that artifact to production. Supply environment differences through configuration. Rebuilding for each environment can produce different images despite identical version labels.</p>
+<p>A standard Deployment replaces replicas gradually without using metrics to decide whether to continue. To send limited traffic to a new version, observe the results, and then increase exposure, you also need traffic control and progressive delivery tooling.</p>
+<p>GitOps changes which component performs deployment. In this push example, CI holds an identity that calls the API. With GitOps, an environment repository records the desired state, and Argo CD or Flux reconciles the cluster to it from inside the cluster or a controlled network.</p>
 <p><a href="/p/k8s-automated-deployment/gitops.svg" target="_blank" rel="noopener noreferrer"><img src="/p/k8s-automated-deployment/gitops.svg" alt="Push CD compared with GitOps: CI-driven changes versus Git-backed reconciliation" loading="lazy" decoding="async"></a>
 </p>
 <div class="table-wrapper" role="region" aria-label="Scrollable table" tabindex="0"><table>
@@ -1712,9 +1712,9 @@
 </tr>
 </tbody>
 </table></div>
-<p>With Argo CD automatic sync, update Git before relying on a manual cluster change: self-healing can restore the Git version. Pruning resources is also an explicit policy. See <a class="link" href="https://argo-cd.readthedocs.io/en/stable/user-guide/auto_sync/"  target="_blank" rel="noopener"
+<p>When using Argo CD automatic sync, update the desired state in Git first. Otherwise, self-healing may undo a manual cluster change and restore the version in Git. Resource pruning also needs an explicit policy. See <a class="link" href="https://argo-cd.readthedocs.io/en/stable/user-guide/auto_sync/"  target="_blank" rel="noopener"
     >Argo CD automated sync</a>.</p>
-<p>A release is accountable when its records answer four questions: <strong>which commit, which artifact and configuration, which checks, and which recovery target?</strong> That is the foundation for adding more environments, progressive delivery, or GitOps.</p>
+<p>Keep a record of each release&rsquo;s source commit, artifact, configuration, verification coverage, and recovery target. With those records in place, you can trace what happened as you add more environments, progressive delivery, or GitOps.</p>
 
 </div>
 
@@ -1831,7 +1831,7 @@
     </main>
     
 <footer class="site-footer">
-    <div class="footer-top"><a class="footer-wordmark" href="/" aria-label="Snow">Sno<span>w</span></a><p>A place to think. A space to grow.</p><a href="#main-content" class="back-top">Back to top <span aria-hidden="true">↑</span></a></div>
+    <div class="footer-top"><a class="footer-wordmark" href="/" aria-label="Snow">Snow</a><p>A place to think. A space to grow.</p><a href="#main-content" class="back-top">Back to top <span aria-hidden="true">↑</span></a></div>
     <div class="footer-bottom"><span>© 2026 Snow</span><nav aria-label="More links"><a href="/about/">About</a><a href="https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0" target="_blank" rel="noopener noreferrer me">Bilibili <span aria-hidden="true">↗</span></a><a href="https://github.com/SymphonyW" target="_blank" rel="noopener noreferrer me">GitHub <span aria-hidden="true">↗</span></a><a href="https://twitter.com" target="_blank" rel="noopener noreferrer me">Twitter <span aria-hidden="true">↗</span></a><a href="/index.xml">RSS ↗</a></nav><span class="footer-colophon">Built with Hugo · Always in progress</span></div>
 </footer>
 

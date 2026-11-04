@@ -1,0 +1,1333 @@
+<!DOCTYPE html>
+<html lang="zh-cn" dir="ltr">
+<head>
+    <meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="把 40 道 Kubernetes 面试题串成一条完整链路：用图解理解集群架构、Pod 创建、调度与资源、Service 和 DNS，再用命令定位常见故障。">
+<title>Kubernetes ：从 Pod 创建到故障排查</title>
+
+<link rel='canonical' href='https://SymphonyW.github.io/zh-cn/p/kubernetes-interview-guide/'>
+<link rel="stylesheet" href="/scss/custom.min.876057f2db13b2c37cd2ad3c8f76274ae23bfde09c95ff8d93059f5719a1b1dc.css">
+<script>
+(() => {
+    let preference = 'auto';
+    try { preference = localStorage.getItem('StackColorScheme') || preference; } catch (_) {}
+    document.documentElement.dataset.scheme = preference === 'dark' || (preference === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+})();
+</script>
+
+<meta property='og:title' content="Kubernetes ：从 Pod 创建到故障排查">
+<meta property='og:description' content="把 40 道 Kubernetes 面试题串成一条完整链路：用图解理解集群架构、Pod 创建、调度与资源、Service 和 DNS，再用命令定位常见故障。">
+<meta property='og:url' content='https://SymphonyW.github.io/zh-cn/p/kubernetes-interview-guide/'>
+<meta property='og:site_name' content='Snow'>
+<meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='Kubernetes' /><meta property='article:tag' content='云原生' /><meta property='article:tag' content='容器' /><meta property='article:tag' content='面试' /><meta property='article:tag' content='故障排查' /><meta property='article:published_time' content='2026-10-20T20:25:00&#43;08:00'/><meta property='article:modified_time' content='2026-10-20T20:25:00&#43;08:00'/><meta property='og:image' content='https://SymphonyW.github.io/zh-cn/p/kubernetes-interview-guide/cluster-architecture.svg' />
+<meta name="twitter:title" content="Kubernetes ：从 Pod 创建到故障排查">
+<meta name="twitter:description" content="把 40 道 Kubernetes 面试题串成一条完整链路：用图解理解集群架构、Pod 创建、调度与资源、Service 和 DNS，再用命令定位常见故障。"><meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content='https://SymphonyW.github.io/zh-cn/p/kubernetes-interview-guide/cluster-architecture.svg' />
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    
+    <noscript><style>@media(max-width:760px){.site-header{position:static}.site-header__inner{height:auto;min-height:66px;flex-wrap:wrap}.site-nav{position:static;display:grid;order:3;flex-basis:100%;padding:8px 0 18px}.menu-toggle,.theme-toggle{display:none}}</style></noscript>
+</head>
+<body id="top" class="article-page">
+    <a class="skip-link" href="#main-content">跳至正文</a>
+    
+<header class="site-header">
+    <div class="site-header__inner">
+        <a class="site-brand" href="/zh-cn/" aria-label="Snow — 主页">Snow.</a>
+        <nav class="site-nav" id="site-navigation" aria-label="主导航">
+            
+            
+                
+                    
+                    
+                    <a href="/zh-cn/">主页</a>
+                
+            
+                
+                    
+                    
+                    <a href="/zh-cn/post/" aria-current="page">博客</a>
+                
+            
+                
+                    
+                    
+                    <a href="/zh-cn/archives/">归档</a>
+                
+            
+                
+                    
+                    
+                    <a href="/zh-cn/stats/">写作记录</a>
+                
+            
+                
+                    
+                    
+                    <a href="/zh-cn/diary/">日记</a>
+                
+            
+                
+            
+                
+                    
+                    
+                    <a href="/zh-cn/links/">链接</a>
+                
+            
+        </nav>
+        <div class="header-tools">
+            
+                <a class="language-link" href="/p/kubernetes-interview-guide/" lang="en" hreflang="en" aria-label="Switch to English">EN</a>
+            
+            <button type="button" id="dark-mode-toggle" class="icon-button theme-toggle" aria-label="切换明暗主题" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><path d="M12 4.5a7.5 7.5 0 0 1 0 15z" fill="currentColor" stroke="none"/></svg></button>
+            <a class="icon-button search-link" href="/zh-cn/search/" aria-label="搜索文章"><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+  <path stroke="none" d="M0 0h24v24H0z"/>
+  <circle cx="10" cy="10" r="7" />
+  <line x1="21" y1="21" x2="15" y2="15" />
+</svg>
+
+
+</a>
+            <button class="icon-button menu-toggle" type="button" aria-expanded="false" aria-controls="site-navigation" aria-label="展开导航"><span></span><span></span></button>
+        </div>
+    </div>
+    <div class="reading-progress" aria-hidden="true"></div>
+</header>
+
+    <main id="main-content" class="site-main main" tabindex="-1">
+        
+    <div class="reading-page">
+        <article class="main-article has-toc">
+    <header class="article-header">
+    <div class="article-wayfinding">
+        
+            <a href="/zh-cn/post/"><span aria-hidden="true">←</span> 全部文章</a>
+        
+        <span class="article-kind">笔记与思考</span>
+    </div>
+    <div class="article-details">
+    
+    <h1 class="article-title">Kubernetes ：从 Pod 创建到故障排查</h1>
+    <p class="article-subtitle">把 40 道 Kubernetes 面试题串成一条完整链路：用图解理解集群架构、Pod 创建、调度与资源、Service 和 DNS，再用命令定位常见故障。</p>
+    <div class="article-meta">
+        
+            <time datetime="2026-10-20T20:25:00&#43;08:00">2026 年 10 月 20 日</time>
+            <span class="meta-divider" aria-hidden="true">/</span>
+            <span>约 8 分钟</span>
+        
+        
+            <div class="article-translations"><a href="/p/kubernetes-interview-guide/" hreflang="en" lang="en">Read in English <span aria-hidden="true">↗</span></a></div>
+        
+    </div>
+</div>
+
+</header>
+
+    <div class="reading-layout">
+        
+            <aside class="reading-margin" aria-label="文章目录">
+                <details class="article-toc" open>
+                    <summary><span>本文目录</span><span class="toc-indicator" aria-hidden="true">+</span></summary>
+                    <nav id="TableOfContents">
+  <ol>
+    <li><a href="#1-先看清分工谁决定谁执行">1. 先看清分工：谁决定，谁执行</a>
+      <ol>
+        <li><a href="#11-声明式与调谐">1.1 声明式与调谐</a></li>
+        <li><a href="#12-控制面与工作节点">1.2 控制面与工作节点</a></li>
+        <li><a href="#13-pod共享网络与存储">1.3 Pod：共享网络与存储</a></li>
+        <li><a href="#14-dockercontainerd-与容器底层">1.4 Docker、containerd 与容器底层</a></li>
+      </ol>
+    </li>
+    <li><a href="#2-提交一个-deployment-后pod-怎样跑起来">2. 提交一个 Deployment 后，Pod 怎样跑起来</a>
+      <ol>
+        <li><a href="#21-deploymentreplicaset-与-pod">2.1 Deployment、ReplicaSet 与 Pod</a></li>
+        <li><a href="#22-完整部署示例">2.2 完整部署示例</a></li>
+        <li><a href="#23-pod-创建流程">2.3 Pod 创建流程</a></li>
+        <li><a href="#24-容器重启与-pod-重建">2.4 容器重启与 Pod 重建</a></li>
+        <li><a href="#25-deployment-与-statefulset">2.5 Deployment 与 StatefulSet</a></li>
+        <li><a href="#26-滚动更新maxsurge-与-maxunavailable">2.6 滚动更新：maxSurge 与 maxUnavailable</a></li>
+      </ol>
+    </li>
+    <li><a href="#3-pod-放在哪台机器能用多少资源">3. Pod 放在哪台机器，能用多少资源</a>
+      <ol>
+        <li><a href="#31-调度流程过滤打分与绑定">3.1 调度流程：过滤、打分与绑定</a></li>
+        <li><a href="#32-节点选择与亲和性">3.2 节点选择与亲和性</a></li>
+        <li><a href="#33-污点与容忍度">3.3 污点与容忍度</a></li>
+        <li><a href="#34-requestslimits-与-cpu内存超限">3.4 requests、limits 与 CPU/内存超限</a></li>
+      </ol>
+    </li>
+    <li><a href="#4-pod-的-ip-会变请求怎样找到应用">4. Pod 的 IP 会变，请求怎样找到应用</a>
+      <ol>
+        <li><a href="#41-service-与-endpointslice">4.1 Service 与 EndpointSlice</a></li>
+        <li><a href="#42-service-类型与-headless">4.2 Service 类型与 Headless</a></li>
+        <li><a href="#43-selectorport-与-targetport">4.3 selector、port 与 targetPort</a></li>
+        <li><a href="#44-coredns-与服务名解析">4.4 CoreDNS 与服务名解析</a></li>
+      </ol>
+    </li>
+    <li><a href="#5-能运行以后还要处理健康数据和配置">5. 能运行以后，还要处理健康、数据和配置</a>
+      <ol>
+        <li><a href="#51-startupreadiness-与-liveness">5.1 Startup、Readiness 与 Liveness</a></li>
+        <li><a href="#52-emptydirpvpvc-与-storageclass">5.2 emptyDir、PV、PVC 与 StorageClass</a></li>
+        <li><a href="#53-configmap-与-secret">5.3 ConfigMap 与 Secret</a></li>
+      </ol>
+    </li>
+    <li><a href="#6-出问题时先判断卡在哪一步">6. 出问题时，先判断卡在哪一步</a>
+      <ol>
+        <li><a href="#61-排障入口getdescribe-与-logs">6.1 排障入口：get、describe 与 logs</a></li>
+        <li><a href="#62-pending调度与启动准备">6.2 Pending：调度与启动准备</a></li>
+        <li><a href="#63-imagepullbackoff镜像拉取失败">6.3 ImagePullBackOff：镜像拉取失败</a></li>
+        <li><a href="#64-crashloopbackoff反复退出与重启">6.4 CrashLoopBackOff：反复退出与重启</a></li>
+        <li><a href="#65-oomkilled内存限制与节点压力">6.5 OOMKilled：内存限制与节点压力</a></li>
+        <li><a href="#66-running-但-service-不通">6.6 Running 但 Service 不通</a></li>
+        <li><a href="#67-dns-超时与解析失败">6.7 DNS 超时与解析失败</a></li>
+      </ol>
+    </li>
+    <li><a href="#7-常用命令与面试前三分钟速记">7. 常用命令与面试前三分钟速记</a>
+      <ol>
+        <li><a href="#71-kubectl-命令速查">7.1 kubectl 命令速查</a></li>
+        <li><a href="#72-面试前三分钟速记">7.2 面试前三分钟速记</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+                </details>
+            </aside>
+        
+        <div class="reading-body">
+            <div class="article-content"><p>假设你有一个 Web 服务，希望它始终运行两个副本，发布新版本时尽量不中断访问，某个副本出问题后还能自动补上。只靠手工启动容器，你就得自己处理机器选择、进程重启、流量切换和版本替换。</p>
+<p><strong>Kubernetes 做的，就是把这些工作交给一组持续运行的管理程序。你描述“我想要什么”，它们不断检查并调整“现在是什么”。</strong></p>
+<p>本文根据《K8s实习生面试八股文》整理，覆盖原文的 40 道题。阅读时可以跟着同一个问题往下走：<strong>一个服务怎样从配置文件变成可访问的应用，出了问题又该去哪里找原因？</strong> 文末保留命令速查和面试速记。</p>
+<p>以下以 Linux 节点、常规 Deployment 和带 selector 的 ClusterIP Service 为主要例子；具体网络实现和默认行为需要结合集群版本与配置判断。</p>
+<h2 id="1-先看清分工谁决定谁执行">1. 先看清分工：谁决定，谁执行
+</h2><h3 id="11-声明式与调谐">1.1 声明式与调谐
+</h3><p>Kubernetes，常缩写为 K8s，是一个<strong>声明式的容器编排系统</strong>。“声明式”可以用一个具体例子理解：你提交配置，说“这个应用需要两个副本”，而不是依次命令每台机器“启动容器、检查进程、坏了再补一个”。</p>
+<p>这里有两个状态：配置里写的是<strong>期望状态</strong>，集群当前运行的情况是<strong>实际状态</strong>。控制器持续比较两者，发现缺口就采取动作。这个反复检查、调整的过程叫<strong>调谐（Reconcile）</strong>。</p>
+<h3 id="12-控制面与工作节点">1.2 控制面与工作节点
+</h3><p><a href="/zh-cn/p/kubernetes-interview-guide/cluster-architecture.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/kubernetes-interview-guide/cluster-architecture.svg" alt="Kubernetes 组件分工：控制面通过 API 协作，节点上的 kubelet 与容器运行时负责执行" loading="lazy" decoding="async"></a>
+</p>
+<p>一个集群可以先分成两部分：<strong>控制面管理整个集群，工作节点运行应用</strong>。</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>组件</th>
+<th>主要位置</th>
+<th>负责的事情</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>kube-apiserver</td>
+<td>控制面</td>
+<td>提供统一 API 入口，处理认证、鉴权、准入和资源读写</td>
+</tr>
+<tr>
+<td>etcd</td>
+<td>控制面存储</td>
+<td>持久化保存集群资源对象及其状态</td>
+</tr>
+<tr>
+<td>kube-controller-manager</td>
+<td>控制面</td>
+<td>运行多种控制器，持续让实际状态接近期望状态</td>
+</tr>
+<tr>
+<td>kube-scheduler</td>
+<td>控制面</td>
+<td>为尚未绑定节点的 Pod 选择合适的节点</td>
+</tr>
+<tr>
+<td>kubelet</td>
+<td>工作节点</td>
+<td>根据分配给本节点的 Pod 配置，协调容器运行和状态上报</td>
+</tr>
+<tr>
+<td>containerd 等容器运行时</td>
+<td>工作节点</td>
+<td>拉取镜像、管理容器生命周期</td>
+</tr>
+<tr>
+<td>kube-proxy，或替代实现</td>
+<td>工作节点</td>
+<td>实现 Service 所需的网络转发能力</td>
+</tr>
+</tbody>
+</table></div>
+<p>etcd 可以理解为集群的“状态账本”，保存 Deployment、Service、ConfigMap 等 API 对象；它不替应用保存数据库里的业务记录。调度器、控制器和 kubelet 通常通过 API Server 观察、修改资源，并不各自直接读写 etcd。组件职责可以对照 <a class="link" href="https://kubernetes.io/docs/concepts/overview/components/"  target="_blank" rel="noopener"
+    >Kubernetes 官方架构说明</a>。</p>
+<h3 id="13-pod共享网络与存储">1.3 Pod：共享网络与存储
+</h3><p>Pod 是 Kubernetes 最小的调度单位。一个 Pod 可以放一个或多个紧密协作的容器，它们共同调度到同一个节点，共享网络命名空间和 Pod IP，可以通过 <code>localhost</code> 通信，也可以通过共同挂载的 Volume 交换文件。</p>
+<p>例如，一个容器处理业务请求，另一个辅助容器负责代理流量。它们需要一起部署、就近通信，于是适合放进同一个 Pod。这类辅助容器通常叫 Sidecar。普通 Web 服务则往往只需要一个主业务容器，不必为了“微服务”把所有服务塞进同一个 Pod。</p>
+<p>注意两个边界：<strong>共享网络不等于默认共享进程命名空间；可以共享卷，也不等于各容器的根文件系统自动共享。</strong></p>
+<h3 id="14-dockercontainerd-与容器底层">1.4 Docker、containerd 与容器底层
+</h3><p>Docker 面向使用者，提供命令行、镜像构建、容器管理等一整套工具；containerd 更侧重容器运行时能力。以 containerd 为例，kubelet 通过容器运行时接口 <strong>CRI</strong> 与它交互，运行时再借助 runc 等底层实现启动容器进程。Kubernetes 节点并不一定要安装 Docker Engine。</p>
+<p>在 Linux 上，容器仍然是共享宿主机内核的进程，主要依靠以下机制工作：</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>机制</th>
+<th>解决的问题</th>
+<th>直观理解</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Linux namespaces</td>
+<td>隔离进程、网络、挂载点等视图</td>
+<td>让进程拥有相对独立的“可见环境”</td>
+</tr>
+<tr>
+<td>Cgroups</td>
+<td>统计和限制 CPU、内存、IO 等资源</td>
+<td>规定能使用多少资源</td>
+</tr>
+<tr>
+<td>OverlayFS 等分层文件系统</td>
+<td>复用镜像层并提供可写层</td>
+<td>公共镜像层复用，修改写到自己的层</td>
+</tr>
+</tbody>
+</table></div>
+<p>这里的 Linux namespace 是内核机制，与 Kubernetes 中用来划分资源范围的 <strong>Namespace 对象</strong>不是同一个概念。</p>
+<h2 id="2-提交一个-deployment-后pod-怎样跑起来">2. 提交一个 Deployment 后，Pod 怎样跑起来
+</h2><h3 id="21-deploymentreplicaset-与-pod">2.1 Deployment、ReplicaSet 与 Pod
+</h3><p>先分清三个对象的关系：<strong>Deployment 管理 ReplicaSet，ReplicaSet 管理 Pod</strong>。</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>对象</th>
+<th>关心什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Deployment</td>
+<td>应用版本、发布策略、期望副本数和回滚</td>
+</tr>
+<tr>
+<td>ReplicaSet</td>
+<td>维持所需数量的 Pod 副本</td>
+</tr>
+<tr>
+<td>Pod</td>
+<td>承载具体运行的容器</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="22-完整部署示例">2.2 完整部署示例
+</h3><p>下面是一份贯穿全文的示例。将它保存为 <code>web-demo.yaml</code>，就能同时描述两个 Nginx 副本和一个集群内访问入口。</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt"> 1
+</span><span class="lnt"> 2
+</span><span class="lnt"> 3
+</span><span class="lnt"> 4
+</span><span class="lnt"> 5
+</span><span class="lnt"> 6
+</span><span class="lnt"> 7
+</span><span class="lnt"> 8
+</span><span class="lnt"> 9
+</span><span class="lnt">10
+</span><span class="lnt">11
+</span><span class="lnt">12
+</span><span class="lnt">13
+</span><span class="lnt">14
+</span><span class="lnt">15
+</span><span class="lnt">16
+</span><span class="lnt">17
+</span><span class="lnt">18
+</span><span class="lnt">19
+</span><span class="lnt">20
+</span><span class="lnt">21
+</span><span class="lnt">22
+</span><span class="lnt">23
+</span><span class="lnt">24
+</span><span class="lnt">25
+</span><span class="lnt">26
+</span><span class="lnt">27
+</span><span class="lnt">28
+</span><span class="lnt">29
+</span><span class="lnt">30
+</span><span class="lnt">31
+</span><span class="lnt">32
+</span><span class="lnt">33
+</span><span class="lnt">34
+</span><span class="lnt">35
+</span><span class="lnt">36
+</span><span class="lnt">37
+</span><span class="lnt">38
+</span><span class="lnt">39
+</span><span class="lnt">40
+</span><span class="lnt">41
+</span><span class="lnt">42
+</span><span class="lnt">43
+</span><span class="lnt">44
+</span><span class="lnt">45
+</span><span class="lnt">46
+</span><span class="lnt">47
+</span><span class="lnt">48
+</span><span class="lnt">49
+</span><span class="lnt">50
+</span><span class="lnt">51
+</span><span class="lnt">52
+</span><span class="lnt">53
+</span><span class="lnt">54
+</span><span class="lnt">55
+</span><span class="lnt">56
+</span><span class="lnt">57
+</span><span class="lnt">58
+</span><span class="lnt">59
+</span><span class="lnt">60
+</span><span class="lnt">61
+</span><span class="lnt">62
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">apps/v1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">Deployment</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">web-demo</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">spec</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span><span class="m">2</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">minReadySeconds</span><span class="p">:</span><span class="w"> </span><span class="m">5</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">selector</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">matchLabels</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l">web-demo</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">strategy</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l">RollingUpdate</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">rollingUpdate</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">maxSurge</span><span class="p">:</span><span class="w"> </span><span class="m">1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">maxUnavailable</span><span class="p">:</span><span class="w"> </span><span class="m">0</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">template</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">labels</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l">web-demo</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">spec</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">containers</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">        </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">nginx</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l">nginx:1.28</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">ports</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">http</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">containerPort</span><span class="p">:</span><span class="w"> </span><span class="m">80</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">resources</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">requests</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;500m&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;512Mi&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">limits</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;1&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;1Gi&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">startupProbe</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">httpGet</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l">/</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l">http</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">periodSeconds</span><span class="p">:</span><span class="w"> </span><span class="m">2</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">failureThreshold</span><span class="p">:</span><span class="w"> </span><span class="m">30</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">readinessProbe</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">httpGet</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l">/</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l">http</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">periodSeconds</span><span class="p">:</span><span class="w"> </span><span class="m">5</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">          </span><span class="nt">livenessProbe</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">httpGet</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l">/</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">              </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l">http</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">periodSeconds</span><span class="p">:</span><span class="w"> </span><span class="m">10</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nn">---</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l">v1</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l">Service</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">metadata</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">web-demo</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w"></span><span class="nt">spec</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">selector</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l">web-demo</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">ports</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span>- <span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l">http</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="m">80</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">      </span><span class="nt">targetPort</span><span class="p">:</span><span class="w"> </span><span class="l">http</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l">ClusterIP</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>这里的资源数值用于解释原理，并不是所有 Web 服务都应照搬的配额。实际使用时，要根据程序表现和节点容量调整。</p>
+<h3 id="23-pod-创建流程">2.3 Pod 创建流程
+</h3><p>提交以后，各个组件大致按下面的关系接力：</p>
+<p><a href="/zh-cn/p/kubernetes-interview-guide/deployment-flow.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/kubernetes-interview-guide/deployment-flow.svg" alt="Deployment 创建 Pod 的协作过程：提交配置、创建 ReplicaSet 和 Pod、调度、启动、通过就绪检查" loading="lazy" decoding="async"></a>
+</p>
+<ol>
+<li><code>kubectl apply</code> 把配置提交给 API Server，经过相应校验后，资源对象被持久化到 etcd。</li>
+<li>Deployment 控制器观察到新 Deployment，创建对应的 ReplicaSet。</li>
+<li>ReplicaSet 控制器发现还缺两个副本，于是创建两个 Pod 对象。</li>
+<li>调度器为尚未分配节点的 Pod 选择节点，并通过 API 写入绑定结果。</li>
+<li>对应节点的 kubelet 观察到分配结果，协调存储、网络和容器运行时，拉取镜像并启动容器。</li>
+<li>应用通过就绪检查后，Pod 才能作为普通 Service 的可用后端接收流量。</li>
+</ol>
+<p><strong>这是一组组件通过 API 和对象状态协作的过程。</strong> 图中的顺序用于理解依赖关系，不代表 API Server 用一个同步函数依次调用所有组件。</p>
+<h3 id="24-容器重启与-pod-重建">2.4 容器重启与 Pod 重建
+</h3><p>如果只是容器里的进程退出，kubelet 可以按照重启策略，在<strong>同一个 Pod 内重启容器</strong>。如果 Pod 被删除，或者节点故障最终导致原 Pod 被清理、需要补副本，ReplicaSet 则会<strong>创建一个新 Pod</strong>。</p>
+<p>这两件事不能混为一谈。新 Pod 有新的 UID，名称和 IP 也可能变化；一个已经绑定节点的 Pod 不会以原身份“搬家”到另一个节点。没有控制器管理的独立 Pod，被删除后也不会凭空补出来。</p>
+<h3 id="25-deployment-与-statefulset">2.5 Deployment 与 StatefulSet
+</h3><div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>比较项</th>
+<th>Deployment</th>
+<th>StatefulSet</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>主要诉求</td>
+<td>副本通常可以互相替代</td>
+<td>每个副本需要稳定身份</td>
+</tr>
+<tr>
+<td>常见场景</td>
+<td>Web、API 等无状态应用</td>
+<td>需要稳定成员身份的数据库、消息系统等</td>
+</tr>
+<tr>
+<td>Pod 名称</td>
+<td>通常不依赖固定名称</td>
+<td>具有稳定序号，如 <code>mysql-0</code></td>
+</tr>
+<tr>
+<td>存储安排</td>
+<td>也可以挂载 PVC</td>
+<td>常通过卷声明模板为各副本申请独立 PVC</td>
+</tr>
+<tr>
+<td>创建与删除</td>
+<td>通常不要求按序号进行</td>
+<td>默认按有序策略管理，也可配置并行创建等行为</td>
+</tr>
+<tr>
+<td>网络身份</td>
+<td>通常通过 Service 找副本</td>
+<td>配合 Headless Service 提供稳定的网络名称</td>
+</tr>
+</tbody>
+</table></div>
+<p>StatefulSet 不会自动解决数据库复制、选主和备份问题，它提供的是身份和生命周期管理能力。</p>
+<h3 id="26-滚动更新maxsurge-与-maxunavailable">2.6 滚动更新：maxSurge 与 maxUnavailable
+</h3><p>修改 Deployment 的 Pod 模板，例如更换镜像后，会触发新一轮发布：逐步增加新 ReplicaSet 的副本，同时减少旧 ReplicaSet 的副本。仅修改 <code>replicas</code> 是扩缩容，不是一次新版本发布。</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>参数</th>
+<th>控制什么</th>
+<th>期望副本数为 10 时的例子</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>maxSurge: 2</code></td>
+<td>更新期间允许额外创建的副本数量</td>
+<td>按发布策略可增加到 12 个非终止中的 Pod</td>
+</tr>
+<tr>
+<td><code>maxUnavailable: 1</code></td>
+<td>更新期间允许的不可用副本数量</td>
+<td>发布过程按至少 9 个可用副本推进</td>
+</tr>
+</tbody>
+</table></div>
+<p>示例中使用 <code>maxSurge: 1</code>、<code>maxUnavailable: 0</code>，希望用额外容量换取发布期间的可用性；<code>minReadySeconds: 5</code> 表示新 Pod 连续就绪至少 5 秒后，才算可用。它们不能替代正确的健康检查，也不能保证外部故障下始终零中断。</p>
+<p>还有一个容易被追问的细节：<strong>正在终止的 Pod 可能仍占用资源，因此实际观察到的 Pod 总数和资源占用，可以暂时超过 <code>replicas + maxSurge</code>。</strong> 这也是为什么不能把“最多 12 个”理解成所有状态下的绝对上限。见 <a class="link" href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#rolling-update-deployment"  target="_blank" rel="noopener"
+    >Deployment 滚动更新说明</a>。</p>
+<h2 id="3-pod-放在哪台机器能用多少资源">3. Pod 放在哪台机器，能用多少资源
+</h2><h3 id="31-调度流程过滤打分与绑定">3.1 调度流程：过滤、打分与绑定
+</h3><p>调度和资源限制回答的是两个问题：<strong>先决定能不能放到某个节点，再约束运行时能用多少资源。</strong></p>
+<p><a href="/zh-cn/p/kubernetes-interview-guide/scheduling-resources.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/kubernetes-interview-guide/scheduling-resources.svg" alt="调度先过滤、再打分、最后绑定；requests 用于容量判断，CPU 与内存 limits 有不同的运行时行为" loading="lazy" decoding="async"></a>
+</p>
+<p>调度器的主要过程可以概括为：</p>
+<ol>
+<li><strong>过滤（Filtering）</strong>：排除资源不够、标签不匹配、不满足亲和性或污点要求等节点。</li>
+<li><strong>打分（Scoring）</strong>：在满足条件的候选节点中，根据调度策略评分。</li>
+<li><strong>绑定（Binding）</strong>：选定节点，并记录 Pod 与节点的绑定关系。</li>
+</ol>
+<p>实际调度框架还有其他扩展阶段；实习生面试先把这条主线说清楚即可。</p>
+<h3 id="32-节点选择与亲和性">3.2 节点选择与亲和性
+</h3><p><code>nodeSelector</code> 是最直接的标签筛选。例如，下面的片段放在 Pod 的 <code>spec</code> 下，表示只能选择带 <code>disktype=ssd</code> 标签的节点：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">nodeSelector</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">disktype</span><span class="p">:</span><span class="w"> </span><span class="l">ssd</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p>亲和性提供更灵活的表达方式：</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>机制</th>
+<th>关注对象</th>
+<th>例子</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NodeAffinity</td>
+<td>节点的标签</td>
+<td>必须在指定可用区，或者优先选择 SSD 节点</td>
+</tr>
+<tr>
+<td>PodAffinity</td>
+<td>其他 Pod 所在的位置</td>
+<td>希望应用靠近某类依赖服务</td>
+</tr>
+<tr>
+<td>PodAntiAffinity</td>
+<td>其他 Pod 所在的位置</td>
+<td>将同一应用的副本分散到不同节点或可用区</td>
+</tr>
+</tbody>
+</table></div>
+<p>亲和性里，<code>requiredDuringSchedulingIgnoredDuringExecution</code> 是<strong>必须满足的硬约束</strong>；<code>preferredDuringSchedulingIgnoredDuringExecution</code> 是<strong>尽量满足的软偏好</strong>。名称中的 <code>IgnoredDuringExecution</code> 表示，调度完成后，如果对应标签条件变化，不会仅因为这条规则不再满足就自动驱逐现有 Pod。见 <a class="link" href="https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/"  target="_blank" rel="noopener"
+    >Pod 到节点的分配规则</a>。</p>
+<h3 id="33-污点与容忍度">3.3 污点与容忍度
+</h3><p>污点与容忍度从另一个方向起作用：<strong>Taint 写在节点上，用于排斥 Pod；Toleration 写在 Pod 上，表示允许它容忍某种污点。</strong></p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>污点效果</th>
+<th>不匹配容忍度时的行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>NoSchedule</code></td>
+<td>不再把新 Pod 调度到该节点，已有 Pod 不因此被驱逐</td>
+</tr>
+<tr>
+<td><code>PreferNoSchedule</code></td>
+<td>尽量避免调度到该节点</td>
+</tr>
+<tr>
+<td><code>NoExecute</code></td>
+<td>阻止新调度，并可能驱逐已有 Pod；容忍时间也会影响结果</td>
+</tr>
+</tbody>
+</table></div>
+<p>例如，给 GPU 节点打上专用污点，可以阻止普通服务随意占用它。但 <strong>Toleration 只表示“允许来”，不表示“一定来”</strong>；要让应用定向使用这类节点，还需要节点标签选择或亲和性等约束。</p>
+<h3 id="34-requestslimits-与-cpu内存超限">3.4 requests、limits 与 CPU/内存超限
+</h3><p>回到示例中的一个容器：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-yaml" data-lang="yaml"><span class="line"><span class="cl"><span class="nt">resources</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">requests</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;500m&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;512Mi&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">  </span><span class="nt">limits</span><span class="p">:</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;1&#34;</span><span class="w">
+</span></span></span><span class="line"><span class="cl"><span class="w">    </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;1Gi&#34;</span><span class="w">
+</span></span></span></code></pre></td></tr></table>
+</div>
+</div><p><code>500m</code> CPU 表示 0.5 个 CPU 单位；<code>512Mi</code> 内存表示 512 × 2²⁰ 字节，<code>1Gi</code> 表示 1024Mi。</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>配置</th>
+<th>什么时候起作用</th>
+<th>不要误解成什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>requests</td>
+<td>调度时用于判断节点容量，运行时也会影响部分资源分配行为</td>
+<td>不是应用每时每刻都实际使用这么多</td>
+</tr>
+<tr>
+<td>limits</td>
+<td>由运行时和内核等机制实施资源上限</td>
+<td>不是 CPU、内存一超限就采取同一种动作</td>
+</tr>
+</tbody>
+</table></div>
+<p>调度器主要看<strong>节点可分配资源减去已经承诺的 requests</strong>，而不是只看此刻 <code>kubectl top</code> 显示的用量。节点现在看起来很空闲，也可能因为已经承诺出去的资源而无法接纳新 Pod。多个容器、初始化容器和 Pod 开销等还会影响 Pod 的有效请求，不能总是只看一个主容器。</p>
+<p>CPU 时间可以少分一点，让程序慢一些，所以通常称为<strong>可压缩资源</strong>。CPU 达到上限时，一般表现为节流：容器得到的 CPU 时间受到限制，响应可能变慢，而不是直接因 CPU 超限被杀死。</p>
+<p>内存通常称为<strong>不可压缩资源</strong>。当内存无法满足分配需求时，仅仅让进程变慢并不能解决问题，可能触发 OOM，由内核杀死进程。容器状态中可能看到 <code>OOMKilled</code>。内存限制是反应式执行的，不应理解成“监控数值刚碰到上限，容器立刻消失”。见 <a class="link" href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"  target="_blank" rel="noopener"
+    >资源请求与限制</a>。</p>
+<p>所以，面试时的简短回答是：<strong>CPU 超限通常被节流，内存不足可能触发 OOM；后续是否重启，还要看重启策略等配置。</strong></p>
+<h2 id="4-pod-的-ip-会变请求怎样找到应用">4. Pod 的 IP 会变，请求怎样找到应用
+</h2><h3 id="41-service-与-endpointslice">4.1 Service 与 EndpointSlice
+</h3><p>假设两个 Web Pod 的 IP 分别是 <code>10.244.1.8</code> 和 <code>10.244.2.9</code>。一旦其中一个被重建，新副本的 IP 可能变化。如果客户端把这两个地址写死，就得不断修改配置。</p>
+<p><strong>Service 给一组后端提供相对稳定的访问入口。</strong> 对普通 ClusterIP Service 来说，客户端可以使用固定的 Service IP 和服务名，由集群维护它与动态后端之间的对应关系。</p>
+<p><a href="/zh-cn/p/kubernetes-interview-guide/service-dns.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/kubernetes-interview-guide/service-dns.svg" alt="Service 的三条关系：DNS 查询得到访问地址，EndpointSlice 驱动规则更新，业务请求按节点规则转发到 Pod" loading="lazy" decoding="async"></a>
+</p>
+<p>先把图中的三件事分开：</p>
+<ol>
+<li><strong>找名字</strong>：客户端查询 Service 域名，集群 DNS 返回访问地址。</li>
+<li><strong>维护后端</strong>：控制面根据 Service 的 selector、Pod 标签与就绪情况，维护 EndpointSlice；网络实现据此更新转发规则。</li>
+<li><strong>发请求</strong>：客户端访问 Service IP 和端口，流量按节点上的规则转向合适的后端 Pod。</li>
+</ol>
+<p>EndpointSlice 是记录后端地址、端口、就绪等信息的 API 对象，<strong>不是请求需要经过的一台代理服务器</strong>。Pod 尚未就绪时，地址也可能已经出现在 EndpointSlice 中，只是带有不可用的就绪条件。排障时既要看“有没有地址”，也要看条件是否正常。见 <a class="link" href="https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/"  target="_blank" rel="noopener"
+    >EndpointSlice 及其条件</a>。</p>
+<p>在使用 kube-proxy 的集群里，它主要负责观察 Service 和 EndpointSlice 的变化，维护节点转发规则。Linux 上的实现可涉及 iptables、nftables，已有集群中也能见到 IPVS；具体取决于版本和配置。有些网络方案会替代 kube-proxy。不能把 kube-proxy 一律理解为“每个请求都经过它这个用户态进程”。见 <a class="link" href="https://kubernetes.io/docs/reference/networking/virtual-ips/"  target="_blank" rel="noopener"
+    >Service 虚拟 IP 与代理机制</a>。</p>
+<h3 id="42-service-类型与-headless">4.2 Service 类型与 Headless
+</h3><div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>类型或形式</th>
+<th>主要用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ClusterIP</td>
+<td>默认类型，提供集群内部的虚拟 IP 入口</td>
+</tr>
+<tr>
+<td>NodePort</td>
+<td>通过节点地址和指定端口暴露服务，可达性还受网络、防火墙等影响</td>
+</tr>
+<tr>
+<td>LoadBalancer</td>
+<td>配合云厂商或其他负载均衡实现提供入口，不是写上类型就凭空有外部设备</td>
+</tr>
+<tr>
+<td>ExternalName</td>
+<td>通过 DNS CNAME 指向指定域名，不走通常的 Service IP 转发</td>
+</tr>
+<tr>
+<td>Headless Service</td>
+<td>将 <code>clusterIP</code> 设为 <code>None</code>，不分配普通 ClusterIP，可用 DNS 发现后端地址</td>
+</tr>
+</tbody>
+</table></div>
+<p>Headless 是 Service 的一种配置形式，不是与 ClusterIP 并列的 <code>type</code> 取值。它也解释了 StatefulSet 为什么常与 Headless Service 配合使用。见 <a class="link" href="https://kubernetes.io/docs/concepts/services-networking/service/#headless-services"  target="_blank" rel="noopener"
+    >Service 类型与 Headless Service</a>。</p>
+<h3 id="43-selectorport-与-targetport">4.3 selector、port 与 targetPort
+</h3><p>示例里三个看起来相似的配置，也要分清楚：</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>字段</th>
+<th>示例中的作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>selector: app: web-demo</code></td>
+<td>选择带相应标签的后端 Pod</td>
+</tr>
+<tr>
+<td><code>port: 80</code></td>
+<td>客户端访问 Service 时使用的端口</td>
+</tr>
+<tr>
+<td><code>targetPort: http</code></td>
+<td>转发到 Pod 中名为 <code>http</code> 的端口，此处对应 80</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>containerPort</code> 是端口声明，本身不会替程序打开监听端口。应用仍要实际监听正确的地址和端口；通常应监听容器内的可达接口，而不是只监听 <code>127.0.0.1</code>。</p>
+<h3 id="44-coredns-与服务名解析">4.4 CoreDNS 与服务名解析
+</h3><p>在常见配置下，集群通过 CoreDNS 提供 DNS 服务。Pod 中的解析器根据 <code>/etc/resolv.conf</code>，把查询发送到集群 DNS 地址；查询最终到达 CoreDNS。CoreDNS 对集群服务名生成相应结果，对外部域名通常再转发到上游解析器。部分集群还会增加节点本地 DNS 缓存。</p>
+<p>假设服务位于 <code>default</code> 命名空间，集群域是 <code>cluster.local</code>，Linux Pod 中常见的访问名称有：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-text" data-lang="text"><span class="line"><span class="cl">web-demo
+</span></span><span class="line"><span class="cl">web-demo.default
+</span></span><span class="line"><span class="cl">web-demo.default.svc.cluster.local
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>同命名空间通常可以直接使用短名称，背后依赖解析器的搜索域。<code>cluster.local</code> 可以自定义，不能假定每个集群都一样。普通 ClusterIP Service 的 DNS 结果通常是 Service IP；Headless Service 的结果则可以是后端地址。见 <a class="link" href="https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/"  target="_blank" rel="noopener"
+    >Pod 与 Service 的 DNS</a>。</p>
+<h2 id="5-能运行以后还要处理健康数据和配置">5. 能运行以后，还要处理健康、数据和配置
+</h2><h3 id="51-startupreadiness-与-liveness">5.1 Startup、Readiness 与 Liveness
+</h3><p><strong>Running 不等于 Ready。</strong> 前者是 Pod 生命周期的阶段，后者表示它是否满足就绪条件。一个 Pod 可以已经运行，但因为应用还在预热、依赖不可用等原因，尚未准备好接收请求。</p>
+<p><a href="/zh-cn/p/kubernetes-interview-guide/probe-lifecycle.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/kubernetes-interview-guide/probe-lifecycle.svg" alt="Startup 成功后才启用其他两类探针；Readiness 控制流量资格，Liveness 在失败达到阈值后触发容器重启处理" loading="lazy" decoding="async"></a>
+</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>探针</th>
+<th>要回答的问题</th>
+<th>失败达到配置阈值后的主要效果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Startup</td>
+<td>应用是否完成启动？</td>
+<td>终止容器，按重启策略处理；成功前不执行另两类探针</td>
+</tr>
+<tr>
+<td>Readiness</td>
+<td>应用现在是否能接请求？</td>
+<td>标记为未就绪，普通 Service 通常不再将其作为可用后端，不直接因此重启</td>
+</tr>
+<tr>
+<td>Liveness</td>
+<td>应用是否陷入需要重启才能恢复的状态？</td>
+<td>终止容器，按重启策略处理</td>
+</tr>
+</tbody>
+</table></div>
+<p>比如，一个应用需要较长时间加载数据，可以用 Startup 给它留出启动窗口；运行期间暂时无法处理请求，可以让 Readiness 失败；进程死锁且无法自行恢复，才适合由 Liveness 触发重启。Startup 成功后，Readiness 和 Liveness 各自判断，不要求先通过 Readiness 才能做 Liveness。</p>
+<p>示例中 Nginx 的三个探针都访问 <code>/</code>，便于理解配置。真实业务通常应根据各探针的目的设计检查条件，避免把一次短暂的外部依赖故障扩大成全体容器反复重启。相关语义见 <a class="link" href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/"  target="_blank" rel="noopener"
+    >三类探针配置</a>。</p>
+<p>“未就绪不接流量”说的是普通 Service 的常见行为。直接访问 Pod IP 不受 Readiness 自动阻断；显式设置 <code>publishNotReadyAddresses</code> 等配置时，也需要另外判断。</p>
+<h3 id="52-emptydirpvpvc-与-storageclass">5.2 emptyDir、PV、PVC 与 StorageClass
+</h3><div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>对象或机制</th>
+<th>表示什么</th>
+<th>生命周期上的重点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>emptyDir</td>
+<td>Pod 内可共享的临时目录</td>
+<td>容器重启通常保留，Pod 从节点移除后数据被删除</td>
+</tr>
+<tr>
+<td>PVC</td>
+<td>应用对存储容量、访问模式等的申请</td>
+<td>Pod 引用它来使用持久化存储</td>
+</tr>
+<tr>
+<td>PV</td>
+<td>集群中的持久化卷资源</td>
+<td>与满足条件的 PVC 绑定</td>
+</tr>
+<tr>
+<td>StorageClass</td>
+<td>描述存储类别及动态供应方式</td>
+<td>有相应供应器时，可按 PVC 动态创建存储和 PV</td>
+</tr>
+</tbody>
+</table></div>
+<p>通常先由 PVC 申请存储，再绑定已有 PV，或触发 StorageClass 对应的动态供应器创建合适的卷，最后 Pod 挂载 PVC。</p>
+<p>emptyDir 适合临时文件、缓存或同 Pod 容器间的数据交换；它的生命周期跟着 Pod，<strong>不会因为同一个 Pod 中的容器崩溃重启就自动清空</strong>。持久卷能否保留数据，则还要结合回收策略、工作负载设置和底层存储判断。emptyDir 的边界见 <a class="link" href="https://kubernetes.io/docs/concepts/storage/volumes/#emptydir"  target="_blank" rel="noopener"
+    >卷类型说明</a>。</p>
+<h3 id="53-configmap-与-secret">5.3 ConfigMap 与 Secret
+</h3><p>ConfigMap 用来存普通配置，例如服务地址、日志级别；Secret 用来承载密码、Token、证书等敏感配置。</p>
+<p>需要记住：<strong>Secret 的 <code>data</code> 字段使用 Base64 编码，Base64 可以直接解码，并不等于加密。</strong> 数据保护还依赖 API 权限、静态加密配置以及实际的密钥管理方式，不能只因为对象叫 Secret 就认定内容已经安全加密。见 <a class="link" href="https://kubernetes.io/docs/concepts/configuration/secret/"  target="_blank" rel="noopener"
+    >Secret 官方说明</a>。</p>
+<h2 id="6-出问题时先判断卡在哪一步">6. 出问题时，先判断卡在哪一步
+</h2><h3 id="61-排障入口getdescribe-与-logs">6.1 排障入口：get、describe 与 logs
+</h3><p>故障题不要从“是不是网络坏了”开始猜。先获得事实，再决定往哪层走：</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl"><span class="c1"># 以下示例使用 default 命名空间；&lt;pod&gt;、&lt;node&gt; 等需要换成实际名称</span>
+</span></span><span class="line"><span class="cl">kubectl get pods -n default -o wide
+</span></span><span class="line"><span class="cl">kubectl describe pod &lt;pod&gt; -n default
+</span></span><span class="line"><span class="cl">kubectl logs &lt;pod&gt; -n default
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p><code>get</code> 看现状，<code>describe</code> 看资源配置、状态和 Events，<code>logs</code> 看程序输出。对于容器尚未启动的故障，应用日志可能根本不存在，Events 往往更有帮助。</p>
+<p>还要区分：<code>Pending</code>、<code>Running</code> 是 Pod 的阶段；<code>CrashLoopBackOff</code>、<code>ImagePullBackOff</code> 是 <code>kubectl</code> 常展示的容器状态原因，不是同一层级的 Pod phase。见 <a class="link" href="https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/"  target="_blank" rel="noopener"
+    >Pod 生命周期</a>。</p>
+<h3 id="62-pending调度与启动准备">6.2 Pending：调度与启动准备
+</h3><p>Pending 包含等待调度和容器准备过程，不只等于“调度器没找到节点”。在 <code>get -o wide</code> 和 <code>describe</code> 中检查节点分配、<code>PodScheduled</code> 条件和 Events：</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>看到的线索</th>
+<th>优先检查什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>FailedScheduling</code>、<code>Insufficient memory/cpu</code></td>
+<td>requests 与节点可分配资源，以及其他 Pod 的已申请资源</td>
+</tr>
+<tr>
+<td>节点标签或亲和性不匹配</td>
+<td>nodeSelector、required 规则与实际标签</td>
+</tr>
+<tr>
+<td>未被容忍的污点</td>
+<td>节点 Taint 与 Pod Toleration</td>
+</tr>
+<tr>
+<td>PVC 无法绑定</td>
+<td>PVC 状态、StorageClass、卷容量和拓扑条件</td>
+</tr>
+<tr>
+<td>已有节点，但容器仍未就绪</td>
+<td>镜像拉取、卷挂载、Pod 网络及初始化容器</td>
+</tr>
+</tbody>
+</table></div>
+<p>调度提示 <code>Insufficient memory</code>，说明按请求计算无法满足放置条件；它不是在说这个尚未启动的容器已经 OOM 了。合理调整请求、释放已占用容量或扩容节点，需要根据实际资源需求选择。</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl get nodes
+</span></span><span class="line"><span class="cl">kubectl describe node &lt;node&gt;
+</span></span><span class="line"><span class="cl">kubectl get pvc -n default
+</span></span><span class="line"><span class="cl">kubectl describe pvc &lt;pvc&gt; -n default
+</span></span></code></pre></td></tr></table>
+</div>
+</div><h3 id="63-imagepullbackoff镜像拉取失败">6.3 ImagePullBackOff：镜像拉取失败
+</h3><p>它表示镜像拉取失败后正在退避重试。可以依次看：镜像名或 tag 是否存在、仓库地址是否可达、节点访问仓库的 DNS 和网络、私有仓库认证，以及 <code>imagePullSecrets</code> 的名称和命名空间是否正确。</p>
+<p>架构问题也要看具体错误：仓库没有适配该节点架构的镜像清单，可能导致拉取失败；如果镜像已经拉下来，运行时才报 <code>exec format error</code>，则属于启动阶段，不能一概叫 ImagePullBackOff。</p>
+<h3 id="64-crashloopbackoff反复退出与重启">6.4 CrashLoopBackOff：反复退出与重启
+</h3><p>这表示容器反复退出、重启，并处在重试退避中。原因可以是应用报错、缺配置、启动命令不对、探针失败，也可能是内存问题；使用 Always 重启策略的容器即使正常退出，也可能不断被重启。</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl logs &lt;pod&gt; -n default -c &lt;container&gt;
+</span></span><span class="line"><span class="cl">kubectl logs &lt;pod&gt; -n default -c &lt;container&gt; --previous
+</span></span><span class="line"><span class="cl">kubectl describe pod &lt;pod&gt; -n default
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p><code>--previous</code> 用来查看同一 Pod 中该容器上一个实例的日志。多容器 Pod 用 <code>-c</code> 指定目标，避免看错容器。结合 <code>Last State</code>、<code>Reason</code>、退出码和探针事件，才能把“反复重启”缩小到具体原因。</p>
+<h3 id="65-oomkilled内存限制与节点压力">6.5 OOMKilled：内存限制与节点压力
+</h3><div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>现象</th>
+<th>怎样判断</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>容器状态出现 <code>OOMKilled</code></td>
+<td>对照内存 limit、用量峰值、内核记录，调查是否超出容器内存预算</td>
+</tr>
+<tr>
+<td>节点内存不足导致系统级 OOM</td>
+<td>结合节点状态与内核日志判断，不能只看一个容器的 limit</td>
+</tr>
+<tr>
+<td>Pod 显示 <code>Evicted</code>，节点有内存压力</td>
+<td>检查 kubelet 的节点压力驱逐事件，与容器 OOM 区分</td>
+</tr>
+<tr>
+<td>只看到退出码 <code>137</code></td>
+<td>常见含义是进程被 SIGKILL，不能单凭它认定是 OOM</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>kubectl top</code> 提供当前采样，不一定能抓到导致 OOM 的短时峰值，最好结合历史监控。处理时再判断是资源预算不合理、批处理峰值过高，还是程序存在内存泄漏。<strong>节点压力驱逐与内核 OOM 是不同机制</strong>，官方的 <a class="link" href="https://kubernetes.io/docs/concepts/scheduling-eviction/node-pressure-eviction/"  target="_blank" rel="noopener"
+    >节点压力驱逐说明</a> 也区分了两者。</p>
+<h3 id="66-running-但-service-不通">6.6 Running 但 Service 不通
+</h3><div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl get pods -n default -l <span class="nv">app</span><span class="o">=</span>web-demo -o wide
+</span></span><span class="line"><span class="cl">kubectl describe pod &lt;pod&gt; -n default
+</span></span><span class="line"><span class="cl">kubectl get svc web-demo -n default -o yaml
+</span></span><span class="line"><span class="cl">kubectl get endpointslices -n default -l kubernetes.io/service-name<span class="o">=</span>web-demo -o yaml
+</span></span><span class="line"><span class="cl">kubectl describe svc web-demo -n default
+</span></span></code></pre></td></tr></table>
+</div>
+</div><div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>检查顺序</th>
+<th>要确认的事实</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>应用</td>
+<td>进程实际监听什么地址和端口，访问应用本身是否正常</td>
+</tr>
+<tr>
+<td>Pod 就绪</td>
+<td>Ready 是否为真，Readiness 有没有失败</td>
+</tr>
+<tr>
+<td>Service 选择</td>
+<td>selector 是否匹配 Pod 标签，是否处于同一命名空间</td>
+</tr>
+<tr>
+<td>EndpointSlice</td>
+<td>是否记录了预期地址、端口，是否存在可用后端</td>
+</tr>
+<tr>
+<td>端口映射</td>
+<td>Service 的 port、targetPort 与应用实际监听是否一致</td>
+</tr>
+<tr>
+<td>网络</td>
+<td>NetworkPolicy、网络插件 CNI、节点路由和 Service 转发实现是否正常</td>
+</tr>
+</tbody>
+</table></div>
+<p>没有预期地址时，先看 selector、标签等；有地址但不可用时，先看就绪条件。只有可用地址、端口都正常，才继续深入转发与网络。若能访问 Pod IP 却不能访问 Service IP，重点往 Service 端口、转发规则等方向收敛，而不是继续重复重启应用。</p>
+<h3 id="67-dns-超时与解析失败">6.7 DNS 超时与解析失败
+</h3><p>在一个确实包含 <code>cat</code>、<code>nslookup</code> 等工具的 Pod 中执行；精简业务镜像没有这些工具时，使用集群允许的调试镜像或调试容器。</p>
+<div class="highlight"><div class="chroma">
+<table class="lntable"><tr><td class="lntd">
+<pre tabindex="0" class="chroma"><code><span class="lnt">1
+</span><span class="lnt">2
+</span><span class="lnt">3
+</span><span class="lnt">4
+</span><span class="lnt">5
+</span><span class="lnt">6
+</span><span class="lnt">7
+</span><span class="lnt">8
+</span></code></pre></td>
+<td class="lntd">
+<pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">kubectl <span class="nb">exec</span> &lt;debug-pod&gt; -n default -- cat /etc/resolv.conf
+</span></span><span class="line"><span class="cl">kubectl <span class="nb">exec</span> &lt;debug-pod&gt; -n default -- nslookup kubernetes.default
+</span></span><span class="line"><span class="cl">kubectl <span class="nb">exec</span> &lt;debug-pod&gt; -n default -- nslookup web-demo.default.svc.cluster.local
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">kubectl get svc kube-dns -n kube-system
+</span></span><span class="line"><span class="cl">kubectl get endpointslices -n kube-system -l kubernetes.io/service-name<span class="o">=</span>kube-dns -o yaml
+</span></span><span class="line"><span class="cl">kubectl get pods -n kube-system -l k8s-app<span class="o">=</span>kube-dns -o wide
+</span></span><span class="line"><span class="cl">kubectl logs -n kube-system &lt;coredns-pod&gt;
+</span></span></code></pre></td></tr></table>
+</div>
+</div><p>这些名称与标签是常见约定，实际部署不同就替换。检查顺序是：Pod 的 nameserver 和搜索域 → DNS Service 与可用后端 → CoreDNS 状态和日志 → 到 DNS 的 UDP、TCP 53 端口网络 → 上游解析器。</p>
+<p>如果 Service IP 可访问、对应名字却解析失败，就先调查 DNS；如果连集群内服务名也失败，优先调查集群 DNS 链路；如果内部名称正常、只有外部域名失败，再检查上游配置和外部访问。</p>
+<h2 id="7-常用命令与面试前三分钟速记">7. 常用命令与面试前三分钟速记
+</h2><h3 id="71-kubectl-命令速查">7.1 kubectl 命令速查
+</h3><p>下面的命令按默认命名空间展示，需要时补上 <code>-n &lt;namespace&gt;</code>。尖括号内容都是占位符。</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>目的</th>
+<th>命令</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>查看 Pod 和所在节点</td>
+<td><code>kubectl get pods -o wide</code></td>
+</tr>
+<tr>
+<td>看配置、状态和事件</td>
+<td><code>kubectl describe pod &lt;pod&gt;</code></td>
+</tr>
+<tr>
+<td>看当前容器日志</td>
+<td><code>kubectl logs &lt;pod&gt; -c &lt;container&gt;</code></td>
+</tr>
+<tr>
+<td>看上一个容器实例的日志</td>
+<td><code>kubectl logs &lt;pod&gt; -c &lt;container&gt; --previous</code></td>
+</tr>
+<tr>
+<td>进入有 shell 的容器</td>
+<td><code>kubectl exec -it &lt;pod&gt; -c &lt;container&gt; -- /bin/sh</code></td>
+</tr>
+<tr>
+<td>看工作负载与副本</td>
+<td><code>kubectl get deploy,rs,pods</code></td>
+</tr>
+<tr>
+<td>看 Service</td>
+<td><code>kubectl get svc</code></td>
+</tr>
+<tr>
+<td>看某个 Service 的后端与条件</td>
+<td><code>kubectl get endpointslices -l kubernetes.io/service-name=&lt;svc&gt; -o yaml</code></td>
+</tr>
+<tr>
+<td>看节点</td>
+<td><code>kubectl get nodes</code></td>
+</tr>
+<tr>
+<td>看完整对象</td>
+<td><code>kubectl get pod &lt;pod&gt; -o yaml</code></td>
+</tr>
+<tr>
+<td>看 PVC</td>
+<td><code>kubectl get pvc</code></td>
+</tr>
+<tr>
+<td>应用示例配置</td>
+<td><code>kubectl apply -f web-demo.yaml</code></td>
+</tr>
+<tr>
+<td>观察发布</td>
+<td><code>kubectl rollout status deployment/web-demo</code></td>
+</tr>
+<tr>
+<td>查看发布历史</td>
+<td><code>kubectl rollout history deployment/web-demo</code></td>
+</tr>
+<tr>
+<td>回滚到保留的上一版本</td>
+<td><code>kubectl rollout undo deployment/web-demo</code></td>
+</tr>
+<tr>
+<td>看 Pod 当前资源用量</td>
+<td><code>kubectl top pod</code></td>
+</tr>
+<tr>
+<td>看节点当前资源用量</td>
+<td><code>kubectl top node</code></td>
+</tr>
+<tr>
+<td>删除示例清单对应的资源</td>
+<td><code>kubectl delete -f web-demo.yaml</code></td>
+</tr>
+</tbody>
+</table></div>
+<p><code>kubectl top</code> 依赖资源指标 API，通常由 Metrics Server 提供；没有相应组件时，命令无法返回用量，并不说明 Pod 一定有问题。回滚也依赖仍保留着可用的历史 ReplicaSet。</p>
+<h3 id="72-面试前三分钟速记">7.2 面试前三分钟速记
+</h3><p>复习时可以先合上正文，试着回答下面这些问题：</p>
+<div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
+<thead>
+<tr>
+<th>问题</th>
+<th>一句话抓住重点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Kubernetes 在做什么？</td>
+<td>持续让实际状态接近声明的期望状态</td>
+</tr>
+<tr>
+<td>谁保存集群状态？</td>
+<td>etcd；其他核心组件通常通过 API Server 读写对象</td>
+</tr>
+<tr>
+<td>谁创建、调度、启动 Pod？</td>
+<td>控制器创建对象，调度器选节点，kubelet 协调运行时启动</td>
+</tr>
+<tr>
+<td>Pod 为什么存在？</td>
+<td>为紧密协作的容器提供统一调度、共享网络和可共享卷</td>
+</tr>
+<tr>
+<td>Pod 出问题后如何恢复？</td>
+<td>区分同一 Pod 内重启容器与控制器补建新 Pod</td>
+</tr>
+<tr>
+<td>Deployment 和 StatefulSet 怎么区分？</td>
+<td>可互换的副本，与需要稳定身份的副本</td>
+</tr>
+<tr>
+<td>调度主线是什么？</td>
+<td>过滤 → 打分 → 绑定</td>
+</tr>
+<tr>
+<td>requests 与 limits 怎么区分？</td>
+<td>请求用于容量与分配，上限约束运行时资源使用</td>
+</tr>
+<tr>
+<td>CPU、内存超限有什么区别？</td>
+<td>CPU 通常节流，内存不足可能 OOM；137 不是独立证据</td>
+</tr>
+<tr>
+<td>亲和性与污点有什么区别？</td>
+<td>前者表达放置条件，后者由节点排斥 Pod；容忍不保证被选中</td>
+</tr>
+<tr>
+<td>Service 为什么有用？</td>
+<td>用稳定入口连接会重建、会换 IP 的后端</td>
+</tr>
+<tr>
+<td>EndpointSlice 干什么？</td>
+<td>记录后端地址和条件，供网络实现维护规则</td>
+</tr>
+<tr>
+<td>CoreDNS 干什么？</td>
+<td>提供集群服务发现，并按配置解析或转发外部域名查询</td>
+</tr>
+<tr>
+<td>三种探针怎么区分？</td>
+<td>Startup 看启动，Readiness 控制就绪，Liveness 判断是否需重启</td>
+</tr>
+<tr>
+<td>emptyDir 与 PVC 怎么区分？</td>
+<td>前者跟随 Pod 生命周期，后者申请持久化存储</td>
+</tr>
+<tr>
+<td>Secret 是否等于已加密？</td>
+<td>不等于，Base64 是编码，保护措施需要另外配置</td>
+</tr>
+<tr>
+<td>Pending 先查什么？</td>
+<td>节点分配、PodScheduled 条件和 Events</td>
+</tr>
+<tr>
+<td>CrashLoopBackOff 先查什么？</td>
+<td>上次退出原因、<code>logs --previous</code>、配置和探针事件</td>
+</tr>
+<tr>
+<td>Service 不通先查什么？</td>
+<td>应用监听、Ready、selector、可用 EndpointSlice 和端口</td>
+</tr>
+<tr>
+<td>故障题怎么组织回答？</td>
+<td>先确认现象和证据，再沿创建、调度、启动、就绪、访问链路定位</td>
+</tr>
+</tbody>
+</table></div>
+<p>回答面试题时，可以用“<strong>一句结论 → 关键过程 → 一个验证方法</strong>”的顺序。例如被问到“Pod 已经 Running，为什么还访问不了”，先说 Running 不代表 Ready，再解释就绪条件如何影响普通 Service 的可用后端，最后给出 <code>describe pod</code> 和查询 EndpointSlice 的命令。这样既能说清机制，也能说明自己会怎样验证。</p>
+
+</div>
+
+            <footer class="article-footer">
+    
+        <div class="article-tags" aria-label="文章标签"><span class="article-footer-label">相关主题</span><a href="/zh-cn/tags/kubernetes/">Kubernetes</a><a href="/zh-cn/tags/%E4%BA%91%E5%8E%9F%E7%94%9F/">云原生</a><a href="/zh-cn/tags/%E5%AE%B9%E5%99%A8/">容器</a><a href="/zh-cn/tags/%E9%9D%A2%E8%AF%95/">面试</a><a href="/zh-cn/tags/%E6%95%85%E9%9A%9C%E6%8E%92%E6%9F%A5/">故障排查</a></div>
+    
+    
+    
+    <div class="article-endnote"><span>感谢读到这里。</span><a href="#top">回到开头 <span aria-hidden="true">↑</span></a></div>
+</footer>
+
+        </div>
+    </div>
+    
+</article>
+
+        <div class="reading-afterword">
+            
+            
+
+            
+        </div>
+    </div>
+    
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    
+    <div class="pswp__bg"></div>
+
+    
+    <div class="pswp__scroll-wrap">
+
+        
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                
+                
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo="crossorigin="anonymous"
+                defer
+                >
+            </script><script 
+                src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU="crossorigin="anonymous"
+                defer
+                >
+            </script><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css"crossorigin="anonymous"
+            ><link 
+                rel="stylesheet" 
+                href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css"crossorigin="anonymous"
+            >
+
+    </main>
+    
+<footer class="site-footer">
+    <div class="footer-top"><a class="footer-wordmark" href="/zh-cn/" aria-label="Snow">Snow</a><p>认真记录，自由生长。</p><a href="#main-content" class="back-top">回到顶部 <span aria-hidden="true">↑</span></a></div>
+    <div class="footer-bottom"><span>© 2026 Snow</span><nav aria-label="更多链接"><a href="/zh-cn/about/">关于</a><a href="https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0" target="_blank" rel="noopener noreferrer me">Bilibili <span aria-hidden="true">↗</span></a><a href="https://github.com/SymphonyW" target="_blank" rel="noopener noreferrer me">GitHub <span aria-hidden="true">↗</span></a><a href="https://twitter.com" target="_blank" rel="noopener noreferrer me">Twitter <span aria-hidden="true">↗</span></a><a href="/zh-cn/index.xml">RSS ↗</a></nav><span class="footer-colophon">由 Hugo 构建 · 持续书写</span></div>
+</footer>
+
+    
+
+<script src="/ts/main.c86029ddb4aad8364879723acaf7efcd526e724d2381088d445aaf6f3ab1bfdf.js" defer></script>
+
+
+<script src="/ts/custom.6c99a7b037ac7e2bde801fbad26b9c20b3b18707868c164174142870ef3bc309.js" defer></script>
+
+
+
+
+
+<script>
+window.MathJax = {
+  tex: {
+    
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
+  svg: {
+    fontCache: 'global'
+  }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
+
+</body>
+</html>

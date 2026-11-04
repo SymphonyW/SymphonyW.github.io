@@ -3453,20 +3453,1028 @@ sequenceDiagram
 </description>
         </item>
         <item>
+        <title>Kubernetes ：从 Pod 创建到故障排查</title>
+        <link>https://SymphonyW.github.io/zh-cn/p/kubernetes-interview-guide/</link>
+        <pubDate>Tue, 20 Oct 2026 20:25:00 +0800</pubDate>
+        
+        <guid>https://SymphonyW.github.io/zh-cn/p/kubernetes-interview-guide/</guid>
+        <description>&lt;img src="https://SymphonyW.github.io/zh-cn/p/kubernetes-interview-guide/cluster-architecture.svg" alt="Featured image of post Kubernetes ：从 Pod 创建到故障排查" /&gt;&lt;p&gt;假设你有一个 Web 服务，希望它始终运行两个副本，发布新版本时尽量不中断访问，某个副本出问题后还能自动补上。只靠手工启动容器，你就得自己处理机器选择、进程重启、流量切换和版本替换。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Kubernetes 做的，就是把这些工作交给一组持续运行的管理程序。你描述“我想要什么”，它们不断检查并调整“现在是什么”。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;本文根据《K8s实习生面试八股文》整理，覆盖原文的 40 道题。阅读时可以跟着同一个问题往下走：&lt;strong&gt;一个服务怎样从配置文件变成可访问的应用，出了问题又该去哪里找原因？&lt;/strong&gt; 文末保留命令速查和面试速记。&lt;/p&gt;
+&lt;p&gt;以下以 Linux 节点、常规 Deployment 和带 selector 的 ClusterIP Service 为主要例子；具体网络实现和默认行为需要结合集群版本与配置判断。&lt;/p&gt;
+&lt;h2 id=&#34;1-先看清分工谁决定谁执行&#34;&gt;1. 先看清分工：谁决定，谁执行
+&lt;/h2&gt;&lt;h3 id=&#34;11-声明式与调谐&#34;&gt;1.1 声明式与调谐
+&lt;/h3&gt;&lt;p&gt;Kubernetes，常缩写为 K8s，是一个&lt;strong&gt;声明式的容器编排系统&lt;/strong&gt;。“声明式”可以用一个具体例子理解：你提交配置，说“这个应用需要两个副本”，而不是依次命令每台机器“启动容器、检查进程、坏了再补一个”。&lt;/p&gt;
+&lt;p&gt;这里有两个状态：配置里写的是&lt;strong&gt;期望状态&lt;/strong&gt;，集群当前运行的情况是&lt;strong&gt;实际状态&lt;/strong&gt;。控制器持续比较两者，发现缺口就采取动作。这个反复检查、调整的过程叫&lt;strong&gt;调谐（Reconcile）&lt;/strong&gt;。&lt;/p&gt;
+&lt;h3 id=&#34;12-控制面与工作节点&#34;&gt;1.2 控制面与工作节点
+&lt;/h3&gt;&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/kubernetes-interview-guide/cluster-architecture.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/kubernetes-interview-guide/cluster-architecture.svg&#34; alt=&#34;Kubernetes 组件分工：控制面通过 API 协作，节点上的 kubelet 与容器运行时负责执行&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;p&gt;一个集群可以先分成两部分：&lt;strong&gt;控制面管理整个集群，工作节点运行应用&lt;/strong&gt;。&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;组件&lt;/th&gt;
+&lt;th&gt;主要位置&lt;/th&gt;
+&lt;th&gt;负责的事情&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;kube-apiserver&lt;/td&gt;
+&lt;td&gt;控制面&lt;/td&gt;
+&lt;td&gt;提供统一 API 入口，处理认证、鉴权、准入和资源读写&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;etcd&lt;/td&gt;
+&lt;td&gt;控制面存储&lt;/td&gt;
+&lt;td&gt;持久化保存集群资源对象及其状态&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;kube-controller-manager&lt;/td&gt;
+&lt;td&gt;控制面&lt;/td&gt;
+&lt;td&gt;运行多种控制器，持续让实际状态接近期望状态&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;kube-scheduler&lt;/td&gt;
+&lt;td&gt;控制面&lt;/td&gt;
+&lt;td&gt;为尚未绑定节点的 Pod 选择合适的节点&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;kubelet&lt;/td&gt;
+&lt;td&gt;工作节点&lt;/td&gt;
+&lt;td&gt;根据分配给本节点的 Pod 配置，协调容器运行和状态上报&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;containerd 等容器运行时&lt;/td&gt;
+&lt;td&gt;工作节点&lt;/td&gt;
+&lt;td&gt;拉取镜像、管理容器生命周期&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;kube-proxy，或替代实现&lt;/td&gt;
+&lt;td&gt;工作节点&lt;/td&gt;
+&lt;td&gt;实现 Service 所需的网络转发能力&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;etcd 可以理解为集群的“状态账本”，保存 Deployment、Service、ConfigMap 等 API 对象；它不替应用保存数据库里的业务记录。调度器、控制器和 kubelet 通常通过 API Server 观察、修改资源，并不各自直接读写 etcd。组件职责可以对照 &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/concepts/overview/components/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Kubernetes 官方架构说明&lt;/a&gt;。&lt;/p&gt;
+&lt;h3 id=&#34;13-pod共享网络与存储&#34;&gt;1.3 Pod：共享网络与存储
+&lt;/h3&gt;&lt;p&gt;Pod 是 Kubernetes 最小的调度单位。一个 Pod 可以放一个或多个紧密协作的容器，它们共同调度到同一个节点，共享网络命名空间和 Pod IP，可以通过 &lt;code&gt;localhost&lt;/code&gt; 通信，也可以通过共同挂载的 Volume 交换文件。&lt;/p&gt;
+&lt;p&gt;例如，一个容器处理业务请求，另一个辅助容器负责代理流量。它们需要一起部署、就近通信，于是适合放进同一个 Pod。这类辅助容器通常叫 Sidecar。普通 Web 服务则往往只需要一个主业务容器，不必为了“微服务”把所有服务塞进同一个 Pod。&lt;/p&gt;
+&lt;p&gt;注意两个边界：&lt;strong&gt;共享网络不等于默认共享进程命名空间；可以共享卷，也不等于各容器的根文件系统自动共享。&lt;/strong&gt;&lt;/p&gt;
+&lt;h3 id=&#34;14-dockercontainerd-与容器底层&#34;&gt;1.4 Docker、containerd 与容器底层
+&lt;/h3&gt;&lt;p&gt;Docker 面向使用者，提供命令行、镜像构建、容器管理等一整套工具；containerd 更侧重容器运行时能力。以 containerd 为例，kubelet 通过容器运行时接口 &lt;strong&gt;CRI&lt;/strong&gt; 与它交互，运行时再借助 runc 等底层实现启动容器进程。Kubernetes 节点并不一定要安装 Docker Engine。&lt;/p&gt;
+&lt;p&gt;在 Linux 上，容器仍然是共享宿主机内核的进程，主要依靠以下机制工作：&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;机制&lt;/th&gt;
+&lt;th&gt;解决的问题&lt;/th&gt;
+&lt;th&gt;直观理解&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;Linux namespaces&lt;/td&gt;
+&lt;td&gt;隔离进程、网络、挂载点等视图&lt;/td&gt;
+&lt;td&gt;让进程拥有相对独立的“可见环境”&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Cgroups&lt;/td&gt;
+&lt;td&gt;统计和限制 CPU、内存、IO 等资源&lt;/td&gt;
+&lt;td&gt;规定能使用多少资源&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;OverlayFS 等分层文件系统&lt;/td&gt;
+&lt;td&gt;复用镜像层并提供可写层&lt;/td&gt;
+&lt;td&gt;公共镜像层复用，修改写到自己的层&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;这里的 Linux namespace 是内核机制，与 Kubernetes 中用来划分资源范围的 &lt;strong&gt;Namespace 对象&lt;/strong&gt;不是同一个概念。&lt;/p&gt;
+&lt;h2 id=&#34;2-提交一个-deployment-后pod-怎样跑起来&#34;&gt;2. 提交一个 Deployment 后，Pod 怎样跑起来
+&lt;/h2&gt;&lt;h3 id=&#34;21-deploymentreplicaset-与-pod&#34;&gt;2.1 Deployment、ReplicaSet 与 Pod
+&lt;/h3&gt;&lt;p&gt;先分清三个对象的关系：&lt;strong&gt;Deployment 管理 ReplicaSet，ReplicaSet 管理 Pod&lt;/strong&gt;。&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;对象&lt;/th&gt;
+&lt;th&gt;关心什么&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;Deployment&lt;/td&gt;
+&lt;td&gt;应用版本、发布策略、期望副本数和回滚&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;ReplicaSet&lt;/td&gt;
+&lt;td&gt;维持所需数量的 Pod 副本&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Pod&lt;/td&gt;
+&lt;td&gt;承载具体运行的容器&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;h3 id=&#34;22-完整部署示例&#34;&gt;2.2 完整部署示例
+&lt;/h3&gt;&lt;p&gt;下面是一份贯穿全文的示例。将它保存为 &lt;code&gt;web-demo.yaml&lt;/code&gt;，就能同时描述两个 Nginx 副本和一个集群内访问入口。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;12
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;13
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;14
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;15
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;16
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;17
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;18
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;19
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;20
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;21
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;22
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;23
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;24
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;25
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;26
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;27
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;28
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;29
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;30
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;31
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;32
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;33
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;34
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;35
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;36
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;37
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;38
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;39
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;40
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;41
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;42
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;43
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;44
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;45
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;46
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;47
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;48
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;49
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;50
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;51
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;52
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;53
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;54
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;55
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;56
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;57
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;58
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;59
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;60
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;61
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;62
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-yaml&#34; data-lang=&#34;yaml&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nt&#34;&gt;apiVersion&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;apps/v1&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;kind&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;Deployment&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;metadata&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;  &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;web-demo&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;spec&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;  &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;replicas&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;m&#34;&gt;2&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;  &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;minReadySeconds&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;m&#34;&gt;5&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;  &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;selector&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;    &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;matchLabels&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;      &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;app&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;web-demo&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;  &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;strategy&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;    &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;type&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;RollingUpdate&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;    &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;rollingUpdate&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;      &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;maxSurge&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;m&#34;&gt;1&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;      &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;maxUnavailable&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;m&#34;&gt;0&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;  &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;template&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;    &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;metadata&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;      &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;labels&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;        &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;app&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;web-demo&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;    &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;spec&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;      &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;containers&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;        &lt;/span&gt;- &lt;span class=&#34;nt&#34;&gt;name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;nginx&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;          &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;image&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;nginx:1.28&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;          &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;ports&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;            &lt;/span&gt;- &lt;span class=&#34;nt&#34;&gt;name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;http&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;              &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;containerPort&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;m&#34;&gt;80&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;          &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;resources&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;            &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;requests&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;              &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;cpu&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;500m&amp;#34;&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;              &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;memory&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;512Mi&amp;#34;&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;            &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;limits&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;              &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;cpu&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;1&amp;#34;&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;              &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;memory&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;1Gi&amp;#34;&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;          &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;startupProbe&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;            &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;httpGet&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;              &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;path&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;/&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;              &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;port&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;http&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;            &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;periodSeconds&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;m&#34;&gt;2&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;            &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;failureThreshold&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;m&#34;&gt;30&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;          &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;readinessProbe&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;            &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;httpGet&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;              &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;path&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;/&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;              &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;port&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;http&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;            &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;periodSeconds&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;m&#34;&gt;5&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;          &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;livenessProbe&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;            &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;httpGet&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;              &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;path&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;/&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;              &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;port&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;http&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;            &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;periodSeconds&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;m&#34;&gt;10&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;nn&#34;&gt;---&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;apiVersion&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;v1&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;kind&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;Service&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;metadata&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;  &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;web-demo&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;spec&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;  &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;selector&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;    &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;app&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;web-demo&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;  &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;ports&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;    &lt;/span&gt;- &lt;span class=&#34;nt&#34;&gt;name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;http&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;      &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;port&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;m&#34;&gt;80&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;      &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;targetPort&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;http&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;  &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;type&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;ClusterIP&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;这里的资源数值用于解释原理，并不是所有 Web 服务都应照搬的配额。实际使用时，要根据程序表现和节点容量调整。&lt;/p&gt;
+&lt;h3 id=&#34;23-pod-创建流程&#34;&gt;2.3 Pod 创建流程
+&lt;/h3&gt;&lt;p&gt;提交以后，各个组件大致按下面的关系接力：&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/kubernetes-interview-guide/deployment-flow.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/kubernetes-interview-guide/deployment-flow.svg&#34; alt=&#34;Deployment 创建 Pod 的协作过程：提交配置、创建 ReplicaSet 和 Pod、调度、启动、通过就绪检查&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;code&gt;kubectl apply&lt;/code&gt; 把配置提交给 API Server，经过相应校验后，资源对象被持久化到 etcd。&lt;/li&gt;
+&lt;li&gt;Deployment 控制器观察到新 Deployment，创建对应的 ReplicaSet。&lt;/li&gt;
+&lt;li&gt;ReplicaSet 控制器发现还缺两个副本，于是创建两个 Pod 对象。&lt;/li&gt;
+&lt;li&gt;调度器为尚未分配节点的 Pod 选择节点，并通过 API 写入绑定结果。&lt;/li&gt;
+&lt;li&gt;对应节点的 kubelet 观察到分配结果，协调存储、网络和容器运行时，拉取镜像并启动容器。&lt;/li&gt;
+&lt;li&gt;应用通过就绪检查后，Pod 才能作为普通 Service 的可用后端接收流量。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;&lt;strong&gt;这是一组组件通过 API 和对象状态协作的过程。&lt;/strong&gt; 图中的顺序用于理解依赖关系，不代表 API Server 用一个同步函数依次调用所有组件。&lt;/p&gt;
+&lt;h3 id=&#34;24-容器重启与-pod-重建&#34;&gt;2.4 容器重启与 Pod 重建
+&lt;/h3&gt;&lt;p&gt;如果只是容器里的进程退出，kubelet 可以按照重启策略，在&lt;strong&gt;同一个 Pod 内重启容器&lt;/strong&gt;。如果 Pod 被删除，或者节点故障最终导致原 Pod 被清理、需要补副本，ReplicaSet 则会&lt;strong&gt;创建一个新 Pod&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;这两件事不能混为一谈。新 Pod 有新的 UID，名称和 IP 也可能变化；一个已经绑定节点的 Pod 不会以原身份“搬家”到另一个节点。没有控制器管理的独立 Pod，被删除后也不会凭空补出来。&lt;/p&gt;
+&lt;h3 id=&#34;25-deployment-与-statefulset&#34;&gt;2.5 Deployment 与 StatefulSet
+&lt;/h3&gt;&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;比较项&lt;/th&gt;
+&lt;th&gt;Deployment&lt;/th&gt;
+&lt;th&gt;StatefulSet&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;主要诉求&lt;/td&gt;
+&lt;td&gt;副本通常可以互相替代&lt;/td&gt;
+&lt;td&gt;每个副本需要稳定身份&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;常见场景&lt;/td&gt;
+&lt;td&gt;Web、API 等无状态应用&lt;/td&gt;
+&lt;td&gt;需要稳定成员身份的数据库、消息系统等&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Pod 名称&lt;/td&gt;
+&lt;td&gt;通常不依赖固定名称&lt;/td&gt;
+&lt;td&gt;具有稳定序号，如 &lt;code&gt;mysql-0&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;存储安排&lt;/td&gt;
+&lt;td&gt;也可以挂载 PVC&lt;/td&gt;
+&lt;td&gt;常通过卷声明模板为各副本申请独立 PVC&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;创建与删除&lt;/td&gt;
+&lt;td&gt;通常不要求按序号进行&lt;/td&gt;
+&lt;td&gt;默认按有序策略管理，也可配置并行创建等行为&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;网络身份&lt;/td&gt;
+&lt;td&gt;通常通过 Service 找副本&lt;/td&gt;
+&lt;td&gt;配合 Headless Service 提供稳定的网络名称&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;StatefulSet 不会自动解决数据库复制、选主和备份问题，它提供的是身份和生命周期管理能力。&lt;/p&gt;
+&lt;h3 id=&#34;26-滚动更新maxsurge-与-maxunavailable&#34;&gt;2.6 滚动更新：maxSurge 与 maxUnavailable
+&lt;/h3&gt;&lt;p&gt;修改 Deployment 的 Pod 模板，例如更换镜像后，会触发新一轮发布：逐步增加新 ReplicaSet 的副本，同时减少旧 ReplicaSet 的副本。仅修改 &lt;code&gt;replicas&lt;/code&gt; 是扩缩容，不是一次新版本发布。&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;参数&lt;/th&gt;
+&lt;th&gt;控制什么&lt;/th&gt;
+&lt;th&gt;期望副本数为 10 时的例子&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;maxSurge: 2&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;更新期间允许额外创建的副本数量&lt;/td&gt;
+&lt;td&gt;按发布策略可增加到 12 个非终止中的 Pod&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;maxUnavailable: 1&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;更新期间允许的不可用副本数量&lt;/td&gt;
+&lt;td&gt;发布过程按至少 9 个可用副本推进&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;示例中使用 &lt;code&gt;maxSurge: 1&lt;/code&gt;、&lt;code&gt;maxUnavailable: 0&lt;/code&gt;，希望用额外容量换取发布期间的可用性；&lt;code&gt;minReadySeconds: 5&lt;/code&gt; 表示新 Pod 连续就绪至少 5 秒后，才算可用。它们不能替代正确的健康检查，也不能保证外部故障下始终零中断。&lt;/p&gt;
+&lt;p&gt;还有一个容易被追问的细节：&lt;strong&gt;正在终止的 Pod 可能仍占用资源，因此实际观察到的 Pod 总数和资源占用，可以暂时超过 &lt;code&gt;replicas + maxSurge&lt;/code&gt;。&lt;/strong&gt; 这也是为什么不能把“最多 12 个”理解成所有状态下的绝对上限。见 &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#rolling-update-deployment&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Deployment 滚动更新说明&lt;/a&gt;。&lt;/p&gt;
+&lt;h2 id=&#34;3-pod-放在哪台机器能用多少资源&#34;&gt;3. Pod 放在哪台机器，能用多少资源
+&lt;/h2&gt;&lt;h3 id=&#34;31-调度流程过滤打分与绑定&#34;&gt;3.1 调度流程：过滤、打分与绑定
+&lt;/h3&gt;&lt;p&gt;调度和资源限制回答的是两个问题：&lt;strong&gt;先决定能不能放到某个节点，再约束运行时能用多少资源。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/kubernetes-interview-guide/scheduling-resources.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/kubernetes-interview-guide/scheduling-resources.svg&#34; alt=&#34;调度先过滤、再打分、最后绑定；requests 用于容量判断，CPU 与内存 limits 有不同的运行时行为&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;p&gt;调度器的主要过程可以概括为：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;过滤（Filtering）&lt;/strong&gt;：排除资源不够、标签不匹配、不满足亲和性或污点要求等节点。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;打分（Scoring）&lt;/strong&gt;：在满足条件的候选节点中，根据调度策略评分。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;绑定（Binding）&lt;/strong&gt;：选定节点，并记录 Pod 与节点的绑定关系。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;实际调度框架还有其他扩展阶段；实习生面试先把这条主线说清楚即可。&lt;/p&gt;
+&lt;h3 id=&#34;32-节点选择与亲和性&#34;&gt;3.2 节点选择与亲和性
+&lt;/h3&gt;&lt;p&gt;&lt;code&gt;nodeSelector&lt;/code&gt; 是最直接的标签筛选。例如，下面的片段放在 Pod 的 &lt;code&gt;spec&lt;/code&gt; 下，表示只能选择带 &lt;code&gt;disktype=ssd&lt;/code&gt; 标签的节点：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-yaml&#34; data-lang=&#34;yaml&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nt&#34;&gt;nodeSelector&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;  &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;disktype&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;ssd&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;亲和性提供更灵活的表达方式：&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;机制&lt;/th&gt;
+&lt;th&gt;关注对象&lt;/th&gt;
+&lt;th&gt;例子&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;NodeAffinity&lt;/td&gt;
+&lt;td&gt;节点的标签&lt;/td&gt;
+&lt;td&gt;必须在指定可用区，或者优先选择 SSD 节点&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;PodAffinity&lt;/td&gt;
+&lt;td&gt;其他 Pod 所在的位置&lt;/td&gt;
+&lt;td&gt;希望应用靠近某类依赖服务&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;PodAntiAffinity&lt;/td&gt;
+&lt;td&gt;其他 Pod 所在的位置&lt;/td&gt;
+&lt;td&gt;将同一应用的副本分散到不同节点或可用区&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;亲和性里，&lt;code&gt;requiredDuringSchedulingIgnoredDuringExecution&lt;/code&gt; 是&lt;strong&gt;必须满足的硬约束&lt;/strong&gt;；&lt;code&gt;preferredDuringSchedulingIgnoredDuringExecution&lt;/code&gt; 是&lt;strong&gt;尽量满足的软偏好&lt;/strong&gt;。名称中的 &lt;code&gt;IgnoredDuringExecution&lt;/code&gt; 表示，调度完成后，如果对应标签条件变化，不会仅因为这条规则不再满足就自动驱逐现有 Pod。见 &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Pod 到节点的分配规则&lt;/a&gt;。&lt;/p&gt;
+&lt;h3 id=&#34;33-污点与容忍度&#34;&gt;3.3 污点与容忍度
+&lt;/h3&gt;&lt;p&gt;污点与容忍度从另一个方向起作用：&lt;strong&gt;Taint 写在节点上，用于排斥 Pod；Toleration 写在 Pod 上，表示允许它容忍某种污点。&lt;/strong&gt;&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;污点效果&lt;/th&gt;
+&lt;th&gt;不匹配容忍度时的行为&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;NoSchedule&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;不再把新 Pod 调度到该节点，已有 Pod 不因此被驱逐&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;PreferNoSchedule&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;尽量避免调度到该节点&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;NoExecute&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;阻止新调度，并可能驱逐已有 Pod；容忍时间也会影响结果&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;例如，给 GPU 节点打上专用污点，可以阻止普通服务随意占用它。但 &lt;strong&gt;Toleration 只表示“允许来”，不表示“一定来”&lt;/strong&gt;；要让应用定向使用这类节点，还需要节点标签选择或亲和性等约束。&lt;/p&gt;
+&lt;h3 id=&#34;34-requestslimits-与-cpu内存超限&#34;&gt;3.4 requests、limits 与 CPU/内存超限
+&lt;/h3&gt;&lt;p&gt;回到示例中的一个容器：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;7
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-yaml&#34; data-lang=&#34;yaml&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nt&#34;&gt;resources&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;  &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;requests&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;    &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;cpu&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;500m&amp;#34;&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;    &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;memory&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;512Mi&amp;#34;&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;  &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;limits&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;    &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;cpu&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;1&amp;#34;&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;    &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;memory&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;1Gi&amp;#34;&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;500m&lt;/code&gt; CPU 表示 0.5 个 CPU 单位；&lt;code&gt;512Mi&lt;/code&gt; 内存表示 512 × 2²⁰ 字节，&lt;code&gt;1Gi&lt;/code&gt; 表示 1024Mi。&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;配置&lt;/th&gt;
+&lt;th&gt;什么时候起作用&lt;/th&gt;
+&lt;th&gt;不要误解成什么&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;requests&lt;/td&gt;
+&lt;td&gt;调度时用于判断节点容量，运行时也会影响部分资源分配行为&lt;/td&gt;
+&lt;td&gt;不是应用每时每刻都实际使用这么多&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;limits&lt;/td&gt;
+&lt;td&gt;由运行时和内核等机制实施资源上限&lt;/td&gt;
+&lt;td&gt;不是 CPU、内存一超限就采取同一种动作&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;调度器主要看&lt;strong&gt;节点可分配资源减去已经承诺的 requests&lt;/strong&gt;，而不是只看此刻 &lt;code&gt;kubectl top&lt;/code&gt; 显示的用量。节点现在看起来很空闲，也可能因为已经承诺出去的资源而无法接纳新 Pod。多个容器、初始化容器和 Pod 开销等还会影响 Pod 的有效请求，不能总是只看一个主容器。&lt;/p&gt;
+&lt;p&gt;CPU 时间可以少分一点，让程序慢一些，所以通常称为&lt;strong&gt;可压缩资源&lt;/strong&gt;。CPU 达到上限时，一般表现为节流：容器得到的 CPU 时间受到限制，响应可能变慢，而不是直接因 CPU 超限被杀死。&lt;/p&gt;
+&lt;p&gt;内存通常称为&lt;strong&gt;不可压缩资源&lt;/strong&gt;。当内存无法满足分配需求时，仅仅让进程变慢并不能解决问题，可能触发 OOM，由内核杀死进程。容器状态中可能看到 &lt;code&gt;OOMKilled&lt;/code&gt;。内存限制是反应式执行的，不应理解成“监控数值刚碰到上限，容器立刻消失”。见 &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;资源请求与限制&lt;/a&gt;。&lt;/p&gt;
+&lt;p&gt;所以，面试时的简短回答是：&lt;strong&gt;CPU 超限通常被节流，内存不足可能触发 OOM；后续是否重启，还要看重启策略等配置。&lt;/strong&gt;&lt;/p&gt;
+&lt;h2 id=&#34;4-pod-的-ip-会变请求怎样找到应用&#34;&gt;4. Pod 的 IP 会变，请求怎样找到应用
+&lt;/h2&gt;&lt;h3 id=&#34;41-service-与-endpointslice&#34;&gt;4.1 Service 与 EndpointSlice
+&lt;/h3&gt;&lt;p&gt;假设两个 Web Pod 的 IP 分别是 &lt;code&gt;10.244.1.8&lt;/code&gt; 和 &lt;code&gt;10.244.2.9&lt;/code&gt;。一旦其中一个被重建，新副本的 IP 可能变化。如果客户端把这两个地址写死，就得不断修改配置。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Service 给一组后端提供相对稳定的访问入口。&lt;/strong&gt; 对普通 ClusterIP Service 来说，客户端可以使用固定的 Service IP 和服务名，由集群维护它与动态后端之间的对应关系。&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/kubernetes-interview-guide/service-dns.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/kubernetes-interview-guide/service-dns.svg&#34; alt=&#34;Service 的三条关系：DNS 查询得到访问地址，EndpointSlice 驱动规则更新，业务请求按节点规则转发到 Pod&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;p&gt;先把图中的三件事分开：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;找名字&lt;/strong&gt;：客户端查询 Service 域名，集群 DNS 返回访问地址。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;维护后端&lt;/strong&gt;：控制面根据 Service 的 selector、Pod 标签与就绪情况，维护 EndpointSlice；网络实现据此更新转发规则。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;发请求&lt;/strong&gt;：客户端访问 Service IP 和端口，流量按节点上的规则转向合适的后端 Pod。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;EndpointSlice 是记录后端地址、端口、就绪等信息的 API 对象，&lt;strong&gt;不是请求需要经过的一台代理服务器&lt;/strong&gt;。Pod 尚未就绪时，地址也可能已经出现在 EndpointSlice 中，只是带有不可用的就绪条件。排障时既要看“有没有地址”，也要看条件是否正常。见 &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;EndpointSlice 及其条件&lt;/a&gt;。&lt;/p&gt;
+&lt;p&gt;在使用 kube-proxy 的集群里，它主要负责观察 Service 和 EndpointSlice 的变化，维护节点转发规则。Linux 上的实现可涉及 iptables、nftables，已有集群中也能见到 IPVS；具体取决于版本和配置。有些网络方案会替代 kube-proxy。不能把 kube-proxy 一律理解为“每个请求都经过它这个用户态进程”。见 &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/reference/networking/virtual-ips/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Service 虚拟 IP 与代理机制&lt;/a&gt;。&lt;/p&gt;
+&lt;h3 id=&#34;42-service-类型与-headless&#34;&gt;4.2 Service 类型与 Headless
+&lt;/h3&gt;&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;类型或形式&lt;/th&gt;
+&lt;th&gt;主要用途&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;ClusterIP&lt;/td&gt;
+&lt;td&gt;默认类型，提供集群内部的虚拟 IP 入口&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;NodePort&lt;/td&gt;
+&lt;td&gt;通过节点地址和指定端口暴露服务，可达性还受网络、防火墙等影响&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;LoadBalancer&lt;/td&gt;
+&lt;td&gt;配合云厂商或其他负载均衡实现提供入口，不是写上类型就凭空有外部设备&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;ExternalName&lt;/td&gt;
+&lt;td&gt;通过 DNS CNAME 指向指定域名，不走通常的 Service IP 转发&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Headless Service&lt;/td&gt;
+&lt;td&gt;将 &lt;code&gt;clusterIP&lt;/code&gt; 设为 &lt;code&gt;None&lt;/code&gt;，不分配普通 ClusterIP，可用 DNS 发现后端地址&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;Headless 是 Service 的一种配置形式，不是与 ClusterIP 并列的 &lt;code&gt;type&lt;/code&gt; 取值。它也解释了 StatefulSet 为什么常与 Headless Service 配合使用。见 &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/concepts/services-networking/service/#headless-services&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Service 类型与 Headless Service&lt;/a&gt;。&lt;/p&gt;
+&lt;h3 id=&#34;43-selectorport-与-targetport&#34;&gt;4.3 selector、port 与 targetPort
+&lt;/h3&gt;&lt;p&gt;示例里三个看起来相似的配置，也要分清楚：&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;字段&lt;/th&gt;
+&lt;th&gt;示例中的作用&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;selector: app: web-demo&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;选择带相应标签的后端 Pod&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;port: 80&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;客户端访问 Service 时使用的端口&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;targetPort: http&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;转发到 Pod 中名为 &lt;code&gt;http&lt;/code&gt; 的端口，此处对应 80&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;code&gt;containerPort&lt;/code&gt; 是端口声明，本身不会替程序打开监听端口。应用仍要实际监听正确的地址和端口；通常应监听容器内的可达接口，而不是只监听 &lt;code&gt;127.0.0.1&lt;/code&gt;。&lt;/p&gt;
+&lt;h3 id=&#34;44-coredns-与服务名解析&#34;&gt;4.4 CoreDNS 与服务名解析
+&lt;/h3&gt;&lt;p&gt;在常见配置下，集群通过 CoreDNS 提供 DNS 服务。Pod 中的解析器根据 &lt;code&gt;/etc/resolv.conf&lt;/code&gt;，把查询发送到集群 DNS 地址；查询最终到达 CoreDNS。CoreDNS 对集群服务名生成相应结果，对外部域名通常再转发到上游解析器。部分集群还会增加节点本地 DNS 缓存。&lt;/p&gt;
+&lt;p&gt;假设服务位于 &lt;code&gt;default&lt;/code&gt; 命名空间，集群域是 &lt;code&gt;cluster.local&lt;/code&gt;，Linux Pod 中常见的访问名称有：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;web-demo
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;web-demo.default
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;web-demo.default.svc.cluster.local
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;同命名空间通常可以直接使用短名称，背后依赖解析器的搜索域。&lt;code&gt;cluster.local&lt;/code&gt; 可以自定义，不能假定每个集群都一样。普通 ClusterIP Service 的 DNS 结果通常是 Service IP；Headless Service 的结果则可以是后端地址。见 &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Pod 与 Service 的 DNS&lt;/a&gt;。&lt;/p&gt;
+&lt;h2 id=&#34;5-能运行以后还要处理健康数据和配置&#34;&gt;5. 能运行以后，还要处理健康、数据和配置
+&lt;/h2&gt;&lt;h3 id=&#34;51-startupreadiness-与-liveness&#34;&gt;5.1 Startup、Readiness 与 Liveness
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;Running 不等于 Ready。&lt;/strong&gt; 前者是 Pod 生命周期的阶段，后者表示它是否满足就绪条件。一个 Pod 可以已经运行，但因为应用还在预热、依赖不可用等原因，尚未准备好接收请求。&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/kubernetes-interview-guide/probe-lifecycle.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/kubernetes-interview-guide/probe-lifecycle.svg&#34; alt=&#34;Startup 成功后才启用其他两类探针；Readiness 控制流量资格，Liveness 在失败达到阈值后触发容器重启处理&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;探针&lt;/th&gt;
+&lt;th&gt;要回答的问题&lt;/th&gt;
+&lt;th&gt;失败达到配置阈值后的主要效果&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;Startup&lt;/td&gt;
+&lt;td&gt;应用是否完成启动？&lt;/td&gt;
+&lt;td&gt;终止容器，按重启策略处理；成功前不执行另两类探针&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Readiness&lt;/td&gt;
+&lt;td&gt;应用现在是否能接请求？&lt;/td&gt;
+&lt;td&gt;标记为未就绪，普通 Service 通常不再将其作为可用后端，不直接因此重启&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Liveness&lt;/td&gt;
+&lt;td&gt;应用是否陷入需要重启才能恢复的状态？&lt;/td&gt;
+&lt;td&gt;终止容器，按重启策略处理&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;比如，一个应用需要较长时间加载数据，可以用 Startup 给它留出启动窗口；运行期间暂时无法处理请求，可以让 Readiness 失败；进程死锁且无法自行恢复，才适合由 Liveness 触发重启。Startup 成功后，Readiness 和 Liveness 各自判断，不要求先通过 Readiness 才能做 Liveness。&lt;/p&gt;
+&lt;p&gt;示例中 Nginx 的三个探针都访问 &lt;code&gt;/&lt;/code&gt;，便于理解配置。真实业务通常应根据各探针的目的设计检查条件，避免把一次短暂的外部依赖故障扩大成全体容器反复重启。相关语义见 &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;三类探针配置&lt;/a&gt;。&lt;/p&gt;
+&lt;p&gt;“未就绪不接流量”说的是普通 Service 的常见行为。直接访问 Pod IP 不受 Readiness 自动阻断；显式设置 &lt;code&gt;publishNotReadyAddresses&lt;/code&gt; 等配置时，也需要另外判断。&lt;/p&gt;
+&lt;h3 id=&#34;52-emptydirpvpvc-与-storageclass&#34;&gt;5.2 emptyDir、PV、PVC 与 StorageClass
+&lt;/h3&gt;&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;对象或机制&lt;/th&gt;
+&lt;th&gt;表示什么&lt;/th&gt;
+&lt;th&gt;生命周期上的重点&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;emptyDir&lt;/td&gt;
+&lt;td&gt;Pod 内可共享的临时目录&lt;/td&gt;
+&lt;td&gt;容器重启通常保留，Pod 从节点移除后数据被删除&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;PVC&lt;/td&gt;
+&lt;td&gt;应用对存储容量、访问模式等的申请&lt;/td&gt;
+&lt;td&gt;Pod 引用它来使用持久化存储&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;PV&lt;/td&gt;
+&lt;td&gt;集群中的持久化卷资源&lt;/td&gt;
+&lt;td&gt;与满足条件的 PVC 绑定&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;StorageClass&lt;/td&gt;
+&lt;td&gt;描述存储类别及动态供应方式&lt;/td&gt;
+&lt;td&gt;有相应供应器时，可按 PVC 动态创建存储和 PV&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;通常先由 PVC 申请存储，再绑定已有 PV，或触发 StorageClass 对应的动态供应器创建合适的卷，最后 Pod 挂载 PVC。&lt;/p&gt;
+&lt;p&gt;emptyDir 适合临时文件、缓存或同 Pod 容器间的数据交换；它的生命周期跟着 Pod，&lt;strong&gt;不会因为同一个 Pod 中的容器崩溃重启就自动清空&lt;/strong&gt;。持久卷能否保留数据，则还要结合回收策略、工作负载设置和底层存储判断。emptyDir 的边界见 &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/concepts/storage/volumes/#emptydir&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;卷类型说明&lt;/a&gt;。&lt;/p&gt;
+&lt;h3 id=&#34;53-configmap-与-secret&#34;&gt;5.3 ConfigMap 与 Secret
+&lt;/h3&gt;&lt;p&gt;ConfigMap 用来存普通配置，例如服务地址、日志级别；Secret 用来承载密码、Token、证书等敏感配置。&lt;/p&gt;
+&lt;p&gt;需要记住：&lt;strong&gt;Secret 的 &lt;code&gt;data&lt;/code&gt; 字段使用 Base64 编码，Base64 可以直接解码，并不等于加密。&lt;/strong&gt; 数据保护还依赖 API 权限、静态加密配置以及实际的密钥管理方式，不能只因为对象叫 Secret 就认定内容已经安全加密。见 &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/concepts/configuration/secret/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Secret 官方说明&lt;/a&gt;。&lt;/p&gt;
+&lt;h2 id=&#34;6-出问题时先判断卡在哪一步&#34;&gt;6. 出问题时，先判断卡在哪一步
+&lt;/h2&gt;&lt;h3 id=&#34;61-排障入口getdescribe-与-logs&#34;&gt;6.1 排障入口：get、describe 与 logs
+&lt;/h3&gt;&lt;p&gt;故障题不要从“是不是网络坏了”开始猜。先获得事实，再决定往哪层走：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# 以下示例使用 default 命名空间；&amp;lt;pod&amp;gt;、&amp;lt;node&amp;gt; 等需要换成实际名称&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl get pods -n default -o wide
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl describe pod &amp;lt;pod&amp;gt; -n default
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl logs &amp;lt;pod&amp;gt; -n default
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;get&lt;/code&gt; 看现状，&lt;code&gt;describe&lt;/code&gt; 看资源配置、状态和 Events，&lt;code&gt;logs&lt;/code&gt; 看程序输出。对于容器尚未启动的故障，应用日志可能根本不存在，Events 往往更有帮助。&lt;/p&gt;
+&lt;p&gt;还要区分：&lt;code&gt;Pending&lt;/code&gt;、&lt;code&gt;Running&lt;/code&gt; 是 Pod 的阶段；&lt;code&gt;CrashLoopBackOff&lt;/code&gt;、&lt;code&gt;ImagePullBackOff&lt;/code&gt; 是 &lt;code&gt;kubectl&lt;/code&gt; 常展示的容器状态原因，不是同一层级的 Pod phase。见 &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Pod 生命周期&lt;/a&gt;。&lt;/p&gt;
+&lt;h3 id=&#34;62-pending调度与启动准备&#34;&gt;6.2 Pending：调度与启动准备
+&lt;/h3&gt;&lt;p&gt;Pending 包含等待调度和容器准备过程，不只等于“调度器没找到节点”。在 &lt;code&gt;get -o wide&lt;/code&gt; 和 &lt;code&gt;describe&lt;/code&gt; 中检查节点分配、&lt;code&gt;PodScheduled&lt;/code&gt; 条件和 Events：&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;看到的线索&lt;/th&gt;
+&lt;th&gt;优先检查什么&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;FailedScheduling&lt;/code&gt;、&lt;code&gt;Insufficient memory/cpu&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;requests 与节点可分配资源，以及其他 Pod 的已申请资源&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;节点标签或亲和性不匹配&lt;/td&gt;
+&lt;td&gt;nodeSelector、required 规则与实际标签&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;未被容忍的污点&lt;/td&gt;
+&lt;td&gt;节点 Taint 与 Pod Toleration&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;PVC 无法绑定&lt;/td&gt;
+&lt;td&gt;PVC 状态、StorageClass、卷容量和拓扑条件&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;已有节点，但容器仍未就绪&lt;/td&gt;
+&lt;td&gt;镜像拉取、卷挂载、Pod 网络及初始化容器&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;调度提示 &lt;code&gt;Insufficient memory&lt;/code&gt;，说明按请求计算无法满足放置条件；它不是在说这个尚未启动的容器已经 OOM 了。合理调整请求、释放已占用容量或扩容节点，需要根据实际资源需求选择。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl get nodes
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl describe node &amp;lt;node&amp;gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl get pvc -n default
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl describe pvc &amp;lt;pvc&amp;gt; -n default
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;h3 id=&#34;63-imagepullbackoff镜像拉取失败&#34;&gt;6.3 ImagePullBackOff：镜像拉取失败
+&lt;/h3&gt;&lt;p&gt;它表示镜像拉取失败后正在退避重试。可以依次看：镜像名或 tag 是否存在、仓库地址是否可达、节点访问仓库的 DNS 和网络、私有仓库认证，以及 &lt;code&gt;imagePullSecrets&lt;/code&gt; 的名称和命名空间是否正确。&lt;/p&gt;
+&lt;p&gt;架构问题也要看具体错误：仓库没有适配该节点架构的镜像清单，可能导致拉取失败；如果镜像已经拉下来，运行时才报 &lt;code&gt;exec format error&lt;/code&gt;，则属于启动阶段，不能一概叫 ImagePullBackOff。&lt;/p&gt;
+&lt;h3 id=&#34;64-crashloopbackoff反复退出与重启&#34;&gt;6.4 CrashLoopBackOff：反复退出与重启
+&lt;/h3&gt;&lt;p&gt;这表示容器反复退出、重启，并处在重试退避中。原因可以是应用报错、缺配置、启动命令不对、探针失败，也可能是内存问题；使用 Always 重启策略的容器即使正常退出，也可能不断被重启。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl logs &amp;lt;pod&amp;gt; -n default -c &amp;lt;container&amp;gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl logs &amp;lt;pod&amp;gt; -n default -c &amp;lt;container&amp;gt; --previous
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl describe pod &amp;lt;pod&amp;gt; -n default
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;--previous&lt;/code&gt; 用来查看同一 Pod 中该容器上一个实例的日志。多容器 Pod 用 &lt;code&gt;-c&lt;/code&gt; 指定目标，避免看错容器。结合 &lt;code&gt;Last State&lt;/code&gt;、&lt;code&gt;Reason&lt;/code&gt;、退出码和探针事件，才能把“反复重启”缩小到具体原因。&lt;/p&gt;
+&lt;h3 id=&#34;65-oomkilled内存限制与节点压力&#34;&gt;6.5 OOMKilled：内存限制与节点压力
+&lt;/h3&gt;&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;现象&lt;/th&gt;
+&lt;th&gt;怎样判断&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;容器状态出现 &lt;code&gt;OOMKilled&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;对照内存 limit、用量峰值、内核记录，调查是否超出容器内存预算&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;节点内存不足导致系统级 OOM&lt;/td&gt;
+&lt;td&gt;结合节点状态与内核日志判断，不能只看一个容器的 limit&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Pod 显示 &lt;code&gt;Evicted&lt;/code&gt;，节点有内存压力&lt;/td&gt;
+&lt;td&gt;检查 kubelet 的节点压力驱逐事件，与容器 OOM 区分&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;只看到退出码 &lt;code&gt;137&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;常见含义是进程被 SIGKILL，不能单凭它认定是 OOM&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;code&gt;kubectl top&lt;/code&gt; 提供当前采样，不一定能抓到导致 OOM 的短时峰值，最好结合历史监控。处理时再判断是资源预算不合理、批处理峰值过高，还是程序存在内存泄漏。&lt;strong&gt;节点压力驱逐与内核 OOM 是不同机制&lt;/strong&gt;，官方的 &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/concepts/scheduling-eviction/node-pressure-eviction/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;节点压力驱逐说明&lt;/a&gt; 也区分了两者。&lt;/p&gt;
+&lt;h3 id=&#34;66-running-但-service-不通&#34;&gt;6.6 Running 但 Service 不通
+&lt;/h3&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl get pods -n default -l &lt;span class=&#34;nv&#34;&gt;app&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;web-demo -o wide
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl describe pod &amp;lt;pod&amp;gt; -n default
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl get svc web-demo -n default -o yaml
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl get endpointslices -n default -l kubernetes.io/service-name&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;web-demo -o yaml
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl describe svc web-demo -n default
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;检查顺序&lt;/th&gt;
+&lt;th&gt;要确认的事实&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;应用&lt;/td&gt;
+&lt;td&gt;进程实际监听什么地址和端口，访问应用本身是否正常&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Pod 就绪&lt;/td&gt;
+&lt;td&gt;Ready 是否为真，Readiness 有没有失败&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Service 选择&lt;/td&gt;
+&lt;td&gt;selector 是否匹配 Pod 标签，是否处于同一命名空间&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;EndpointSlice&lt;/td&gt;
+&lt;td&gt;是否记录了预期地址、端口，是否存在可用后端&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;端口映射&lt;/td&gt;
+&lt;td&gt;Service 的 port、targetPort 与应用实际监听是否一致&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;网络&lt;/td&gt;
+&lt;td&gt;NetworkPolicy、网络插件 CNI、节点路由和 Service 转发实现是否正常&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;没有预期地址时，先看 selector、标签等；有地址但不可用时，先看就绪条件。只有可用地址、端口都正常，才继续深入转发与网络。若能访问 Pod IP 却不能访问 Service IP，重点往 Service 端口、转发规则等方向收敛，而不是继续重复重启应用。&lt;/p&gt;
+&lt;h3 id=&#34;67-dns-超时与解析失败&#34;&gt;6.7 DNS 超时与解析失败
+&lt;/h3&gt;&lt;p&gt;在一个确实包含 &lt;code&gt;cat&lt;/code&gt;、&lt;code&gt;nslookup&lt;/code&gt; 等工具的 Pod 中执行；精简业务镜像没有这些工具时，使用集群允许的调试镜像或调试容器。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;8
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl &lt;span class=&#34;nb&#34;&gt;exec&lt;/span&gt; &amp;lt;debug-pod&amp;gt; -n default -- cat /etc/resolv.conf
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl &lt;span class=&#34;nb&#34;&gt;exec&lt;/span&gt; &amp;lt;debug-pod&amp;gt; -n default -- nslookup kubernetes.default
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl &lt;span class=&#34;nb&#34;&gt;exec&lt;/span&gt; &amp;lt;debug-pod&amp;gt; -n default -- nslookup web-demo.default.svc.cluster.local
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl get svc kube-dns -n kube-system
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl get endpointslices -n kube-system -l kubernetes.io/service-name&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;kube-dns -o yaml
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl get pods -n kube-system -l k8s-app&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;kube-dns -o wide
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl logs -n kube-system &amp;lt;coredns-pod&amp;gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;这些名称与标签是常见约定，实际部署不同就替换。检查顺序是：Pod 的 nameserver 和搜索域 → DNS Service 与可用后端 → CoreDNS 状态和日志 → 到 DNS 的 UDP、TCP 53 端口网络 → 上游解析器。&lt;/p&gt;
+&lt;p&gt;如果 Service IP 可访问、对应名字却解析失败，就先调查 DNS；如果连集群内服务名也失败，优先调查集群 DNS 链路；如果内部名称正常、只有外部域名失败，再检查上游配置和外部访问。&lt;/p&gt;
+&lt;h2 id=&#34;7-常用命令与面试前三分钟速记&#34;&gt;7. 常用命令与面试前三分钟速记
+&lt;/h2&gt;&lt;h3 id=&#34;71-kubectl-命令速查&#34;&gt;7.1 kubectl 命令速查
+&lt;/h3&gt;&lt;p&gt;下面的命令按默认命名空间展示，需要时补上 &lt;code&gt;-n &amp;lt;namespace&amp;gt;&lt;/code&gt;。尖括号内容都是占位符。&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;目的&lt;/th&gt;
+&lt;th&gt;命令&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;查看 Pod 和所在节点&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;kubectl get pods -o wide&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;看配置、状态和事件&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;kubectl describe pod &amp;lt;pod&amp;gt;&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;看当前容器日志&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;kubectl logs &amp;lt;pod&amp;gt; -c &amp;lt;container&amp;gt;&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;看上一个容器实例的日志&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;kubectl logs &amp;lt;pod&amp;gt; -c &amp;lt;container&amp;gt; --previous&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;进入有 shell 的容器&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;kubectl exec -it &amp;lt;pod&amp;gt; -c &amp;lt;container&amp;gt; -- /bin/sh&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;看工作负载与副本&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;kubectl get deploy,rs,pods&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;看 Service&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;kubectl get svc&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;看某个 Service 的后端与条件&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;kubectl get endpointslices -l kubernetes.io/service-name=&amp;lt;svc&amp;gt; -o yaml&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;看节点&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;kubectl get nodes&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;看完整对象&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;kubectl get pod &amp;lt;pod&amp;gt; -o yaml&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;看 PVC&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;kubectl get pvc&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;应用示例配置&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;kubectl apply -f web-demo.yaml&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;观察发布&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;kubectl rollout status deployment/web-demo&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;查看发布历史&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;kubectl rollout history deployment/web-demo&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;回滚到保留的上一版本&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;kubectl rollout undo deployment/web-demo&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;看 Pod 当前资源用量&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;kubectl top pod&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;看节点当前资源用量&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;kubectl top node&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;删除示例清单对应的资源&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;kubectl delete -f web-demo.yaml&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;code&gt;kubectl top&lt;/code&gt; 依赖资源指标 API，通常由 Metrics Server 提供；没有相应组件时，命令无法返回用量，并不说明 Pod 一定有问题。回滚也依赖仍保留着可用的历史 ReplicaSet。&lt;/p&gt;
+&lt;h3 id=&#34;72-面试前三分钟速记&#34;&gt;7.2 面试前三分钟速记
+&lt;/h3&gt;&lt;p&gt;复习时可以先合上正文，试着回答下面这些问题：&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;问题&lt;/th&gt;
+&lt;th&gt;一句话抓住重点&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;Kubernetes 在做什么？&lt;/td&gt;
+&lt;td&gt;持续让实际状态接近声明的期望状态&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;谁保存集群状态？&lt;/td&gt;
+&lt;td&gt;etcd；其他核心组件通常通过 API Server 读写对象&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;谁创建、调度、启动 Pod？&lt;/td&gt;
+&lt;td&gt;控制器创建对象，调度器选节点，kubelet 协调运行时启动&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Pod 为什么存在？&lt;/td&gt;
+&lt;td&gt;为紧密协作的容器提供统一调度、共享网络和可共享卷&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Pod 出问题后如何恢复？&lt;/td&gt;
+&lt;td&gt;区分同一 Pod 内重启容器与控制器补建新 Pod&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Deployment 和 StatefulSet 怎么区分？&lt;/td&gt;
+&lt;td&gt;可互换的副本，与需要稳定身份的副本&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;调度主线是什么？&lt;/td&gt;
+&lt;td&gt;过滤 → 打分 → 绑定&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;requests 与 limits 怎么区分？&lt;/td&gt;
+&lt;td&gt;请求用于容量与分配，上限约束运行时资源使用&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;CPU、内存超限有什么区别？&lt;/td&gt;
+&lt;td&gt;CPU 通常节流，内存不足可能 OOM；137 不是独立证据&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;亲和性与污点有什么区别？&lt;/td&gt;
+&lt;td&gt;前者表达放置条件，后者由节点排斥 Pod；容忍不保证被选中&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Service 为什么有用？&lt;/td&gt;
+&lt;td&gt;用稳定入口连接会重建、会换 IP 的后端&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;EndpointSlice 干什么？&lt;/td&gt;
+&lt;td&gt;记录后端地址和条件，供网络实现维护规则&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;CoreDNS 干什么？&lt;/td&gt;
+&lt;td&gt;提供集群服务发现，并按配置解析或转发外部域名查询&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;三种探针怎么区分？&lt;/td&gt;
+&lt;td&gt;Startup 看启动，Readiness 控制就绪，Liveness 判断是否需重启&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;emptyDir 与 PVC 怎么区分？&lt;/td&gt;
+&lt;td&gt;前者跟随 Pod 生命周期，后者申请持久化存储&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Secret 是否等于已加密？&lt;/td&gt;
+&lt;td&gt;不等于，Base64 是编码，保护措施需要另外配置&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Pending 先查什么？&lt;/td&gt;
+&lt;td&gt;节点分配、PodScheduled 条件和 Events&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;CrashLoopBackOff 先查什么？&lt;/td&gt;
+&lt;td&gt;上次退出原因、&lt;code&gt;logs --previous&lt;/code&gt;、配置和探针事件&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Service 不通先查什么？&lt;/td&gt;
+&lt;td&gt;应用监听、Ready、selector、可用 EndpointSlice 和端口&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;故障题怎么组织回答？&lt;/td&gt;
+&lt;td&gt;先确认现象和证据，再沿创建、调度、启动、就绪、访问链路定位&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;回答面试题时，可以用“&lt;strong&gt;一句结论 → 关键过程 → 一个验证方法&lt;/strong&gt;”的顺序。例如被问到“Pod 已经 Running，为什么还访问不了”，先说 Running 不代表 Ready，再解释就绪条件如何影响普通 Service 的可用后端，最后给出 &lt;code&gt;describe pod&lt;/code&gt; 和查询 EndpointSlice 的命令。这样既能说清机制，也能说明自己会怎样验证。&lt;/p&gt;
+</description>
+        </item>
+        <item>
         <title>CI/CD、GitLab CI 与 Helm：从代码提交到 Kubernetes 交付</title>
         <link>https://SymphonyW.github.io/zh-cn/p/cicd-gitlab-ci-helm/</link>
         <pubDate>Sat, 17 Oct 2026 10:00:00 +0800</pubDate>
         
         <guid>https://SymphonyW.github.io/zh-cn/p/cicd-gitlab-ci-helm/</guid>
-        <description>&lt;img src="https://SymphonyW.github.io/zh-cn/p/cicd-gitlab-ci-helm/bg.png" alt="Featured image of post CI/CD、GitLab CI 与 Helm：从代码提交到 Kubernetes 交付" /&gt;&lt;p&gt;一次 &lt;code&gt;git push&lt;/code&gt; 之后，代码为什么能够自动测试、打包，并最终变成 Kubernetes 里正在运行的服务？GitLab CI、Docker、镜像仓库和 Helm 经常一起出现，但它们分别做什么，失败时谁负责恢复，并没有一条命令看起来那么简单。&lt;/p&gt;
-&lt;p&gt;理解这条链路，可以先抓住三个问题：&lt;strong&gt;变更是否可信，交付的究竟是哪份制品，运行环境是否达到预期状态。&lt;/strong&gt; CI 提供反馈，制品保存交付结果，部署工具与集群协作改变运行状态。把这三件事连起来，才有可追溯、可验证、可恢复的交付机制。&lt;/p&gt;
+        <description>&lt;img src="https://SymphonyW.github.io/zh-cn/p/cicd-gitlab-ci-helm/bg.png" alt="Featured image of post CI/CD、GitLab CI 与 Helm：从代码提交到 Kubernetes 交付" /&gt;&lt;p&gt;一次 &lt;code&gt;git push&lt;/code&gt; 可以触发测试、打包和部署，最后让新版本在 Kubernetes 中运行。这些步骤通常由 GitLab CI、Docker、镜像仓库和 Helm 配合完成。要弄清它们各自做了什么，还得看代码如何变成运行中的服务，以及失败后由谁负责恢复。&lt;/p&gt;
+&lt;p&gt;在这条流程中，需要确认变更是否可信、交付的是哪份制品，以及运行环境是否符合预期。CI 提供反馈，制品保存交付结果，部署工具与集群负责调整运行状态。各个环节衔接起来，发布才有据可查，结果可以验证，失败后也有恢复路径。&lt;/p&gt;
 &lt;p&gt;本文以 GitLab CI + 容器镜像 + Helm + Kubernetes 为主线。已有的 &lt;a class=&#34;link&#34; href=&#34;https://SymphonyW.github.io/zh-cn/p/ci/cd-%E5%AE%8C%E6%95%B4%E6%8C%87%E5%8D%97%E4%BB%8E%E5%8E%9F%E7%90%86%E5%88%B0%E5%AE%9E%E6%88%98/&#34; &gt;CI/CD 入门文章&lt;/a&gt; 侧重 GitHub Actions，这里进一步讨论容器化服务的完整交付过程。容器和集群的基础概念可参考 &lt;a class=&#34;link&#34; href=&#34;https://SymphonyW.github.io/zh-cn/p/docker-k8s-openshift/&#34; &gt;Docker、Kubernetes、OpenShift 的关系&lt;/a&gt;。&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;&lt;strong&gt;示例范围&lt;/strong&gt;：使用 Linux 容器 Runner、Node.js 22、Helm &lt;strong&gt;3&lt;/strong&gt; 和 Kubernetes &lt;code&gt;apps/v1&lt;/code&gt; Deployment。示例镜像的大版本标签用于方便阅读；生产环境应固定经过审核的版本或 digest。Helm 4 的失败回滚选项另有说明，不能直接混用。&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;h2 id=&#34;1-cicd-的核心让变更持续获得反馈&#34;&gt;1. CI/CD 的核心：让变更持续获得反馈
-&lt;/h2&gt;&lt;p&gt;手动发布的问题不只在于“操作很慢”。更难处理的是：测试结果属于哪个提交，服务器上的程序是不是刚才测试过的那一份，发布失败后能否恢复到已知可用的状态。&lt;/p&gt;
-&lt;p&gt;CI/CD 把这些问题变成一套重复执行的流程。每次变更都经过相同的验证，产出可以识别的制品，再按明确的条件进入不同环境。&lt;/p&gt;
+&lt;/h2&gt;&lt;p&gt;手动发布花时间，也容易留下说不清楚的地方：测试结果属于哪个提交，服务器上的程序是不是刚才测试过的那一份，发布失败后还能不能恢复到已知可用的状态。&lt;/p&gt;
+&lt;p&gt;CI/CD 用一套可以重复执行的流程处理这些问题：每次变更都经过相同的验证，生成能明确识别的制品，再按规定的条件进入不同环境。&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
 &lt;tr&gt;
@@ -3497,13 +4505,12 @@ sequenceDiagram
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;因此，&lt;strong&gt;生产环境有一个人工发布按钮，并不妨碍持续交付；它通常意味着还没有采用全自动的持续部署。&lt;/strong&gt; 反过来，配置了自动部署，也不能说明代码质量、权限隔离和恢复能力已经完善。&lt;/p&gt;
-&lt;p&gt;CI 也不等于“开了一个定时构建任务”。如果大家长时间各自开发，直到最后才一起合并，集成风险依然会积累。频繁集成、快速反馈、失败后及时修复，才是这套实践发挥作用的前提。&lt;/p&gt;
-&lt;p&gt;再区分两个容易混用的动作：&lt;strong&gt;部署&lt;/strong&gt;是把某个版本放进运行环境，&lt;strong&gt;发布&lt;/strong&gt;是让用户实际接触某个能力。功能开关可以让代码先部署、功能后开放。这样，代码进入生产和业务功能对外开放就可以分别控制。&lt;/p&gt;
-&lt;p&gt;一个合理的反馈顺序是：语法与静态检查 → 单元测试 → 构建与依赖检查 → 集成验证 → 预发布环境 → 生产环境与监控。昂贵的检查不必全部挤进第一分钟，但阻止坏版本继续前进的条件必须明确。耗时很长却频繁误报的测试，会逐渐失去团队的信任。&lt;/p&gt;
+&lt;p&gt;生产环境保留人工发布按钮，并不妨碍持续交付，通常只是还没有采用全自动的持续部署。而配置了自动部署，也不代表代码质量、权限隔离和恢复能力已经完善。&lt;/p&gt;
+&lt;p&gt;只开一个定时构建任务，还不足以做好 CI。如果大家长时间各自开发，直到最后才一起合并，集成风险依然会积累。团队需要频繁集成，尽快拿到反馈，并及时修复失败的构建。&lt;/p&gt;
+&lt;p&gt;部署是把某个版本放进运行环境，发布是让用户实际用到某个功能。两者可以分开控制：通过功能开关，代码先部署到生产环境，功能稍后再向用户开放。&lt;/p&gt;
+&lt;p&gt;检查可以按这个顺序安排：语法与静态检查 → 单元测试 → 构建与依赖检查 → 集成验证 → 预发布环境 → 生产环境与监控。耗时较长、成本较高的检查可以稍后执行，但哪些检查失败就必须停止发布，需要提前定好。测试如果既慢又经常误报，团队会逐渐不再信任它。&lt;/p&gt;
 &lt;h2 id=&#34;2-gitlab-ci镜像仓库helm-与-kubernetes-如何协作&#34;&gt;2. GitLab CI、镜像仓库、Helm 与 Kubernetes 如何协作
-&lt;/h2&gt;&lt;p&gt;先把工具放到同一张图里：&lt;/p&gt;
-&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/cicd-gitlab-ci-helm/delivery-flow.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/cicd-gitlab-ci-helm/delivery-flow.svg&#34; alt=&#34;GitLab 调度、Runner 执行、镜像与 Chart 制品、Helm Release 和 Kubernetes 状态收敛的关系&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/cicd-gitlab-ci-helm/delivery-flow.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/cicd-gitlab-ci-helm/delivery-flow.svg&#34; alt=&#34;GitLab 调度、Runner 执行、镜像与 Chart 制品、Helm Release 和 Kubernetes 状态收敛的关系&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
 &lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
@@ -3553,9 +4560,9 @@ sequenceDiagram
 &lt;/table&gt;
 &lt;p&gt;GitLab 的 Web 页面负责展示和调度，真正执行 &lt;code&gt;node --test&lt;/code&gt;、&lt;code&gt;docker build&lt;/code&gt;、&lt;code&gt;helm upgrade&lt;/code&gt; 的是 Runner。Runner 可以使用 Docker、Kubernetes 或 Shell 等 executor；本文依赖容器 executor 提供的 &lt;code&gt;image&lt;/code&gt; 和 &lt;code&gt;services&lt;/code&gt;，不能直接照搬到 Shell executor。&lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/runner/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;GitLab Runner 文档&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;Helm 提交资源更新之后，Deployment 控制器会管理 ReplicaSet 和 Pod，调度器为 Pod 选择节点，节点运行时拉取镜像并启动容器。这个过程是异步的：&lt;strong&gt;API 接受了更新，不代表应用已经能够处理请求。&lt;/strong&gt; Kubernetes 的 Deployment 控制器负责副本和滚动更新，但不会因为业务错误率升高就自动恢复到某个 Helm 历史版本。&lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/concepts/workloads/controllers/deployment/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;Helm 提交资源更新后，Deployment 控制器管理 ReplicaSet 和 Pod，调度器为 Pod 选择节点，节点运行时再拉取镜像并启动容器。这些操作是异步完成的，所以 &lt;strong&gt;API 接受了更新，不代表应用已经能处理请求&lt;/strong&gt;。Deployment 控制器负责副本和滚动更新，但不会因为业务错误率升高就自动恢复到某个 Helm 历史版本。&lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/concepts/workloads/controllers/deployment/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Kubernetes Deployment 文档&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;把一次发布当成一份可追溯的记录，会更容易排查问题：&lt;/p&gt;
+&lt;p&gt;排查发布问题时，需要把下面这些记录对应起来：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
@@ -3576,10 +4583,10 @@ sequenceDiagram
 &lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;验证结果         = 测试报告 + 冒烟结果 + 运行指标
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;这也解释了为什么不应在每个环境重新构建镜像：同一份源码在不同时间构建，基础镜像、依赖源或者编译环境都可能发生变化。更稳妥的交付方式是&lt;strong&gt;构建一次，把同一个镜像 digest 和 Chart 包依次推进到 staging、production，只改变明确记录的环境配置。&lt;/strong&gt;&lt;/p&gt;
-&lt;p&gt;Git SHA 标签方便人定位代码，但标签本身仍然可以被覆盖。&lt;code&gt;repository@sha256:...&lt;/code&gt; 按内容寻址，适合作为部署输入。digest 保证的是所引用内容的身份，不能证明内容安全，也不能代替依赖审计、签名验证或测试。&lt;/p&gt;
+&lt;/div&gt;&lt;p&gt;同一份源码在不同时间构建，基础镜像、依赖源或者编译环境都可能变化。因此，不应在每个环境重新构建镜像，而应构建一次，再把同一个镜像 digest 和 Chart 包依次部署到 staging、production，只调整有明确记录的环境配置。&lt;/p&gt;
+&lt;p&gt;Git SHA 标签方便查找对应代码，但标签本身仍然可以被覆盖。&lt;code&gt;repository@sha256:...&lt;/code&gt; 按内容寻址，适合作为部署输入。digest 能确定引用的是哪份内容，但不能证明内容安全，也不能代替依赖审计、签名验证或测试。&lt;/p&gt;
 &lt;h2 id=&#34;3-gitlab-ci从-yaml-到真正执行的-job&#34;&gt;3. GitLab CI：从 YAML 到真正执行的 Job
-&lt;/h2&gt;&lt;p&gt;仓库根目录的 &lt;code&gt;.gitlab-ci.yml&lt;/code&gt; 描述流水线；它不是一段从头执行到尾的 Shell 脚本。GitLab 先解析配置、求值规则并建立 Job 依赖，再把符合条件的 Job 放进队列。Runner 领取 Job 后，准备环境、检出代码、获取需要的制品并执行命令，最后上传结果。&lt;/p&gt;
+&lt;/h2&gt;&lt;p&gt;仓库根目录的 &lt;code&gt;.gitlab-ci.yml&lt;/code&gt; 描述了流水线中的任务和执行条件，并不像 Shell 脚本那样从头运行到尾。GitLab 先解析配置、判断规则并建立 Job 依赖，再把符合条件的 Job 放进队列。Runner 领取 Job 后，准备环境、检出代码、获取需要的制品并执行命令，最后上传结果。&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
 &lt;tr&gt;
@@ -3633,7 +4640,7 @@ sequenceDiagram
 &lt;/table&gt;
 &lt;p&gt;上述配置的精确语义以 &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/yaml/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;GitLab CI YAML 参考&lt;/a&gt; 为准。最终配置还应使用目标 GitLab 实例的 CI Lint 检查，尤其是包含 &lt;code&gt;include&lt;/code&gt;、继承或版本相关语法时。&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;先确定什么事件值得执行。&lt;/strong&gt; 本文示例只创建两类流水线：MR 验证，以及默认分支收到 push 后的交付；普通功能分支 push、标签和定时任务不会创建流水线。&lt;/p&gt;
+&lt;p&gt;示例只为两类事件创建流水线：MR 验证，以及默认分支收到 push 后的交付。普通功能分支 push、标签和定时任务都不会创建流水线。&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
@@ -3650,9 +4657,9 @@ sequenceDiagram
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;    &lt;/span&gt;- &lt;span class=&#34;nt&#34;&gt;when&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;never&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;如果希望“没有 MR 时运行分支流水线，有 MR 后改用 MR 流水线”，需要进一步结合 &lt;code&gt;CI_OPEN_MERGE_REQUESTS&lt;/code&gt;，避免同一次提交产生两条重复流水线。MR 流水线也不天然等于“已经测试了合并后的完整结果”；需要时应配置 merged results pipeline 等能力，并核对实例支持情况。&lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/yaml/workflow/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;/div&gt;&lt;p&gt;如果希望在没有 MR 时运行分支流水线，创建 MR 后改用 MR 流水线，可以结合 &lt;code&gt;CI_OPEN_MERGE_REQUESTS&lt;/code&gt;，避免同一次提交触发两条重复流水线。还要注意，MR 流水线不一定测试了合并后的完整结果；有这类要求时，需要配置 merged results pipeline 等能力，并确认当前实例支持。&lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/yaml/workflow/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;workflow 规则文档&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;Job 之间不要假设共享工作目录。&lt;/strong&gt; 上一个 Job 生成的文件，要通过明确的传递机制交给下一个 Job：&lt;/p&gt;
+&lt;p&gt;Job 之间不能假设共享工作目录。上一个 Job 生成的文件，需要通过下面这些机制传给下一个 Job：&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
 &lt;tr&gt;
@@ -3710,11 +4717,12 @@ sequenceDiagram
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;  &lt;/span&gt;- &lt;span class=&#34;l&#34;&gt;npm test&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;&lt;code&gt;npm ci&lt;/code&gt; 根据 lockfile 安装，缓存只减少重复下载。不要因为某台 Runner 恰好留有 &lt;code&gt;node_modules&lt;/code&gt;，就认为每台执行环境都能得到相同结果。&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;变量与权限是另一条控制链。&lt;/strong&gt; 普通变量用于镜像地址、namespace 等配置；敏感信息应进入受控变量或外部密钥服务。Masked 主要减少意外日志泄露，Protected 限制变量可用的 ref 范围，环境作用域进一步区分 staging 与 production，File 类型则把内容写到临时文件并把路径交给 Job。任何能够修改受信任 Job 的人，都可能编写读取或外传变量的脚本，因此还必须保护分支、审查 CI 配置并限制 Runner 权限。&lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/variables/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;npm ci&lt;/code&gt; 根据 lockfile 安装依赖，缓存只负责减少重复下载。某台 Runner 恰好留有 &lt;code&gt;node_modules&lt;/code&gt;，并不能保证换一台执行环境也会得到相同结果。&lt;/p&gt;
+&lt;p&gt;镜像地址、namespace 等配置可以用普通变量，敏感信息则应放进受控变量或外部密钥服务。Masked 主要减少日志意外泄露，Protected 限制哪些 ref 能使用变量，环境作用域区分 staging 与 production。File 类型会把内容写入临时文件，再把文件路径交给 Job。&lt;/p&gt;
+&lt;p&gt;这些设置仍然需要权限控制配合。能够修改受信任 Job 的人，也可能写出读取或外传变量的脚本，因此还要保护分支、审查 CI 配置，并限制 Runner 权限。&lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/variables/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;GitLab CI/CD 变量文档&lt;/a&gt;&lt;/p&gt;
 &lt;h2 id=&#34;4-helm把-kubernetes-资源组织成可管理的-release&#34;&gt;4. Helm：把 Kubernetes 资源组织成可管理的 Release
-&lt;/h2&gt;&lt;p&gt;一个服务通常不只有一份 Deployment，还涉及 Service、配置、Secret 引用、Ingress 和资源配额等。不同环境又有不同副本数和域名。Helm 用模板与参数组织这些资源，减少重复配置，并为安装与升级保留发布记录。&lt;/p&gt;
+&lt;/h2&gt;&lt;p&gt;部署一个服务，通常要配置 Deployment、Service、应用配置、Secret 引用、Ingress 和资源配额等内容，不同环境的副本数和域名也可能不同。Helm 用模板与参数组织这些资源，减少重复配置，并记录每次安装和升级。&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
 &lt;tr&gt;
@@ -3751,7 +4759,7 @@ sequenceDiagram
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;同一个 Chart 可以安装成多个 Release。同一集群不同 namespace 中也可以各有一个叫 &lt;code&gt;demo&lt;/code&gt; 的 Release。因此排查问题时要同时确认&lt;strong&gt;集群上下文、namespace 和 Release 名称&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;同一个 Chart 可以安装成多个 Release；同一集群的不同 namespace 中，也可以各有一个叫 &lt;code&gt;demo&lt;/code&gt; 的 Release。排查问题时，要一起确认集群上下文、namespace 和 Release 名称。&lt;/p&gt;
 &lt;p&gt;本文的 Chart 只包含 Deployment、Service 与一个 Helm test Pod：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
@@ -3794,9 +4802,9 @@ sequenceDiagram
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;appVersion&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;1.0.0&amp;#34;&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;&lt;code&gt;version&lt;/code&gt; 是 Chart 包的版本，&lt;code&gt;appVersion&lt;/code&gt; 是描述应用版本的元数据。&lt;strong&gt;修改 &lt;code&gt;appVersion&lt;/code&gt; 不会自动改变容器镜像&lt;/strong&gt;；只有模板实际引用了某个值，那个值才会影响最终资源。&lt;a class=&#34;link&#34; href=&#34;https://helm.sh/docs/topics/charts/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;version&lt;/code&gt; 是 Chart 包的版本，&lt;code&gt;appVersion&lt;/code&gt; 是描述应用版本的元数据。修改 &lt;code&gt;appVersion&lt;/code&gt; 不会自动改变容器镜像，只有模板实际引用的值才会影响最终资源。&lt;a class=&#34;link&#34; href=&#34;https://helm.sh/docs/topics/charts/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Helm Chart 格式说明&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;默认 &lt;code&gt;values.yaml&lt;/code&gt; 保留通用结构，环境文件覆盖副本数，流水线注入真实镜像身份：&lt;/p&gt;
+&lt;p&gt;默认 &lt;code&gt;values.yaml&lt;/code&gt; 保存通用配置，环境文件覆盖副本数，流水线再填入实际使用的镜像信息：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
@@ -3896,7 +4904,7 @@ sequenceDiagram
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;              &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;port&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;http&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;这里存在一条清晰的转换关系：&lt;/p&gt;
+&lt;/div&gt;&lt;p&gt;从模板到运行中的服务，过程如下：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
@@ -3915,10 +4923,10 @@ sequenceDiagram
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;多个 &lt;code&gt;-f&lt;/code&gt; 按顺序合并，后面的同名配置优先；命令行 &lt;code&gt;--set&lt;/code&gt; / &lt;code&gt;--set-string&lt;/code&gt; 可进一步覆盖。镜像 digest、提交 SHA 等字符串适合用 &lt;code&gt;--set-string&lt;/code&gt;，避免类型推断带来歧义。本文每次显式传入完整的环境输入，不依赖 &lt;code&gt;--reuse-values&lt;/code&gt; 继承旧配置。&lt;a class=&#34;link&#34; href=&#34;https://helm.sh/docs/v3/intro/using_helm/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Helm values 使用说明&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;Release 记录与资源更新是怎么发生的？&lt;/strong&gt; Helm 3 客户端使用 kubeconfig 直接访问 Kubernetes API，不需要 Helm 2 时代的 Tiller。默认情况下，Release 记录以 Secret 保存在目标 namespace 中，包含 Chart、values、渲染结果和发布状态等信息。因此，读取这些 Secret 的权限也可能暴露发布配置；密钥管理仍应单独设计。&lt;/p&gt;
-&lt;p&gt;对 Deployment 等内置资源的常规升级，Helm 3 会结合&lt;strong&gt;旧清单、集群当前状态和新清单&lt;/strong&gt;生成三方合并补丁，再调用 API 更新资源；不是把整个 namespace 删除重建。安装与升级还可以执行前后置 hooks，记录 revision 和状态，并按选项等待资源就绪。资源类型、不可变字段和 hooks 都可能让更新失败，所以这套过程仍然不是跨所有资源的原子事务。&lt;a class=&#34;link&#34; href=&#34;https://helm.sh/docs/v3/faq/changes_since_helm2/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;Helm 3 客户端使用 kubeconfig 直接访问 Kubernetes API，不再需要 Helm 2 时代的 Tiller。Release 记录默认以 Secret 保存在目标 namespace 中，包含 Chart、values、渲染结果和发布状态等信息。能读取这些 Secret 的身份，也可能读到发布配置，因此密钥管理仍要单独设计。&lt;/p&gt;
+&lt;p&gt;常规升级 Deployment 等内置资源时，Helm 3 会结合旧清单、集群当前状态和新清单，生成三方合并补丁，再调用 API 更新资源，不会删除整个 namespace 再重建。安装与升级期间，还可以执行前后置 hooks、记录 revision 和状态，并按选项等待资源就绪。资源类型、不可变字段和 hooks 都可能导致更新失败，整个过程并不具备跨所有资源的原子性。&lt;a class=&#34;link&#34; href=&#34;https://helm.sh/docs/v3/faq/changes_since_helm2/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Helm 3 的状态存储与升级机制&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;几个常用命令分别对应不同层次的检查：&lt;/p&gt;
+&lt;p&gt;常用命令的用途和检查范围如下：&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
 &lt;tr&gt;
@@ -3957,7 +4965,7 @@ sequenceDiagram
 &lt;/table&gt;
 &lt;p&gt;&lt;code&gt;helm lint&lt;/code&gt; 和 &lt;code&gt;helm template&lt;/code&gt; 都不能替代服务端校验。集群支持的 API、Admission Policy、RBAC、配额与真实依赖，需要在对应环境继续验证。不要把包含 Secret 的渲染结果随意写进公开制品或日志。&lt;/p&gt;
 &lt;h2 id=&#34;5-一条完整链路验证构建预发布与人工上线&#34;&gt;5. 一条完整链路：验证、构建、预发布与人工上线
-&lt;/h2&gt;&lt;p&gt;可以下载 &lt;a class=&#34;link&#34; href=&#34;gitlab-helm-demo.zip&#34; &gt;完整的 GitLab CI + Helm 示例工程&lt;/a&gt;。解压后将&lt;strong&gt;包含隐藏文件在内的全部内容&lt;/strong&gt;放入一个新的 GitLab 项目根目录，再按 README 配置执行环境。这个示例独立于本博客自身的 GitHub Actions 部署流程。&lt;/p&gt;
+&lt;/h2&gt;&lt;p&gt;&lt;a class=&#34;link&#34; href=&#34;gitlab-helm-demo.zip&#34; &gt;完整的 GitLab CI + Helm 示例工程&lt;/a&gt; 可以直接下载。解压后，把全部文件（包括隐藏文件）放进一个新的 GitLab 项目根目录，再按 README 配置执行环境。它独立于本博客自身的 GitHub Actions 部署流程。&lt;/p&gt;
 &lt;p&gt;示例应用是一个没有第三方依赖的 Node.js HTTP 服务，提供 &lt;code&gt;/&lt;/code&gt;、&lt;code&gt;/healthz&lt;/code&gt;、&lt;code&gt;/readyz&lt;/code&gt;，并在响应中返回 &lt;code&gt;APP_VERSION&lt;/code&gt;。测试直接发起 HTTP 请求，检查成功响应、版本字段与 404；本地可以运行：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
@@ -3971,7 +4979,7 @@ sequenceDiagram
 &lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# 另开终端访问 http://localhost:3000/&lt;/span&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;它没有编译步骤，镜像就是可部署制品。对于 Java、Go 或 TypeScript 项目，可以在构建阶段加入相应的编译和制品检查，后面的交付身份原则保持一致。&lt;/p&gt;
+&lt;/div&gt;&lt;p&gt;这个应用不需要编译，构建出的镜像就是可部署制品。Java、Go 或 TypeScript 项目可以在构建阶段加入编译和制品检查，后续仍按同样的方式识别和交付制品。&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
@@ -3990,7 +4998,7 @@ sequenceDiagram
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;err&#34;&gt;&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;CMD&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;[&lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;node&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;server.mjs&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;]&lt;/span&gt;&lt;span class=&#34;err&#34;&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;&lt;strong&gt;运行流水线之前，先准备这些外部条件。&lt;/strong&gt; YAML 不会替你创建集群、凭据和 Runner：&lt;/p&gt;
+&lt;/div&gt;&lt;p&gt;运行流水线前，需要准备好集群、凭据和 Runner。这些都不会由 YAML 自动创建：&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
 &lt;tr&gt;
@@ -4039,7 +5047,7 @@ sequenceDiagram
 &lt;/table&gt;
 &lt;p&gt;DinD 的 privileged 模式扩大了 Runner 的权限边界，所以示例把它放在独立、受保护的构建 Runner 上；不要让不可信 MR 使用该环境。TLS 的 daemon 端口、证书路径和共享卷需要一起配置，仅设置 &lt;code&gt;DOCKER_HOST&lt;/code&gt; 不够。受限环境可选择经过验证的 rootless BuildKit 等替代构建方式。&lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/docker/using_docker_build/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;GitLab Docker 构建文档&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;另一个常见问题是：&lt;strong&gt;CI 能 push 镜像，集群却拉不下来。&lt;/strong&gt; CI Registry 凭据用于构建 Job，不会自动传给 Pod；短期 Job token 也不适合作为集群长期拉取镜像的凭据。示例要求预置独立的拉取 Secret，并在 Deployment 与测试 Pod 中引用。&lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/user/packages/container_registry/authenticate_with_container_registry/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;CI 能 push 镜像，集群却可能拉不下来，因为构建 Job 使用的 CI Registry 凭据不会自动传给 Pod。短期 Job token 也不适合作为集群长期拉取镜像的凭据。示例需要预先配置独立的拉取 Secret，并在 Deployment 与测试 Pod 中引用。&lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/user/packages/container_registry/authenticate_with_container_registry/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;GitLab Registry 认证说明&lt;/a&gt;&lt;/p&gt;
 &lt;p&gt;这条流水线的执行关系如下：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
@@ -4323,23 +5331,23 @@ sequenceDiagram
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;/details&gt;
-&lt;p&gt;读这份配置时，重点关注五个约束：&lt;/p&gt;
+&lt;p&gt;这份配置中，有几处依赖和制品传递需要留意：&lt;/p&gt;
 &lt;ol&gt;
-&lt;li&gt;&lt;strong&gt;验证先于构建。&lt;/strong&gt; &lt;code&gt;build_image&lt;/code&gt; 明确依赖应用检查与 Chart 检查；MR 中不存在构建与部署 Job。Chart 验证时使用全零 digest 作为占位符，只检查渲染，不会尝试部署该镜像。&lt;/li&gt;
-&lt;li&gt;&lt;strong&gt;镜像身份显式传递。&lt;/strong&gt; 用完整提交 SHA 与 pipeline ID 组合成便于识别的标签，推送并读取 registry digest，再通过 dotenv 报告传给部署 Job。同一提交重新跑流水线也不会自动覆盖另一个 pipeline 的标签；同一 Job 重试仍应审慎处理。&lt;/li&gt;
-&lt;li&gt;&lt;strong&gt;Chart 也只打包一次。&lt;/strong&gt; 两个环境下载同一份 &lt;code&gt;demo-0.1.0.tgz&lt;/code&gt;，避免上线时再去拉取一个已经变化的 Chart。默认 values 与命令行输入共同决定实际渲染结果。&lt;/li&gt;
-&lt;li&gt;&lt;strong&gt;生产显式依赖 staging。&lt;/strong&gt; 配置了 &lt;code&gt;needs&lt;/code&gt; 后，生产 Job 还要单独依赖 &lt;code&gt;deploy_staging&lt;/code&gt;，才能确保 staging 的冒烟测试通过。&lt;code&gt;when: manual&lt;/code&gt; 配合 &lt;code&gt;allow_failure: false&lt;/code&gt; 保留阻塞式人工门槛。&lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/jobs/job_control/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;li&gt;&lt;code&gt;build_image&lt;/code&gt; 明确依赖应用检查与 Chart 检查，验证通过后才构建镜像；MR 中没有构建与部署 Job。Chart 验证使用全零 digest 作为占位符，只检查渲染，不会部署该镜像。&lt;/li&gt;
+&lt;li&gt;镜像标签由完整提交 SHA 与 pipeline ID 组成，方便识别。推送镜像后，读取 registry digest，再通过 dotenv 报告传给部署 Job。同一提交重新运行流水线，不会自动覆盖另一个 pipeline 的标签；但重试同一 Job 时仍要谨慎。&lt;/li&gt;
+&lt;li&gt;Chart 只打包一次，两个环境下载同一份 &lt;code&gt;demo-0.1.0.tgz&lt;/code&gt;，避免上线时取到已经变化的 Chart。默认 values 与命令行输入共同决定实际渲染结果。&lt;/li&gt;
+&lt;li&gt;配置 &lt;code&gt;needs&lt;/code&gt; 后，生产 Job 还要单独依赖 &lt;code&gt;deploy_staging&lt;/code&gt;，才能保证 staging 的冒烟测试通过后再上线。&lt;code&gt;when: manual&lt;/code&gt; 配合 &lt;code&gt;allow_failure: false&lt;/code&gt;，让生产发布停下来等待人工触发。&lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/jobs/job_control/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;GitLab 手动 Job 说明&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;strong&gt;锁覆盖升级与冒烟。&lt;/strong&gt; 两条命令放在同一个带 &lt;code&gt;resource_group&lt;/code&gt; 的 Job 中，避免本项目另一条部署流水线在中间更新同一环境。这个锁不会限制其他项目、人工操作或外部控制器。&lt;/li&gt;
+&lt;li&gt;升级和冒烟测试放在同一个带 &lt;code&gt;resource_group&lt;/code&gt; 的 Job 中，避免本项目另一条部署流水线在两条命令之间更新同一环境。这个锁不会限制其他项目、人工操作或外部控制器。&lt;/li&gt;
 &lt;/ol&gt;
-&lt;p&gt;环境作用域的 &lt;code&gt;KUBE_CONFIG&lt;/code&gt; 只在对应部署 Job 中使用，不拿它判断 &lt;code&gt;rules&lt;/code&gt;。两个文件都应设置正确的当前 context，并限制在目标 namespace；Helm 还需要管理 Release 记录所用的 Secret，以及部署资源和测试 Pod 的必要权限。&lt;/p&gt;
+&lt;p&gt;带环境作用域的 &lt;code&gt;KUBE_CONFIG&lt;/code&gt; 只用于对应的部署 Job，不用于判断 &lt;code&gt;rules&lt;/code&gt;。两个文件都应设置正确的当前 context，并把权限限制在目标 namespace。Helm 还需要必要的权限，才能管理 Release 记录所用的 Secret、部署资源和测试 Pod。&lt;/p&gt;
 &lt;p&gt;示例仅构建单平台镜像，默认构建机与节点 CPU 架构一致。如果集群包含不同架构，应使用经过验证的多平台构建，记录对应 image index digest，并分别验证目标平台。&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;部署验证分三层。&lt;/strong&gt; &lt;code&gt;/healthz&lt;/code&gt; 检查进程健康，&lt;code&gt;/readyz&lt;/code&gt; 决定是否接收流量；示例服务无外部依赖，因此两者都直接返回成功。真实应用要按依赖和启动行为设计探针，不能把这个简化实现当成业务就绪判断。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;/healthz&lt;/code&gt; 检查进程健康，&lt;code&gt;/readyz&lt;/code&gt; 决定是否接收流量。示例服务没有外部依赖，所以两者都直接返回成功。真实应用需要根据依赖和启动行为设计探针，不能照搬这个简化实现来判断业务是否就绪。&lt;/p&gt;
 &lt;p&gt;&lt;code&gt;helm upgrade --atomic --wait&lt;/code&gt; 等待资源达到 Helm 判断的就绪状态；随后 &lt;code&gt;helm test&lt;/code&gt; 创建测试 Pod，从集群内部访问 Service，并核对返回的提交版本。这可以发现一部分服务连通性或版本错误，但不会验证外部 Ingress、TLS、用户身份认证和完整业务链路。那些检查应作为额外的上线门槛或生产探测。&lt;/p&gt;
 &lt;p&gt;Helm test 通过 &lt;code&gt;helm.sh/hook: test&lt;/code&gt; 标记测试资源，以容器退出码判断结果。下载工程保留测试 Pod，方便 &lt;code&gt;--logs&lt;/code&gt; 读取日志并进行排查，下一次执行测试前再清理同名 Pod。&lt;a class=&#34;link&#34; href=&#34;https://helm.sh/docs/v3/topics/chart_tests/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Helm Chart 测试文档&lt;/a&gt;&lt;/p&gt;
 &lt;h2 id=&#34;6-发布失败时健康检查并发控制与回滚的边界&#34;&gt;6. 发布失败时：健康检查、并发控制与回滚的边界
-&lt;/h2&gt;&lt;p&gt;流水线变绿只代表已定义的检查通过。一个真实的发布过程还需要知道失败发生在哪层，以及恢复动作会影响什么。&lt;/p&gt;
+&lt;/h2&gt;&lt;p&gt;流水线变绿，只能说明已定义的检查通过。出了问题，还需要分清失败发生在哪一层，以及恢复操作会影响什么。&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
 &lt;tr&gt;
@@ -4386,13 +5394,13 @@ sequenceDiagram
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;&lt;strong&gt;滚动升级需要容量。&lt;/strong&gt; 示例设置 &lt;code&gt;maxUnavailable: 0&lt;/code&gt;、&lt;code&gt;maxSurge: 1&lt;/code&gt;，希望在新副本就绪前保留旧副本。但集群如果没有放置额外 Pod 的资源，发布仍会卡住。该策略也不能保证数据库兼容、长连接无损或所有请求零错误。&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;&lt;code&gt;--atomic&lt;/code&gt; 不是业务事务。&lt;/strong&gt; 在 Helm 3 中，它让失败升级尝试回滚，并自动启用等待；首次安装失败走安装的清理语义，并不存在一个可恢复的旧 Release。&lt;a class=&#34;link&#34; href=&#34;https://helm.sh/docs/v3/helm/helm_upgrade/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;示例设置 &lt;code&gt;maxUnavailable: 0&lt;/code&gt;、&lt;code&gt;maxSurge: 1&lt;/code&gt;，希望在新副本就绪前保留旧副本。这需要集群有资源运行额外的 Pod，否则发布仍会卡住。即便容量充足，这个策略也不能保证数据库兼容、长连接无损或所有请求都不出错。&lt;/p&gt;
+&lt;p&gt;在 Helm 3 中，&lt;code&gt;--atomic&lt;/code&gt; 会在升级失败时尝试回滚，并自动启用等待，但它不等于业务事务。首次安装失败时，执行的是安装清理，此时还没有可以恢复的旧 Release。&lt;a class=&#34;link&#34; href=&#34;https://helm.sh/docs/v3/helm/helm_upgrade/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Helm 3 upgrade 参考&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;尤其要注意，示例的 &lt;code&gt;helm test&lt;/code&gt; 是升级命令&lt;strong&gt;之后&lt;/strong&gt;执行的独立命令。如果升级成功、冒烟失败，Job 会失败，但新 Release 仍然存在，&lt;code&gt;--atomic&lt;/code&gt; 不会替它自动回滚。需要明确选择人工回滚、经过验证的自动恢复策略，或让渐进式交付控制器处理更完整的发布判定。&lt;/p&gt;
+&lt;p&gt;示例中的 &lt;code&gt;helm test&lt;/code&gt; 在升级命令之后单独执行。如果升级成功、冒烟测试失败，Job 会失败，但新 Release 仍然存在，&lt;code&gt;--atomic&lt;/code&gt; 不会触发回滚。这种情况需要另行处理：可以人工回滚，配置经过验证的自动恢复策略，或交给渐进式交付控制器做更完整的发布判断。&lt;/p&gt;
 &lt;p&gt;Helm 4 使用 &lt;code&gt;--rollback-on-failure&lt;/code&gt; 表达升级失败时的回滚，并调整了等待策略。迁移时应固定工具版本、检查 &lt;code&gt;helm upgrade --help&lt;/code&gt; 并验证失败路径，不要只把命令中的主版本改掉。&lt;a class=&#34;link&#34; href=&#34;https://helm.sh/docs/helm/helm_upgrade/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Helm 4 upgrade 参考&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;需要恢复时，先找到&lt;strong&gt;已知可用&lt;/strong&gt;的 revision，而不是机械地选择上一条记录：&lt;/p&gt;
+&lt;p&gt;需要恢复时，先确认哪个 revision 已知可用。上一条记录不一定就是合适的恢复目标：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
@@ -4413,19 +5421,19 @@ sequenceDiagram
 &lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;helm &lt;span class=&#34;nb&#34;&gt;test&lt;/span&gt; demo -n demo-production --logs --timeout 2m
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;回滚会再次改变集群状态，应纳入同样的发布互斥和审计流程。应用镜像与旧 Chart 必须仍可获取；如果镜像清理策略已经删掉旧 digest，再完整的历史记录也无法把旧程序拉起来。&lt;/p&gt;
-&lt;p&gt;Helm 回滚也不能反向撤销数据库迁移、发送出去的消息、第三方接口调用或 CRD 的全部演化。数据库变更宜采用 expand → migrate → contract：先增加兼容的新结构，再迁移数据和调用方式，最后在旧版本不再需要时删除旧结构。把不可逆删除与应用升级绑在同一步，会让恢复路径非常脆弱。&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;串行部署还需要防止旧版本覆盖新版本。&lt;/strong&gt; &lt;code&gt;resource_group&lt;/code&gt; 默认只保证同一资源组的 Job 不并行，并不保证按提交新旧排序。即使使用“优先最新”的处理模式，也要考虑旧 Job 之后仍被执行的情况。&lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/resource_groups/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;/div&gt;&lt;p&gt;回滚也会改变集群状态，需要遵守同样的发布互斥和审计流程。旧应用镜像与 Chart 都必须还能获取；如果镜像清理策略已经删除旧 digest 对应的内容，即使保留了历史记录，也无法再拉取旧程序。&lt;/p&gt;
+&lt;p&gt;Helm 回滚不能撤销数据库迁移、已经发出的消息、第三方接口调用，也不能撤销 CRD 的全部变更。数据库变更宜采用 expand → migrate → contract：先增加兼容的新结构，再迁移数据和调用方式，等旧版本不再需要时，最后删除旧结构。如果把不可逆的删除操作和应用升级放在同一步，出问题后就很难恢复。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;resource_group&lt;/code&gt; 默认只保证同一资源组的 Job 不并行，不保证按提交新旧排序。因此，即使部署已经串行执行，旧版本仍可能覆盖新版本。使用“优先最新”的处理模式时，也要考虑旧 Job 随后仍被执行的情况。&lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/resource_groups/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;GitLab Resource group 文档&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;应结合过时部署拦截、适合团队的队列处理模式，以及人工发布时核对提交与制品身份，避免有人从很早的流水线点下发布。只自动取消可安全中断的验证任务；部署过程中随意中断，可能留下需要处理的发布状态。&lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/environments/deployment_safety/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;除了选择合适的队列处理模式，还应启用过时部署拦截，并在人工发布前核对提交和制品，避免从旧流水线误发旧版本。自动取消应限于可以安全中断的验证任务；随意中断正在执行的部署，可能留下需要手动处理的发布状态。&lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/environments/deployment_safety/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;GitLab 部署安全文档&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;另外，YAML 中的手动 Job 只是执行门槛，&lt;strong&gt;不等于独立的审批人与权限策略&lt;/strong&gt;。需要限制谁可以发布、是否必须由其他人审批时，应使用 protected environments 与 deployment approvals 等能力；部署审批功能的可用性取决于 GitLab 套餐和版本。&lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/environments/deployment_approvals/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;YAML 中的手动 Job 只能让发布等待人工触发，不能代替审批人与权限策略。如果要限制谁能发布，或要求其他人审批，还需要 protected environments 与 deployment approvals 等能力；部署审批是否可用，取决于 GitLab 套餐和版本。&lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/environments/deployment_approvals/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;GitLab 部署审批文档&lt;/a&gt;&lt;/p&gt;
 &lt;h2 id=&#34;7-从脚本发布走向-gitops应该增加什么&#34;&gt;7. 从脚本发布走向 GitOps，应该增加什么
-&lt;/h2&gt;&lt;p&gt;本文的流程属于 push 模式：CI Job 持有部署凭据，通过 Helm 调用 Kubernetes API。链路直接，适合先把构建与部署做清楚，但 Job 结束后，Helm CLI 不会一直驻留在集群中检查配置是否被人改动。&lt;/p&gt;
+&lt;/h2&gt;&lt;p&gt;本文采用 push 模式：CI Job 持有部署凭据，通过 Helm 调用 Kubernetes API。这种方式直接，适合先理清构建和部署过程。不过，Job 结束后，Helm CLI 就退出了，不会继续留在集群中检查配置是否被人改动。&lt;/p&gt;
 &lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/cicd-gitlab-ci-helm/push-vs-gitops.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/cicd-gitlab-ci-helm/push-vs-gitops.svg&#34; alt=&#34;Push 模式由 CI 调用 Helm 更新集群，GitOps 模式由控制器读取配置仓库并同步状态&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
 &lt;/p&gt;
-&lt;p&gt;GitOps 则把期望状态保存在版本控制中。CI 构建镜像并更新配置仓库中的 digest，配置变更经过评审后，由 Argo CD、Flux 等控制器读取并协调到集群。这样可以把源码构建权限与生产环境变更权限进一步分开。&lt;a class=&#34;link&#34; href=&#34;https://argo-cd.readthedocs.io/en/stable/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;采用 GitOps 时，期望状态保存在版本控制中。CI 构建镜像并更新配置仓库中的 digest，配置变更经过评审后，再由 Argo CD、Flux 等控制器读取，让集群状态与配置保持一致。源码构建权限与生产环境变更权限也就可以进一步分开。&lt;a class=&#34;link&#34; href=&#34;https://argo-cd.readthedocs.io/en/stable/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Argo CD 官方文档&lt;/a&gt;&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
@@ -4468,9 +5476,9 @@ sequenceDiagram
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;Helm 与 GitOps 可以配合使用，例如让控制器用 Chart 与 values 生成资源；这不意味着控制器一定执行了 &lt;code&gt;helm install&lt;/code&gt; 并维护同样的 Release 历史。以 Argo CD 为例，Helm 主要用于模板渲染，应用生命周期由 Argo CD 管理。&lt;a class=&#34;link&#34; href=&#34;https://argo-cd.readthedocs.io/en/stable/user-guide/helm/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;GitOps 控制器可以用 Helm Chart 与 values 生成资源，但不一定执行 &lt;code&gt;helm install&lt;/code&gt;，也不一定维护同样的 Release 历史。以 Argo CD 为例，Helm 主要负责模板渲染，应用生命周期由 Argo CD 管理。&lt;a class=&#34;link&#34; href=&#34;https://argo-cd.readthedocs.io/en/stable/user-guide/helm/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Argo CD 的 Helm 集成说明&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;同一组资源应有明确的管理者。如果 GitLab Job 直接升级同一份资源，同时又让 GitOps 控制器按另一个期望状态持续同步，双方就可能互相覆盖。&lt;/p&gt;
+&lt;p&gt;同一组资源需要明确由谁管理。如果 GitLab Job 直接升级资源，GitOps 控制器又按另一份配置持续同步，两边就可能互相覆盖。&lt;/p&gt;
 &lt;p&gt;发布策略也可以按需要逐步增加：&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
@@ -4504,11 +5512,11 @@ sequenceDiagram
 &lt;/tbody&gt;
 &lt;/table&gt;
 &lt;p&gt;Helm 可以描述相关资源，但不会仅凭一个 &lt;code&gt;helm upgrade&lt;/code&gt; 就自动完成基于错误率的金丝雀分析。需要这种能力时，再引入合适的流量管理与渐进式交付控制器。&lt;/p&gt;
-&lt;p&gt;制品可信度也可以继续增强：依赖与镜像扫描回答“已知风险是什么”，SBOM 记录“包含哪些组件”，构建 provenance 描述“来自什么输入、经过什么构建过程”，签名与准入验证帮助约束“哪些身份产生的制品能够进入集群”。这些检查需要实际配置门槛；生成一份报告并不等于发布已经被保护。&lt;a class=&#34;link&#34; href=&#34;https://docs.docker.com/build/metadata/attestations/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;要进一步检查制品是否可信，可以扫描依赖和镜像中的已知风险，用 SBOM 记录组件，用构建 provenance 说明构建输入和过程，再通过签名与准入验证，限制哪些身份产生的制品能够进入集群。这些检查必须配置成实际的发布条件，单纯生成报告起不到拦截作用。&lt;a class=&#34;link&#34; href=&#34;https://docs.docker.com/build/metadata/attestations/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Docker 构建证明文档&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;最后，不要只把“流水线成功率”当作交付效果。还应观察从提交到生产的耗时、发布后故障比例、恢复速度，以及失败是否经常来自测试抖动或执行环境。优化目标是缩短可信反馈的时间，并让恢复路径始终可用。&lt;/p&gt;
-&lt;p&gt;示例中的 Artifacts 只保存 30 天，适合学习和短周期验证；长期等待审批的版本，应把 Chart、镜像 digest、配置提交和验证结论归档到持久的发布存储中，并为镜像保留策略留出恢复窗口。&lt;strong&gt;一条完整的交付链，需要同时回答：为什么允许这个版本上线，上线的是哪份制品，失败后如何回到可用状态。&lt;/strong&gt;&lt;/p&gt;
-&lt;p&gt;本文链接的官方文档用于核对机制与参数；自建 GitLab 的具体支持范围应以实例版本、套餐及 CI Lint 结果为准。&lt;/p&gt;
+&lt;p&gt;评估交付效果时，除了流水线成功率，还要看从提交到生产的耗时、发布后故障比例和恢复速度。也要分清流水线失败是代码问题，还是测试抖动或执行环境问题。改进流程时，应尽快提供可信的反馈，并保证恢复路径可用。&lt;/p&gt;
+&lt;p&gt;示例中的 Artifacts 只保存 30 天，适合学习和短周期验证。如果版本需要长期等待审批，就应把 Chart、镜像 digest、配置提交和验证结论归档到持久的发布存储中，同时让镜像保留策略覆盖所需的恢复窗口。保留下来的记录，应能查明允许上线的依据、实际部署的制品，以及失败后的恢复办法。&lt;/p&gt;
+&lt;p&gt;机制与参数可查阅文中链接的官方文档。使用自建 GitLab 时，还需核对实例版本、套餐和 CI Lint 结果。&lt;/p&gt;
 </description>
         </item>
         <item>
@@ -4517,13 +5525,13 @@ sequenceDiagram
         <pubDate>Sat, 17 Oct 2026 10:00:00 +0800</pubDate>
         
         <guid>https://SymphonyW.github.io/zh-cn/p/k8s-automated-deployment/</guid>
-        <description>&lt;img src="https://SymphonyW.github.io/zh-cn/p/k8s-automated-deployment/bg.svg" alt="Featured image of post K8s 自动化部署全流程：从一次 Git Push 到发布验证与回滚" /&gt;&lt;p&gt;前面的&lt;a class=&#34;link&#34; href=&#34;https://SymphonyW.github.io/zh-cn/p/kubernetes-from-docker/&#34; &gt;《从 Docker 到 Kubernetes》&lt;/a&gt;讲清了 Pod、Deployment 和 Service，&lt;a class=&#34;link&#34; href=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/&#34; &gt;《K8s 容器云平台服务部署流程》&lt;/a&gt;把打包镜像、上传仓库和在平台上创建应用串了起来；&lt;a class=&#34;link&#34; href=&#34;https://SymphonyW.github.io/zh-cn/p/ci/cd-%E5%AE%8C%E6%95%B4%E6%8C%87%E5%8D%97%E4%BB%8E%E5%8E%9F%E7%90%86%E5%88%B0%E5%AE%9E%E6%88%98/&#34; &gt;《CI/CD 完整指南》&lt;/a&gt;则介绍了流水线的基本概念。&lt;/p&gt;
-&lt;p&gt;接下来很自然会遇到一个问题：&lt;strong&gt;应用已经能够手动部署了，怎样做到提交代码以后，自动测试、打包、更新服务，而且出问题能及时发现和恢复？&lt;/strong&gt;&lt;/p&gt;
-&lt;p&gt;这篇文章用一个很小的 Go 服务，走完一条完整链路。先理解每一步的输入和输出，再看可以放进项目的配置。示例中的订单服务只是演示 HTTP 服务，没有接入真实订单或数据库。&lt;/p&gt;
+        <description>&lt;img src="https://SymphonyW.github.io/zh-cn/p/k8s-automated-deployment/bg.svg" alt="Featured image of post K8s 自动化部署全流程：从一次 Git Push 到发布验证与回滚" /&gt;&lt;p&gt;前面的&lt;a class=&#34;link&#34; href=&#34;https://SymphonyW.github.io/zh-cn/p/kubernetes-from-docker/&#34; &gt;《从 Docker 到 Kubernetes》&lt;/a&gt;介绍了 Pod、Deployment 和 Service，&lt;a class=&#34;link&#34; href=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-container-cloud-deployment/&#34; &gt;《K8s 容器云平台服务部署流程》&lt;/a&gt;讲了如何打包镜像、上传仓库，再到平台上创建应用。&lt;a class=&#34;link&#34; href=&#34;https://SymphonyW.github.io/zh-cn/p/ci/cd-%E5%AE%8C%E6%95%B4%E6%8C%87%E5%8D%97%E4%BB%8E%E5%8E%9F%E7%90%86%E5%88%B0%E5%AE%9E%E6%88%98/&#34; &gt;《CI/CD 完整指南》&lt;/a&gt;则介绍了流水线的基本概念。&lt;/p&gt;
+&lt;p&gt;应用能够手动部署以后，就可以把测试、打包和更新服务接入流水线，让代码提交触发这些操作。同时，还要能及时发现发布问题，并在失败后恢复服务。&lt;/p&gt;
+&lt;p&gt;本文用一个小型 Go 服务演示这个过程，先说明每一步的输入和输出，再给出项目配置。示例中的订单服务只用于演示 HTTP 服务，没有接入真实订单或数据库。&lt;/p&gt;
 &lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-automated-deployment/bg.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-automated-deployment/bg.svg&#34; alt=&#34;自动化部署全景：提交、测试、构建、发布、验证与恢复&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
 &lt;/p&gt;
 &lt;h2 id=&#34;一先把自动化部署拆成可验证的步骤&#34;&gt;一、先把“自动化部署”拆成可验证的步骤
-&lt;/h2&gt;&lt;p&gt;手动部署时，很多信息存在人的脑子里：“这个镜像应该是新的”“页面能打开应该就没问题”。自动化以后，这些判断必须变成明确的检查。&lt;/p&gt;
+&lt;/h2&gt;&lt;p&gt;手动部署时，往往靠人判断“这个镜像应该是新的”“页面能打开应该就没问题”。把发布交给流水线后，就需要用明确的检查代替这些判断。&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
 &lt;tr&gt;
@@ -4572,9 +5580,9 @@ sequenceDiagram
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;本文主线采用 &lt;strong&gt;GitHub Actions → GHCR → Kubernetes&lt;/strong&gt;：PR 只做检查，合并到 &lt;code&gt;main&lt;/code&gt; 后生成镜像，再部署到专用的 &lt;code&gt;demo-prod&lt;/code&gt; 命名空间。保留人工批准时属于持续交付；移除批准且检查通过就上线，才是持续部署。&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;先说明实验边界。&lt;/strong&gt; 你需要一个已有 K8s 集群、GitHub 仓库，以及可以管理该命名空间的管理员身份。命令使用 Linux/Bash；Windows 可以在 WSL 或 Git Bash 中执行。示例节点是 &lt;code&gt;linux/amd64&lt;/code&gt;。集群搭建沿用前文，本篇重点是把已经能部署的服务接入流水线。&lt;/p&gt;
-&lt;p&gt;最容易遗漏的准备项并不是 YAML，而是网络：&lt;/p&gt;
+&lt;p&gt;示例使用 GitHub Actions → GHCR → Kubernetes：PR 只做检查，合并到 &lt;code&gt;main&lt;/code&gt; 后生成镜像，再部署到专用的 &lt;code&gt;demo-prod&lt;/code&gt; 命名空间。保留人工批准时属于持续交付；如果检查通过后就自动上线，则属于持续部署。&lt;/p&gt;
+&lt;p&gt;开始前，需要准备已有的 K8s 集群、GitHub 仓库，以及能管理目标命名空间的管理员身份。命令使用 Linux/Bash，Windows 用户可以在 WSL 或 Git Bash 中执行。示例节点是 &lt;code&gt;linux/amd64&lt;/code&gt;。集群搭建沿用前文，这里主要讲如何把已经能部署的服务接入流水线。&lt;/p&gt;
+&lt;p&gt;除了准备 YAML，还要确认各段网络都能连通：&lt;/p&gt;
 &lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-automated-deployment/trust-boundaries.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-automated-deployment/trust-boundaries.svg&#34; alt=&#34;发布控制面与镜像拉取使用不同的网络路径、身份和权限&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
 &lt;/p&gt;
 &lt;table&gt;
@@ -4603,9 +5611,9 @@ sequenceDiagram
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;&lt;code&gt;kubectl&lt;/code&gt; 登录成功，不代表节点可以拉镜像；Runner 登录了镜像仓库，也不会自动替节点登录。GitHub 托管 Runner 也不能直接访问你电脑上的 &lt;code&gt;127.0.0.1&lt;/code&gt; 或公司的内网 API。内网集群应使用可信网络中的专用 Runner，或平台提供的受控网络连接；不要为了跑通实验直接公开管理接口。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;kubectl&lt;/code&gt; 登录成功，不代表节点能拉取镜像；Runner 登录镜像仓库，也不会替节点完成登录。GitHub 托管 Runner 还无法直接访问你电脑上的 &lt;code&gt;127.0.0.1&lt;/code&gt; 或公司的内网 API。内网集群需要使用可信网络中的专用 Runner，或平台提供的受控网络连接，不要为了跑通实验就公开管理接口。&lt;/p&gt;
 &lt;h2 id=&#34;二准备一个能证明发布了哪个版本的服务&#34;&gt;二、准备一个能证明“发布了哪个版本”的服务
-&lt;/h2&gt;&lt;p&gt;在独立应用仓库中准备这些文件。&lt;strong&gt;下面的 &lt;code&gt;.github/workflows/release.yaml&lt;/code&gt; 属于示例应用，不是修改本博客的部署工作流。&lt;/strong&gt;&lt;/p&gt;
+&lt;/h2&gt;&lt;p&gt;在独立应用仓库中准备这些文件。&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
@@ -4634,7 +5642,7 @@ sequenceDiagram
 &lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;└── .github/workflows/release.yaml
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;服务提供三个检查点：&lt;code&gt;/healthz&lt;/code&gt; 判断进程是否正常，&lt;code&gt;/readyz&lt;/code&gt; 表示是否准备接流量，&lt;code&gt;/version&lt;/code&gt; 返回构建时写入的 Git SHA。这里的健康接口没有外部依赖；接入数据库后，应按业务要求设计 readiness，避免把共享数据库故障直接变成所有实例的重启风暴。&lt;/p&gt;
+&lt;/div&gt;&lt;p&gt;服务提供三个检查接口：&lt;code&gt;/healthz&lt;/code&gt; 判断进程是否正常，&lt;code&gt;/readyz&lt;/code&gt; 表示是否准备好接收流量，&lt;code&gt;/version&lt;/code&gt; 返回构建时写入的 Git SHA。示例的健康接口没有外部依赖。接入数据库后，要按业务要求设计 readiness，避免共享数据库一出故障，所有实例就反复重启。&lt;/p&gt;
 &lt;p&gt;&lt;strong&gt;&lt;code&gt;go.mod&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
@@ -4777,7 +5785,7 @@ sequenceDiagram
 &lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;}&lt;/span&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;&lt;code&gt;Addr: &amp;quot;:8080&amp;quot;&lt;/code&gt; 让服务监听容器网络接口。收到终止信号后先取消就绪，再等待正在处理的请求结束。它是优雅退出的基础；真实系统还要考虑入口连接排空、长连接和后台任务，不能仅凭几行配置承诺零停机。&lt;/p&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;Addr: &amp;quot;:8080&amp;quot;&lt;/code&gt; 让服务监听容器网络接口。收到终止信号后，服务先取消就绪状态，再等待正在处理的请求结束，这是优雅退出的基础。真实系统还要处理入口连接排空、长连接和后台任务，仅靠这些配置无法保证零停机。&lt;/p&gt;
 &lt;p&gt;&lt;strong&gt;&lt;code&gt;main_test.go&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
@@ -4882,7 +5890,7 @@ sequenceDiagram
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;err&#34;&gt;&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;ENTRYPOINT&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;[&lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;/server&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;]&lt;/span&gt;&lt;span class=&#34;err&#34;&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;这里只用标准库，不需要第三方依赖或 &lt;code&gt;go.sum&lt;/code&gt;。运行镜像不带 shell；以后接入出站 HTTPS、时区文件或动态库时，要补齐 CA、时区或改用合适的运行镜像。生产中还应维护基础镜像安全更新，并将核验过的基础镜像固定到 digest；版本 tag 本身仍可被重指向。&lt;/p&gt;
+&lt;/div&gt;&lt;p&gt;示例只使用标准库，不需要第三方依赖或 &lt;code&gt;go.sum&lt;/code&gt;。运行镜像不带 shell；以后如果需要出站 HTTPS、时区文件或动态库，要补齐 CA、时区等内容，或换用合适的运行镜像。生产环境还应持续更新基础镜像，安装安全修复，并把核验过的基础镜像固定到 digest，因为版本 tag 仍可能指向不同内容。&lt;/p&gt;
 &lt;p&gt;&lt;strong&gt;&lt;code&gt;.dockerignore&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
@@ -4917,7 +5925,7 @@ sequenceDiagram
 &lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;server
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;先在本地过一遍，确认不是把镜像问题留给集群：&lt;/p&gt;
+&lt;/div&gt;&lt;p&gt;先在本地运行和检查镜像，确认没有问题后再交给集群：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
@@ -4945,7 +5953,7 @@ sequenceDiagram
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;h2 id=&#34;三把在平台上填写的内容保存为发布清单&#34;&gt;三、把“在平台上填写的内容”保存为发布清单
-&lt;/h2&gt;&lt;p&gt;前文在容器云控制台填写的镜像、副本数、探针和资源配置，现在要保存到 Git。YAML 的好处不仅是自动执行，还包括代码评审、历史对比和复现。&lt;/p&gt;
+&lt;/h2&gt;&lt;p&gt;把前文在容器云控制台填写的镜像、副本数、探针和资源配置保存成 YAML，放进 Git。这样既能自动执行部署，也方便代码评审、对比历史和复现配置。&lt;/p&gt;
 &lt;p&gt;&lt;strong&gt;&lt;code&gt;k8s/runtime.yaml&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
@@ -5148,7 +6156,7 @@ sequenceDiagram
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;            &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;periodSeconds&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;m&#34;&gt;10&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;&lt;code&gt;APP_ENV&lt;/code&gt; 用来展示配置注入，当前服务没有据此切换业务逻辑。配置更改时，创建 &lt;code&gt;order-api-config-v2&lt;/code&gt; 并修改 Deployment 引用；旧版本暂时保留。这样恢复旧 Pod 模板时，才能同时恢复它引用的那份配置。Secret 也需要版本或外部密钥版本策略，不能把密码写进 ConfigMap。&lt;/p&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;APP_ENV&lt;/code&gt; 只演示配置注入，当前服务不会根据它切换业务逻辑。更改配置时，创建 &lt;code&gt;order-api-config-v2&lt;/code&gt;，修改 Deployment 的引用，并暂时保留旧版本。恢复旧 Pod 模板时，就能继续使用它原先引用的配置。Secret 也要有版本管理，或采用外部密钥的版本策略；密码不能写进 ConfigMap。&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
 &lt;tr&gt;
@@ -5187,12 +6195,12 @@ sequenceDiagram
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;探针的准确语义见 &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
-    &gt;Kubernetes 官方探针文档&lt;/a&gt;。&lt;strong&gt;发布失败不会因为配置了超时就自动恢复旧版本&lt;/strong&gt;，后面会由流水线处理。&lt;/p&gt;
+&lt;p&gt;探针的具体行为可查阅 &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Kubernetes 官方探针文档&lt;/a&gt;。配置超时并不会让失败的发布自动恢复旧版本，后面会由流水线执行恢复。&lt;/p&gt;
 &lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-automated-deployment/rolling-update.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-automated-deployment/rolling-update.svg&#34; alt=&#34;两个副本的滚动更新：新 Pod 就绪之后，再逐步替换旧 Pod&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
 &lt;/p&gt;
-&lt;p&gt;图中展示的是理想更新顺序。节点故障、容量不足、入口传播延迟和应用本身都可能影响可用性；&lt;code&gt;maxUnavailable: 0&lt;/code&gt; 不是“任何情况下都零停机”的保证。终止中的 Pod 也可能让短时间内实际占用的资源超过图中的三份配额。&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;域名入口由平台准备。&lt;/strong&gt; 这套最小示例先通过 &lt;code&gt;ClusterIP + port-forward&lt;/code&gt; 验证应用。要对外提供服务，再让平台配置 Gateway/Ingress、DNS 和 TLS。Ingress 对象必须配合真正运行的入口控制器，&lt;code&gt;ClusterIP&lt;/code&gt; 也不能直接当公网地址使用。&lt;/p&gt;
+&lt;p&gt;图中是理想的更新顺序。实际发布时，节点故障、容量不足、入口传播延迟和应用行为都可能影响可用性，因此 &lt;code&gt;maxUnavailable: 0&lt;/code&gt; 不能保证任何情况下都零停机。终止中的 Pod 也可能继续占用资源，让短时间内的实际用量超过图中的三份配额。&lt;/p&gt;
+&lt;p&gt;这套最小示例先通过 &lt;code&gt;ClusterIP + port-forward&lt;/code&gt; 验证应用。需要对外提供服务时，再由平台配置 Gateway/Ingress、DNS 和 TLS。Ingress 对象需要配合实际运行的入口控制器，&lt;code&gt;ClusterIP&lt;/code&gt; 也不能直接作为公网地址使用。&lt;/p&gt;
 &lt;h2 id=&#34;四先打通身份和权限再让流水线发布&#34;&gt;四、先打通身份和权限，再让流水线发布
 &lt;/h2&gt;&lt;p&gt;发布时至少有三套不同凭据：&lt;/p&gt;
 &lt;table&gt;
@@ -5227,7 +6235,7 @@ sequenceDiagram
 &lt;/table&gt;
 &lt;p&gt;GHCR 新发布的包默认是私有的；发布账号有写权限，也不代表节点有读权限。可以将纯演示镜像设为 public，或按下面的私有仓库路径配置拉取 Secret，具体权限参见 &lt;a class=&#34;link&#34; href=&#34;https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;GitHub Container registry 文档&lt;/a&gt;。&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;管理员一次性初始化。&lt;/strong&gt; 保存为 &lt;code&gt;bootstrap/rbac.yaml&lt;/code&gt;，由管理员执行，不放进普通发布 Job。&lt;/p&gt;
+&lt;p&gt;把下面的配置保存为 &lt;code&gt;bootstrap/rbac.yaml&lt;/code&gt;，由管理员完成一次性初始化，不放进普通发布 Job。&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
@@ -5358,10 +6366,10 @@ sequenceDiagram
 &lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nb&#34;&gt;unset&lt;/span&gt; GHCR_READ_TOKEN
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;这条初始化命令适合受控实验终端，token 会短暂出现在本机进程参数中；共享主机上应通过平台密钥管理或受控 docker config 导入，别把它写进脚本、shell 历史或日志。已存在同名 Secret 时，按平台流程轮换，不要直接重复创建。&lt;/p&gt;
-&lt;p&gt;Role 没有赋予集群管理、RBAC 修改或直接读取 Secret 的权限，但&lt;strong&gt;能修改工作负载的账号仍可能让 Pod 挂载命名空间中的 Secret&lt;/strong&gt;。因此这里用独立实验命名空间，并只允许可信代码进入部署 Job；生产还应配合准入策略和工作负载身份约束。RBAC 能力边界见 &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/reference/access-authn-authz/rbac/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;/div&gt;&lt;p&gt;初始化命令会让 token 短暂出现在本机进程参数中，因此只适合在受控实验终端执行。共享主机应通过平台密钥管理或受控 docker config 导入，避免 token 留在脚本、shell 历史或日志中。如果已经有同名 Secret，应按平台流程轮换，不要重复创建。&lt;/p&gt;
+&lt;p&gt;这个 Role 不能管理集群、修改 RBAC，也不能直接读取 Secret。不过，&lt;strong&gt;能修改工作负载的账号，仍可能让 Pod 挂载命名空间中的 Secret&lt;/strong&gt;。所以这里使用独立实验命名空间，只允许可信代码进入部署 Job；生产环境还应配合准入策略和工作负载身份约束。具体权限边界见 &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/reference/access-authn-authz/rbac/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Kubernetes 官方文档&lt;/a&gt;。&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;实验中生成一份短期 kubeconfig。&lt;/strong&gt; 以下命令由已连接正确集群的管理员在本地执行，读取集群地址与 CA，不复制管理员凭据。这里请求一小时的 ServiceAccount token，实际有效期由集群决定：&lt;/p&gt;
+&lt;p&gt;接着为实验生成一份短期 kubeconfig。由已连接到正确集群的管理员在本地执行下面的命令，只读取集群地址与 CA，不复制管理员凭据。命令请求一小时的 ServiceAccount token，实际有效期由集群决定：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
@@ -5426,7 +6434,7 @@ sequenceDiagram
 &lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# 预期：yes&lt;/span&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;这段假定 kubeconfig 中有标准 HTTPS 地址和 CA；如果平台依赖代理、特殊 TLS server name 或云认证插件，请使用平台生成的受限 CI kubeconfig。不要用 &lt;code&gt;insecure-skip-tls-verify&lt;/code&gt; 绕过证书问题。&lt;/p&gt;
+&lt;/div&gt;&lt;p&gt;这段命令假定 kubeconfig 使用标准 HTTPS 地址和 CA。如果平台依赖代理、特殊 TLS server name 或云认证插件，需要改用平台生成的受限 CI kubeconfig，不要通过 &lt;code&gt;insecure-skip-tls-verify&lt;/code&gt; 绕过证书问题。&lt;/p&gt;
 &lt;p&gt;在应用仓库的 Settings → Environments 创建 &lt;code&gt;production&lt;/code&gt;，限制发布分支为 &lt;code&gt;main&lt;/code&gt;，按仓库支持的保护规则决定是否增加批准。添加环境 Secret &lt;code&gt;KUBE_CONFIG&lt;/code&gt;，内容为刚才的 kubeconfig；可以用已登录的 GitHub CLI 导入：&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
@@ -5436,12 +6444,12 @@ sequenceDiagram
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;gh secret &lt;span class=&#34;nb&#34;&gt;set&lt;/span&gt; KUBE_CONFIG --env production &amp;lt; .deploy-local/ci.kubeconfig
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;另外添加环境 Variable &lt;code&gt;KUBECTL_VERSION&lt;/code&gt;，填写与 API Server 版本兼容的明确补丁版本，例如 &lt;code&gt;v1.35.0&lt;/code&gt; 只是格式示例。kubectl 应处于服务端相邻一个次版本范围内，安装和校验方式见 &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;/div&gt;&lt;p&gt;再添加环境 Variable &lt;code&gt;KUBECTL_VERSION&lt;/code&gt;，填写与 API Server 兼容的具体补丁版本。这里的 &lt;code&gt;v1.35.0&lt;/code&gt; 只是格式示例。kubectl 与服务端的版本差距应在一个次版本以内，安装和校验方式见 &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;官方 Linux 安装说明&lt;/a&gt;。&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;一小时 token 只用于跑通实验，保存成 Secret 不会让它自动续期。&lt;/strong&gt; 到期或批准等待过久都会导致 &lt;code&gt;Unauthorized&lt;/code&gt;，需要重新生成并更新。长期运行的生产流水线，应使用平台支持的 OIDC/工作负载身份换取短期凭据，或平台托管的轮换机制。GitHub 的 OIDC 令牌也不能直接通用于任意 K8s 集群，需要对应的信任配置或认证交换。TokenRequest 的行为可查 &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;一小时 token 只用于跑通实验，&lt;strong&gt;保存成 Secret 不会自动续期&lt;/strong&gt;。token 到期，或等待批准太久导致过期，都会出现 &lt;code&gt;Unauthorized&lt;/code&gt;，需要重新生成并更新。长期运行的生产流水线，应使用平台支持的 OIDC/工作负载身份换取短期凭据，或使用平台托管的轮换机制。GitHub 的 OIDC 令牌也不能直接用于任意 K8s 集群，还需要对应的信任配置或认证交换。TokenRequest 的行为可查 &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;ServiceAccount 官方说明&lt;/a&gt;。&lt;/p&gt;
 &lt;h2 id=&#34;五把测试构建发布和验收接成一条流水线&#34;&gt;五、把测试、构建、发布和验收接成一条流水线
-&lt;/h2&gt;&lt;p&gt;下面保存为&lt;strong&gt;示例应用仓库&lt;/strong&gt;的 &lt;code&gt;.github/workflows/release.yaml&lt;/code&gt;。构建和测试运行在 GitHub 托管 Runner；部署也默认使用它，因此 API 必须通过前文的受控网络方案可达。私有集群可将部署 Job 的 &lt;code&gt;runs-on&lt;/code&gt; 改为组织配置好的专用 Runner 标签，公共 PR 的测试仍留在隔离环境中。&lt;/p&gt;
+&lt;/h2&gt;&lt;p&gt;把下面的配置保存为示例应用仓库中的 &lt;code&gt;.github/workflows/release.yaml&lt;/code&gt;。构建和测试使用 GitHub 托管 Runner，部署默认也使用它，因此需要通过前文的受控网络方案访问 API。私有集群可以把部署 Job 的 &lt;code&gt;runs-on&lt;/code&gt; 改为组织配置好的专用 Runner 标签，公共 PR 的测试则继续放在隔离环境中。&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;  1
@@ -5774,10 +6782,10 @@ sequenceDiagram
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;        &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;run&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;rm -f -- &amp;#34;$RUNNER_TEMP/order-api.kubeconfig&amp;#34;&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;Actions 的用法和镜像发布权限参考 &lt;a class=&#34;link&#34; href=&#34;https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;/div&gt;&lt;p&gt;Actions 的用法和镜像发布权限可参考 &lt;a class=&#34;link&#34; href=&#34;https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;GitHub 镜像发布教程&lt;/a&gt;及 &lt;a class=&#34;link&#34; href=&#34;https://github.com/docker/build-push-action&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
-    &gt;Docker build-push-action&lt;/a&gt;。这里为阅读方便使用主版本 tag；生产应将 Action 固定到审核过的完整 commit SHA，再用依赖更新工具维护，&lt;code&gt;@v7&lt;/code&gt; 并不是不可变版本。自托管 Runner 还需满足对应 Action 的运行时要求。&lt;/p&gt;
-&lt;p&gt;这段配置有几个容易看漏的设计：&lt;/p&gt;
+    &gt;Docker build-push-action&lt;/a&gt;。示例为方便阅读使用主版本 tag；生产环境应把 Action 固定到审核过的完整 commit SHA，再用依赖更新工具维护。&lt;code&gt;@v7&lt;/code&gt; 仍然可以指向不同提交。自托管 Runner 还需要满足对应 Action 的运行时要求。&lt;/p&gt;
+&lt;p&gt;配置中的依赖、制品传递和发布限制分别如下：&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
 &lt;tr&gt;
@@ -5828,12 +6836,12 @@ sequenceDiagram
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;&lt;code&gt;cancel-in-progress: false&lt;/code&gt; 保留正在执行的部署，但 GitHub 的并发组&lt;strong&gt;不是严格 FIFO 发布队列&lt;/strong&gt;，默认待执行任务可能被更新的任务替换，执行顺序也没有保证。SHA 检查是额外的过期任务检查；检查之后到 apply 之间仍可能有新提交，因此它也不是跨系统事务锁。这里适合“部署最新 main”的模式，要求每个版本严格按序上线时，需要专用发布队列或发布控制器。语义见 &lt;a class=&#34;link&#34; href=&#34;https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;&lt;code&gt;cancel-in-progress: false&lt;/code&gt; 会保留正在执行的部署，但 GitHub 并发组不是严格的 FIFO 发布队列。默认情况下，待执行任务可能被更新的任务替换，执行顺序也没有保证。SHA 检查能额外拦截过期任务，但检查完成到 apply 之间仍可能有新提交，不能把它当作跨系统事务锁。这种做法适合“部署最新 main”；如果要求每个版本严格按顺序上线，就需要专用发布队列或发布控制器。具体行为见 &lt;a class=&#34;link&#34; href=&#34;https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;GitHub 并发控制说明&lt;/a&gt;。&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;为什么同时检查 rollout 和接口？&lt;/strong&gt; &lt;code&gt;kubectl apply&lt;/code&gt; 成功只说明 API 接受了资源；&lt;code&gt;rollout status&lt;/code&gt; 成功说明控制器完成更新；接口返回正确的 SHA 才证明你访问到了预期版本。冒烟再补一个核心业务请求，可以发现“进程活着，但业务已经坏了”的问题。&lt;/p&gt;
-&lt;p&gt;本例通过 &lt;code&gt;port-forward service/...&lt;/code&gt; 访问选中的一个 Pod，验证了应用响应，但&lt;strong&gt;没有覆盖真实 Service 转发、所有副本、DNS、网关和 TLS&lt;/strong&gt;。如果平台已配置域名，发布验收还应增加 &lt;code&gt;curl -fsS --max-time 10 https://你的域名/version&lt;/code&gt;，并执行适合业务的读写验证。不要把一次 HTTP 200 当成整条用户链路已经通过。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;kubectl apply&lt;/code&gt; 成功，只说明 API 接受了资源；&lt;code&gt;rollout status&lt;/code&gt; 成功，说明控制器完成了更新。还要检查接口返回的 SHA，才能确认访问到的是预期版本。冒烟测试再执行一个核心业务请求，可以发现进程仍在运行、业务却已经出错的情况。&lt;/p&gt;
+&lt;p&gt;本例通过 &lt;code&gt;port-forward service/...&lt;/code&gt; 访问选中的一个 Pod，只验证这个 Pod 的应用响应，&lt;strong&gt;没有覆盖真实 Service 转发、所有副本、DNS、网关和 TLS&lt;/strong&gt;。如果平台已经配置域名，发布验收还应增加 &lt;code&gt;curl -fsS --max-time 10 https://你的域名/version&lt;/code&gt;，并执行适合业务的读写验证。一次 HTTP 200 不能说明整条用户访问链路都正常。&lt;/p&gt;
 &lt;h2 id=&#34;六跑一次正常发布再演练一次失败恢复&#34;&gt;六、跑一次正常发布，再演练一次失败恢复
-&lt;/h2&gt;&lt;p&gt;首次操作按下面顺序做，尤其注意私有镜像的授权和短期 token 到期时间：&lt;/p&gt;
+&lt;/h2&gt;&lt;p&gt;首次发布可以按下面的顺序操作，注意私有镜像的授权，以及短期 token 是否会在等待期间到期：&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
 &lt;tr&gt;
@@ -5892,10 +6900,10 @@ sequenceDiagram
 &lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# 预期：2 个可用副本；image 是 ghcr.io/...@sha256:...&lt;/span&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;&lt;strong&gt;再做一次只影响实验环境的失败演练。&lt;/strong&gt; 成功发布过一版后，在专用实验仓库中把 readiness 路径改为 &lt;code&gt;/not-ready&lt;/code&gt;，通过 PR 检查后合并。应用会对这个路径返回 404，新 Pod 无法就绪，更新最终失败；流水线先打印现场，再恢复发布前保存的 Pod 模板。观察旧版本恢复后，立刻通过新的修复提交把 Git 中的路径改回 &lt;code&gt;/readyz&lt;/code&gt;。&lt;/p&gt;
+&lt;/div&gt;&lt;p&gt;成功发布一版后，可以在专用实验环境中演练失败恢复。在实验仓库里把 readiness 路径改为 &lt;code&gt;/not-ready&lt;/code&gt;，通过 PR 检查后合并。应用会对这个路径返回 404，新 Pod 无法就绪，更新最终失败。流水线会先打印诊断信息，再恢复发布前保存的 Pod 模板。确认旧版本恢复后，立刻提交修复，把 Git 中的路径改回 &lt;code&gt;/readyz&lt;/code&gt;。&lt;/p&gt;
 &lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-automated-deployment/failure-recovery.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-automated-deployment/failure-recovery.svg&#34; alt=&#34;失败恢复的决策路径：构建失败不部署，发布失败先诊断，有旧版本才恢复&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
 &lt;/p&gt;
-&lt;p&gt;恢复时使用“发布前快照”，而不是简单地执行一次无条件 &lt;code&gt;rollout undo&lt;/code&gt;，可以避免把“上一条历史记录”误当成“发布前实际在运行的模板”。但这个策略仍有边界：&lt;/p&gt;
+&lt;p&gt;恢复时使用发布前保存的模板快照，可以确认恢复目标确实是发布前运行的模板。无条件执行 &lt;code&gt;rollout undo&lt;/code&gt; 则可能把上一条历史记录误当成这个目标。快照也只能处理一部分故障：&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
 &lt;tr&gt;
@@ -5942,7 +6950,7 @@ sequenceDiagram
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;&lt;strong&gt;恢复成功后，本次工作流仍然是失败状态。&lt;/strong&gt; 自动回滚表示尝试恢复服务，不表示这次发布通过了。回滚的 rollout 成功也只代表副本重新满足条件，还需要业务检查和指标观察。Deployment 的历史回滚只处理 Pod 模板，具体语义见 &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/concepts/workloads/controllers/deployment/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;即使恢复成功，本次工作流仍然保持失败状态。自动回滚是在尝试恢复服务，不能把它当作发布通过。回滚的 rollout 成功，也只代表副本重新满足条件，还需要检查业务和观察指标。Deployment 的历史回滚只处理 Pod 模板，具体行为见 &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/concepts/workloads/controllers/deployment/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Kubernetes Deployment 文档&lt;/a&gt;。&lt;/p&gt;
 &lt;p&gt;遇到故障，可以先按发生位置缩小范围：&lt;/p&gt;
 &lt;table&gt;
@@ -5996,9 +7004,9 @@ sequenceDiagram
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;&lt;strong&gt;数据库迁移要单独设计。&lt;/strong&gt; 常用做法是 expand–migrate–contract：先加向后兼容的字段或表，让新旧应用都能运行；迁移数据并完成观察后，再清理旧结构。迁移 Job 需要自身的幂等、并发和失败处理，不能让每个应用 Pod 启动时都抢着执行不可逆 DDL。回滚应用也不会自动撤销已经发送的消息、调用过的外部接口或修改过的数据。&lt;/p&gt;
+&lt;p&gt;数据库迁移需要单独设计。常用做法是 expand–migrate–contract：先增加向后兼容的字段或表，让新旧应用都能运行；迁移数据并完成观察后，再清理旧结构。迁移 Job 要保证幂等、控制并发，并处理失败，不能让每个应用 Pod 启动时都抢着执行不可逆 DDL。回滚应用也不会自动撤销已经发出的消息、调用过的外部接口或修改过的数据。&lt;/p&gt;
 &lt;h2 id=&#34;七从一条可用流水线走向长期可维护的发布系统&#34;&gt;七、从一条可用流水线，走向长期可维护的发布系统
-&lt;/h2&gt;&lt;p&gt;主线跑通以后，下一步不是立即加入所有工具，而是补齐真实业务需要的验证和治理。&lt;/p&gt;
+&lt;/h2&gt;&lt;p&gt;基本流程跑通后，可以根据实际业务需要，逐步补充验证和发布管理措施。&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
 &lt;tr&gt;
@@ -6045,9 +7053,9 @@ sequenceDiagram
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;多环境推广应复用&lt;strong&gt;同一个 digest&lt;/strong&gt;：构建一次，在 staging 验证后把这份制品推广到 prod，环境差异通过配置注入。不要在每个环境重新构建一份“看起来版本号相同”的镜像。&lt;/p&gt;
-&lt;p&gt;滚动更新也不是金丝雀：普通 Deployment 逐步替换副本，并不会自动按错误率判断是否继续发布。要做到“先放少量流量，观察指标，再逐渐扩大”，还需要流量控制和渐进式发布控制器；是否采用应取决于业务风险。&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;再往后，可以把部署端改成 GitOps。&lt;/strong&gt; 本文是 Push 模式：Runner 带发布身份调用集群 API。GitOps 把期望状态留在部署仓库，由集群侧的 Argo CD 或 Flux 拉取并协调。&lt;/p&gt;
+&lt;p&gt;多个环境应复用同一个 digest：构建一次，在 staging 验证后，把这份制品部署到 prod，环境差异通过配置注入。如果每个环境都重新构建，版本号相同也不代表镜像内容相同。&lt;/p&gt;
+&lt;p&gt;普通 Deployment 会逐步替换副本，但不会自动根据错误率判断是否继续，因此它与金丝雀发布不同。要先放少量流量、观察指标，再逐渐扩大，还需要流量控制和渐进式发布控制器，是否采用要看业务风险。&lt;/p&gt;
+&lt;p&gt;部署端也可以改用 GitOps。本文采用 Push 模式，由 Runner 带着发布身份调用集群 API。采用 GitOps 时，期望状态保存在部署仓库，由集群侧的 Argo CD 或 Flux 拉取，再据此调整集群状态。&lt;/p&gt;
 &lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-automated-deployment/gitops.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/zh-cn/p/k8s-automated-deployment/gitops.svg&#34; alt=&#34;Push CD 与 GitOps：从 Runner 直接发布，到集群协调 Git 中的期望状态&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
 &lt;/p&gt;
 &lt;table&gt;
@@ -6086,9 +7094,9 @@ sequenceDiagram
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;采用 Argo CD 自动同步时，要先把 Git 中的期望状态改正确；启用 self-heal 后，只在集群手动改镜像可能会被协调器改回。资源删除也需要明确配置 prune，并不是开启同步就会自动做所有清理。相关边界见 &lt;a class=&#34;link&#34; href=&#34;https://argo-cd.readthedocs.io/en/stable/user-guide/auto_sync/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;使用 Argo CD 自动同步时，需要先改对 Git 中的期望状态。启用 self-heal 后，如果只在集群中手动修改镜像，协调器可能会把它改回去。删除资源也需要显式配置 prune，开启同步不会自动完成所有清理。具体行为见 &lt;a class=&#34;link&#34; href=&#34;https://argo-cd.readthedocs.io/en/stable/user-guide/auto_sync/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Argo CD 自动同步说明&lt;/a&gt;。&lt;/p&gt;
-&lt;p&gt;这条链路的完成标志，是每次发布都能回答：&lt;strong&gt;部署来自哪个提交，用的是哪个制品和配置，验证覆盖了什么，出错后恢复到了哪里。&lt;/strong&gt; 等这些答案都有记录，再去增加多环境、灰度或 GitOps，才有可靠的基础。&lt;/p&gt;
+&lt;p&gt;每次发布都应记录来源提交、使用的制品和配置、验证覆盖的范围，以及出错后实际恢复到了哪里。这些记录齐全后，再增加多环境、灰度或 GitOps，后续发布也有据可查。&lt;/p&gt;
 </description>
         </item>
         <item>

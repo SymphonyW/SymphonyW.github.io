@@ -6,7 +6,7 @@
 <title>K8s 自动化部署全流程：从一次 Git Push 到发布验证与回滚</title>
 
 <link rel='canonical' href='https://SymphonyW.github.io/zh-cn/p/k8s-automated-deployment/'>
-<link rel="stylesheet" href="/scss/custom.min.919cf0d34f895fec4bc36912621fd0297f1439e1574bdf28d3195939a83690e8.css">
+<link rel="stylesheet" href="/scss/custom.min.876057f2db13b2c37cd2ad3c8f76274ae23bfde09c95ff8d93059f5719a1b1dc.css">
 <script>
 (() => {
     let preference = 'auto';
@@ -33,7 +33,7 @@
     
 <header class="site-header">
     <div class="site-header__inner">
-        <a class="site-brand" href="/zh-cn/" aria-label="Snow — 主页">S<span>now.</span></a>
+        <a class="site-brand" href="/zh-cn/" aria-label="Snow — 主页">Snow.</a>
         <nav class="site-nav" id="site-navigation" aria-label="主导航">
             
             
@@ -144,13 +144,13 @@
             </aside>
         
         <div class="reading-body">
-            <div class="article-content"><p>前面的<a class="link" href="/zh-cn/p/kubernetes-from-docker/" >《从 Docker 到 Kubernetes》</a>讲清了 Pod、Deployment 和 Service，<a class="link" href="/zh-cn/p/k8s-container-cloud-deployment/" >《K8s 容器云平台服务部署流程》</a>把打包镜像、上传仓库和在平台上创建应用串了起来；<a class="link" href="/zh-cn/p/ci/cd-%E5%AE%8C%E6%95%B4%E6%8C%87%E5%8D%97%E4%BB%8E%E5%8E%9F%E7%90%86%E5%88%B0%E5%AE%9E%E6%88%98/" >《CI/CD 完整指南》</a>则介绍了流水线的基本概念。</p>
-<p>接下来很自然会遇到一个问题：<strong>应用已经能够手动部署了，怎样做到提交代码以后，自动测试、打包、更新服务，而且出问题能及时发现和恢复？</strong></p>
-<p>这篇文章用一个很小的 Go 服务，走完一条完整链路。先理解每一步的输入和输出，再看可以放进项目的配置。示例中的订单服务只是演示 HTTP 服务，没有接入真实订单或数据库。</p>
+            <div class="article-content"><p>前面的<a class="link" href="/zh-cn/p/kubernetes-from-docker/" >《从 Docker 到 Kubernetes》</a>介绍了 Pod、Deployment 和 Service，<a class="link" href="/zh-cn/p/k8s-container-cloud-deployment/" >《K8s 容器云平台服务部署流程》</a>讲了如何打包镜像、上传仓库，再到平台上创建应用。<a class="link" href="/zh-cn/p/ci/cd-%E5%AE%8C%E6%95%B4%E6%8C%87%E5%8D%97%E4%BB%8E%E5%8E%9F%E7%90%86%E5%88%B0%E5%AE%9E%E6%88%98/" >《CI/CD 完整指南》</a>则介绍了流水线的基本概念。</p>
+<p>应用能够手动部署以后，就可以把测试、打包和更新服务接入流水线，让代码提交触发这些操作。同时，还要能及时发现发布问题，并在失败后恢复服务。</p>
+<p>本文用一个小型 Go 服务演示这个过程，先说明每一步的输入和输出，再给出项目配置。示例中的订单服务只用于演示 HTTP 服务，没有接入真实订单或数据库。</p>
 <p><a href="/zh-cn/p/k8s-automated-deployment/bg.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/k8s-automated-deployment/bg.svg" alt="自动化部署全景：提交、测试、构建、发布、验证与恢复" loading="lazy" decoding="async"></a>
 </p>
 <h2 id="一先把自动化部署拆成可验证的步骤">一、先把“自动化部署”拆成可验证的步骤
-</h2><p>手动部署时，很多信息存在人的脑子里：“这个镜像应该是新的”“页面能打开应该就没问题”。自动化以后，这些判断必须变成明确的检查。</p>
+</h2><p>手动部署时，往往靠人判断“这个镜像应该是新的”“页面能打开应该就没问题”。把发布交给流水线后，就需要用明确的检查代替这些判断。</p>
 <div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
 <thead>
 <tr>
@@ -199,9 +199,9 @@
 </tr>
 </tbody>
 </table></div>
-<p>本文主线采用 <strong>GitHub Actions → GHCR → Kubernetes</strong>：PR 只做检查，合并到 <code>main</code> 后生成镜像，再部署到专用的 <code>demo-prod</code> 命名空间。保留人工批准时属于持续交付；移除批准且检查通过就上线，才是持续部署。</p>
-<p><strong>先说明实验边界。</strong> 你需要一个已有 K8s 集群、GitHub 仓库，以及可以管理该命名空间的管理员身份。命令使用 Linux/Bash；Windows 可以在 WSL 或 Git Bash 中执行。示例节点是 <code>linux/amd64</code>。集群搭建沿用前文，本篇重点是把已经能部署的服务接入流水线。</p>
-<p>最容易遗漏的准备项并不是 YAML，而是网络：</p>
+<p>示例使用 GitHub Actions → GHCR → Kubernetes：PR 只做检查，合并到 <code>main</code> 后生成镜像，再部署到专用的 <code>demo-prod</code> 命名空间。保留人工批准时属于持续交付；如果检查通过后就自动上线，则属于持续部署。</p>
+<p>开始前，需要准备已有的 K8s 集群、GitHub 仓库，以及能管理目标命名空间的管理员身份。命令使用 Linux/Bash，Windows 用户可以在 WSL 或 Git Bash 中执行。示例节点是 <code>linux/amd64</code>。集群搭建沿用前文，这里主要讲如何把已经能部署的服务接入流水线。</p>
+<p>除了准备 YAML，还要确认各段网络都能连通：</p>
 <p><a href="/zh-cn/p/k8s-automated-deployment/trust-boundaries.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/k8s-automated-deployment/trust-boundaries.svg" alt="发布控制面与镜像拉取使用不同的网络路径、身份和权限" loading="lazy" decoding="async"></a>
 </p>
 <div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
@@ -230,9 +230,9 @@
 </tr>
 </tbody>
 </table></div>
-<p><code>kubectl</code> 登录成功，不代表节点可以拉镜像；Runner 登录了镜像仓库，也不会自动替节点登录。GitHub 托管 Runner 也不能直接访问你电脑上的 <code>127.0.0.1</code> 或公司的内网 API。内网集群应使用可信网络中的专用 Runner，或平台提供的受控网络连接；不要为了跑通实验直接公开管理接口。</p>
+<p><code>kubectl</code> 登录成功，不代表节点能拉取镜像；Runner 登录镜像仓库，也不会替节点完成登录。GitHub 托管 Runner 还无法直接访问你电脑上的 <code>127.0.0.1</code> 或公司的内网 API。内网集群需要使用可信网络中的专用 Runner，或平台提供的受控网络连接，不要为了跑通实验就公开管理接口。</p>
 <h2 id="二准备一个能证明发布了哪个版本的服务">二、准备一个能证明“发布了哪个版本”的服务
-</h2><p>在独立应用仓库中准备这些文件。<strong>下面的 <code>.github/workflows/release.yaml</code> 属于示例应用，不是修改本博客的部署工作流。</strong></p>
+</h2><p>在独立应用仓库中准备这些文件。</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
 <pre tabindex="0" class="chroma"><code><span class="lnt"> 1
@@ -261,7 +261,7 @@
 </span></span><span class="line"><span class="cl">└── .github/workflows/release.yaml
 </span></span></code></pre></td></tr></table>
 </div>
-</div><p>服务提供三个检查点：<code>/healthz</code> 判断进程是否正常，<code>/readyz</code> 表示是否准备接流量，<code>/version</code> 返回构建时写入的 Git SHA。这里的健康接口没有外部依赖；接入数据库后，应按业务要求设计 readiness，避免把共享数据库故障直接变成所有实例的重启风暴。</p>
+</div><p>服务提供三个检查接口：<code>/healthz</code> 判断进程是否正常，<code>/readyz</code> 表示是否准备好接收流量，<code>/version</code> 返回构建时写入的 Git SHA。示例的健康接口没有外部依赖。接入数据库后，要按业务要求设计 readiness，避免共享数据库一出故障，所有实例就反复重启。</p>
 <p><strong><code>go.mod</code></strong></p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
@@ -404,7 +404,7 @@
 </span></span><span class="line"><span class="cl"><span class="p">}</span>
 </span></span></code></pre></td></tr></table>
 </div>
-</div><p><code>Addr: &quot;:8080&quot;</code> 让服务监听容器网络接口。收到终止信号后先取消就绪，再等待正在处理的请求结束。它是优雅退出的基础；真实系统还要考虑入口连接排空、长连接和后台任务，不能仅凭几行配置承诺零停机。</p>
+</div><p><code>Addr: &quot;:8080&quot;</code> 让服务监听容器网络接口。收到终止信号后，服务先取消就绪状态，再等待正在处理的请求结束，这是优雅退出的基础。真实系统还要处理入口连接排空、长连接和后台任务，仅靠这些配置无法保证零停机。</p>
 <p><strong><code>main_test.go</code></strong></p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
@@ -509,7 +509,7 @@
 </span></span></span><span class="line"><span class="cl"><span class="err"></span><span class="k">ENTRYPOINT</span> <span class="p">[</span><span class="s2">&#34;/server&#34;</span><span class="p">]</span><span class="err">
 </span></span></span></code></pre></td></tr></table>
 </div>
-</div><p>这里只用标准库，不需要第三方依赖或 <code>go.sum</code>。运行镜像不带 shell；以后接入出站 HTTPS、时区文件或动态库时，要补齐 CA、时区或改用合适的运行镜像。生产中还应维护基础镜像安全更新，并将核验过的基础镜像固定到 digest；版本 tag 本身仍可被重指向。</p>
+</div><p>示例只使用标准库，不需要第三方依赖或 <code>go.sum</code>。运行镜像不带 shell；以后如果需要出站 HTTPS、时区文件或动态库，要补齐 CA、时区等内容，或换用合适的运行镜像。生产环境还应持续更新基础镜像，安装安全修复，并把核验过的基础镜像固定到 digest，因为版本 tag 仍可能指向不同内容。</p>
 <p><strong><code>.dockerignore</code></strong></p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
@@ -544,7 +544,7 @@
 </span></span><span class="line"><span class="cl">server
 </span></span></code></pre></td></tr></table>
 </div>
-</div><p>先在本地过一遍，确认不是把镜像问题留给集群：</p>
+</div><p>先在本地运行和检查镜像，确认没有问题后再交给集群：</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
 <pre tabindex="0" class="chroma"><code><span class="lnt"> 1
@@ -572,7 +572,7 @@
 </span></span></code></pre></td></tr></table>
 </div>
 </div><h2 id="三把在平台上填写的内容保存为发布清单">三、把“在平台上填写的内容”保存为发布清单
-</h2><p>前文在容器云控制台填写的镜像、副本数、探针和资源配置，现在要保存到 Git。YAML 的好处不仅是自动执行，还包括代码评审、历史对比和复现。</p>
+</h2><p>把前文在容器云控制台填写的镜像、副本数、探针和资源配置保存成 YAML，放进 Git。这样既能自动执行部署，也方便代码评审、对比历史和复现配置。</p>
 <p><strong><code>k8s/runtime.yaml</code></strong></p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
@@ -775,7 +775,7 @@
 </span></span></span><span class="line"><span class="cl"><span class="w">            </span><span class="nt">periodSeconds</span><span class="p">:</span><span class="w"> </span><span class="m">10</span><span class="w">
 </span></span></span></code></pre></td></tr></table>
 </div>
-</div><p><code>APP_ENV</code> 用来展示配置注入，当前服务没有据此切换业务逻辑。配置更改时，创建 <code>order-api-config-v2</code> 并修改 Deployment 引用；旧版本暂时保留。这样恢复旧 Pod 模板时，才能同时恢复它引用的那份配置。Secret 也需要版本或外部密钥版本策略，不能把密码写进 ConfigMap。</p>
+</div><p><code>APP_ENV</code> 只演示配置注入，当前服务不会根据它切换业务逻辑。更改配置时，创建 <code>order-api-config-v2</code>，修改 Deployment 的引用，并暂时保留旧版本。恢复旧 Pod 模板时，就能继续使用它原先引用的配置。Secret 也要有版本管理，或采用外部密钥的版本策略；密码不能写进 ConfigMap。</p>
 <div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
 <thead>
 <tr>
@@ -814,12 +814,12 @@
 </tr>
 </tbody>
 </table></div>
-<p>探针的准确语义见 <a class="link" href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/"  target="_blank" rel="noopener"
-    >Kubernetes 官方探针文档</a>。<strong>发布失败不会因为配置了超时就自动恢复旧版本</strong>，后面会由流水线处理。</p>
+<p>探针的具体行为可查阅 <a class="link" href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/"  target="_blank" rel="noopener"
+    >Kubernetes 官方探针文档</a>。配置超时并不会让失败的发布自动恢复旧版本，后面会由流水线执行恢复。</p>
 <p><a href="/zh-cn/p/k8s-automated-deployment/rolling-update.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/k8s-automated-deployment/rolling-update.svg" alt="两个副本的滚动更新：新 Pod 就绪之后，再逐步替换旧 Pod" loading="lazy" decoding="async"></a>
 </p>
-<p>图中展示的是理想更新顺序。节点故障、容量不足、入口传播延迟和应用本身都可能影响可用性；<code>maxUnavailable: 0</code> 不是“任何情况下都零停机”的保证。终止中的 Pod 也可能让短时间内实际占用的资源超过图中的三份配额。</p>
-<p><strong>域名入口由平台准备。</strong> 这套最小示例先通过 <code>ClusterIP + port-forward</code> 验证应用。要对外提供服务，再让平台配置 Gateway/Ingress、DNS 和 TLS。Ingress 对象必须配合真正运行的入口控制器，<code>ClusterIP</code> 也不能直接当公网地址使用。</p>
+<p>图中是理想的更新顺序。实际发布时，节点故障、容量不足、入口传播延迟和应用行为都可能影响可用性，因此 <code>maxUnavailable: 0</code> 不能保证任何情况下都零停机。终止中的 Pod 也可能继续占用资源，让短时间内的实际用量超过图中的三份配额。</p>
+<p>这套最小示例先通过 <code>ClusterIP + port-forward</code> 验证应用。需要对外提供服务时，再由平台配置 Gateway/Ingress、DNS 和 TLS。Ingress 对象需要配合实际运行的入口控制器，<code>ClusterIP</code> 也不能直接作为公网地址使用。</p>
 <h2 id="四先打通身份和权限再让流水线发布">四、先打通身份和权限，再让流水线发布
 </h2><p>发布时至少有三套不同凭据：</p>
 <div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
@@ -854,7 +854,7 @@
 </table></div>
 <p>GHCR 新发布的包默认是私有的；发布账号有写权限，也不代表节点有读权限。可以将纯演示镜像设为 public，或按下面的私有仓库路径配置拉取 Secret，具体权限参见 <a class="link" href="https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry"  target="_blank" rel="noopener"
     >GitHub Container registry 文档</a>。</p>
-<p><strong>管理员一次性初始化。</strong> 保存为 <code>bootstrap/rbac.yaml</code>，由管理员执行，不放进普通发布 Job。</p>
+<p>把下面的配置保存为 <code>bootstrap/rbac.yaml</code>，由管理员完成一次性初始化，不放进普通发布 Job。</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
 <pre tabindex="0" class="chroma"><code><span class="lnt"> 1
@@ -985,10 +985,10 @@
 </span></span><span class="line"><span class="cl"><span class="nb">unset</span> GHCR_READ_TOKEN
 </span></span></code></pre></td></tr></table>
 </div>
-</div><p>这条初始化命令适合受控实验终端，token 会短暂出现在本机进程参数中；共享主机上应通过平台密钥管理或受控 docker config 导入，别把它写进脚本、shell 历史或日志。已存在同名 Secret 时，按平台流程轮换，不要直接重复创建。</p>
-<p>Role 没有赋予集群管理、RBAC 修改或直接读取 Secret 的权限，但<strong>能修改工作负载的账号仍可能让 Pod 挂载命名空间中的 Secret</strong>。因此这里用独立实验命名空间，并只允许可信代码进入部署 Job；生产还应配合准入策略和工作负载身份约束。RBAC 能力边界见 <a class="link" href="https://kubernetes.io/docs/reference/access-authn-authz/rbac/"  target="_blank" rel="noopener"
+</div><p>初始化命令会让 token 短暂出现在本机进程参数中，因此只适合在受控实验终端执行。共享主机应通过平台密钥管理或受控 docker config 导入，避免 token 留在脚本、shell 历史或日志中。如果已经有同名 Secret，应按平台流程轮换，不要重复创建。</p>
+<p>这个 Role 不能管理集群、修改 RBAC，也不能直接读取 Secret。不过，<strong>能修改工作负载的账号，仍可能让 Pod 挂载命名空间中的 Secret</strong>。所以这里使用独立实验命名空间，只允许可信代码进入部署 Job；生产环境还应配合准入策略和工作负载身份约束。具体权限边界见 <a class="link" href="https://kubernetes.io/docs/reference/access-authn-authz/rbac/"  target="_blank" rel="noopener"
     >Kubernetes 官方文档</a>。</p>
-<p><strong>实验中生成一份短期 kubeconfig。</strong> 以下命令由已连接正确集群的管理员在本地执行，读取集群地址与 CA，不复制管理员凭据。这里请求一小时的 ServiceAccount token，实际有效期由集群决定：</p>
+<p>接着为实验生成一份短期 kubeconfig。由已连接到正确集群的管理员在本地执行下面的命令，只读取集群地址与 CA，不复制管理员凭据。命令请求一小时的 ServiceAccount token，实际有效期由集群决定：</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
 <pre tabindex="0" class="chroma"><code><span class="lnt"> 1
@@ -1053,7 +1053,7 @@
 </span></span><span class="line"><span class="cl"><span class="c1"># 预期：yes</span>
 </span></span></code></pre></td></tr></table>
 </div>
-</div><p>这段假定 kubeconfig 中有标准 HTTPS 地址和 CA；如果平台依赖代理、特殊 TLS server name 或云认证插件，请使用平台生成的受限 CI kubeconfig。不要用 <code>insecure-skip-tls-verify</code> 绕过证书问题。</p>
+</div><p>这段命令假定 kubeconfig 使用标准 HTTPS 地址和 CA。如果平台依赖代理、特殊 TLS server name 或云认证插件，需要改用平台生成的受限 CI kubeconfig，不要通过 <code>insecure-skip-tls-verify</code> 绕过证书问题。</p>
 <p>在应用仓库的 Settings → Environments 创建 <code>production</code>，限制发布分支为 <code>main</code>，按仓库支持的保护规则决定是否增加批准。添加环境 Secret <code>KUBE_CONFIG</code>，内容为刚才的 kubeconfig；可以用已登录的 GitHub CLI 导入：</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
@@ -1063,12 +1063,12 @@
 <pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">gh secret <span class="nb">set</span> KUBE_CONFIG --env production &lt; .deploy-local/ci.kubeconfig
 </span></span></code></pre></td></tr></table>
 </div>
-</div><p>另外添加环境 Variable <code>KUBECTL_VERSION</code>，填写与 API Server 版本兼容的明确补丁版本，例如 <code>v1.35.0</code> 只是格式示例。kubectl 应处于服务端相邻一个次版本范围内，安装和校验方式见 <a class="link" href="https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/"  target="_blank" rel="noopener"
+</div><p>再添加环境 Variable <code>KUBECTL_VERSION</code>，填写与 API Server 兼容的具体补丁版本。这里的 <code>v1.35.0</code> 只是格式示例。kubectl 与服务端的版本差距应在一个次版本以内，安装和校验方式见 <a class="link" href="https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/"  target="_blank" rel="noopener"
     >官方 Linux 安装说明</a>。</p>
-<p><strong>一小时 token 只用于跑通实验，保存成 Secret 不会让它自动续期。</strong> 到期或批准等待过久都会导致 <code>Unauthorized</code>，需要重新生成并更新。长期运行的生产流水线，应使用平台支持的 OIDC/工作负载身份换取短期凭据，或平台托管的轮换机制。GitHub 的 OIDC 令牌也不能直接通用于任意 K8s 集群，需要对应的信任配置或认证交换。TokenRequest 的行为可查 <a class="link" href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/"  target="_blank" rel="noopener"
+<p>一小时 token 只用于跑通实验，<strong>保存成 Secret 不会自动续期</strong>。token 到期，或等待批准太久导致过期，都会出现 <code>Unauthorized</code>，需要重新生成并更新。长期运行的生产流水线，应使用平台支持的 OIDC/工作负载身份换取短期凭据，或使用平台托管的轮换机制。GitHub 的 OIDC 令牌也不能直接用于任意 K8s 集群，还需要对应的信任配置或认证交换。TokenRequest 的行为可查 <a class="link" href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/"  target="_blank" rel="noopener"
     >ServiceAccount 官方说明</a>。</p>
 <h2 id="五把测试构建发布和验收接成一条流水线">五、把测试、构建、发布和验收接成一条流水线
-</h2><p>下面保存为<strong>示例应用仓库</strong>的 <code>.github/workflows/release.yaml</code>。构建和测试运行在 GitHub 托管 Runner；部署也默认使用它，因此 API 必须通过前文的受控网络方案可达。私有集群可将部署 Job 的 <code>runs-on</code> 改为组织配置好的专用 Runner 标签，公共 PR 的测试仍留在隔离环境中。</p>
+</h2><p>把下面的配置保存为示例应用仓库中的 <code>.github/workflows/release.yaml</code>。构建和测试使用 GitHub 托管 Runner，部署默认也使用它，因此需要通过前文的受控网络方案访问 API。私有集群可以把部署 Job 的 <code>runs-on</code> 改为组织配置好的专用 Runner 标签，公共 PR 的测试则继续放在隔离环境中。</p>
 <div class="highlight"><div class="chroma">
 <table class="lntable"><tr><td class="lntd">
 <pre tabindex="0" class="chroma"><code><span class="lnt">  1
@@ -1401,10 +1401,10 @@
 </span></span></span><span class="line"><span class="cl"><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l">rm -f -- &#34;$RUNNER_TEMP/order-api.kubeconfig&#34;</span><span class="w">
 </span></span></span></code></pre></td></tr></table>
 </div>
-</div><p>Actions 的用法和镜像发布权限参考 <a class="link" href="https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images"  target="_blank" rel="noopener"
+</div><p>Actions 的用法和镜像发布权限可参考 <a class="link" href="https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images"  target="_blank" rel="noopener"
     >GitHub 镜像发布教程</a>及 <a class="link" href="https://github.com/docker/build-push-action"  target="_blank" rel="noopener"
-    >Docker build-push-action</a>。这里为阅读方便使用主版本 tag；生产应将 Action 固定到审核过的完整 commit SHA，再用依赖更新工具维护，<code>@v7</code> 并不是不可变版本。自托管 Runner 还需满足对应 Action 的运行时要求。</p>
-<p>这段配置有几个容易看漏的设计：</p>
+    >Docker build-push-action</a>。示例为方便阅读使用主版本 tag；生产环境应把 Action 固定到审核过的完整 commit SHA，再用依赖更新工具维护。<code>@v7</code> 仍然可以指向不同提交。自托管 Runner 还需要满足对应 Action 的运行时要求。</p>
+<p>配置中的依赖、制品传递和发布限制分别如下：</p>
 <div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
 <thead>
 <tr>
@@ -1455,12 +1455,12 @@
 </tr>
 </tbody>
 </table></div>
-<p><code>cancel-in-progress: false</code> 保留正在执行的部署，但 GitHub 的并发组<strong>不是严格 FIFO 发布队列</strong>，默认待执行任务可能被更新的任务替换，执行顺序也没有保证。SHA 检查是额外的过期任务检查；检查之后到 apply 之间仍可能有新提交，因此它也不是跨系统事务锁。这里适合“部署最新 main”的模式，要求每个版本严格按序上线时，需要专用发布队列或发布控制器。语义见 <a class="link" href="https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency"  target="_blank" rel="noopener"
+<p><code>cancel-in-progress: false</code> 会保留正在执行的部署，但 GitHub 并发组不是严格的 FIFO 发布队列。默认情况下，待执行任务可能被更新的任务替换，执行顺序也没有保证。SHA 检查能额外拦截过期任务，但检查完成到 apply 之间仍可能有新提交，不能把它当作跨系统事务锁。这种做法适合“部署最新 main”；如果要求每个版本严格按顺序上线，就需要专用发布队列或发布控制器。具体行为见 <a class="link" href="https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency"  target="_blank" rel="noopener"
     >GitHub 并发控制说明</a>。</p>
-<p><strong>为什么同时检查 rollout 和接口？</strong> <code>kubectl apply</code> 成功只说明 API 接受了资源；<code>rollout status</code> 成功说明控制器完成更新；接口返回正确的 SHA 才证明你访问到了预期版本。冒烟再补一个核心业务请求，可以发现“进程活着，但业务已经坏了”的问题。</p>
-<p>本例通过 <code>port-forward service/...</code> 访问选中的一个 Pod，验证了应用响应，但<strong>没有覆盖真实 Service 转发、所有副本、DNS、网关和 TLS</strong>。如果平台已配置域名，发布验收还应增加 <code>curl -fsS --max-time 10 https://你的域名/version</code>，并执行适合业务的读写验证。不要把一次 HTTP 200 当成整条用户链路已经通过。</p>
+<p><code>kubectl apply</code> 成功，只说明 API 接受了资源；<code>rollout status</code> 成功，说明控制器完成了更新。还要检查接口返回的 SHA，才能确认访问到的是预期版本。冒烟测试再执行一个核心业务请求，可以发现进程仍在运行、业务却已经出错的情况。</p>
+<p>本例通过 <code>port-forward service/...</code> 访问选中的一个 Pod，只验证这个 Pod 的应用响应，<strong>没有覆盖真实 Service 转发、所有副本、DNS、网关和 TLS</strong>。如果平台已经配置域名，发布验收还应增加 <code>curl -fsS --max-time 10 https://你的域名/version</code>，并执行适合业务的读写验证。一次 HTTP 200 不能说明整条用户访问链路都正常。</p>
 <h2 id="六跑一次正常发布再演练一次失败恢复">六、跑一次正常发布，再演练一次失败恢复
-</h2><p>首次操作按下面顺序做，尤其注意私有镜像的授权和短期 token 到期时间：</p>
+</h2><p>首次发布可以按下面的顺序操作，注意私有镜像的授权，以及短期 token 是否会在等待期间到期：</p>
 <div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
 <thead>
 <tr>
@@ -1519,10 +1519,10 @@
 </span></span><span class="line"><span class="cl"><span class="c1"># 预期：2 个可用副本；image 是 ghcr.io/...@sha256:...</span>
 </span></span></code></pre></td></tr></table>
 </div>
-</div><p><strong>再做一次只影响实验环境的失败演练。</strong> 成功发布过一版后，在专用实验仓库中把 readiness 路径改为 <code>/not-ready</code>，通过 PR 检查后合并。应用会对这个路径返回 404，新 Pod 无法就绪，更新最终失败；流水线先打印现场，再恢复发布前保存的 Pod 模板。观察旧版本恢复后，立刻通过新的修复提交把 Git 中的路径改回 <code>/readyz</code>。</p>
+</div><p>成功发布一版后，可以在专用实验环境中演练失败恢复。在实验仓库里把 readiness 路径改为 <code>/not-ready</code>，通过 PR 检查后合并。应用会对这个路径返回 404，新 Pod 无法就绪，更新最终失败。流水线会先打印诊断信息，再恢复发布前保存的 Pod 模板。确认旧版本恢复后，立刻提交修复，把 Git 中的路径改回 <code>/readyz</code>。</p>
 <p><a href="/zh-cn/p/k8s-automated-deployment/failure-recovery.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/k8s-automated-deployment/failure-recovery.svg" alt="失败恢复的决策路径：构建失败不部署，发布失败先诊断，有旧版本才恢复" loading="lazy" decoding="async"></a>
 </p>
-<p>恢复时使用“发布前快照”，而不是简单地执行一次无条件 <code>rollout undo</code>，可以避免把“上一条历史记录”误当成“发布前实际在运行的模板”。但这个策略仍有边界：</p>
+<p>恢复时使用发布前保存的模板快照，可以确认恢复目标确实是发布前运行的模板。无条件执行 <code>rollout undo</code> 则可能把上一条历史记录误当成这个目标。快照也只能处理一部分故障：</p>
 <div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
 <thead>
 <tr>
@@ -1569,7 +1569,7 @@
 </tr>
 </tbody>
 </table></div>
-<p><strong>恢复成功后，本次工作流仍然是失败状态。</strong> 自动回滚表示尝试恢复服务，不表示这次发布通过了。回滚的 rollout 成功也只代表副本重新满足条件，还需要业务检查和指标观察。Deployment 的历史回滚只处理 Pod 模板，具体语义见 <a class="link" href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"  target="_blank" rel="noopener"
+<p>即使恢复成功，本次工作流仍然保持失败状态。自动回滚是在尝试恢复服务，不能把它当作发布通过。回滚的 rollout 成功，也只代表副本重新满足条件，还需要检查业务和观察指标。Deployment 的历史回滚只处理 Pod 模板，具体行为见 <a class="link" href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/"  target="_blank" rel="noopener"
     >Kubernetes Deployment 文档</a>。</p>
 <p>遇到故障，可以先按发生位置缩小范围：</p>
 <div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
@@ -1623,9 +1623,9 @@
 </tr>
 </tbody>
 </table></div>
-<p><strong>数据库迁移要单独设计。</strong> 常用做法是 expand–migrate–contract：先加向后兼容的字段或表，让新旧应用都能运行；迁移数据并完成观察后，再清理旧结构。迁移 Job 需要自身的幂等、并发和失败处理，不能让每个应用 Pod 启动时都抢着执行不可逆 DDL。回滚应用也不会自动撤销已经发送的消息、调用过的外部接口或修改过的数据。</p>
+<p>数据库迁移需要单独设计。常用做法是 expand–migrate–contract：先增加向后兼容的字段或表，让新旧应用都能运行；迁移数据并完成观察后，再清理旧结构。迁移 Job 要保证幂等、控制并发，并处理失败，不能让每个应用 Pod 启动时都抢着执行不可逆 DDL。回滚应用也不会自动撤销已经发出的消息、调用过的外部接口或修改过的数据。</p>
 <h2 id="七从一条可用流水线走向长期可维护的发布系统">七、从一条可用流水线，走向长期可维护的发布系统
-</h2><p>主线跑通以后，下一步不是立即加入所有工具，而是补齐真实业务需要的验证和治理。</p>
+</h2><p>基本流程跑通后，可以根据实际业务需要，逐步补充验证和发布管理措施。</p>
 <div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
 <thead>
 <tr>
@@ -1672,9 +1672,9 @@
 </tr>
 </tbody>
 </table></div>
-<p>多环境推广应复用<strong>同一个 digest</strong>：构建一次，在 staging 验证后把这份制品推广到 prod，环境差异通过配置注入。不要在每个环境重新构建一份“看起来版本号相同”的镜像。</p>
-<p>滚动更新也不是金丝雀：普通 Deployment 逐步替换副本，并不会自动按错误率判断是否继续发布。要做到“先放少量流量，观察指标，再逐渐扩大”，还需要流量控制和渐进式发布控制器；是否采用应取决于业务风险。</p>
-<p><strong>再往后，可以把部署端改成 GitOps。</strong> 本文是 Push 模式：Runner 带发布身份调用集群 API。GitOps 把期望状态留在部署仓库，由集群侧的 Argo CD 或 Flux 拉取并协调。</p>
+<p>多个环境应复用同一个 digest：构建一次，在 staging 验证后，把这份制品部署到 prod，环境差异通过配置注入。如果每个环境都重新构建，版本号相同也不代表镜像内容相同。</p>
+<p>普通 Deployment 会逐步替换副本，但不会自动根据错误率判断是否继续，因此它与金丝雀发布不同。要先放少量流量、观察指标，再逐渐扩大，还需要流量控制和渐进式发布控制器，是否采用要看业务风险。</p>
+<p>部署端也可以改用 GitOps。本文采用 Push 模式，由 Runner 带着发布身份调用集群 API。采用 GitOps 时，期望状态保存在部署仓库，由集群侧的 Argo CD 或 Flux 拉取，再据此调整集群状态。</p>
 <p><a href="/zh-cn/p/k8s-automated-deployment/gitops.svg" target="_blank" rel="noopener noreferrer"><img src="/zh-cn/p/k8s-automated-deployment/gitops.svg" alt="Push CD 与 GitOps：从 Runner 直接发布，到集群协调 Git 中的期望状态" loading="lazy" decoding="async"></a>
 </p>
 <div class="table-wrapper" role="region" aria-label="可横向滚动的表格" tabindex="0"><table>
@@ -1713,9 +1713,9 @@
 </tr>
 </tbody>
 </table></div>
-<p>采用 Argo CD 自动同步时，要先把 Git 中的期望状态改正确；启用 self-heal 后，只在集群手动改镜像可能会被协调器改回。资源删除也需要明确配置 prune，并不是开启同步就会自动做所有清理。相关边界见 <a class="link" href="https://argo-cd.readthedocs.io/en/stable/user-guide/auto_sync/"  target="_blank" rel="noopener"
+<p>使用 Argo CD 自动同步时，需要先改对 Git 中的期望状态。启用 self-heal 后，如果只在集群中手动修改镜像，协调器可能会把它改回去。删除资源也需要显式配置 prune，开启同步不会自动完成所有清理。具体行为见 <a class="link" href="https://argo-cd.readthedocs.io/en/stable/user-guide/auto_sync/"  target="_blank" rel="noopener"
     >Argo CD 自动同步说明</a>。</p>
-<p>这条链路的完成标志，是每次发布都能回答：<strong>部署来自哪个提交，用的是哪个制品和配置，验证覆盖了什么，出错后恢复到了哪里。</strong> 等这些答案都有记录，再去增加多环境、灰度或 GitOps，才有可靠的基础。</p>
+<p>每次发布都应记录来源提交、使用的制品和配置、验证覆盖的范围，以及出错后实际恢复到了哪里。这些记录齐全后，再增加多环境、灰度或 GitOps，后续发布也有据可查。</p>
 
 </div>
 
@@ -1832,7 +1832,7 @@
     </main>
     
 <footer class="site-footer">
-    <div class="footer-top"><a class="footer-wordmark" href="/zh-cn/" aria-label="Snow">Sno<span>w</span></a><p>认真记录，自由生长。</p><a href="#main-content" class="back-top">回到顶部 <span aria-hidden="true">↑</span></a></div>
+    <div class="footer-top"><a class="footer-wordmark" href="/zh-cn/" aria-label="Snow">Snow</a><p>认真记录，自由生长。</p><a href="#main-content" class="back-top">回到顶部 <span aria-hidden="true">↑</span></a></div>
     <div class="footer-bottom"><span>© 2026 Snow</span><nav aria-label="更多链接"><a href="/zh-cn/about/">关于</a><a href="https://space.bilibili.com/636661367?spm_id_from=333.1007.0.0" target="_blank" rel="noopener noreferrer me">Bilibili <span aria-hidden="true">↗</span></a><a href="https://github.com/SymphonyW" target="_blank" rel="noopener noreferrer me">GitHub <span aria-hidden="true">↗</span></a><a href="https://twitter.com" target="_blank" rel="noopener noreferrer me">Twitter <span aria-hidden="true">↗</span></a><a href="/zh-cn/index.xml">RSS ↗</a></nav><span class="footer-colophon">由 Hugo 构建 · 持续书写</span></div>
 </footer>
 

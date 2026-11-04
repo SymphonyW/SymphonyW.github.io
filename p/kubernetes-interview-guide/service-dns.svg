@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="970" viewBox="0 0 1040 970" role="img" aria-labelledby="title desc">
+  <title id="title">区分 Service 的 DNS、规则维护与业务请求路径</title>
+  <desc id="desc">以普通 ClusterIP Service 为例，DNS 查询经集群 DNS 返回 Service IP。控制面根据 selector 和 Pod 状态维护 EndpointSlice，kube-proxy 据此更新节点规则。业务请求访问 Service IP 后，由节点规则转发至就绪 Pod；业务请求不经过 EndpointSlice 对象。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1 1 L11 6 L1 11" fill="none" stroke="#0f766e" stroke-width="2"/></marker>
+    <marker id="config-arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="userSpaceOnUse"><path d="M1 1 L11 6 L1 11" fill="none" stroke="#326ce5" stroke-width="2"/></marker>
+  </defs>
+  <style>
+    text{font-family:"Microsoft YaHei","PingFang SC","Noto Sans CJK SC",sans-serif;fill:#20314b}
+    .heading{font-size:32px;font-weight:700}.label{font-size:25px;font-weight:600}.body{font-size:22px;fill:#516078}.small{font-size:21px;fill:#516078}
+    .traffic{fill:none;stroke:#0f766e;stroke-width:3;marker-end:url(#arrow)}
+    .config{fill:none;stroke:#326ce5;stroke-width:2.5;stroke-dasharray:8 6;marker-end:url(#config-arrow)}
+  </style>
+  <rect width="1040" height="970" rx="24" fill="#fbfaf7"/>
+  <text x="48" y="60" class="heading">名字、后端记录、业务请求，是三条关系</text>
+  <text x="48" y="103" class="body">示例：带 selector 的普通 ClusterIP Service，使用 kube-proxy。</text>
+  <rect x="48" y="136" width="944" height="188" rx="18" fill="#eef8f5" stroke="#c4ded5"/>
+  <text x="72" y="175" class="label">① DNS：先把服务名解析成访问地址</text>
+  <rect x="72" y="199" width="218" height="90" rx="12" fill="#fff" stroke="#c4ded5"/>
+  <text x="181" y="236" text-anchor="middle" class="label">客户端解析器</text>
+  <text x="181" y="269" text-anchor="middle" class="body">查询 web-demo</text>
+  <rect x="386" y="199" width="268" height="90" rx="12" fill="#fff" stroke="#c4ded5"/>
+  <text x="520" y="236" text-anchor="middle" class="label">集群 DNS</text>
+  <text x="520" y="269" text-anchor="middle" class="body">DNS Service → CoreDNS</text>
+  <rect x="750" y="199" width="218" height="90" rx="12" fill="#fff" stroke="#c4ded5"/>
+  <text x="859" y="236" text-anchor="middle" class="label">解析结果</text>
+  <text x="859" y="269" text-anchor="middle" class="body">Service IP</text>
+  <path class="traffic" d="M290 244 H386"/>
+  <path class="traffic" d="M654 244 H750"/>
+  <rect x="48" y="356" width="944" height="236" rx="18" fill="#edf3ff" stroke="#cbd9f1"/>
+  <text x="72" y="395" class="label">② 控制关系：后端变化，驱动规则变化</text>
+  <rect x="72" y="423" width="250" height="116" rx="12" fill="#fff" stroke="#cbd9f1"/>
+  <text x="197" y="460" text-anchor="middle" class="label">Service + Pods</text>
+  <text x="197" y="493" text-anchor="middle" class="body">selector / 标签 / Ready</text>
+  <text x="197" y="522" text-anchor="middle" class="small">控制面维护后端记录</text>
+  <rect x="386" y="423" width="268" height="116" rx="12" fill="#fff" stroke="#cbd9f1"/>
+  <text x="520" y="460" text-anchor="middle" class="label">EndpointSlice</text>
+  <text x="520" y="493" text-anchor="middle" class="body">后端地址、端口、条件</text>
+  <text x="520" y="522" text-anchor="middle" class="small">是 API 对象</text>
+  <rect x="718" y="423" width="250" height="116" rx="12" fill="#fff" stroke="#cbd9f1"/>
+  <text x="843" y="460" text-anchor="middle" class="label">kube-proxy</text>
+  <text x="843" y="493" text-anchor="middle" class="body">观察 Service 与后端</text>
+  <text x="843" y="522" text-anchor="middle" class="small">更新节点转发规则</text>
+  <path class="config" d="M322 481 H386"/>
+  <path class="config" d="M654 481 H718"/>
+  <text x="72" y="573" class="small">虚线表示配置与状态变化；每次业务请求不需要读取一次 EndpointSlice。</text>
+  <rect x="48" y="624" width="944" height="236" rx="18" fill="#eef8f5" stroke="#c4ded5"/>
+  <text x="72" y="663" class="label">③ 请求路径：访问 Service IP，转发给就绪后端</text>
+  <rect x="72" y="710" width="168" height="94" rx="12" fill="#fff" stroke="#c4ded5"/>
+  <text x="156" y="750" text-anchor="middle" class="label">客户端</text>
+  <text x="156" y="784" text-anchor="middle" class="body">HTTP 请求</text>
+  <rect x="282" y="710" width="222" height="94" rx="12" fill="#fff" stroke="#c4ded5"/>
+  <text x="393" y="750" text-anchor="middle" class="label">Service IP : 80</text>
+  <text x="393" y="784" text-anchor="middle" class="body">虚拟访问地址</text>
+  <rect x="546" y="710" width="190" height="94" rx="12" fill="#fff" stroke="#c4ded5"/>
+  <text x="641" y="750" text-anchor="middle" class="label">节点规则</text>
+  <text x="641" y="784" text-anchor="middle" class="body">选择可用后端</text>
+  <rect x="778" y="710" width="190" height="94" rx="12" fill="#fff" stroke="#c4ded5"/>
+  <text x="873" y="750" text-anchor="middle" class="label">Pod IP : 80</text>
+  <text x="873" y="784" text-anchor="middle" class="body">应用处理请求</text>
+  <path class="traffic" d="M240 757 H282"/>
+  <path class="traffic" d="M504 757 H546"/>
+  <path class="traffic" d="M736 757 H778"/>
+  <path class="config" d="M843 539 V611 H704 V710"/>
+  <text x="72" y="841" class="small">图中按逻辑拆分步骤，Service IP 本身不是一台独立服务器。</text>
+  <text x="48" y="908" class="body">Headless、ExternalName、节点本地 DNS 缓存或其他网络实现，路径会有差别。</text>
+  <text x="48" y="946" class="body">绿色实线：查询或请求步骤　　蓝色虚线：配置、状态与规则维护</text>
+</svg>

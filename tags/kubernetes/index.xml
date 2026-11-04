@@ -1017,18 +1017,1026 @@
 </description>
         </item>
         <item>
+        <title>Kubernetes: From Pod Creation to Troubleshooting</title>
+        <link>https://SymphonyW.github.io/p/kubernetes-interview-guide/</link>
+        <pubDate>Tue, 20 Oct 2026 20:25:00 +0800</pubDate>
+        
+        <guid>https://SymphonyW.github.io/p/kubernetes-interview-guide/</guid>
+        <description>&lt;img src="https://SymphonyW.github.io/p/kubernetes-interview-guide/cluster-architecture-en.svg" alt="Featured image of post Kubernetes: From Pod Creation to Troubleshooting" /&gt;&lt;p&gt;Suppose you have a web service that should always run two replicas. You want to release new versions with minimal interruption and replace a replica when it fails. If you start containers manually, you also have to handle machine selection, process restarts, traffic routing, and version replacement yourself.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Kubernetes delegates these tasks to a set of continuously running components. You describe the state you want, and they keep checking and adjusting the state you have.&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;This article adapts the Chinese document &lt;em&gt;Kubernetes Intern Interview Notes&lt;/em&gt; (《K8s实习生面试八股文》), covering its 40 questions. Follow one practical question throughout: &lt;strong&gt;How does a configuration file become a reachable application, and where should you look when something goes wrong?&lt;/strong&gt; Command references and a final interview review table appear at the end.&lt;/p&gt;
+&lt;p&gt;The examples mainly assume Linux nodes, a conventional Deployment, and a ClusterIP Service with a selector. Network implementations and default behavior depend on the cluster version and configuration.&lt;/p&gt;
+&lt;h2 id=&#34;1-understand-the-roles-who-decides-and-who-executes&#34;&gt;1. Understand the roles: who decides and who executes
+&lt;/h2&gt;&lt;h3 id=&#34;11-declarative-configuration-and-reconciliation&#34;&gt;1.1 Declarative configuration and reconciliation
+&lt;/h3&gt;&lt;p&gt;Kubernetes, often shortened to K8s, is a &lt;strong&gt;declarative container orchestration system&lt;/strong&gt;. Declarative means submitting a configuration that says “this application needs two replicas,” rather than telling individual machines to start containers, inspect processes, and replace failures step by step.&lt;/p&gt;
+&lt;p&gt;The configuration describes the &lt;strong&gt;desired state&lt;/strong&gt;; what is currently running is the &lt;strong&gt;actual state&lt;/strong&gt;. Controllers repeatedly compare the two and act when they differ. This continuous process of checking and adjusting is called &lt;strong&gt;reconciliation&lt;/strong&gt;.&lt;/p&gt;
+&lt;h3 id=&#34;12-control-plane-and-worker-nodes&#34;&gt;1.2 Control plane and worker nodes
+&lt;/h3&gt;&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/p/kubernetes-interview-guide/cluster-architecture-en.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/p/kubernetes-interview-guide/cluster-architecture-en.svg&#34; alt=&#34;Kubernetes component roles: the control plane coordinates through the API, while kubelet and the container runtime execute work on nodes&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;p&gt;Start with two parts: &lt;strong&gt;the control plane manages the cluster, and worker nodes run applications&lt;/strong&gt;.&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Component&lt;/th&gt;
+&lt;th&gt;Main location&lt;/th&gt;
+&lt;th&gt;Responsibility&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;kube-apiserver&lt;/td&gt;
+&lt;td&gt;Control plane&lt;/td&gt;
+&lt;td&gt;Provides the shared API entry point for authentication, authorization, admission, and resource operations&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;etcd&lt;/td&gt;
+&lt;td&gt;Control plane storage&lt;/td&gt;
+&lt;td&gt;Persists cluster resource objects and their state&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;kube-controller-manager&lt;/td&gt;
+&lt;td&gt;Control plane&lt;/td&gt;
+&lt;td&gt;Runs controllers that reconcile actual state with desired state&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;kube-scheduler&lt;/td&gt;
+&lt;td&gt;Control plane&lt;/td&gt;
+&lt;td&gt;Selects suitable nodes for Pods that have not yet been bound&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;kubelet&lt;/td&gt;
+&lt;td&gt;Worker node&lt;/td&gt;
+&lt;td&gt;Coordinates containers and reports status for Pods assigned to its node&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;containerd or another container runtime&lt;/td&gt;
+&lt;td&gt;Worker node&lt;/td&gt;
+&lt;td&gt;Pulls images and manages container lifecycles&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;kube-proxy or an alternative implementation&lt;/td&gt;
+&lt;td&gt;Worker node&lt;/td&gt;
+&lt;td&gt;Implements the network forwarding behavior needed by Services&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;Think of etcd as the cluster&amp;rsquo;s state ledger. It stores API objects such as Deployments, Services, and ConfigMaps; it does not store your application&amp;rsquo;s database records on its behalf. The scheduler, controllers, and kubelet normally observe and modify resources through the API Server rather than accessing etcd directly. See the official &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/concepts/overview/components/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Kubernetes component overview&lt;/a&gt;.&lt;/p&gt;
+&lt;h3 id=&#34;13-pods-shared-networking-and-storage&#34;&gt;1.3 Pods: shared networking and storage
+&lt;/h3&gt;&lt;p&gt;A Pod is Kubernetes&amp;rsquo; smallest scheduling unit. It can contain one or more closely cooperating containers, all scheduled onto the same node. They share a network namespace and Pod IP, can communicate through &lt;code&gt;localhost&lt;/code&gt;, and can exchange files through volumes they mount in common.&lt;/p&gt;
+&lt;p&gt;For example, one container might serve application requests while a helper container proxies traffic. They need to be deployed together and communicate locally, so placing them in one Pod can make sense. Such helpers are often called sidecars. An ordinary web service often needs only one main application container; using microservices does not mean putting every service into the same Pod.&lt;/p&gt;
+&lt;p&gt;Two boundaries matter: &lt;strong&gt;sharing a network does not mean sharing a process namespace by default, and sharing a volume does not automatically share the containers&amp;rsquo; root filesystems.&lt;/strong&gt;&lt;/p&gt;
+&lt;h3 id=&#34;14-docker-containerd-and-container-internals&#34;&gt;1.4 Docker, containerd, and container internals
+&lt;/h3&gt;&lt;p&gt;Docker provides a user-facing toolchain for command-line operations, image builds, and container management. containerd focuses on container runtime capabilities. With containerd, kubelet communicates through the &lt;strong&gt;Container Runtime Interface (CRI)&lt;/strong&gt;, and the runtime uses a lower-level implementation such as runc to start container processes. Kubernetes nodes do not necessarily need Docker Engine installed.&lt;/p&gt;
+&lt;p&gt;On Linux, containers are still processes sharing the host kernel. Their main building blocks are:&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Mechanism&lt;/th&gt;
+&lt;th&gt;Problem it addresses&lt;/th&gt;
+&lt;th&gt;Intuition&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;Linux namespaces&lt;/td&gt;
+&lt;td&gt;Isolate views of processes, networking, mount points, and other resources&lt;/td&gt;
+&lt;td&gt;Give processes a relatively independent view of their environment&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Cgroups&lt;/td&gt;
+&lt;td&gt;Account for and constrain CPU, memory, IO, and other resources&lt;/td&gt;
+&lt;td&gt;Control how much a workload can use&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Layered filesystems such as OverlayFS&lt;/td&gt;
+&lt;td&gt;Reuse image layers while providing a writable layer&lt;/td&gt;
+&lt;td&gt;Share common image layers and keep changes in a separate layer&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;A Linux namespace is a kernel mechanism. It is different from a Kubernetes &lt;strong&gt;Namespace object&lt;/strong&gt;, which groups resources into named scopes.&lt;/p&gt;
+&lt;h2 id=&#34;2-how-a-deployment-becomes-running-pods&#34;&gt;2. How a Deployment becomes running Pods
+&lt;/h2&gt;&lt;h3 id=&#34;21-deployments-replicasets-and-pods&#34;&gt;2.1 Deployments, ReplicaSets, and Pods
+&lt;/h3&gt;&lt;p&gt;First separate three objects: &lt;strong&gt;a Deployment manages ReplicaSets, and a ReplicaSet manages Pods&lt;/strong&gt;.&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Object&lt;/th&gt;
+&lt;th&gt;Main concern&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;Deployment&lt;/td&gt;
+&lt;td&gt;Application versions, rollout strategy, desired replicas, and rollback&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;ReplicaSet&lt;/td&gt;
+&lt;td&gt;Maintaining the required number of Pod replicas&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Pod&lt;/td&gt;
+&lt;td&gt;Hosting the actual containers&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;h3 id=&#34;22-complete-deployment-example&#34;&gt;2.2 Complete deployment example
+&lt;/h3&gt;&lt;p&gt;The following example runs throughout the article. Save it as &lt;code&gt;web-demo.yaml&lt;/code&gt; to describe two Nginx replicas and an internal Service endpoint.&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;12
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;13
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;14
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;15
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;16
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;17
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;18
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;19
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;20
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;21
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;22
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;23
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;24
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;25
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;26
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;27
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;28
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;29
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;30
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;31
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;32
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;33
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;34
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;35
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;36
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;37
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;38
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;39
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;40
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;41
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;42
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;43
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;44
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;45
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;46
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;47
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;48
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;49
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;50
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;51
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;52
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;53
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;54
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;55
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;56
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;57
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;58
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;59
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;60
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;61
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;62
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-yaml&#34; data-lang=&#34;yaml&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nt&#34;&gt;apiVersion&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;apps/v1&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;kind&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;Deployment&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;metadata&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;  &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;web-demo&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;spec&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;  &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;replicas&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;m&#34;&gt;2&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;  &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;minReadySeconds&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;m&#34;&gt;5&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;  &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;selector&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;    &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;matchLabels&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;      &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;app&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;web-demo&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;  &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;strategy&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;    &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;type&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;RollingUpdate&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;    &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;rollingUpdate&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;      &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;maxSurge&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;m&#34;&gt;1&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;      &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;maxUnavailable&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;m&#34;&gt;0&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;  &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;template&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;    &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;metadata&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;      &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;labels&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;        &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;app&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;web-demo&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;    &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;spec&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;      &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;containers&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;        &lt;/span&gt;- &lt;span class=&#34;nt&#34;&gt;name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;nginx&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;          &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;image&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;nginx:1.28&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;          &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;ports&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;            &lt;/span&gt;- &lt;span class=&#34;nt&#34;&gt;name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;http&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;              &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;containerPort&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;m&#34;&gt;80&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;          &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;resources&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;            &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;requests&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;              &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;cpu&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;500m&amp;#34;&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;              &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;memory&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;512Mi&amp;#34;&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;            &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;limits&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;              &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;cpu&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;1&amp;#34;&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;              &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;memory&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;1Gi&amp;#34;&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;          &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;startupProbe&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;            &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;httpGet&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;              &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;path&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;/&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;              &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;port&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;http&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;            &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;periodSeconds&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;m&#34;&gt;2&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;            &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;failureThreshold&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;m&#34;&gt;30&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;          &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;readinessProbe&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;            &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;httpGet&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;              &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;path&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;/&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;              &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;port&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;http&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;            &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;periodSeconds&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;m&#34;&gt;5&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;          &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;livenessProbe&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;            &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;httpGet&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;              &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;path&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;/&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;              &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;port&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;http&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;            &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;periodSeconds&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;m&#34;&gt;10&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;nn&#34;&gt;---&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;apiVersion&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;v1&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;kind&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;Service&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;metadata&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;  &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;web-demo&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;spec&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;  &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;selector&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;    &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;app&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;web-demo&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;  &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;ports&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;    &lt;/span&gt;- &lt;span class=&#34;nt&#34;&gt;name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;http&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;      &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;port&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;m&#34;&gt;80&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;      &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;targetPort&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;http&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;  &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;type&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;ClusterIP&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;These resource values illustrate the concepts; they are not a universal allocation for web services. Adjust them to match application behavior and node capacity.&lt;/p&gt;
+&lt;h3 id=&#34;23-pod-creation-flow&#34;&gt;2.3 Pod creation flow
+&lt;/h3&gt;&lt;p&gt;After submission, the components cooperate roughly as follows:&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/p/kubernetes-interview-guide/deployment-flow-en.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/p/kubernetes-interview-guide/deployment-flow-en.svg&#34; alt=&#34;Deployment creation flow: submit configuration, create a ReplicaSet and Pods, schedule, start containers, and pass readiness checks&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;code&gt;kubectl apply&lt;/code&gt; submits the configuration to the API Server. After the relevant validation, the resource objects are persisted in etcd.&lt;/li&gt;
+&lt;li&gt;The Deployment controller observes the new Deployment and creates its ReplicaSet.&lt;/li&gt;
+&lt;li&gt;The ReplicaSet controller sees that two replicas are missing and creates two Pod objects.&lt;/li&gt;
+&lt;li&gt;The scheduler selects nodes for unassigned Pods and records the bindings through the API.&lt;/li&gt;
+&lt;li&gt;Each selected node&amp;rsquo;s kubelet observes the assignment, coordinates storage, networking, and the runtime, and gets images pulled and containers started.&lt;/li&gt;
+&lt;li&gt;Once the application passes readiness checks, its Pod can receive traffic as an available backend of a normal Service.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;&lt;strong&gt;These components cooperate through the API and resource state.&lt;/strong&gt; The sequence illustrates dependencies; it does not mean that the API Server synchronously invokes every component in a single function call.&lt;/p&gt;
+&lt;h3 id=&#34;24-container-restarts-and-pod-replacement&#34;&gt;2.4 Container restarts and Pod replacement
+&lt;/h3&gt;&lt;p&gt;If a process inside a container exits, kubelet can &lt;strong&gt;restart that container within the same Pod&lt;/strong&gt;, according to the restart policy. If the Pod is deleted, or a node failure eventually leads to the original Pod being removed and a replica needing replacement, the ReplicaSet &lt;strong&gt;creates a new Pod&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;These are different operations. A new Pod has a new UID, and its name and IP may change. A Pod already bound to a node does not move to another node while retaining its original identity. A standalone Pod without a managing controller is not automatically recreated after deletion.&lt;/p&gt;
+&lt;h3 id=&#34;25-deployment-versus-statefulset&#34;&gt;2.5 Deployment versus StatefulSet
+&lt;/h3&gt;&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Aspect&lt;/th&gt;
+&lt;th&gt;Deployment&lt;/th&gt;
+&lt;th&gt;StatefulSet&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;Main need&lt;/td&gt;
+&lt;td&gt;Replicas are usually interchangeable&lt;/td&gt;
+&lt;td&gt;Each replica needs a stable identity&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Typical use&lt;/td&gt;
+&lt;td&gt;Stateless web applications and APIs&lt;/td&gt;
+&lt;td&gt;Databases, messaging systems, and other workloads needing stable member identities&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Pod names&lt;/td&gt;
+&lt;td&gt;Applications generally do not depend on fixed names&lt;/td&gt;
+&lt;td&gt;Stable ordinals, such as &lt;code&gt;mysql-0&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Storage&lt;/td&gt;
+&lt;td&gt;Can also mount PVCs&lt;/td&gt;
+&lt;td&gt;Often uses volume claim templates to request a separate PVC for each replica&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Creation and deletion&lt;/td&gt;
+&lt;td&gt;Usually no ordinal ordering requirement&lt;/td&gt;
+&lt;td&gt;Ordered management by default, with options such as parallel creation&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Network identity&lt;/td&gt;
+&lt;td&gt;Clients usually find replicas through a Service&lt;/td&gt;
+&lt;td&gt;Uses a Headless Service to support stable network names&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;A StatefulSet provides identity and lifecycle management. It does not automatically implement database replication, leader election, or backups.&lt;/p&gt;
+&lt;h3 id=&#34;26-rolling-updates-maxsurge-and-maxunavailable&#34;&gt;2.6 Rolling updates: maxSurge and maxUnavailable
+&lt;/h3&gt;&lt;p&gt;Changing a Deployment&amp;rsquo;s Pod template, such as its image, triggers a rollout: replicas in the new ReplicaSet increase while replicas in the old one decrease. Changing only &lt;code&gt;replicas&lt;/code&gt; scales the workload; it does not create a new application revision.&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Parameter&lt;/th&gt;
+&lt;th&gt;What it controls&lt;/th&gt;
+&lt;th&gt;Example with 10 desired replicas&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;maxSurge: 2&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;Additional replicas allowed during an update&lt;/td&gt;
+&lt;td&gt;The rollout strategy can allow up to 12 non-terminating Pods&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;maxUnavailable: 1&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;Desired replicas allowed to be unavailable during an update&lt;/td&gt;
+&lt;td&gt;The rollout proceeds with a target of at least 9 available replicas&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;The example uses &lt;code&gt;maxSurge: 1&lt;/code&gt; and &lt;code&gt;maxUnavailable: 0&lt;/code&gt; to trade spare capacity for availability during updates. &lt;code&gt;minReadySeconds: 5&lt;/code&gt; means a new Pod must remain ready for at least five seconds before it counts as available. These settings do not replace correct health checks or guarantee zero interruption during external failures.&lt;/p&gt;
+&lt;p&gt;One useful follow-up detail: &lt;strong&gt;terminating Pods may still consume resources, so the observed total Pod count and resource usage can temporarily exceed &lt;code&gt;replicas + maxSurge&lt;/code&gt;.&lt;/strong&gt; “At most 12” is therefore not an absolute cap across every Pod state. See the &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#rolling-update-deployment&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Deployment rolling update documentation&lt;/a&gt;.&lt;/p&gt;
+&lt;h2 id=&#34;3-where-pods-run-and-how-much-they-can-use&#34;&gt;3. Where Pods run and how much they can use
+&lt;/h2&gt;&lt;h3 id=&#34;31-scheduling-filtering-scoring-and-binding&#34;&gt;3.1 Scheduling: filtering, scoring, and binding
+&lt;/h3&gt;&lt;p&gt;Scheduling and resource limits address two questions: &lt;strong&gt;first decide whether a Pod fits on a node, then constrain its resource use while running&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/p/kubernetes-interview-guide/scheduling-resources-en.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/p/kubernetes-interview-guide/scheduling-resources-en.svg&#34; alt=&#34;Scheduling filters, scores, and binds nodes; requests support capacity decisions, while CPU and memory limits have different runtime effects&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;p&gt;The main scheduling sequence is:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;Filtering&lt;/strong&gt; removes nodes that lack resources or fail label, affinity, taint, or other requirements.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Scoring&lt;/strong&gt; ranks eligible nodes according to scheduling policies.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Binding&lt;/strong&gt; selects a node and records the Pod-to-node assignment.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;The scheduling framework has other extension points, but this sequence is a useful starting point for an internship interview.&lt;/p&gt;
+&lt;h3 id=&#34;32-node-selection-and-affinity&#34;&gt;3.2 Node selection and affinity
+&lt;/h3&gt;&lt;p&gt;&lt;code&gt;nodeSelector&lt;/code&gt; is a straightforward label filter. This fragment, placed under a Pod&amp;rsquo;s &lt;code&gt;spec&lt;/code&gt;, restricts it to nodes labeled &lt;code&gt;disktype=ssd&lt;/code&gt;:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-yaml&#34; data-lang=&#34;yaml&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nt&#34;&gt;nodeSelector&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;  &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;disktype&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;ssd&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;Affinity provides more expressive placement rules:&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Mechanism&lt;/th&gt;
+&lt;th&gt;What it considers&lt;/th&gt;
+&lt;th&gt;Example&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;NodeAffinity&lt;/td&gt;
+&lt;td&gt;Node labels&lt;/td&gt;
+&lt;td&gt;Require a particular zone or prefer SSD nodes&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;PodAffinity&lt;/td&gt;
+&lt;td&gt;Placement of other Pods&lt;/td&gt;
+&lt;td&gt;Place an application near a class of dependency&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;PodAntiAffinity&lt;/td&gt;
+&lt;td&gt;Placement of other Pods&lt;/td&gt;
+&lt;td&gt;Spread replicas across nodes or zones&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;code&gt;requiredDuringSchedulingIgnoredDuringExecution&lt;/code&gt; is a &lt;strong&gt;hard requirement&lt;/strong&gt;. &lt;code&gt;preferredDuringSchedulingIgnoredDuringExecution&lt;/code&gt; is a &lt;strong&gt;soft preference&lt;/strong&gt;. &lt;code&gt;IgnoredDuringExecution&lt;/code&gt; means that if the relevant labels change after scheduling, the existing Pod is not automatically evicted solely because that rule no longer matches. See &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;assigning Pods to nodes&lt;/a&gt;.&lt;/p&gt;
+&lt;h3 id=&#34;33-taints-and-tolerations&#34;&gt;3.3 Taints and tolerations
+&lt;/h3&gt;&lt;p&gt;Taints and tolerations act from the other direction: &lt;strong&gt;a Taint belongs to a node and repels Pods; a Toleration belongs to a Pod and allows it to tolerate a matching taint&lt;/strong&gt;.&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Taint effect&lt;/th&gt;
+&lt;th&gt;Behavior without a matching toleration&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;NoSchedule&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;Blocks new scheduling onto the node; does not evict existing Pods by itself&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;PreferNoSchedule&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;Tries to avoid scheduling onto the node&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;NoExecute&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;Blocks new scheduling and may evict existing Pods; toleration duration also matters&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;For example, a dedicated taint on GPU nodes can keep ordinary services from occupying them. But &lt;strong&gt;a toleration permits placement; it does not guarantee that placement&lt;/strong&gt;. Directing a workload to those nodes also requires a selector, affinity, or another suitable constraint.&lt;/p&gt;
+&lt;h3 id=&#34;34-requests-limits-and-cpu-or-memory-constraints&#34;&gt;3.4 Requests, limits, and CPU or memory constraints
+&lt;/h3&gt;&lt;p&gt;Return to one container in the example:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;7
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-yaml&#34; data-lang=&#34;yaml&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nt&#34;&gt;resources&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;  &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;requests&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;    &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;cpu&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;500m&amp;#34;&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;    &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;memory&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;512Mi&amp;#34;&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;  &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;limits&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;    &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;cpu&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;1&amp;#34;&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;    &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;memory&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;1Gi&amp;#34;&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;500m&lt;/code&gt; CPU means 0.5 CPU units. &lt;code&gt;512Mi&lt;/code&gt; means 512 × 2²⁰ bytes of memory, and &lt;code&gt;1Gi&lt;/code&gt; means 1024Mi.&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Setting&lt;/th&gt;
+&lt;th&gt;When it matters&lt;/th&gt;
+&lt;th&gt;Common misconception to avoid&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;requests&lt;/td&gt;
+&lt;td&gt;Used to assess node capacity during scheduling; also affects some runtime resource allocation&lt;/td&gt;
+&lt;td&gt;The application does not necessarily consume this amount at every moment&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;limits&lt;/td&gt;
+&lt;td&gt;Enforced by mechanisms in the runtime and kernel&lt;/td&gt;
+&lt;td&gt;CPU and memory do not trigger the same action when constrained&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;The scheduler primarily considers &lt;strong&gt;node allocatable resources minus resources already committed through requests&lt;/strong&gt;, not just the usage currently shown by &lt;code&gt;kubectl top&lt;/code&gt;. A node can look idle yet be unable to accept another Pod because its capacity is already committed. Multiple containers, init containers, and Pod overhead can also affect effective Pod requests; looking only at the main container is not always sufficient.&lt;/p&gt;
+&lt;p&gt;CPU is usually described as a &lt;strong&gt;compressible resource&lt;/strong&gt;: giving a process less CPU time can make it run more slowly. At its CPU limit, a container is generally throttled. It may respond more slowly because it receives less CPU time, rather than being killed directly for exceeding CPU use.&lt;/p&gt;
+&lt;p&gt;Memory is usually described as &lt;strong&gt;incompressible&lt;/strong&gt;. When allocation demands cannot be met, slowing a process down does not by itself solve the shortage. An out-of-memory event can cause the kernel to kill a process, and container status may show &lt;code&gt;OOMKilled&lt;/code&gt;. Memory limit enforcement is reactive; it does not mean that a container vanishes the instant a monitoring sample touches the limit. See &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;resource requests and limits&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;The short interview answer is: &lt;strong&gt;CPU limits generally cause throttling; memory shortages may cause OOM kills. Whether a container then restarts depends on its restart policy and other configuration.&lt;/strong&gt;&lt;/p&gt;
+&lt;h2 id=&#34;4-how-requests-find-applications-when-pod-ips-change&#34;&gt;4. How requests find applications when Pod IPs change
+&lt;/h2&gt;&lt;h3 id=&#34;41-services-and-endpointslices&#34;&gt;4.1 Services and EndpointSlices
+&lt;/h3&gt;&lt;p&gt;Suppose the two web Pods have addresses &lt;code&gt;10.244.1.8&lt;/code&gt; and &lt;code&gt;10.244.2.9&lt;/code&gt;. Recreating either Pod may give its replacement a different IP. Clients that hard-code these addresses would need constant configuration updates.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;A Service provides a relatively stable entry point for a set of backends.&lt;/strong&gt; With an ordinary ClusterIP Service, clients use a stable Service IP and service name while the cluster maintains the relationship to changing backends.&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/p/kubernetes-interview-guide/service-dns-en.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/p/kubernetes-interview-guide/service-dns-en.svg&#34; alt=&#34;Three separate Service relationships: DNS resolves an address, EndpointSlice changes drive forwarding rules, and application requests follow those rules to Pods&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;p&gt;Separate the diagram into three operations:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;Resolve a name:&lt;/strong&gt; the client looks up a Service name and receives an address from cluster DNS.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Maintain backends:&lt;/strong&gt; the control plane maintains EndpointSlices based on the Service selector, Pod labels, and readiness. The networking implementation updates forwarding rules accordingly.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Send a request:&lt;/strong&gt; the client accesses the Service IP and port, and node rules direct traffic to a suitable backend Pod.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;An EndpointSlice is an API object recording backend addresses, ports, readiness, and related information. &lt;strong&gt;It is not a proxy server that requests pass through.&lt;/strong&gt; An unready Pod&amp;rsquo;s address may already appear in an EndpointSlice with an unavailable readiness condition. During troubleshooting, inspect both the addresses and their conditions. See &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/concepts/services-networking/endpoint-slices/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;EndpointSlices and their conditions&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;In clusters using kube-proxy, it watches Service and EndpointSlice changes and maintains forwarding rules on nodes. Linux implementations may use iptables or nftables, and existing clusters can also use IPVS; the details depend on version and configuration. Some networking solutions replace kube-proxy. Do not assume every request passes through the kube-proxy userspace process. See &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/reference/networking/virtual-ips/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Service virtual IPs and proxy mechanisms&lt;/a&gt;.&lt;/p&gt;
+&lt;h3 id=&#34;42-service-types-and-headless-services&#34;&gt;4.2 Service types and Headless Services
+&lt;/h3&gt;&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Type or form&lt;/th&gt;
+&lt;th&gt;Main purpose&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;ClusterIP&lt;/td&gt;
+&lt;td&gt;The default type, providing an internal virtual IP&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;NodePort&lt;/td&gt;
+&lt;td&gt;Exposes a Service through node addresses and a designated port; reachability also depends on networking and firewalls&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;LoadBalancer&lt;/td&gt;
+&lt;td&gt;Integrates with a cloud provider or another load balancer implementation; setting the type alone does not create external infrastructure&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;ExternalName&lt;/td&gt;
+&lt;td&gt;Returns a DNS CNAME pointing to a configured name instead of using ordinary Service IP forwarding&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Headless Service&lt;/td&gt;
+&lt;td&gt;Sets &lt;code&gt;clusterIP&lt;/code&gt; to &lt;code&gt;None&lt;/code&gt;, allocates no ordinary ClusterIP, and can expose backend addresses through DNS&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;Headless is a Service configuration, not a separate value of &lt;code&gt;type&lt;/code&gt; alongside ClusterIP. It also helps explain why StatefulSets commonly use Headless Services. See &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/concepts/services-networking/service/#headless-services&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Service types and Headless Services&lt;/a&gt;.&lt;/p&gt;
+&lt;h3 id=&#34;43-selector-port-and-targetport&#34;&gt;4.3 selector, port, and targetPort
+&lt;/h3&gt;&lt;p&gt;Three similar-looking fields in the example serve different purposes:&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Field&lt;/th&gt;
+&lt;th&gt;Role in the example&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;selector: app: web-demo&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;Selects backend Pods with the matching label&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;port: 80&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;The port clients use to access the Service&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;targetPort: http&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;The named Pod port &lt;code&gt;http&lt;/code&gt;, which corresponds to port 80 here&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;code&gt;containerPort&lt;/code&gt; declares a port; it does not make the application listen there. The process must actually listen on the correct address and port, normally on an interface reachable from outside the container rather than only on &lt;code&gt;127.0.0.1&lt;/code&gt;.&lt;/p&gt;
+&lt;h3 id=&#34;44-coredns-and-service-name-resolution&#34;&gt;4.4 CoreDNS and service name resolution
+&lt;/h3&gt;&lt;p&gt;A typical cluster uses CoreDNS for DNS. The resolver inside a Pod reads &lt;code&gt;/etc/resolv.conf&lt;/code&gt; and sends queries to its configured cluster DNS address, eventually reaching CoreDNS. CoreDNS answers cluster service names and normally forwards external name queries to upstream resolvers. Some clusters also use a node-local DNS cache.&lt;/p&gt;
+&lt;p&gt;For a Service in the &lt;code&gt;default&lt;/code&gt; namespace and a cluster domain of &lt;code&gt;cluster.local&lt;/code&gt;, common names usable from Linux Pods include:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;web-demo
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;web-demo.default
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;web-demo.default.svc.cluster.local
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;Within the same namespace, a short name usually works through the resolver&amp;rsquo;s search domains. The cluster domain can be customized, so do not assume every cluster uses &lt;code&gt;cluster.local&lt;/code&gt;. A normal ClusterIP Service generally resolves to its Service IP; a Headless Service can resolve to backend addresses. See &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;DNS for Pods and Services&lt;/a&gt;.&lt;/p&gt;
+&lt;h2 id=&#34;5-health-checks-storage-and-configuration&#34;&gt;5. Health checks, storage, and configuration
+&lt;/h2&gt;&lt;h3 id=&#34;51-startup-readiness-and-liveness-probes&#34;&gt;5.1 Startup, Readiness, and Liveness probes
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;Running does not mean Ready.&lt;/strong&gt; Running is a Pod lifecycle phase; Ready indicates whether its readiness conditions are satisfied. A Pod may be running while its application is still warming up or unable to reach dependencies, leaving it unprepared to serve requests.&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/p/kubernetes-interview-guide/probe-lifecycle-en.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/p/kubernetes-interview-guide/probe-lifecycle-en.svg&#34; alt=&#34;Startup succeeds before the other probes run; Readiness controls eligibility for traffic, while repeated Liveness failures trigger container termination and restart-policy handling&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
+&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Probe&lt;/th&gt;
+&lt;th&gt;Question it answers&lt;/th&gt;
+&lt;th&gt;Main effect after the configured failure threshold&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;Startup&lt;/td&gt;
+&lt;td&gt;Has the application finished starting?&lt;/td&gt;
+&lt;td&gt;Terminates the container, subject to its restart policy; the other two probe types do not run before startup succeeds&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Readiness&lt;/td&gt;
+&lt;td&gt;Can the application serve requests now?&lt;/td&gt;
+&lt;td&gt;Marks it unready, normally excluding it as an available backend of ordinary Services, without directly restarting it&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Liveness&lt;/td&gt;
+&lt;td&gt;Is the application in a state that requires a restart to recover?&lt;/td&gt;
+&lt;td&gt;Terminates the container, subject to its restart policy&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;For example, use Startup to give an application time to load a large dataset. During operation, use Readiness to withhold traffic when it temporarily cannot handle requests. Use Liveness for conditions such as a deadlock that cannot recover on its own. After Startup succeeds, Readiness and Liveness evaluate independently; Liveness does not need to wait for Readiness to succeed.&lt;/p&gt;
+&lt;p&gt;The Nginx example sends all three probes to &lt;code&gt;/&lt;/code&gt; to keep the configuration easy to follow. A real application should use checks suited to each probe&amp;rsquo;s purpose, avoiding a design where a brief external dependency outage causes every container to restart repeatedly. See &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;configuring the three probe types&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;“Unready means no traffic” describes the usual behavior of ordinary Services. Readiness does not automatically block direct access to a Pod IP. Explicit options such as &lt;code&gt;publishNotReadyAddresses&lt;/code&gt; also require separate consideration.&lt;/p&gt;
+&lt;h3 id=&#34;52-emptydir-pvs-pvcs-and-storageclasses&#34;&gt;5.2 emptyDir, PVs, PVCs, and StorageClasses
+&lt;/h3&gt;&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Object or mechanism&lt;/th&gt;
+&lt;th&gt;Meaning&lt;/th&gt;
+&lt;th&gt;Lifecycle consideration&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;emptyDir&lt;/td&gt;
+&lt;td&gt;A temporary directory that containers in a Pod can share&lt;/td&gt;
+&lt;td&gt;Usually survives container restarts; deleted when the Pod is removed from its node&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;PVC&lt;/td&gt;
+&lt;td&gt;An application&amp;rsquo;s request for storage capacity, access modes, and other properties&lt;/td&gt;
+&lt;td&gt;Pods reference it to use persistent storage&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;PV&lt;/td&gt;
+&lt;td&gt;A persistent volume resource in the cluster&lt;/td&gt;
+&lt;td&gt;Binds to a matching PVC&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;StorageClass&lt;/td&gt;
+&lt;td&gt;Describes a storage class and dynamic provisioning behavior&lt;/td&gt;
+&lt;td&gt;With a suitable provisioner, can dynamically create storage and PVs for PVCs&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;Typically, a PVC requests storage and binds to an existing PV, or triggers the StorageClass provisioner to create a suitable volume. The Pod then mounts the PVC.&lt;/p&gt;
+&lt;p&gt;emptyDir is useful for temporary files, caches, and data exchange between containers in one Pod. Its lifetime follows the Pod: &lt;strong&gt;a container crashing and restarting within the same Pod does not automatically clear it&lt;/strong&gt;. Whether persistent volume data is retained also depends on the reclaim policy, workload settings, and storage backend. See the &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/concepts/storage/volumes/#emptydir&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;emptyDir volume documentation&lt;/a&gt;.&lt;/p&gt;
+&lt;h3 id=&#34;53-configmaps-and-secrets&#34;&gt;5.3 ConfigMaps and Secrets
+&lt;/h3&gt;&lt;p&gt;ConfigMaps hold ordinary configuration, such as service addresses and log levels. Secrets carry sensitive configuration such as passwords, tokens, and certificates.&lt;/p&gt;
+&lt;p&gt;Remember that &lt;strong&gt;a Secret&amp;rsquo;s &lt;code&gt;data&lt;/code&gt; field uses Base64 encoding, which is reversible encoding, not encryption&lt;/strong&gt;. Protection also depends on API permissions, encryption-at-rest configuration, and actual key management. An object named Secret is not proof that its contents are securely encrypted. See the &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/concepts/configuration/secret/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Secret documentation&lt;/a&gt;.&lt;/p&gt;
+&lt;h2 id=&#34;6-when-something-fails-identify-the-blocked-step&#34;&gt;6. When something fails, identify the blocked step
+&lt;/h2&gt;&lt;h3 id=&#34;61-start-with-get-describe-and-logs&#34;&gt;6.1 Start with get, describe, and logs
+&lt;/h3&gt;&lt;p&gt;Do not start a troubleshooting question by guessing “the network must be broken.” Collect evidence first, then choose the next layer to investigate:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# These examples use the default namespace. Replace &amp;lt;pod&amp;gt;, &amp;lt;node&amp;gt;, etc. with actual names.&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl get pods -n default -o wide
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl describe pod &amp;lt;pod&amp;gt; -n default
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl logs &amp;lt;pod&amp;gt; -n default
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;get&lt;/code&gt; shows the current situation, &lt;code&gt;describe&lt;/code&gt; shows configuration, state, and Events, and &lt;code&gt;logs&lt;/code&gt; shows application output. If the container has not started, there may be no application logs; Events can be more informative.&lt;/p&gt;
+&lt;p&gt;Also distinguish Pod phases from displayed reasons: &lt;code&gt;Pending&lt;/code&gt; and &lt;code&gt;Running&lt;/code&gt; are phases, while &lt;code&gt;CrashLoopBackOff&lt;/code&gt; and &lt;code&gt;ImagePullBackOff&lt;/code&gt; are container state reasons often shown by &lt;code&gt;kubectl&lt;/code&gt;. They are not equivalent values in the Pod phase model. See the &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Pod lifecycle documentation&lt;/a&gt;.&lt;/p&gt;
+&lt;h3 id=&#34;62-pending-scheduling-and-startup-preparation&#34;&gt;6.2 Pending: scheduling and startup preparation
+&lt;/h3&gt;&lt;p&gt;Pending includes both waiting for scheduling and preparing containers. It does not only mean “the scheduler could not find a node.” Use &lt;code&gt;get -o wide&lt;/code&gt; and &lt;code&gt;describe&lt;/code&gt; to inspect node assignment, the &lt;code&gt;PodScheduled&lt;/code&gt; condition, and Events:&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Evidence&lt;/th&gt;
+&lt;th&gt;What to inspect first&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;FailedScheduling&lt;/code&gt;, &lt;code&gt;Insufficient memory/cpu&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;Requests, node allocatable capacity, and requests already committed to other Pods&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Label or affinity mismatch&lt;/td&gt;
+&lt;td&gt;nodeSelector, required rules, and actual node labels&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;An untolerated taint&lt;/td&gt;
+&lt;td&gt;Node taints and Pod tolerations&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;An unbound PVC&lt;/td&gt;
+&lt;td&gt;PVC state, StorageClass, volume capacity, and topology constraints&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;A node is assigned, but containers are not ready&lt;/td&gt;
+&lt;td&gt;Image pulls, volume mounts, Pod networking, and init containers&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;A scheduling event saying &lt;code&gt;Insufficient memory&lt;/code&gt; means placement cannot satisfy the calculated requests. It does not mean that a container which has not yet started has already suffered an OOM kill. Choose between adjusting requests, freeing committed capacity, and adding nodes based on actual resource needs.&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl get nodes
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl describe node &amp;lt;node&amp;gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl get pvc -n default
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl describe pvc &amp;lt;pvc&amp;gt; -n default
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;h3 id=&#34;63-imagepullbackoff-image-pull-failures&#34;&gt;6.3 ImagePullBackOff: image pull failures
+&lt;/h3&gt;&lt;p&gt;This indicates a failed image pull followed by retry backoff. Check whether the image and tag exist, whether the registry is reachable, node-side DNS and networking to the registry, private registry credentials, and the names and namespaces of &lt;code&gt;imagePullSecrets&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;Architecture issues need the exact error too. A registry lacking a manifest for the node&amp;rsquo;s architecture can cause a pull failure. If the image has already been pulled and execution then fails with &lt;code&gt;exec format error&lt;/code&gt;, that is a startup failure; not every architecture mismatch is ImagePullBackOff.&lt;/p&gt;
+&lt;h3 id=&#34;64-crashloopbackoff-repeated-exits-and-restarts&#34;&gt;6.4 CrashLoopBackOff: repeated exits and restarts
+&lt;/h3&gt;&lt;p&gt;The container repeatedly exits and restarts, with backoff between attempts. Causes include application errors, missing configuration, incorrect startup commands, failing probes, and memory problems. With an Always restart policy, even a container that exits successfully can be restarted repeatedly.&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl logs &amp;lt;pod&amp;gt; -n default -c &amp;lt;container&amp;gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl logs &amp;lt;pod&amp;gt; -n default -c &amp;lt;container&amp;gt; --previous
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl describe pod &amp;lt;pod&amp;gt; -n default
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;--previous&lt;/code&gt; retrieves logs from the previous instance of that container in the same Pod. Use &lt;code&gt;-c&lt;/code&gt; for multi-container Pods to avoid inspecting the wrong container. Combine &lt;code&gt;Last State&lt;/code&gt;, &lt;code&gt;Reason&lt;/code&gt;, exit codes, and probe events to narrow “keeps restarting” down to a cause.&lt;/p&gt;
+&lt;h3 id=&#34;65-oomkilled-memory-limits-and-node-pressure&#34;&gt;6.5 OOMKilled: memory limits and node pressure
+&lt;/h3&gt;&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Observation&lt;/th&gt;
+&lt;th&gt;How to investigate&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;Container status shows &lt;code&gt;OOMKilled&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;Compare its memory limit, usage peaks, and kernel records to investigate whether its memory budget was exceeded&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Node memory shortage triggers a system-level OOM&lt;/td&gt;
+&lt;td&gt;Check node state and kernel logs, not just one container&amp;rsquo;s limit&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;A Pod shows &lt;code&gt;Evicted&lt;/code&gt; and its node has memory pressure&lt;/td&gt;
+&lt;td&gt;Inspect kubelet&amp;rsquo;s pressure eviction events; distinguish these from container OOM kills&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Only exit code &lt;code&gt;137&lt;/code&gt; is available&lt;/td&gt;
+&lt;td&gt;This commonly indicates SIGKILL; it is not sufficient evidence of OOM by itself&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;code&gt;kubectl top&lt;/code&gt; shows current samples and may miss the brief peak that caused a failure. Historical monitoring helps. Then investigate whether the problem is an unsuitable memory budget, a batch processing peak, or a memory leak. &lt;strong&gt;Node-pressure eviction and kernel OOM killing are separate mechanisms&lt;/strong&gt;, as described in the &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/concepts/scheduling-eviction/node-pressure-eviction/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;node-pressure eviction documentation&lt;/a&gt;.&lt;/p&gt;
+&lt;h3 id=&#34;66-running-pod-unreachable-service&#34;&gt;6.6 Running Pod, unreachable Service
+&lt;/h3&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl get pods -n default -l &lt;span class=&#34;nv&#34;&gt;app&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;web-demo -o wide
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl describe pod &amp;lt;pod&amp;gt; -n default
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl get svc web-demo -n default -o yaml
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl get endpointslices -n default -l kubernetes.io/service-name&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;web-demo -o yaml
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl describe svc web-demo -n default
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Order&lt;/th&gt;
+&lt;th&gt;What to establish&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;Application&lt;/td&gt;
+&lt;td&gt;The actual listening address and port, and whether the application itself responds&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Pod readiness&lt;/td&gt;
+&lt;td&gt;Whether Ready is true and whether Readiness is failing&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Service selection&lt;/td&gt;
+&lt;td&gt;Whether the selector matches Pod labels in the same namespace&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;EndpointSlice&lt;/td&gt;
+&lt;td&gt;Whether the expected addresses and ports exist and there are usable backends&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Port mapping&lt;/td&gt;
+&lt;td&gt;Whether Service port, targetPort, and the application&amp;rsquo;s listening port agree&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Networking&lt;/td&gt;
+&lt;td&gt;NetworkPolicy, the CNI network plugin, node routing, and the Service forwarding implementation&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;If the expected addresses are missing, start with selectors and labels. If addresses exist but are unavailable, inspect readiness conditions. Once usable addresses and ports are correct, investigate forwarding and networking. If Pod IP access succeeds but Service IP access fails, focus on Service ports and forwarding rules rather than repeatedly restarting the application.&lt;/p&gt;
+&lt;h3 id=&#34;67-dns-timeouts-and-resolution-failures&#34;&gt;6.7 DNS timeouts and resolution failures
+&lt;/h3&gt;&lt;p&gt;Run these commands in a Pod that actually includes tools such as &lt;code&gt;cat&lt;/code&gt; and &lt;code&gt;nslookup&lt;/code&gt;. If a minimal application image lacks them, use a debug image or debug container permitted by the cluster.&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;8
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl &lt;span class=&#34;nb&#34;&gt;exec&lt;/span&gt; &amp;lt;debug-pod&amp;gt; -n default -- cat /etc/resolv.conf
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl &lt;span class=&#34;nb&#34;&gt;exec&lt;/span&gt; &amp;lt;debug-pod&amp;gt; -n default -- nslookup kubernetes.default
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl &lt;span class=&#34;nb&#34;&gt;exec&lt;/span&gt; &amp;lt;debug-pod&amp;gt; -n default -- nslookup web-demo.default.svc.cluster.local
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl get svc kube-dns -n kube-system
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl get endpointslices -n kube-system -l kubernetes.io/service-name&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;kube-dns -o yaml
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl get pods -n kube-system -l k8s-app&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;kube-dns -o wide
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;kubectl logs -n kube-system &amp;lt;coredns-pod&amp;gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;These names and labels are common conventions; replace them if your deployment differs. Check in this order: the Pod&amp;rsquo;s nameserver and search domains → DNS Service and usable backends → CoreDNS state and logs → network reachability on both UDP and TCP port 53 → upstream resolvers.&lt;/p&gt;
+&lt;p&gt;If the Service IP works but its name does not resolve, investigate DNS first. If internal service names fail too, prioritize the cluster DNS path. If internal names work and only external names fail, inspect upstream configuration and external connectivity.&lt;/p&gt;
+&lt;h2 id=&#34;7-commands-and-a-final-three-minute-interview-review&#34;&gt;7. Commands and a final three-minute interview review
+&lt;/h2&gt;&lt;h3 id=&#34;71-kubectl-command-reference&#34;&gt;7.1 kubectl command reference
+&lt;/h3&gt;&lt;p&gt;The commands below use the default namespace; add &lt;code&gt;-n &amp;lt;namespace&amp;gt;&lt;/code&gt; when needed. Values in angle brackets are placeholders.&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Goal&lt;/th&gt;
+&lt;th&gt;Command&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;Show Pods and their nodes&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;kubectl get pods -o wide&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Inspect configuration, state, and events&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;kubectl describe pod &amp;lt;pod&amp;gt;&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Read current container logs&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;kubectl logs &amp;lt;pod&amp;gt; -c &amp;lt;container&amp;gt;&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Read the previous container instance&amp;rsquo;s logs&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;kubectl logs &amp;lt;pod&amp;gt; -c &amp;lt;container&amp;gt; --previous&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Open a shell, if the container has one&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;kubectl exec -it &amp;lt;pod&amp;gt; -c &amp;lt;container&amp;gt; -- /bin/sh&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Inspect workloads and replicas&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;kubectl get deploy,rs,pods&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Inspect Services&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;kubectl get svc&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Inspect a Service&amp;rsquo;s backends and conditions&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;kubectl get endpointslices -l kubernetes.io/service-name=&amp;lt;svc&amp;gt; -o yaml&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Inspect nodes&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;kubectl get nodes&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Show a complete object&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;kubectl get pod &amp;lt;pod&amp;gt; -o yaml&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Inspect PVCs&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;kubectl get pvc&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Apply the example configuration&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;kubectl apply -f web-demo.yaml&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Watch a rollout&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;kubectl rollout status deployment/web-demo&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Inspect rollout history&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;kubectl rollout history deployment/web-demo&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Roll back to a retained previous revision&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;kubectl rollout undo deployment/web-demo&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Show current Pod resource use&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;kubectl top pod&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Show current node resource use&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;kubectl top node&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Delete resources described in the example manifest&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;kubectl delete -f web-demo.yaml&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;&lt;code&gt;kubectl top&lt;/code&gt; depends on the resource metrics API, commonly provided by Metrics Server. If that API is unavailable, the command cannot return usage; this alone does not mean a Pod is faulty. Rollback also depends on usable historical ReplicaSets being retained.&lt;/p&gt;
+&lt;h3 id=&#34;72-final-three-minute-interview-review&#34;&gt;7.2 Final three-minute interview review
+&lt;/h3&gt;&lt;p&gt;Before an interview, close the main text and try answering these questions:&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Question&lt;/th&gt;
+&lt;th&gt;One-sentence answer&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;What does Kubernetes do?&lt;/td&gt;
+&lt;td&gt;Continuously reconciles actual state with declared desired state&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;What stores cluster state?&lt;/td&gt;
+&lt;td&gt;etcd; other core components normally access objects through the API Server&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;What creates, schedules, and starts Pods?&lt;/td&gt;
+&lt;td&gt;Controllers create objects, the scheduler selects nodes, and kubelet coordinates the runtime&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Why have Pods?&lt;/td&gt;
+&lt;td&gt;To schedule cooperating containers together with shared networking and shareable volumes&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;How does recovery work?&lt;/td&gt;
+&lt;td&gt;Distinguish a container restart inside a Pod from a controller creating a replacement Pod&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Deployment versus StatefulSet?&lt;/td&gt;
+&lt;td&gt;Interchangeable replicas versus replicas requiring stable identities&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;What is the main scheduling sequence?&lt;/td&gt;
+&lt;td&gt;Filtering → scoring → binding&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Requests versus limits?&lt;/td&gt;
+&lt;td&gt;Requests support capacity and allocation decisions; limits constrain runtime use&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;What happens at CPU and memory limits?&lt;/td&gt;
+&lt;td&gt;CPU is generally throttled; memory shortages may cause OOM kills, and 137 alone does not prove OOM&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Affinity versus taints?&lt;/td&gt;
+&lt;td&gt;Affinity expresses placement rules; taints repel Pods, and tolerations do not guarantee placement&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Why use a Service?&lt;/td&gt;
+&lt;td&gt;A stable entry point connects clients to backends that can be recreated with new IPs&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;What does an EndpointSlice do?&lt;/td&gt;
+&lt;td&gt;Records backend addresses and conditions so networking implementations can maintain rules&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;What does CoreDNS do?&lt;/td&gt;
+&lt;td&gt;Provides cluster service discovery and resolves or forwards external queries according to configuration&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;How do the three probes differ?&lt;/td&gt;
+&lt;td&gt;Startup checks startup, Readiness controls readiness, and Liveness detects a need for restart&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;emptyDir versus PVC?&lt;/td&gt;
+&lt;td&gt;The former follows a Pod&amp;rsquo;s lifetime; the latter requests persistent storage&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Does Secret mean encrypted?&lt;/td&gt;
+&lt;td&gt;No: Base64 is encoding, and protection requires additional controls&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;What should you inspect first for Pending?&lt;/td&gt;
+&lt;td&gt;Node assignment, the PodScheduled condition, and Events&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;What should you inspect first for CrashLoopBackOff?&lt;/td&gt;
+&lt;td&gt;The previous exit reason, &lt;code&gt;logs --previous&lt;/code&gt;, configuration, and probe events&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;What should you inspect first for an unreachable Service?&lt;/td&gt;
+&lt;td&gt;Application listeners, Ready, selectors, usable EndpointSlices, and ports&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;How should you structure a troubleshooting answer?&lt;/td&gt;
+&lt;td&gt;Establish evidence, then follow creation, scheduling, startup, readiness, and access to locate the failure&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;p&gt;For an interview answer, use &lt;strong&gt;one conclusion → the key mechanism → one verification method&lt;/strong&gt;. If asked why a Running Pod is unreachable, first explain that Running does not imply Ready. Then describe how readiness affects usable backends for ordinary Services, and finish with &lt;code&gt;describe pod&lt;/code&gt; and an EndpointSlice query. This explains both the mechanism and how you would verify it.&lt;/p&gt;
+</description>
+        </item>
+        <item>
         <title>Automating Kubernetes Deployments: From Git Push to Verification and Recovery</title>
         <link>https://SymphonyW.github.io/p/k8s-automated-deployment/</link>
         <pubDate>Sat, 17 Oct 2026 10:00:00 +0800</pubDate>
         
         <guid>https://SymphonyW.github.io/p/k8s-automated-deployment/</guid>
         <description>&lt;img src="https://SymphonyW.github.io/p/k8s-automated-deployment/bg.svg" alt="Featured image of post Automating Kubernetes Deployments: From Git Push to Verification and Recovery" /&gt;&lt;p&gt;The earlier &lt;a class=&#34;link&#34; href=&#34;https://SymphonyW.github.io/p/kubernetes-from-docker/&#34; &gt;Docker to Kubernetes guide&lt;/a&gt; introduced Pods, Deployments, and Services. The &lt;a class=&#34;link&#34; href=&#34;https://SymphonyW.github.io/p/k8s-container-cloud-deployment/&#34; &gt;container cloud deployment walkthrough&lt;/a&gt; connected Dockerfile builds, registry uploads, and platform configuration. The &lt;a class=&#34;link&#34; href=&#34;https://SymphonyW.github.io/p/ci/cd-complete-guidefrom-principles-to-practice/&#34; &gt;CI/CD guide&lt;/a&gt; explained the pipeline concepts.&lt;/p&gt;
-&lt;p&gt;The next question follows naturally: &lt;strong&gt;once an application can be deployed manually, how do we make a code change trigger tests, an image build, a deployment, and checks that detect a broken release?&lt;/strong&gt;&lt;/p&gt;
-&lt;p&gt;This article follows a small Go service through that entire path. The order API is an HTTP demonstration; it does not process real orders or connect to a database.&lt;/p&gt;
+&lt;p&gt;Once the application can be deployed manually, those steps can move into a pipeline. A code change can then trigger tests, an image build, deployment, and checks that detect a broken release.&lt;/p&gt;
+&lt;p&gt;The example follows a small Go service through this process. The order API only demonstrates an HTTP service; it does not process real orders or connect to a database.&lt;/p&gt;
 &lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/p/k8s-automated-deployment/bg.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/p/k8s-automated-deployment/bg.svg&#34; alt=&#34;The deployment lifecycle: commit, test, build, release, verify, and respond&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
 &lt;/p&gt;
 &lt;h2 id=&#34;1-turn-deployment-into-a-sequence-of-checks&#34;&gt;1. Turn deployment into a sequence of checks
-&lt;/h2&gt;&lt;p&gt;Manual releases often depend on assumptions: “this image should be current,” or “the page loads, so the deployment probably worked.” Automation needs explicit inputs, outputs, and acceptance criteria.&lt;/p&gt;
+&lt;/h2&gt;&lt;p&gt;Manual releases often rely on judgments such as &amp;ldquo;this image should be current&amp;rdquo; or &amp;ldquo;the page loads, so the deployment probably worked.&amp;rdquo; A pipeline needs explicit inputs, outputs, and checks to make those decisions.&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
 &lt;tr&gt;
@@ -1077,9 +2085,9 @@
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;The example uses &lt;strong&gt;GitHub Actions → GHCR → Kubernetes&lt;/strong&gt;. Pull requests run checks. Merging into &lt;code&gt;main&lt;/code&gt; builds an image and deploys to a dedicated &lt;code&gt;demo-prod&lt;/code&gt; namespace. Keeping a human approval makes this continuous delivery; deployment without that approval is continuous deployment.&lt;/p&gt;
+&lt;p&gt;The example uses GitHub Actions → GHCR → Kubernetes. Pull requests run checks; merging into &lt;code&gt;main&lt;/code&gt; builds an image and deploys it to a dedicated &lt;code&gt;demo-prod&lt;/code&gt; namespace. Keeping human approval makes this continuous delivery. Automatically deploying after the checks pass is continuous deployment.&lt;/p&gt;
 &lt;p&gt;You need an existing cluster, an application repository on GitHub, and an administrator who can initialize the namespace. Commands use Linux/Bash; Windows users can use WSL or Git Bash. Target nodes use &lt;code&gt;linux/amd64&lt;/code&gt;. Cluster installation is covered in the earlier guide.&lt;/p&gt;
-&lt;p&gt;Before writing the workflow, check connectivity:&lt;/p&gt;
+&lt;p&gt;Check that each part of the system can reach the services it needs:&lt;/p&gt;
 &lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/p/k8s-automated-deployment/trust-boundaries.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/p/k8s-automated-deployment/trust-boundaries.svg&#34; alt=&#34;Deployment control and image pulls use separate identities and network paths&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
 &lt;/p&gt;
 &lt;table&gt;
@@ -1108,9 +2116,9 @@
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;A working &lt;code&gt;kubectl&lt;/code&gt; connection does not prove that nodes can pull images. Logging the Runner into GHCR does not log nodes in. GitHub-hosted Runners also cannot directly reach your computer&amp;rsquo;s &lt;code&gt;127.0.0.1&lt;/code&gt; or a private corporate API. Use a dedicated Runner on a trusted network or an approved private connectivity solution for private clusters.&lt;/p&gt;
+&lt;p&gt;A working &lt;code&gt;kubectl&lt;/code&gt; connection does not mean the nodes can pull images, and logging the Runner into GHCR does not log the nodes in. GitHub-hosted Runners also cannot directly reach your computer&amp;rsquo;s &lt;code&gt;127.0.0.1&lt;/code&gt; or a private corporate API. Private clusters need a dedicated Runner on a trusted network or an approved private connection.&lt;/p&gt;
 &lt;h2 id=&#34;2-prepare-a-service-that-identifies-its-source-version&#34;&gt;2. Prepare a service that identifies its source version
-&lt;/h2&gt;&lt;p&gt;Create these files in a separate application repository. &lt;strong&gt;The workflow below belongs to that application; it does not replace this blog&amp;rsquo;s publishing workflow.&lt;/strong&gt;&lt;/p&gt;
+&lt;/h2&gt;&lt;p&gt;Create these files in a separate application repository.&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
@@ -1139,7 +2147,7 @@
 &lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;└── .github/workflows/release.yaml
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;The service exposes &lt;code&gt;/healthz&lt;/code&gt; for process health, &lt;code&gt;/readyz&lt;/code&gt; for readiness, and &lt;code&gt;/version&lt;/code&gt; for the Git SHA embedded during compilation. These health handlers have no external dependencies. When adding a database, design readiness for the workload and avoid making a shared database failure restart every instance.&lt;/p&gt;
+&lt;/div&gt;&lt;p&gt;The service exposes &lt;code&gt;/healthz&lt;/code&gt; to check process health, &lt;code&gt;/readyz&lt;/code&gt; to report whether it can receive traffic, and &lt;code&gt;/version&lt;/code&gt; to return the Git SHA embedded during compilation. The health handlers have no external dependencies. If you add a database, design readiness around the workload so a shared database failure does not cause every instance to restart.&lt;/p&gt;
 &lt;p&gt;&lt;strong&gt;&lt;code&gt;go.mod&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
@@ -1282,7 +2290,7 @@
 &lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;}&lt;/span&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;The listener binds to the container network interfaces. On termination, the application withdraws readiness and waits for active requests to finish. Real workloads also need connection draining, long connection handling, and background task coordination; these settings alone do not guarantee uninterrupted service.&lt;/p&gt;
+&lt;/div&gt;&lt;p&gt;The service listens on the container&amp;rsquo;s network interfaces. On termination, it marks itself unready and waits for active requests to finish. A real application also needs to drain connections, handle long-lived connections, and coordinate background tasks. These settings alone cannot guarantee uninterrupted service.&lt;/p&gt;
 &lt;p&gt;&lt;strong&gt;&lt;code&gt;main_test.go&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
@@ -1387,7 +2395,7 @@
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;err&#34;&gt;&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;ENTRYPOINT&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;[&lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;/server&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;]&lt;/span&gt;&lt;span class=&#34;err&#34;&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;Only the standard library is used, so there are no third-party modules or &lt;code&gt;go.sum&lt;/code&gt;. The runtime image has no shell. Outbound HTTPS, timezone data, or dynamic libraries require additional files or a suitable runtime image. Maintain base image security updates and pin approved base images by digest in production: a version tag can still move.&lt;/p&gt;
+&lt;/div&gt;&lt;p&gt;The example uses only the standard library, so it needs no third-party modules or &lt;code&gt;go.sum&lt;/code&gt;. Its runtime image has no shell. If the application later needs outbound HTTPS, timezone data, or dynamic libraries, add the required files or choose a suitable runtime image. Keep base images updated with security fixes and pin approved images by digest in production, since a version tag can still point to different content.&lt;/p&gt;
 &lt;p&gt;&lt;strong&gt;&lt;code&gt;.dockerignore&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
@@ -1451,7 +2459,7 @@
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;The expected responses are &lt;code&gt;ready&lt;/code&gt; and &lt;code&gt;local-check&lt;/code&gt;.&lt;/p&gt;
 &lt;h2 id=&#34;3-save-the-deployment-specification-in-git&#34;&gt;3. Save the deployment specification in Git
-&lt;/h2&gt;&lt;p&gt;The image, replicas, probes, and resource settings previously entered in a platform console now become reviewable manifests.&lt;/p&gt;
+&lt;/h2&gt;&lt;p&gt;Save the image, replica count, probes, and resource settings from the platform console as manifests that can be reviewed in Git.&lt;/p&gt;
 &lt;p&gt;&lt;strong&gt;&lt;code&gt;k8s/runtime.yaml&lt;/code&gt;&lt;/strong&gt;&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
@@ -1654,7 +2662,7 @@
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;            &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;periodSeconds&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;m&#34;&gt;10&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;&lt;code&gt;APP_ENV&lt;/code&gt; demonstrates configuration injection; the service does not change its behavior based on it. For a configuration change, create &lt;code&gt;order-api-config-v2&lt;/code&gt;, update the Deployment reference, and retain the old object. Restoring an old template can then restore its configuration reference. Secrets also need a version strategy; credentials do not belong in ConfigMaps.&lt;/p&gt;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;APP_ENV&lt;/code&gt; demonstrates configuration injection without changing the service&amp;rsquo;s behavior. When changing configuration, create &lt;code&gt;order-api-config-v2&lt;/code&gt;, update the Deployment reference, and keep the old object. An old template can then use the configuration it originally referenced when restored. Secrets also need a version strategy; do not put credentials in ConfigMaps.&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
 &lt;tr&gt;
@@ -1694,11 +2702,11 @@
 &lt;/tbody&gt;
 &lt;/table&gt;
 &lt;p&gt;See the &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
-    &gt;official probe documentation&lt;/a&gt; for exact semantics. A progress deadline does &lt;strong&gt;not&lt;/strong&gt; automatically restore the previous version; recovery is an explicit workflow step below.&lt;/p&gt;
+    &gt;official probe documentation&lt;/a&gt; for the detailed behavior. Setting a progress deadline does not automatically restore the previous version. The workflow below handles recovery explicitly.&lt;/p&gt;
 &lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/p/k8s-automated-deployment/rolling-update.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/p/k8s-automated-deployment/rolling-update.svg&#34; alt=&#34;An ideal rolling update: a new Pod becomes ready before an old Pod is replaced&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
 &lt;/p&gt;
-&lt;p&gt;The diagram shows an ideal progression. Node failures, capacity shortages, endpoint propagation, and application behavior still affect availability. Terminating Pods can temporarily consume additional resources beyond the three active slots illustrated here.&lt;/p&gt;
-&lt;p&gt;The initial example uses &lt;code&gt;ClusterIP&lt;/code&gt; and port forwarding. For user access, have the platform provision a Gateway/Ingress, DNS, and TLS. An Ingress object needs an actual controller, and a ClusterIP is not a public address.&lt;/p&gt;
+&lt;p&gt;The diagram shows the ideal update order. In practice, node failures, capacity shortages, endpoint propagation delays, and application behavior can affect availability. Terminating Pods may still consume resources, temporarily pushing usage beyond the three active slots shown here.&lt;/p&gt;
+&lt;p&gt;The example first uses &lt;code&gt;ClusterIP&lt;/code&gt; and port forwarding to check the application. To make it accessible to users, have the platform configure a Gateway/Ingress, DNS, and TLS. An Ingress object needs a running controller; a ClusterIP cannot be used as a public address.&lt;/p&gt;
 &lt;h2 id=&#34;4-establish-identities-and-release-permissions&#34;&gt;4. Establish identities and release permissions
 &lt;/h2&gt;&lt;p&gt;There are three separate credentials:&lt;/p&gt;
 &lt;table&gt;
@@ -1731,9 +2739,9 @@
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;New GHCR packages are private by default. Either make a demonstration image public or configure private image access as below. Write access in CI does not imply node read access. See &lt;a class=&#34;link&#34; href=&#34;https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;New GHCR packages are private by default. You can make a demonstration image public or configure private image access as shown below. CI&amp;rsquo;s write permission does not give the nodes read permission. See &lt;a class=&#34;link&#34; href=&#34;https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;GitHub&amp;rsquo;s Container registry documentation&lt;/a&gt;.&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;One-time administrator setup.&lt;/strong&gt; Save the following as &lt;code&gt;bootstrap/rbac.yaml&lt;/code&gt;. Administrators apply it separately from routine releases.&lt;/p&gt;
+&lt;p&gt;Save the following as &lt;code&gt;bootstrap/rbac.yaml&lt;/code&gt; and have an administrator apply it once, separately from routine releases.&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
@@ -1864,10 +2872,10 @@
 &lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;nb&#34;&gt;unset&lt;/span&gt; GHCR_READ_TOKEN
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;Use an account with access to the target package and a classic PAT with &lt;code&gt;read:packages&lt;/code&gt;; organizational SSO and package policies may impose additional authorization. The interactive initialization command briefly places the token in local process arguments. Use a controlled terminal for the exercise; shared hosts should use platform secret management or controlled Docker configuration imports. Rotate an existing Secret through the platform&amp;rsquo;s approved process.&lt;/p&gt;
-&lt;p&gt;The Role cannot manage the cluster, change RBAC, or directly read Secrets. However, an identity that can modify workloads may still cause a Pod to mount namespace Secrets. Use a dedicated namespace, trusted deployment code, and appropriate admission and workload identity policies. See &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/reference/access-authn-authz/rbac/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;/div&gt;&lt;p&gt;Use an account that can access the target package and a classic PAT with &lt;code&gt;read:packages&lt;/code&gt;. Organizational SSO and package policies may require further authorization. The initialization command briefly exposes the token in local process arguments, so run it in a controlled terminal. On shared hosts, use platform secret management or controlled Docker configuration imports. If the Secret already exists, rotate it through the platform&amp;rsquo;s approved process.&lt;/p&gt;
+&lt;p&gt;This Role cannot manage the cluster, change RBAC, or directly read Secrets. An identity allowed to modify workloads may still make a Pod mount Secrets from the namespace, though. Use a dedicated namespace, allow only trusted deployment code, and apply appropriate admission and workload identity policies. See &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/reference/access-authn-authz/rbac/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Kubernetes RBAC&lt;/a&gt;.&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;Generate a short-lived kubeconfig for the exercise.&lt;/strong&gt; Run this locally as an administrator connected to the intended cluster. It copies the endpoint and CA, not the administrator&amp;rsquo;s credentials. A one-hour ServiceAccount token is requested; actual lifetime depends on the server.&lt;/p&gt;
+&lt;p&gt;Next, generate a short-lived kubeconfig for the exercise. Run the commands locally as an administrator connected to the intended cluster. They copy the endpoint and CA without copying the administrator&amp;rsquo;s credentials, and request a one-hour ServiceAccount token. The server determines its actual lifetime.&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
@@ -1932,7 +2940,7 @@
 &lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# Expected: yes&lt;/span&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;The expected authorization result is &lt;code&gt;yes&lt;/code&gt;. This assumes a standard HTTPS endpoint and CA. Platforms requiring proxies, a special TLS server name, or cloud authentication plugins should provide a suitable restricted CI kubeconfig. Do not bypass certificate verification.&lt;/p&gt;
+&lt;/div&gt;&lt;p&gt;The authorization check should return &lt;code&gt;yes&lt;/code&gt;. These commands assume a standard HTTPS endpoint and CA. If the platform requires proxies, a special TLS server name, or cloud authentication plugins, use a suitable restricted CI kubeconfig from the platform. Do not bypass certificate verification.&lt;/p&gt;
 &lt;p&gt;Create a &lt;code&gt;production&lt;/code&gt; environment in the application repository&amp;rsquo;s Settings → Environments. Restrict deployments to &lt;code&gt;main&lt;/code&gt; and configure approval if desired and supported. Add environment Secret &lt;code&gt;KUBE_CONFIG&lt;/code&gt; containing this file. With an authenticated GitHub CLI:&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
@@ -1942,12 +2950,12 @@
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;gh secret &lt;span class=&#34;nb&#34;&gt;set&lt;/span&gt; KUBE_CONFIG --env production &amp;lt; .deploy-local/ci.kubeconfig
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;Also create environment Variable &lt;code&gt;KUBECTL_VERSION&lt;/code&gt; containing a compatible explicit patch version. &lt;code&gt;v1.35.0&lt;/code&gt; illustrates the format, not a version recommendation. Keep kubectl within one minor version of the API Server. The workflow follows the checksum verification described in the &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;/div&gt;&lt;p&gt;Create an environment Variable named &lt;code&gt;KUBECTL_VERSION&lt;/code&gt; and set it to a specific, compatible patch version. &lt;code&gt;v1.35.0&lt;/code&gt; is only an example of the format. Keep kubectl within one minor version of the API Server. The workflow uses the checksum verification described in the &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;official Linux installation guide&lt;/a&gt;.&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;Storing a one-hour token in a Secret does not renew it.&lt;/strong&gt; Expiration, including time spent waiting for approval, requires a new token and Secret update. Long-lived production automation should exchange platform-supported OIDC/workload identity for short-lived credentials or use managed rotation. GitHub OIDC tokens are not automatically accepted by arbitrary Kubernetes clusters: trust configuration or an identity exchange is required. See &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;A one-hour token does not renew itself when stored in a Secret. If it expires, including while waiting for approval, generate a new token and update the Secret. For ongoing production use, exchange a platform-supported OIDC/workload identity for short-lived credentials or use managed rotation. GitHub OIDC tokens are not automatically accepted by every Kubernetes cluster; they need a trust configuration or an identity exchange. See &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;ServiceAccount token documentation&lt;/a&gt;.&lt;/p&gt;
 &lt;h2 id=&#34;5-connect-tests-builds-deployment-and-acceptance&#34;&gt;5. Connect tests, builds, deployment, and acceptance
-&lt;/h2&gt;&lt;p&gt;Save this in the &lt;strong&gt;application repository&lt;/strong&gt; as &lt;code&gt;.github/workflows/release.yaml&lt;/code&gt;. The example uses GitHub-hosted Runners, so the API must be reachable through an approved network path. For a private cluster, use the organization&amp;rsquo;s dedicated Runner labels for the deployment Job; keep public PR tests isolated from the production network.&lt;/p&gt;
+&lt;/h2&gt;&lt;p&gt;Save the following as &lt;code&gt;.github/workflows/release.yaml&lt;/code&gt; in the application repository. The example uses GitHub-hosted Runners, which need an approved network path to the API. For a private cluster, assign the deployment Job to the organization&amp;rsquo;s dedicated Runner labels. Keep public PR tests isolated from the production network.&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;  1
@@ -2280,9 +3288,9 @@
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;        &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;run&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;rm -f -- &amp;#34;$RUNNER_TEMP/order-api.kubeconfig&amp;#34;&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;The publishing pattern is documented in &lt;a class=&#34;link&#34; href=&#34;https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;/div&gt;&lt;p&gt;The image publishing setup follows &lt;a class=&#34;link&#34; href=&#34;https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;GitHub&amp;rsquo;s image publishing tutorial&lt;/a&gt; and &lt;a class=&#34;link&#34; href=&#34;https://github.com/docker/build-push-action&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
-    &gt;Docker build-push-action&lt;/a&gt;. Major Action tags improve readability here. Production should pin reviewed full commit SHAs and maintain them with dependency updates. A tag such as &lt;code&gt;@v7&lt;/code&gt; is mutable; self-hosted Runners must also meet each Action&amp;rsquo;s runtime requirements.&lt;/p&gt;
+    &gt;Docker build-push-action&lt;/a&gt;. The example uses major Action tags for readability. In production, pin reviewed full commit SHAs and maintain them with dependency updates. A tag such as &lt;code&gt;@v7&lt;/code&gt; can point to a different commit later. Self-hosted Runners must also meet each Action&amp;rsquo;s runtime requirements.&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
 &lt;tr&gt;
@@ -2333,10 +3341,10 @@
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;&lt;code&gt;cancel-in-progress: false&lt;/code&gt; preserves a running deployment. However, GitHub concurrency groups are not strict FIFO release queues: pending work can be replaced and execution ordering is not guaranteed. The main SHA check reduces stale releases but is not a transaction lock; another commit may arrive between the check and apply. This suits a “deploy the latest main” policy. Strictly ordered release requirements need a dedicated queue or controller. See &lt;a class=&#34;link&#34; href=&#34;https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;&lt;code&gt;cancel-in-progress: false&lt;/code&gt; prevents newer work in the concurrency group from cancelling a running deployment, but GitHub concurrency groups are not strict FIFO release queues. Pending work can be replaced, and execution order is not guaranteed. The main SHA check helps reject stale releases, but another commit can arrive between that check and apply. It is not a transaction lock. This approach suits a &amp;ldquo;deploy the latest main&amp;rdquo; policy; strictly ordered releases need a dedicated queue or controller. See &lt;a class=&#34;link&#34; href=&#34;https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;GitHub concurrency control&lt;/a&gt;.&lt;/p&gt;
-&lt;p&gt;There are three different completion signals: &lt;code&gt;apply&lt;/code&gt; means the API accepted the resources; &lt;code&gt;rollout status&lt;/code&gt; means the controller finished the rollout; an expected SHA from &lt;code&gt;/version&lt;/code&gt; demonstrates that the responding application matches the intended source. The business smoke request adds a check beyond process health.&lt;/p&gt;
-&lt;p&gt;Port forwarding a Service selects a Pod. It checks that application&amp;rsquo;s response, but does &lt;strong&gt;not&lt;/strong&gt; exercise normal Service forwarding, every replica, DNS, the gateway, or TLS. When a real entry point exists, also check &lt;code&gt;https://your-domain/version&lt;/code&gt; and run suitable business requests through it. One HTTP 200 is not complete user-path validation.&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;apply&lt;/code&gt; confirms that the API accepted the resources, while &lt;code&gt;rollout status&lt;/code&gt; confirms that the controller finished the update. Check the SHA from &lt;code&gt;/version&lt;/code&gt; as well to confirm that the responding application is the intended version. The business smoke request then checks more than process health.&lt;/p&gt;
+&lt;p&gt;Port forwarding a Service selects one Pod and checks its application response. It does &lt;strong&gt;not&lt;/strong&gt; test normal Service forwarding, every replica, DNS, the gateway, or TLS. If a real entry point is available, also check &lt;code&gt;https://your-domain/version&lt;/code&gt; and send appropriate business requests through it. One HTTP 200 cannot validate the whole user path.&lt;/p&gt;
 &lt;h2 id=&#34;6-run-a-successful-release-then-rehearse-recovery&#34;&gt;6. Run a successful release, then rehearse recovery
 &lt;/h2&gt;&lt;table&gt;
 &lt;thead&gt;
@@ -2379,7 +3387,7 @@
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;An existing package may also need to grant Actions write access to the repository. Branch and environment protection availability depends on repository type and organizational policies.&lt;/p&gt;
+&lt;p&gt;If the package already exists, check that the repository&amp;rsquo;s Actions are allowed to write to it. Available branch and environment protections depend on repository type and organizational policies.&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
@@ -2397,10 +3405,10 @@
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;Expect two available replicas and an image reference ending in &lt;code&gt;@sha256:...&lt;/code&gt;.&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;Rehearse a failure only in the dedicated exercise environment.&lt;/strong&gt; After a successful baseline release, change the readiness path to &lt;code&gt;/not-ready&lt;/code&gt;, pass the PR checks, and merge. The application returns 404 at that path, so new Pods cannot become ready. The rollout fails; CI collects evidence and restores the saved Pod template. After observing recovery, immediately fix the path back to &lt;code&gt;/readyz&lt;/code&gt; through a new commit so Git is correct too.&lt;/p&gt;
+&lt;p&gt;After one successful release, rehearse a failure in the dedicated exercise environment only. Change the readiness path to &lt;code&gt;/not-ready&lt;/code&gt;, pass the PR checks, and merge. The application returns 404 at that path, leaving the new Pods unready. When the rollout fails, CI collects diagnostic information and restores the saved Pod template. Once you have observed recovery, immediately submit a fix that changes the path back to &lt;code&gt;/readyz&lt;/code&gt; so Git is correct too.&lt;/p&gt;
 &lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/p/k8s-automated-deployment/failure-recovery.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/p/k8s-automated-deployment/failure-recovery.svg&#34; alt=&#34;Recovery decisions: keep build failures out of the cluster, collect evidence, and restore an existing template&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
 &lt;/p&gt;
-&lt;p&gt;Restoring a snapshot of the actual previous template avoids assuming that the previous rollout history entry is the desired recovery target. The strategy still has limits:&lt;/p&gt;
+&lt;p&gt;The snapshot preserves the template that was running before deployment, which may differ from the previous rollout history entry. Restoring it has the following limits:&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
 &lt;tr&gt;
@@ -2447,7 +3455,7 @@
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;&lt;strong&gt;Recovery does not turn a failed release green.&lt;/strong&gt; The workflow remains failed even when the restoration step succeeds. A recovered rollout also needs business verification and metric observation. Deployment history rollback concerns the Pod template, not an entire application transaction; see the &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/concepts/workloads/controllers/deployment/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;The workflow stays failed even if restoration succeeds. Recovery is an attempt to restore service, not evidence that the release passed. Check business behavior and metrics after the recovery rollout as well. Deployment history rollback restores a Pod template; it does not reverse an entire application transaction. See the &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/concepts/workloads/controllers/deployment/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Deployment documentation&lt;/a&gt;.&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
@@ -2500,9 +3508,9 @@
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;&lt;strong&gt;Database migrations need a separate release design.&lt;/strong&gt; A common approach is expand–migrate–contract: introduce backward-compatible structures, support old and new application versions, migrate data, then remove old structures after observation. Migration Jobs need idempotency, concurrency control, and failure handling. Do not have every application Pod race to execute irreversible DDL. Restoring an image also does not undo messages, external calls, or modified records.&lt;/p&gt;
+&lt;p&gt;Plan database migrations separately. A common approach is to expand, migrate, then contract: add backward-compatible structures so old and new application versions can run, migrate the data, observe the results, and only then remove the old structures. Migration Jobs need idempotency, concurrency control, and failure handling. Do not let every application Pod race to execute irreversible DDL at startup. Restoring an image does not undo messages already sent, external calls, or changes to records.&lt;/p&gt;
 &lt;h2 id=&#34;7-evolve-toward-a-maintainable-release-system&#34;&gt;7. Evolve toward a maintainable release system
-&lt;/h2&gt;&lt;p&gt;Once the basic path works, add controls according to the workload&amp;rsquo;s needs.&lt;/p&gt;
+&lt;/h2&gt;&lt;p&gt;Once the basic workflow works, add the checks and release controls the workload needs.&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
 &lt;tr&gt;
@@ -2549,9 +3557,9 @@
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;Promote &lt;strong&gt;the same digest&lt;/strong&gt; between environments: build once, validate in staging, then release that artifact to production. Inject environment differences through configuration instead of rebuilding nominally identical versions.&lt;/p&gt;
-&lt;p&gt;A standard Deployment rolling update does not automatically make metric-based canary decisions. Sending limited traffic, observing results, and expanding exposure requires traffic control and progressive delivery tooling.&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;GitOps changes who performs deployment.&lt;/strong&gt; This example is push deployment: CI holds an identity that calls the API. With GitOps, an environment repository records the desired state, and Argo CD or Flux reconciles it from the cluster side or a controlled network.&lt;/p&gt;
+&lt;p&gt;Use the same digest across environments: build once, validate in staging, then deploy that artifact to production. Supply environment differences through configuration. Rebuilding for each environment can produce different images despite identical version labels.&lt;/p&gt;
+&lt;p&gt;A standard Deployment replaces replicas gradually without using metrics to decide whether to continue. To send limited traffic to a new version, observe the results, and then increase exposure, you also need traffic control and progressive delivery tooling.&lt;/p&gt;
+&lt;p&gt;GitOps changes which component performs deployment. In this push example, CI holds an identity that calls the API. With GitOps, an environment repository records the desired state, and Argo CD or Flux reconciles the cluster to it from inside the cluster or a controlled network.&lt;/p&gt;
 &lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/p/k8s-automated-deployment/gitops.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/p/k8s-automated-deployment/gitops.svg&#34; alt=&#34;Push CD compared with GitOps: CI-driven changes versus Git-backed reconciliation&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
 &lt;/p&gt;
 &lt;table&gt;
@@ -2590,9 +3598,9 @@
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;With Argo CD automatic sync, update Git before relying on a manual cluster change: self-healing can restore the Git version. Pruning resources is also an explicit policy. See &lt;a class=&#34;link&#34; href=&#34;https://argo-cd.readthedocs.io/en/stable/user-guide/auto_sync/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;When using Argo CD automatic sync, update the desired state in Git first. Otherwise, self-healing may undo a manual cluster change and restore the version in Git. Resource pruning also needs an explicit policy. See &lt;a class=&#34;link&#34; href=&#34;https://argo-cd.readthedocs.io/en/stable/user-guide/auto_sync/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Argo CD automated sync&lt;/a&gt;.&lt;/p&gt;
-&lt;p&gt;A release is accountable when its records answer four questions: &lt;strong&gt;which commit, which artifact and configuration, which checks, and which recovery target?&lt;/strong&gt; That is the foundation for adding more environments, progressive delivery, or GitOps.&lt;/p&gt;
+&lt;p&gt;Keep a record of each release&amp;rsquo;s source commit, artifact, configuration, verification coverage, and recovery target. With those records in place, you can trace what happened as you add more environments, progressive delivery, or GitOps.&lt;/p&gt;
 </description>
         </item>
         <item>
@@ -2601,15 +3609,15 @@
         <pubDate>Sat, 17 Oct 2026 10:00:00 +0800</pubDate>
         
         <guid>https://SymphonyW.github.io/p/cicd-gitlab-ci-helm/</guid>
-        <description>&lt;img src="https://SymphonyW.github.io/p/cicd-gitlab-ci-helm/bg.png" alt="Featured image of post CI/CD, GitLab CI, and Helm: From Commit to Kubernetes Delivery" /&gt;&lt;p&gt;How does a &lt;code&gt;git push&lt;/code&gt; become a tested application running in Kubernetes? GitLab CI, container builders, registries, and Helm often appear in the same pipeline, but each owns a different part of the delivery process.&lt;/p&gt;
-&lt;p&gt;Three questions connect them: &lt;strong&gt;Is this change trustworthy? Which exact artifact are we delivering? Has the environment reached the intended state?&lt;/strong&gt; CI provides feedback, artifacts preserve build results, and deployment tools cooperate with the cluster to change running state. A dependable delivery process also records how to recover when those steps fail.&lt;/p&gt;
+        <description>&lt;img src="https://SymphonyW.github.io/p/cicd-gitlab-ci-helm/bg.png" alt="Featured image of post CI/CD, GitLab CI, and Helm: From Commit to Kubernetes Delivery" /&gt;&lt;p&gt;A &lt;code&gt;git push&lt;/code&gt; can trigger tests, build an image, and deploy a new version to Kubernetes. GitLab CI, container builders, registries, and Helm each handle part of that process. Understanding their responsibilities also makes it easier to work out what needs to happen when a step fails.&lt;/p&gt;
+&lt;p&gt;At each step, you need to know whether the change is trustworthy, which artifact is being delivered, and whether the environment matches the intended state. CI provides feedback, artifacts preserve build results, and deployment tools work with the cluster to update the running application. The delivery records should also explain how to recover if something fails.&lt;/p&gt;
 &lt;p&gt;This article follows GitLab CI → container image → Helm → Kubernetes. The earlier &lt;a class=&#34;link&#34; href=&#34;https://SymphonyW.github.io/p/ci/cd-complete-guidefrom-principles-to-practice/&#34; &gt;CI/CD introduction&lt;/a&gt; focuses on GitHub Actions; this article extends the discussion to containerized services. For the underlying platform concepts, see &lt;a class=&#34;link&#34; href=&#34;https://SymphonyW.github.io/p/docker-k8s-openshift/&#34; &gt;Docker, Kubernetes, and OpenShift&lt;/a&gt;.&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;&lt;strong&gt;Example scope:&lt;/strong&gt; Linux container runners, Node.js 22, Helm &lt;strong&gt;3&lt;/strong&gt;, and Kubernetes &lt;code&gt;apps/v1&lt;/code&gt; Deployments. Major image tags keep the example readable; use reviewed versions or digests in production. Helm 4 uses a different failure rollback option, discussed below.&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;h2 id=&#34;1-cicd-makes-feedback-a-continuous-part-of-change&#34;&gt;1. CI/CD makes feedback a continuous part of change
-&lt;/h2&gt;&lt;p&gt;Manual releases leave difficult questions unanswered: which commit passed the tests, whether the deployed binary is the tested artifact, and whether an earlier working state can still be restored.&lt;/p&gt;
-&lt;p&gt;CI/CD turns those questions into repeatable checks, identifiable artifacts, and explicit conditions for moving between environments.&lt;/p&gt;
+&lt;/h2&gt;&lt;p&gt;With manual releases, it can be hard to establish which commit passed the tests, whether the deployed binary is the one that was tested, and whether a previous working version can still be restored.&lt;/p&gt;
+&lt;p&gt;CI/CD uses repeatable checks and identifiable artifacts to keep track of a change, with explicit conditions for deploying it to each environment.&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
 &lt;tr&gt;
@@ -2640,10 +3648,10 @@
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;A manual production job is compatible with continuous delivery. Automating that final step does not, by itself, establish good tests, permission boundaries, or recovery procedures.&lt;/p&gt;
-&lt;p&gt;CI also requires working habits. Running nightly builds while developers keep separate changes for weeks still allows integration risk to accumulate. Frequent integration, useful checks, and prompt repairs to broken builds make the feedback loop effective.&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;Deployment&lt;/strong&gt; puts a version into an environment. &lt;strong&gt;Release&lt;/strong&gt; exposes functionality to users. Feature flags allow those decisions to happen at different times: deploy the code first, then expose a capability to selected users.&lt;/p&gt;
-&lt;p&gt;A practical feedback sequence is syntax and static checks → unit tests → artifact and dependency checks → integration testing → staging → production observation. Expensive checks can come later, but their blocking conditions should be explicit. Slow, unreliable checks eventually teach people to ignore the pipeline.&lt;/p&gt;
+&lt;p&gt;You can keep a manual production job and still practice continuous delivery. Automating the final step does not, on its own, give you good tests, appropriate permissions, or a way to recover.&lt;/p&gt;
+&lt;p&gt;CI depends on how the team works, too. Nightly builds do little to reduce integration risk if developers keep their changes separate for weeks. Integrate frequently, run useful checks, and fix broken builds promptly so that feedback arrives while it is still useful.&lt;/p&gt;
+&lt;p&gt;Deployment puts a version into an environment; release makes functionality available to users. Feature flags let you deploy the code first and expose the feature to selected users later.&lt;/p&gt;
+&lt;p&gt;A practical order is syntax and static checks → unit tests → artifact and dependency checks → integration testing → staging → production observation. Expensive checks can run later, as long as it is clear which failures must stop deployment. Slow checks that frequently report false failures will eventually lose the team&amp;rsquo;s trust.&lt;/p&gt;
 &lt;h2 id=&#34;2-how-the-delivery-components-fit-together&#34;&gt;2. How the delivery components fit together
 &lt;/h2&gt;&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/p/cicd-gitlab-ci-helm/delivery-flow.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/p/cicd-gitlab-ci-helm/delivery-flow.svg&#34; alt=&#34;GitLab schedules jobs, Runner executes them, Helm manages a release, and Kubernetes reconciles workloads&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
 &lt;/p&gt;
@@ -2693,11 +3701,11 @@
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;Runner executes the commands. GitLab coordinates them. Container executors supply the job images and services used here; a Shell executor needs a different setup. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/runner/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;GitLab coordinates the jobs, and Runner executes their commands. The example relies on a container executor to supply job images and services; a Shell executor needs a different setup. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/runner/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;GitLab Runner documentation&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;After an update, Kubernetes controllers, the scheduler, and node runtimes cooperate to start the intended workload. API acceptance is only one step toward availability. A Deployment controller manages replicas and rollouts; it does not automatically choose a previous Helm revision when business error rates rise. &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/concepts/workloads/controllers/deployment/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;After an update, Kubernetes controllers, the scheduler, and node runtimes work together to start the workload. An accepted API request does not mean the application is ready to serve traffic. The Deployment controller manages replicas and rollouts, but it does not automatically restore a previous Helm revision when business error rates rise. &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/concepts/workloads/controllers/deployment/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Kubernetes Deployments&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;A release record should connect these identities:&lt;/p&gt;
+&lt;p&gt;To trace a release, keep the following records together:&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
@@ -2718,10 +3726,10 @@
 &lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Verification        = test results + smoke checks + runtime metrics
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;Build once and promote the &lt;strong&gt;same image digest and chart package&lt;/strong&gt; through staging and production. Rebuilding separately for each environment can resolve different dependencies or base images even when the source commit is unchanged. Record the environment values that intentionally differ.&lt;/p&gt;
-&lt;p&gt;A Git SHA tag is readable, but a tag can still be overwritten. A digest identifies content. It does not prove that the content is safe, tested, signed, or produced by a trusted builder.&lt;/p&gt;
+&lt;/div&gt;&lt;p&gt;Build once, then deploy the same image digest and chart package to staging and production. Separate builds can use different dependencies or base images even when the source commit is unchanged. Record any environment values that intentionally differ.&lt;/p&gt;
+&lt;p&gt;A Git SHA tag helps identify the source commit, but the tag can still be overwritten. A digest identifies the content itself; it does not prove that the content is safe, tested, signed, or produced by a trusted builder.&lt;/p&gt;
 &lt;h2 id=&#34;3-gitlab-ci-turns-configuration-into-scheduled-jobs&#34;&gt;3. GitLab CI turns configuration into scheduled jobs
-&lt;/h2&gt;&lt;p&gt;The root &lt;code&gt;.gitlab-ci.yml&lt;/code&gt; describes a pipeline rather than a single sequential shell script. GitLab parses the configuration, evaluates rules, and creates the dependency graph. Runner prepares an execution environment, checks out source, retrieves requested artifacts, runs commands, and uploads results.&lt;/p&gt;
+&lt;/h2&gt;&lt;p&gt;The root &lt;code&gt;.gitlab-ci.yml&lt;/code&gt; defines jobs and their execution conditions. It does not run from top to bottom like a shell script. GitLab parses the configuration, evaluates the rules, and creates a dependency graph. Runner then prepares an environment, checks out the source, retrieves the required artifacts, runs the commands, and uploads the results.&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
 &lt;tr&gt;
@@ -2764,9 +3772,9 @@
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;Jobs in one stage can run concurrently when runner capacity permits. With &lt;code&gt;needs&lt;/code&gt;, explicitly preserve every required gate. Validate the final configuration with the target instance&amp;rsquo;s CI Lint, particularly when using includes or inheritance. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/yaml/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;Jobs in the same stage can run concurrently if enough runners are available. When using &lt;code&gt;needs&lt;/code&gt;, include every dependency required to keep the validation steps in place. Check the final configuration with the target instance&amp;rsquo;s CI Lint, especially if it uses includes or inheritance. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/yaml/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;GitLab YAML reference&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;Choose the events first.&lt;/strong&gt; This example creates MR validation pipelines and default-branch push pipelines. Ordinary feature-branch pushes, tag events, and schedules are excluded:&lt;/p&gt;
+&lt;p&gt;This example runs pipelines for MR validation and default-branch pushes. Ordinary feature-branch pushes, tag events, and schedules do not create pipelines:&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
@@ -2783,10 +3791,10 @@
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;    &lt;/span&gt;- &lt;span class=&#34;nt&#34;&gt;when&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;never&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;For branch validation before an MR exists, consider switching between branch and MR pipelines with &lt;code&gt;CI_OPEN_MERGE_REQUESTS&lt;/code&gt; to avoid duplicate runs. An MR pipeline also does not inherently test the final merged result; configure merged results pipelines when required and supported. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/yaml/workflow/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;/div&gt;&lt;p&gt;If you also want branch validation before an MR exists, use &lt;code&gt;CI_OPEN_MERGE_REQUESTS&lt;/code&gt; to switch between branch and MR pipelines without duplicate runs. An MR pipeline does not necessarily test the final merged result. Configure merged results pipelines if you need them and your instance supports them. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/yaml/workflow/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Workflow documentation&lt;/a&gt;, &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/pipelines/merged_results_pipelines/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;merged results pipelines&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;Jobs should not rely on a shared filesystem.&lt;/strong&gt; Choose an explicit handoff:&lt;/p&gt;
+&lt;p&gt;Jobs cannot assume they share a filesystem. Pass files and metadata through an appropriate storage mechanism:&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
 &lt;tr&gt;
@@ -2818,7 +3826,7 @@
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;Cache accelerates work; artifacts transmit results. Do not put the only copy of a release package in a cache. Jobs using &lt;code&gt;needs&lt;/code&gt; should name the producers whose artifacts they require. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/caching/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;Use cache to speed up work and artifacts to pass results between jobs. Keep the release package somewhere more reliable than a cache. Jobs using &lt;code&gt;needs&lt;/code&gt; should name the jobs that produce their required artifacts. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/caching/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Caching documentation&lt;/a&gt;, &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/jobs/job_artifacts/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;job artifacts&lt;/a&gt;&lt;/p&gt;
 &lt;p&gt;For an application with npm dependencies, cache downloads while retaining lockfile-based installation:&lt;/p&gt;
@@ -2844,11 +3852,11 @@
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;  &lt;/span&gt;- &lt;span class=&#34;l&#34;&gt;npm test&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;&lt;code&gt;npm ci&lt;/code&gt; defines installation behavior; the download cache only reduces repeated work. A runner&amp;rsquo;s leftover &lt;code&gt;node_modules&lt;/code&gt; directory is not a reliable dependency contract.&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;Credentials need a separate control path.&lt;/strong&gt; Masking helps prevent accidental log disclosure, protected variables restrict eligible refs, environment scopes separate targets, and file variables supply temporary file paths. Code running inside a trusted job can still read its variables. Protect branches, review CI changes, and restrict runner privileges accordingly. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/variables/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;npm ci&lt;/code&gt; installs dependencies from the lockfile; the cache only saves repeated downloads. A leftover &lt;code&gt;node_modules&lt;/code&gt; directory on one runner does not guarantee the same result on another.&lt;/p&gt;
+&lt;p&gt;Masking helps prevent accidental disclosure in logs. Protected variables restrict which refs can use them, environment scopes separate deployment targets, and file variables provide temporary file paths. Code running inside a trusted job can still read its variables, so protect branches, review CI changes, and restrict runner privileges as well. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/variables/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;CI/CD variables&lt;/a&gt;&lt;/p&gt;
 &lt;h2 id=&#34;4-helm-organizes-resources-into-a-manageable-release&#34;&gt;4. Helm organizes resources into a manageable release
-&lt;/h2&gt;&lt;p&gt;A service usually needs several resources, with environment-specific parameters. Helm packages their templates and records installations and upgrades.&lt;/p&gt;
+&lt;/h2&gt;&lt;p&gt;A service usually needs several Kubernetes resources, with some settings varying by environment. Helm packages the templates and records each installation and upgrade.&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
 &lt;tr&gt;
@@ -2885,7 +3893,7 @@
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;One chart can produce many releases. Always identify the cluster context, namespace, and release name when inspecting an installation.&lt;/p&gt;
+&lt;p&gt;The same chart can be installed as several releases. When inspecting one, check the cluster context, namespace, and release name together.&lt;/p&gt;
 &lt;p&gt;The example contains a Deployment, a Service, and a Helm test Pod:&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
@@ -2911,7 +3919,7 @@
 &lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;values-production.yaml
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;The chart metadata is straightforward:&lt;/p&gt;
+&lt;/div&gt;&lt;p&gt;The chart metadata includes its name and versions:&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
@@ -2930,7 +3938,7 @@
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;&lt;code&gt;version&lt;/code&gt; identifies the chart package; &lt;code&gt;appVersion&lt;/code&gt; describes the application. Changing &lt;code&gt;appVersion&lt;/code&gt; alone does not select another container image. Templates must actually consume the relevant value. &lt;a class=&#34;link&#34; href=&#34;https://helm.sh/docs/topics/charts/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Helm chart format&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;Default values establish the structure; environment files change replica counts, and CI supplies the real image identity:&lt;/p&gt;
+&lt;p&gt;Default values hold the shared settings, environment files override replica counts, and CI supplies the actual image reference:&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
@@ -3030,7 +4038,7 @@
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;              &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;port&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;http&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;The transformation is:&lt;/p&gt;
+&lt;/div&gt;&lt;p&gt;Helm renders the templates, then Kubernetes reconciles the resulting resources:&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
@@ -3049,8 +4057,8 @@
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;Later &lt;code&gt;-f&lt;/code&gt; files override earlier ones; command-line settings can override values again. Use &lt;code&gt;--set-string&lt;/code&gt; for identities such as commit SHAs and digests. This example passes explicit environment inputs instead of relying on &lt;code&gt;--reuse-values&lt;/code&gt;. &lt;a class=&#34;link&#34; href=&#34;https://helm.sh/docs/v3/intro/using_helm/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Using Helm values&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;Where does release state live?&lt;/strong&gt; Helm 3 uses kubeconfig to contact Kubernetes directly, without Helm 2&amp;rsquo;s Tiller. Release records default to Secrets in the target namespace and contain chart, values, manifests, and status. Read access can expose configuration; design secret management separately.&lt;/p&gt;
-&lt;p&gt;For ordinary updates to built-in resources such as Deployments, Helm 3 generates three-way merge patches from the previous manifest, live state, and proposed manifest. It updates resources rather than recreating the namespace. Hooks, revision recording, and optional readiness waiting surround the operation. Immutable fields and partial failures still prevent treating the whole update as one transaction. &lt;a class=&#34;link&#34; href=&#34;https://helm.sh/docs/v3/faq/changes_since_helm2/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;Helm 3 uses kubeconfig to contact Kubernetes directly and no longer needs Helm 2&amp;rsquo;s Tiller. By default, it stores release records as Secrets in the target namespace, including the chart, values, manifests, and status. Anyone with read access to those Secrets may also see the release configuration, so secret management still needs a separate design.&lt;/p&gt;
+&lt;p&gt;For ordinary updates to built-in resources such as Deployments, Helm 3 generates three-way merge patches from the previous manifest, live state, and proposed manifest. It applies those updates without recreating the namespace. Installation and upgrade can also run hooks, record revisions and status, and wait for readiness when requested. Immutable fields and partial failures mean the whole update cannot be treated as a single transaction. &lt;a class=&#34;link&#34; href=&#34;https://helm.sh/docs/v3/faq/changes_since_helm2/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Helm 3 storage and upgrade mechanisms&lt;/a&gt;&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
@@ -3088,9 +4096,9 @@
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;Local linting and rendering do not replace server-side validation. API compatibility, admission policies, RBAC, quotas, and runtime dependencies remain environment concerns. Avoid exposing Secret-bearing rendered manifests in public logs or artifacts.&lt;/p&gt;
+&lt;p&gt;Local linting and rendering cannot check everything the server will enforce. Validate API compatibility, admission policies, RBAC, quotas, and runtime dependencies in the target environment. Keep rendered manifests containing Secrets out of public logs and artifacts.&lt;/p&gt;
 &lt;h2 id=&#34;5-a-complete-pipeline-verify-package-stage-and-promote&#34;&gt;5. A complete pipeline: verify, package, stage, and promote
-&lt;/h2&gt;&lt;p&gt;Download the &lt;a class=&#34;link&#34; href=&#34;gitlab-helm-demo.zip&#34; &gt;complete GitLab CI + Helm example&lt;/a&gt;. Copy &lt;strong&gt;all files, including dotfiles&lt;/strong&gt;, into a new GitLab repository and configure the prerequisites in its README. The example has its own pipeline, separate from this blog&amp;rsquo;s GitHub Actions deployment.&lt;/p&gt;
+&lt;/h2&gt;&lt;p&gt;Download the &lt;a class=&#34;link&#34; href=&#34;gitlab-helm-demo.zip&#34; &gt;complete GitLab CI + Helm example&lt;/a&gt;, copy all files (including dotfiles) into a new GitLab repository, and configure the prerequisites in its README. This is a separate project with its own pipeline; it does not use this blog&amp;rsquo;s GitHub Actions deployment.&lt;/p&gt;
 &lt;p&gt;The dependency-free Node.js service exposes &lt;code&gt;/&lt;/code&gt;, &lt;code&gt;/healthz&lt;/code&gt;, and &lt;code&gt;/readyz&lt;/code&gt;, returning its &lt;code&gt;APP_VERSION&lt;/code&gt;. Its test makes actual HTTP requests and checks successful responses, the version field, and a missing route:&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
@@ -3104,7 +4112,7 @@
 &lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# Visit http://localhost:3000/ from another terminal or browser.&lt;/span&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;There is no compilation phase in this small application. The container image is the deployable artifact. Java, Go, or TypeScript projects can add compilation while retaining the same artifact identity and promotion rules.&lt;/p&gt;
+&lt;/div&gt;&lt;p&gt;This application needs no compilation; the container image is the deployable artifact. Java, Go, or TypeScript projects can add compilation and still use the same rules for identifying and promoting artifacts.&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
@@ -3123,7 +4131,7 @@
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;err&#34;&gt;&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;CMD&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;[&lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;node&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;server.mjs&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;]&lt;/span&gt;&lt;span class=&#34;err&#34;&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;&lt;strong&gt;Prepare the execution environment first:&lt;/strong&gt;&lt;/p&gt;
+&lt;/div&gt;&lt;p&gt;Before running the pipeline, prepare the following resources and credentials:&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
 &lt;tr&gt;
@@ -3170,9 +4178,9 @@
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;Privileged DinD broadens runner privileges. Keep that runner isolated and protected; untrusted MR jobs must not use it. Configure its TLS endpoint, shared certificates, and executor settings together. Where privileged execution is unsuitable, evaluate a verified alternative such as rootless BuildKit. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/docker/using_docker_build/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;Privileged DinD gives the runner broader permissions, so keep it isolated and protected. Untrusted MR jobs must not use it. Configure its TLS endpoint, shared certificates, and executor settings together. If privileged execution is unsuitable, consider a verified alternative such as rootless BuildKit. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/docker/using_docker_build/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;GitLab Docker build documentation&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;CI push credentials are not automatically available to Kubernetes. Pods need their own pull access, and an expiring job token is unsuitable as a long-lived cluster pull credential. Both the Deployment and test Pod reference the precreated pull Secret. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/user/packages/container_registry/authenticate_with_container_registry/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;Being able to push an image from CI does not give Kubernetes permission to pull it. Pods need their own credentials, and an expiring job token is unsuitable for long-lived cluster access. Both the Deployment and test Pod reference the pull Secret created beforehand. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/user/packages/container_registry/authenticate_with_container_registry/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Registry authentication&lt;/a&gt;&lt;/p&gt;
 &lt;p&gt;The pipeline follows this dependency graph:&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
@@ -3456,23 +4464,23 @@
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;/details&gt;
-&lt;p&gt;Five constraints make the handoffs explicit:&lt;/p&gt;
+&lt;p&gt;Several dependencies and artifact transfers in this configuration deserve a closer look:&lt;/p&gt;
 &lt;ol&gt;
-&lt;li&gt;&lt;strong&gt;Validation precedes image building.&lt;/strong&gt; Both application and chart checks are required. The all-zero digest is a rendering placeholder and is never deployed. MR pipelines contain neither image building nor deployment jobs.&lt;/li&gt;
-&lt;li&gt;&lt;strong&gt;Image identity is transferred explicitly.&lt;/strong&gt; The full commit SHA and pipeline ID form a readable tag. After pushing, the builder obtains the registry digest and publishes it through a dotenv report. A new pipeline for the same commit has another tag; retries within a pipeline still require care.&lt;/li&gt;
-&lt;li&gt;&lt;strong&gt;The chart is packaged once.&lt;/strong&gt; Both environments fetch the same chart artifact. Rendering then combines that package with recorded environment values and runtime inputs.&lt;/li&gt;
-&lt;li&gt;&lt;strong&gt;Production explicitly depends on staging.&lt;/strong&gt; Its &lt;code&gt;needs&lt;/code&gt; includes &lt;code&gt;deploy_staging&lt;/code&gt;, preserving the smoke-test gate. &lt;code&gt;when: manual&lt;/code&gt; plus &lt;code&gt;allow_failure: false&lt;/code&gt; makes the human trigger blocking. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/jobs/job_control/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;li&gt;Both application and chart checks must pass before the image is built. The all-zero digest is only a rendering placeholder and is never deployed. MR pipelines have no image-building or deployment jobs.&lt;/li&gt;
+&lt;li&gt;The full commit SHA and pipeline ID form a readable image tag. After pushing the image, the builder reads its registry digest and passes it to deployment jobs through a dotenv report. Another pipeline for the same commit uses a different tag, though retries within a pipeline still need care.&lt;/li&gt;
+&lt;li&gt;The chart is packaged once, and both environments fetch the same artifact. Rendering combines that package with the recorded environment values and runtime inputs.&lt;/li&gt;
+&lt;li&gt;Production&amp;rsquo;s &lt;code&gt;needs&lt;/code&gt; includes &lt;code&gt;deploy_staging&lt;/code&gt;, so the staging smoke test must pass first. With &lt;code&gt;when: manual&lt;/code&gt; and &lt;code&gt;allow_failure: false&lt;/code&gt;, production waits for someone to trigger it. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/jobs/job_control/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Manual job behavior&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;strong&gt;The deployment lock covers upgrade and smoke testing.&lt;/strong&gt; Both commands run inside one job with a &lt;code&gt;resource_group&lt;/code&gt;. This protects against competing jobs in that project, not unrelated projects, manual changes, or other controllers.&lt;/li&gt;
+&lt;li&gt;Upgrade and smoke testing run in the same job with a &lt;code&gt;resource_group&lt;/code&gt;, keeping competing jobs in this project from changing the environment between the two commands. The lock does not cover other projects, manual changes, or other controllers.&lt;/li&gt;
 &lt;/ol&gt;
-&lt;p&gt;The environment-scoped kubeconfig is used only by its deployment job, not in rule evaluation. Set the correct current context and restrict each identity to its target namespace. Helm also needs access to release Secrets, workload resources, test Pods, and their logs.&lt;/p&gt;
+&lt;p&gt;Use the environment-scoped kubeconfig only in its deployment job, not when evaluating rules. Set the correct current context and restrict each identity to the target namespace. Helm also needs permission to manage release Secrets and workload resources, and to access test Pods and their logs.&lt;/p&gt;
 &lt;p&gt;The build is single-platform and assumes matching builder and node CPU architectures. For mixed architectures, use a tested multi-platform build, record its image index digest, and verify the target platforms.&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;Verification has several layers.&lt;/strong&gt; Liveness checks process health; readiness determines whether a Pod should receive traffic. The sample has no external dependencies, so both endpoints simply succeed. A real application&amp;rsquo;s probes must represent its actual startup and dependency behavior.&lt;/p&gt;
-&lt;p&gt;Helm waits for the resource readiness it understands. The subsequent &lt;code&gt;helm test&lt;/code&gt; creates an in-cluster Pod that calls the Service and checks the returned commit version. That does not test an external Ingress, TLS, user authentication, or a complete business transaction; add those checks where they matter.&lt;/p&gt;
+&lt;p&gt;Liveness checks process health, while readiness determines whether a Pod should receive traffic. The sample has no external dependencies, so both endpoints return success. Design a real application&amp;rsquo;s probes around its startup behavior and dependencies.&lt;/p&gt;
+&lt;p&gt;Helm waits for resources to meet its readiness criteria. The subsequent &lt;code&gt;helm test&lt;/code&gt; creates a Pod inside the cluster, calls the Service, and checks the returned commit version. It does not check an external Ingress, TLS, user authentication, or a complete business transaction. Add those checks where they are needed.&lt;/p&gt;
 &lt;p&gt;Helm tests use resources annotated &lt;code&gt;helm.sh/hook: test&lt;/code&gt;, with container exit status determining success. The sample keeps test Pods for &lt;code&gt;--logs&lt;/code&gt; and inspection, then removes the previous Pod before the next test run. &lt;a class=&#34;link&#34; href=&#34;https://helm.sh/docs/v3/topics/chart_tests/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Helm chart tests&lt;/a&gt;&lt;/p&gt;
 &lt;h2 id=&#34;6-failure-handling-health-concurrency-and-rollback-boundaries&#34;&gt;6. Failure handling: health, concurrency, and rollback boundaries
-&lt;/h2&gt;&lt;p&gt;A green pipeline proves that its defined checks passed. Recovery still depends on locating the failed layer.&lt;/p&gt;
+&lt;/h2&gt;&lt;p&gt;A green pipeline only tells you that its defined checks passed. When a release fails, you still need to find the failed layer before choosing a recovery action.&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
 &lt;tr&gt;
@@ -3519,13 +4527,13 @@
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;&lt;strong&gt;Rolling updates require spare capacity.&lt;/strong&gt; &lt;code&gt;maxUnavailable: 0&lt;/code&gt; and &lt;code&gt;maxSurge: 1&lt;/code&gt; retain old replicas while a replacement becomes ready, but insufficient capacity can still block the rollout. The policy does not guarantee database compatibility or error-free long-lived connections.&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;Helm 3 &lt;code&gt;--atomic&lt;/code&gt; is not a business transaction.&lt;/strong&gt; Failed upgrades attempt rollback and enable waiting. A failed first installation follows install cleanup behavior; there is no previous release to restore. &lt;a class=&#34;link&#34; href=&#34;https://helm.sh/docs/v3/helm/helm_upgrade/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;With &lt;code&gt;maxUnavailable: 0&lt;/code&gt; and &lt;code&gt;maxSurge: 1&lt;/code&gt;, old replicas remain while a replacement becomes ready. This requires spare capacity; without it, the rollout can stall. The policy also does not guarantee database compatibility or error-free long-lived connections.&lt;/p&gt;
+&lt;p&gt;In Helm 3, &lt;code&gt;--atomic&lt;/code&gt; attempts to roll back a failed upgrade and enables waiting. It does not make the deployment a business transaction. A failed first installation runs install cleanup because there is no previous release to restore. &lt;a class=&#34;link&#34; href=&#34;https://helm.sh/docs/v3/helm/helm_upgrade/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Helm 3 upgrade reference&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;The later &lt;code&gt;helm test&lt;/code&gt; command is outside that upgrade operation. If upgrade succeeds and smoke testing fails, the job fails while the new release remains installed. Choose an explicit recovery policy: manual rollback, tested automatic compensation, or a progressive delivery controller with broader release evaluation.&lt;/p&gt;
+&lt;p&gt;The later &lt;code&gt;helm test&lt;/code&gt; command runs separately from the upgrade. If the upgrade succeeds but the smoke test fails, the job fails and the new release stays installed. Handle that case explicitly through manual rollback, a tested automatic recovery policy, or a progressive delivery controller that evaluates more of the release process.&lt;/p&gt;
 &lt;p&gt;Helm 4 uses &lt;code&gt;--rollback-on-failure&lt;/code&gt; and changes waiting strategies. Pin the major version, inspect &lt;code&gt;helm upgrade --help&lt;/code&gt;, and test failure paths when migrating. &lt;a class=&#34;link&#34; href=&#34;https://helm.sh/docs/helm/helm_upgrade/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Helm 4 upgrade reference&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;Choose a &lt;strong&gt;known-good&lt;/strong&gt; revision after inspection:&lt;/p&gt;
+&lt;p&gt;Inspect the history and choose a revision known to work:&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
@@ -3546,19 +4554,19 @@
 &lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;helm &lt;span class=&#34;nb&#34;&gt;test&lt;/span&gt; demo -n demo-production --logs --timeout 2m
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;Rollback changes the cluster again and belongs inside the same concurrency and audit controls. Retain the old images and charts: a historical digest is useless for recovery if the registry has garbage-collected its content.&lt;/p&gt;
-&lt;p&gt;Helm does not undo database migrations, emitted messages, external API calls, or every CRD change. For schema evolution, use expand → migrate → contract: add a compatible structure, migrate data and callers, then remove the old structure once older versions no longer need it. Irreversible deletion in the deployment step makes recovery fragile.&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;Serialization also needs stale-deployment protection.&lt;/strong&gt; A resource group prevents simultaneous jobs but does not inherently enforce commit order. Even newest-first scheduling requires care because an older queued job may still execute later. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/resource_groups/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;/div&gt;&lt;p&gt;Rollback changes cluster state, so it needs the same concurrency and audit controls as deployment. Keep the old images and charts available. A recorded digest cannot restore an application if the registry has already garbage-collected its content.&lt;/p&gt;
+&lt;p&gt;Helm cannot undo database migrations, messages already sent, external API calls, or every CRD change. For schema changes, use expand → migrate → contract: add a compatible structure, migrate the data and callers, then remove the old structure when older versions no longer need it. Combining irreversible deletion with an application upgrade makes recovery difficult.&lt;/p&gt;
+&lt;p&gt;A resource group prevents simultaneous jobs but does not guarantee commit order, so an older deployment can still overwrite a newer one. Even with newest-first scheduling, an older queued job may run later. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/resource_groups/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Resource group documentation&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;Combine queue policy with outdated-deployment prevention and artifact identity checks before manual promotion. Automatically cancel only work that is safe to interrupt; stopping an in-progress deployment can leave state requiring inspection. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/environments/deployment_safety/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;Use an appropriate queue policy and outdated-deployment prevention, and check the commit and artifact before manually promoting a version. Automatically cancel only work that is safe to interrupt. Stopping a deployment midway can leave state that needs inspection. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/environments/deployment_safety/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Deployment safety&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;A manual job is an execution gate, not an independent approval policy. Protected environments and deployment approvals can restrict production actors and reviewers where the instance&amp;rsquo;s tier and version support them. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/environments/deployment_approvals/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;A manual job waits for someone to trigger it; it does not define a separate approval policy. Use protected environments and deployment approvals to restrict who can deploy and review production changes, where the instance&amp;rsquo;s tier and version support them. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/environments/deployment_approvals/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Deployment approvals&lt;/a&gt;&lt;/p&gt;
 &lt;h2 id=&#34;7-moving-from-deployment-scripts-toward-gitops&#34;&gt;7. Moving from deployment scripts toward GitOps
-&lt;/h2&gt;&lt;p&gt;This example uses a push model: a CI job holds deployment credentials and invokes Helm against Kubernetes. It is direct, but Helm CLI does not remain running after the job to detect later configuration drift.&lt;/p&gt;
+&lt;/h2&gt;&lt;p&gt;This example uses a push model: a CI job holds deployment credentials and invokes Helm against Kubernetes. The process is direct, but Helm CLI exits when the job finishes. It does not keep checking for later configuration drift.&lt;/p&gt;
 &lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/p/cicd-gitlab-ci-helm/push-vs-gitops.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/p/cicd-gitlab-ci-helm/push-vs-gitops.svg&#34; alt=&#34;CI push deployment versus GitOps reconciliation through a desired-state repository&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
 &lt;/p&gt;
-&lt;p&gt;GitOps stores desired state in version control. CI publishes an image and updates a digest in a configuration repository; a controller such as Argo CD or Flux reconciles the reviewed state into the cluster. This separates build permissions from production change authority. &lt;a class=&#34;link&#34; href=&#34;https://argo-cd.readthedocs.io/en/stable/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;With GitOps, desired state lives in version control. CI publishes an image and updates its digest in a configuration repository. After review, a controller such as Argo CD or Flux reconciles that state into the cluster. Build permissions can then be separated from permission to change production. &lt;a class=&#34;link&#34; href=&#34;https://argo-cd.readthedocs.io/en/stable/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Argo CD documentation&lt;/a&gt;&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
@@ -3601,9 +4609,9 @@
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;Helm and GitOps can work together, but a controller rendering a chart does not necessarily execute &lt;code&gt;helm install&lt;/code&gt; or maintain ordinary Helm release history. Argo CD uses Helm for template rendering and manages the application lifecycle itself. &lt;a class=&#34;link&#34; href=&#34;https://argo-cd.readthedocs.io/en/stable/user-guide/helm/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;A GitOps controller can render Helm charts without executing &lt;code&gt;helm install&lt;/code&gt; or maintaining the usual Helm release history. Argo CD uses Helm to render templates and manages the application lifecycle itself. &lt;a class=&#34;link&#34; href=&#34;https://argo-cd.readthedocs.io/en/stable/user-guide/helm/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Argo CD Helm integration&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;Give each resource a clear owner. Direct CI upgrades and continuous GitOps synchronization against different desired states can overwrite one another.&lt;/p&gt;
+&lt;p&gt;Decide which tool manages each resource. If CI upgrades a resource directly while a GitOps controller keeps applying a different desired state, they can overwrite each other&amp;rsquo;s changes.&lt;/p&gt;
 &lt;p&gt;Release strategies can grow with actual requirements:&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
@@ -3637,11 +4645,11 @@
 &lt;/tbody&gt;
 &lt;/table&gt;
 &lt;p&gt;Helm can describe the resources involved, but a plain upgrade does not perform error-rate-based canary analysis. Add traffic management and progressive delivery controls when that requirement exists.&lt;/p&gt;
-&lt;p&gt;Artifact assurance can also evolve. Scanning checks known risks, an SBOM records components, provenance describes build inputs and process, and signature verification can constrain accepted publishers. Reports become deployment controls only when policies actually enforce them. &lt;a class=&#34;link&#34; href=&#34;https://docs.docker.com/build/metadata/attestations/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;To check artifacts more thoroughly, scan for known risks, record components in an SBOM, and use provenance to document build inputs and the build process. Signature verification can restrict which publishers are accepted. These checks only block deployment when a policy enforces their results. &lt;a class=&#34;link&#34; href=&#34;https://docs.docker.com/build/metadata/attestations/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Docker build attestations&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;Observe more than pipeline success rate: time from commit to production, release-related failures, recovery time, flaky checks, and execution-environment failures all help identify where delivery needs improvement.&lt;/p&gt;
-&lt;p&gt;The example&amp;rsquo;s artifacts expire after 30 days. Long approval windows and recovery requirements need durable storage for chart packages, image digests, configuration commits, and verification results, plus a compatible registry retention policy. A complete delivery record should answer &lt;strong&gt;why this version was allowed, which artifact reached production, and how a working state can be restored.&lt;/strong&gt;&lt;/p&gt;
-&lt;p&gt;Official links support the mechanisms and parameters described here. For self-managed GitLab, verify availability against the actual instance version, tier, and CI Lint results.&lt;/p&gt;
+&lt;p&gt;Alongside pipeline success rate, track time from commit to production, release-related failures, and recovery time. Check whether pipeline failures come from the application, flaky tests, or the execution environment so that you know where to improve the process.&lt;/p&gt;
+&lt;p&gt;The example&amp;rsquo;s artifacts expire after 30 days. If approval or recovery may take longer, keep chart packages, image digests, configuration commits, and verification results in durable storage, with a registry retention policy that covers the required recovery window. Those records should let you establish why a version was approved, what actually reached production, and how to restore a working state.&lt;/p&gt;
+&lt;p&gt;Consult the linked official documentation for command behavior and parameters. For self-managed GitLab, also check the instance version, tier, and CI Lint results.&lt;/p&gt;
 </description>
         </item>
         <item>

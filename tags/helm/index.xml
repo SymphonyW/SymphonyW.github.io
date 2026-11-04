@@ -1022,15 +1022,15 @@
         <pubDate>Sat, 17 Oct 2026 10:00:00 +0800</pubDate>
         
         <guid>https://SymphonyW.github.io/p/cicd-gitlab-ci-helm/</guid>
-        <description>&lt;img src="https://SymphonyW.github.io/p/cicd-gitlab-ci-helm/bg.png" alt="Featured image of post CI/CD, GitLab CI, and Helm: From Commit to Kubernetes Delivery" /&gt;&lt;p&gt;How does a &lt;code&gt;git push&lt;/code&gt; become a tested application running in Kubernetes? GitLab CI, container builders, registries, and Helm often appear in the same pipeline, but each owns a different part of the delivery process.&lt;/p&gt;
-&lt;p&gt;Three questions connect them: &lt;strong&gt;Is this change trustworthy? Which exact artifact are we delivering? Has the environment reached the intended state?&lt;/strong&gt; CI provides feedback, artifacts preserve build results, and deployment tools cooperate with the cluster to change running state. A dependable delivery process also records how to recover when those steps fail.&lt;/p&gt;
+        <description>&lt;img src="https://SymphonyW.github.io/p/cicd-gitlab-ci-helm/bg.png" alt="Featured image of post CI/CD, GitLab CI, and Helm: From Commit to Kubernetes Delivery" /&gt;&lt;p&gt;A &lt;code&gt;git push&lt;/code&gt; can trigger tests, build an image, and deploy a new version to Kubernetes. GitLab CI, container builders, registries, and Helm each handle part of that process. Understanding their responsibilities also makes it easier to work out what needs to happen when a step fails.&lt;/p&gt;
+&lt;p&gt;At each step, you need to know whether the change is trustworthy, which artifact is being delivered, and whether the environment matches the intended state. CI provides feedback, artifacts preserve build results, and deployment tools work with the cluster to update the running application. The delivery records should also explain how to recover if something fails.&lt;/p&gt;
 &lt;p&gt;This article follows GitLab CI → container image → Helm → Kubernetes. The earlier &lt;a class=&#34;link&#34; href=&#34;https://SymphonyW.github.io/p/ci/cd-complete-guidefrom-principles-to-practice/&#34; &gt;CI/CD introduction&lt;/a&gt; focuses on GitHub Actions; this article extends the discussion to containerized services. For the underlying platform concepts, see &lt;a class=&#34;link&#34; href=&#34;https://SymphonyW.github.io/p/docker-k8s-openshift/&#34; &gt;Docker, Kubernetes, and OpenShift&lt;/a&gt;.&lt;/p&gt;
 &lt;blockquote&gt;
 &lt;p&gt;&lt;strong&gt;Example scope:&lt;/strong&gt; Linux container runners, Node.js 22, Helm &lt;strong&gt;3&lt;/strong&gt;, and Kubernetes &lt;code&gt;apps/v1&lt;/code&gt; Deployments. Major image tags keep the example readable; use reviewed versions or digests in production. Helm 4 uses a different failure rollback option, discussed below.&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;h2 id=&#34;1-cicd-makes-feedback-a-continuous-part-of-change&#34;&gt;1. CI/CD makes feedback a continuous part of change
-&lt;/h2&gt;&lt;p&gt;Manual releases leave difficult questions unanswered: which commit passed the tests, whether the deployed binary is the tested artifact, and whether an earlier working state can still be restored.&lt;/p&gt;
-&lt;p&gt;CI/CD turns those questions into repeatable checks, identifiable artifacts, and explicit conditions for moving between environments.&lt;/p&gt;
+&lt;/h2&gt;&lt;p&gt;With manual releases, it can be hard to establish which commit passed the tests, whether the deployed binary is the one that was tested, and whether a previous working version can still be restored.&lt;/p&gt;
+&lt;p&gt;CI/CD uses repeatable checks and identifiable artifacts to keep track of a change, with explicit conditions for deploying it to each environment.&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
 &lt;tr&gt;
@@ -1061,10 +1061,10 @@
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;A manual production job is compatible with continuous delivery. Automating that final step does not, by itself, establish good tests, permission boundaries, or recovery procedures.&lt;/p&gt;
-&lt;p&gt;CI also requires working habits. Running nightly builds while developers keep separate changes for weeks still allows integration risk to accumulate. Frequent integration, useful checks, and prompt repairs to broken builds make the feedback loop effective.&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;Deployment&lt;/strong&gt; puts a version into an environment. &lt;strong&gt;Release&lt;/strong&gt; exposes functionality to users. Feature flags allow those decisions to happen at different times: deploy the code first, then expose a capability to selected users.&lt;/p&gt;
-&lt;p&gt;A practical feedback sequence is syntax and static checks → unit tests → artifact and dependency checks → integration testing → staging → production observation. Expensive checks can come later, but their blocking conditions should be explicit. Slow, unreliable checks eventually teach people to ignore the pipeline.&lt;/p&gt;
+&lt;p&gt;You can keep a manual production job and still practice continuous delivery. Automating the final step does not, on its own, give you good tests, appropriate permissions, or a way to recover.&lt;/p&gt;
+&lt;p&gt;CI depends on how the team works, too. Nightly builds do little to reduce integration risk if developers keep their changes separate for weeks. Integrate frequently, run useful checks, and fix broken builds promptly so that feedback arrives while it is still useful.&lt;/p&gt;
+&lt;p&gt;Deployment puts a version into an environment; release makes functionality available to users. Feature flags let you deploy the code first and expose the feature to selected users later.&lt;/p&gt;
+&lt;p&gt;A practical order is syntax and static checks → unit tests → artifact and dependency checks → integration testing → staging → production observation. Expensive checks can run later, as long as it is clear which failures must stop deployment. Slow checks that frequently report false failures will eventually lose the team&amp;rsquo;s trust.&lt;/p&gt;
 &lt;h2 id=&#34;2-how-the-delivery-components-fit-together&#34;&gt;2. How the delivery components fit together
 &lt;/h2&gt;&lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/p/cicd-gitlab-ci-helm/delivery-flow.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/p/cicd-gitlab-ci-helm/delivery-flow.svg&#34; alt=&#34;GitLab schedules jobs, Runner executes them, Helm manages a release, and Kubernetes reconciles workloads&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
 &lt;/p&gt;
@@ -1114,11 +1114,11 @@
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;Runner executes the commands. GitLab coordinates them. Container executors supply the job images and services used here; a Shell executor needs a different setup. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/runner/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;GitLab coordinates the jobs, and Runner executes their commands. The example relies on a container executor to supply job images and services; a Shell executor needs a different setup. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/runner/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;GitLab Runner documentation&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;After an update, Kubernetes controllers, the scheduler, and node runtimes cooperate to start the intended workload. API acceptance is only one step toward availability. A Deployment controller manages replicas and rollouts; it does not automatically choose a previous Helm revision when business error rates rise. &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/concepts/workloads/controllers/deployment/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;After an update, Kubernetes controllers, the scheduler, and node runtimes work together to start the workload. An accepted API request does not mean the application is ready to serve traffic. The Deployment controller manages replicas and rollouts, but it does not automatically restore a previous Helm revision when business error rates rise. &lt;a class=&#34;link&#34; href=&#34;https://kubernetes.io/docs/concepts/workloads/controllers/deployment/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Kubernetes Deployments&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;A release record should connect these identities:&lt;/p&gt;
+&lt;p&gt;To trace a release, keep the following records together:&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
@@ -1139,10 +1139,10 @@
 &lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;Verification        = test results + smoke checks + runtime metrics
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;Build once and promote the &lt;strong&gt;same image digest and chart package&lt;/strong&gt; through staging and production. Rebuilding separately for each environment can resolve different dependencies or base images even when the source commit is unchanged. Record the environment values that intentionally differ.&lt;/p&gt;
-&lt;p&gt;A Git SHA tag is readable, but a tag can still be overwritten. A digest identifies content. It does not prove that the content is safe, tested, signed, or produced by a trusted builder.&lt;/p&gt;
+&lt;/div&gt;&lt;p&gt;Build once, then deploy the same image digest and chart package to staging and production. Separate builds can use different dependencies or base images even when the source commit is unchanged. Record any environment values that intentionally differ.&lt;/p&gt;
+&lt;p&gt;A Git SHA tag helps identify the source commit, but the tag can still be overwritten. A digest identifies the content itself; it does not prove that the content is safe, tested, signed, or produced by a trusted builder.&lt;/p&gt;
 &lt;h2 id=&#34;3-gitlab-ci-turns-configuration-into-scheduled-jobs&#34;&gt;3. GitLab CI turns configuration into scheduled jobs
-&lt;/h2&gt;&lt;p&gt;The root &lt;code&gt;.gitlab-ci.yml&lt;/code&gt; describes a pipeline rather than a single sequential shell script. GitLab parses the configuration, evaluates rules, and creates the dependency graph. Runner prepares an execution environment, checks out source, retrieves requested artifacts, runs commands, and uploads results.&lt;/p&gt;
+&lt;/h2&gt;&lt;p&gt;The root &lt;code&gt;.gitlab-ci.yml&lt;/code&gt; defines jobs and their execution conditions. It does not run from top to bottom like a shell script. GitLab parses the configuration, evaluates the rules, and creates a dependency graph. Runner then prepares an environment, checks out the source, retrieves the required artifacts, runs the commands, and uploads the results.&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
 &lt;tr&gt;
@@ -1185,9 +1185,9 @@
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;Jobs in one stage can run concurrently when runner capacity permits. With &lt;code&gt;needs&lt;/code&gt;, explicitly preserve every required gate. Validate the final configuration with the target instance&amp;rsquo;s CI Lint, particularly when using includes or inheritance. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/yaml/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;Jobs in the same stage can run concurrently if enough runners are available. When using &lt;code&gt;needs&lt;/code&gt;, include every dependency required to keep the validation steps in place. Check the final configuration with the target instance&amp;rsquo;s CI Lint, especially if it uses includes or inheritance. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/yaml/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;GitLab YAML reference&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;Choose the events first.&lt;/strong&gt; This example creates MR validation pipelines and default-branch push pipelines. Ordinary feature-branch pushes, tag events, and schedules are excluded:&lt;/p&gt;
+&lt;p&gt;This example runs pipelines for MR validation and default-branch pushes. Ordinary feature-branch pushes, tag events, and schedules do not create pipelines:&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
@@ -1204,10 +1204,10 @@
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;    &lt;/span&gt;- &lt;span class=&#34;nt&#34;&gt;when&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;never&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;For branch validation before an MR exists, consider switching between branch and MR pipelines with &lt;code&gt;CI_OPEN_MERGE_REQUESTS&lt;/code&gt; to avoid duplicate runs. An MR pipeline also does not inherently test the final merged result; configure merged results pipelines when required and supported. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/yaml/workflow/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;/div&gt;&lt;p&gt;If you also want branch validation before an MR exists, use &lt;code&gt;CI_OPEN_MERGE_REQUESTS&lt;/code&gt; to switch between branch and MR pipelines without duplicate runs. An MR pipeline does not necessarily test the final merged result. Configure merged results pipelines if you need them and your instance supports them. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/yaml/workflow/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Workflow documentation&lt;/a&gt;, &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/pipelines/merged_results_pipelines/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;merged results pipelines&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;Jobs should not rely on a shared filesystem.&lt;/strong&gt; Choose an explicit handoff:&lt;/p&gt;
+&lt;p&gt;Jobs cannot assume they share a filesystem. Pass files and metadata through an appropriate storage mechanism:&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
 &lt;tr&gt;
@@ -1239,7 +1239,7 @@
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;Cache accelerates work; artifacts transmit results. Do not put the only copy of a release package in a cache. Jobs using &lt;code&gt;needs&lt;/code&gt; should name the producers whose artifacts they require. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/caching/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;Use cache to speed up work and artifacts to pass results between jobs. Keep the release package somewhere more reliable than a cache. Jobs using &lt;code&gt;needs&lt;/code&gt; should name the jobs that produce their required artifacts. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/caching/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Caching documentation&lt;/a&gt;, &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/jobs/job_artifacts/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;job artifacts&lt;/a&gt;&lt;/p&gt;
 &lt;p&gt;For an application with npm dependencies, cache downloads while retaining lockfile-based installation:&lt;/p&gt;
@@ -1265,11 +1265,11 @@
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;  &lt;/span&gt;- &lt;span class=&#34;l&#34;&gt;npm test&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;&lt;code&gt;npm ci&lt;/code&gt; defines installation behavior; the download cache only reduces repeated work. A runner&amp;rsquo;s leftover &lt;code&gt;node_modules&lt;/code&gt; directory is not a reliable dependency contract.&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;Credentials need a separate control path.&lt;/strong&gt; Masking helps prevent accidental log disclosure, protected variables restrict eligible refs, environment scopes separate targets, and file variables supply temporary file paths. Code running inside a trusted job can still read its variables. Protect branches, review CI changes, and restrict runner privileges accordingly. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/variables/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;/div&gt;&lt;p&gt;&lt;code&gt;npm ci&lt;/code&gt; installs dependencies from the lockfile; the cache only saves repeated downloads. A leftover &lt;code&gt;node_modules&lt;/code&gt; directory on one runner does not guarantee the same result on another.&lt;/p&gt;
+&lt;p&gt;Masking helps prevent accidental disclosure in logs. Protected variables restrict which refs can use them, environment scopes separate deployment targets, and file variables provide temporary file paths. Code running inside a trusted job can still read its variables, so protect branches, review CI changes, and restrict runner privileges as well. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/variables/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;CI/CD variables&lt;/a&gt;&lt;/p&gt;
 &lt;h2 id=&#34;4-helm-organizes-resources-into-a-manageable-release&#34;&gt;4. Helm organizes resources into a manageable release
-&lt;/h2&gt;&lt;p&gt;A service usually needs several resources, with environment-specific parameters. Helm packages their templates and records installations and upgrades.&lt;/p&gt;
+&lt;/h2&gt;&lt;p&gt;A service usually needs several Kubernetes resources, with some settings varying by environment. Helm packages the templates and records each installation and upgrade.&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
 &lt;tr&gt;
@@ -1306,7 +1306,7 @@
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;One chart can produce many releases. Always identify the cluster context, namespace, and release name when inspecting an installation.&lt;/p&gt;
+&lt;p&gt;The same chart can be installed as several releases. When inspecting one, check the cluster context, namespace, and release name together.&lt;/p&gt;
 &lt;p&gt;The example contains a Deployment, a Service, and a Helm test Pod:&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
@@ -1332,7 +1332,7 @@
 &lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;values-production.yaml
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;The chart metadata is straightforward:&lt;/p&gt;
+&lt;/div&gt;&lt;p&gt;The chart metadata includes its name and versions:&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
@@ -1351,7 +1351,7 @@
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;&lt;code&gt;version&lt;/code&gt; identifies the chart package; &lt;code&gt;appVersion&lt;/code&gt; describes the application. Changing &lt;code&gt;appVersion&lt;/code&gt; alone does not select another container image. Templates must actually consume the relevant value. &lt;a class=&#34;link&#34; href=&#34;https://helm.sh/docs/topics/charts/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Helm chart format&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;Default values establish the structure; environment files change replica counts, and CI supplies the real image identity:&lt;/p&gt;
+&lt;p&gt;Default values hold the shared settings, environment files override replica counts, and CI supplies the actual image reference:&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
@@ -1451,7 +1451,7 @@
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;              &lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;port&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;:&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;l&#34;&gt;http&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;The transformation is:&lt;/p&gt;
+&lt;/div&gt;&lt;p&gt;Helm renders the templates, then Kubernetes reconciles the resulting resources:&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
@@ -1470,8 +1470,8 @@
 &lt;/div&gt;
 &lt;/div&gt;&lt;p&gt;Later &lt;code&gt;-f&lt;/code&gt; files override earlier ones; command-line settings can override values again. Use &lt;code&gt;--set-string&lt;/code&gt; for identities such as commit SHAs and digests. This example passes explicit environment inputs instead of relying on &lt;code&gt;--reuse-values&lt;/code&gt;. &lt;a class=&#34;link&#34; href=&#34;https://helm.sh/docs/v3/intro/using_helm/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Using Helm values&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;Where does release state live?&lt;/strong&gt; Helm 3 uses kubeconfig to contact Kubernetes directly, without Helm 2&amp;rsquo;s Tiller. Release records default to Secrets in the target namespace and contain chart, values, manifests, and status. Read access can expose configuration; design secret management separately.&lt;/p&gt;
-&lt;p&gt;For ordinary updates to built-in resources such as Deployments, Helm 3 generates three-way merge patches from the previous manifest, live state, and proposed manifest. It updates resources rather than recreating the namespace. Hooks, revision recording, and optional readiness waiting surround the operation. Immutable fields and partial failures still prevent treating the whole update as one transaction. &lt;a class=&#34;link&#34; href=&#34;https://helm.sh/docs/v3/faq/changes_since_helm2/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;Helm 3 uses kubeconfig to contact Kubernetes directly and no longer needs Helm 2&amp;rsquo;s Tiller. By default, it stores release records as Secrets in the target namespace, including the chart, values, manifests, and status. Anyone with read access to those Secrets may also see the release configuration, so secret management still needs a separate design.&lt;/p&gt;
+&lt;p&gt;For ordinary updates to built-in resources such as Deployments, Helm 3 generates three-way merge patches from the previous manifest, live state, and proposed manifest. It applies those updates without recreating the namespace. Installation and upgrade can also run hooks, record revisions and status, and wait for readiness when requested. Immutable fields and partial failures mean the whole update cannot be treated as a single transaction. &lt;a class=&#34;link&#34; href=&#34;https://helm.sh/docs/v3/faq/changes_since_helm2/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Helm 3 storage and upgrade mechanisms&lt;/a&gt;&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
@@ -1509,9 +1509,9 @@
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;Local linting and rendering do not replace server-side validation. API compatibility, admission policies, RBAC, quotas, and runtime dependencies remain environment concerns. Avoid exposing Secret-bearing rendered manifests in public logs or artifacts.&lt;/p&gt;
+&lt;p&gt;Local linting and rendering cannot check everything the server will enforce. Validate API compatibility, admission policies, RBAC, quotas, and runtime dependencies in the target environment. Keep rendered manifests containing Secrets out of public logs and artifacts.&lt;/p&gt;
 &lt;h2 id=&#34;5-a-complete-pipeline-verify-package-stage-and-promote&#34;&gt;5. A complete pipeline: verify, package, stage, and promote
-&lt;/h2&gt;&lt;p&gt;Download the &lt;a class=&#34;link&#34; href=&#34;gitlab-helm-demo.zip&#34; &gt;complete GitLab CI + Helm example&lt;/a&gt;. Copy &lt;strong&gt;all files, including dotfiles&lt;/strong&gt;, into a new GitLab repository and configure the prerequisites in its README. The example has its own pipeline, separate from this blog&amp;rsquo;s GitHub Actions deployment.&lt;/p&gt;
+&lt;/h2&gt;&lt;p&gt;Download the &lt;a class=&#34;link&#34; href=&#34;gitlab-helm-demo.zip&#34; &gt;complete GitLab CI + Helm example&lt;/a&gt;, copy all files (including dotfiles) into a new GitLab repository, and configure the prerequisites in its README. This is a separate project with its own pipeline; it does not use this blog&amp;rsquo;s GitHub Actions deployment.&lt;/p&gt;
 &lt;p&gt;The dependency-free Node.js service exposes &lt;code&gt;/&lt;/code&gt;, &lt;code&gt;/healthz&lt;/code&gt;, and &lt;code&gt;/readyz&lt;/code&gt;, returning its &lt;code&gt;APP_VERSION&lt;/code&gt;. Its test makes actual HTTP requests and checks successful responses, the version field, and a missing route:&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
@@ -1525,7 +1525,7 @@
 &lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;c1&#34;&gt;# Visit http://localhost:3000/ from another terminal or browser.&lt;/span&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;There is no compilation phase in this small application. The container image is the deployable artifact. Java, Go, or TypeScript projects can add compilation while retaining the same artifact identity and promotion rules.&lt;/p&gt;
+&lt;/div&gt;&lt;p&gt;This application needs no compilation; the container image is the deployable artifact. Java, Go, or TypeScript projects can add compilation and still use the same rules for identifying and promoting artifacts.&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
@@ -1544,7 +1544,7 @@
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;err&#34;&gt;&lt;/span&gt;&lt;span class=&#34;k&#34;&gt;CMD&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;[&lt;/span&gt;&lt;span class=&#34;s2&#34;&gt;&amp;#34;node&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;s2&#34;&gt;&amp;#34;server.mjs&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;]&lt;/span&gt;&lt;span class=&#34;err&#34;&gt;
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;&lt;strong&gt;Prepare the execution environment first:&lt;/strong&gt;&lt;/p&gt;
+&lt;/div&gt;&lt;p&gt;Before running the pipeline, prepare the following resources and credentials:&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
 &lt;tr&gt;
@@ -1591,9 +1591,9 @@
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;Privileged DinD broadens runner privileges. Keep that runner isolated and protected; untrusted MR jobs must not use it. Configure its TLS endpoint, shared certificates, and executor settings together. Where privileged execution is unsuitable, evaluate a verified alternative such as rootless BuildKit. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/docker/using_docker_build/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;Privileged DinD gives the runner broader permissions, so keep it isolated and protected. Untrusted MR jobs must not use it. Configure its TLS endpoint, shared certificates, and executor settings together. If privileged execution is unsuitable, consider a verified alternative such as rootless BuildKit. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/docker/using_docker_build/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;GitLab Docker build documentation&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;CI push credentials are not automatically available to Kubernetes. Pods need their own pull access, and an expiring job token is unsuitable as a long-lived cluster pull credential. Both the Deployment and test Pod reference the precreated pull Secret. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/user/packages/container_registry/authenticate_with_container_registry/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;Being able to push an image from CI does not give Kubernetes permission to pull it. Pods need their own credentials, and an expiring job token is unsuitable for long-lived cluster access. Both the Deployment and test Pod reference the pull Secret created beforehand. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/user/packages/container_registry/authenticate_with_container_registry/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Registry authentication&lt;/a&gt;&lt;/p&gt;
 &lt;p&gt;The pipeline follows this dependency graph:&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
@@ -1877,23 +1877,23 @@
 &lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
 &lt;/div&gt;&lt;/details&gt;
-&lt;p&gt;Five constraints make the handoffs explicit:&lt;/p&gt;
+&lt;p&gt;Several dependencies and artifact transfers in this configuration deserve a closer look:&lt;/p&gt;
 &lt;ol&gt;
-&lt;li&gt;&lt;strong&gt;Validation precedes image building.&lt;/strong&gt; Both application and chart checks are required. The all-zero digest is a rendering placeholder and is never deployed. MR pipelines contain neither image building nor deployment jobs.&lt;/li&gt;
-&lt;li&gt;&lt;strong&gt;Image identity is transferred explicitly.&lt;/strong&gt; The full commit SHA and pipeline ID form a readable tag. After pushing, the builder obtains the registry digest and publishes it through a dotenv report. A new pipeline for the same commit has another tag; retries within a pipeline still require care.&lt;/li&gt;
-&lt;li&gt;&lt;strong&gt;The chart is packaged once.&lt;/strong&gt; Both environments fetch the same chart artifact. Rendering then combines that package with recorded environment values and runtime inputs.&lt;/li&gt;
-&lt;li&gt;&lt;strong&gt;Production explicitly depends on staging.&lt;/strong&gt; Its &lt;code&gt;needs&lt;/code&gt; includes &lt;code&gt;deploy_staging&lt;/code&gt;, preserving the smoke-test gate. &lt;code&gt;when: manual&lt;/code&gt; plus &lt;code&gt;allow_failure: false&lt;/code&gt; makes the human trigger blocking. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/jobs/job_control/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;li&gt;Both application and chart checks must pass before the image is built. The all-zero digest is only a rendering placeholder and is never deployed. MR pipelines have no image-building or deployment jobs.&lt;/li&gt;
+&lt;li&gt;The full commit SHA and pipeline ID form a readable image tag. After pushing the image, the builder reads its registry digest and passes it to deployment jobs through a dotenv report. Another pipeline for the same commit uses a different tag, though retries within a pipeline still need care.&lt;/li&gt;
+&lt;li&gt;The chart is packaged once, and both environments fetch the same artifact. Rendering combines that package with the recorded environment values and runtime inputs.&lt;/li&gt;
+&lt;li&gt;Production&amp;rsquo;s &lt;code&gt;needs&lt;/code&gt; includes &lt;code&gt;deploy_staging&lt;/code&gt;, so the staging smoke test must pass first. With &lt;code&gt;when: manual&lt;/code&gt; and &lt;code&gt;allow_failure: false&lt;/code&gt;, production waits for someone to trigger it. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/jobs/job_control/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Manual job behavior&lt;/a&gt;&lt;/li&gt;
-&lt;li&gt;&lt;strong&gt;The deployment lock covers upgrade and smoke testing.&lt;/strong&gt; Both commands run inside one job with a &lt;code&gt;resource_group&lt;/code&gt;. This protects against competing jobs in that project, not unrelated projects, manual changes, or other controllers.&lt;/li&gt;
+&lt;li&gt;Upgrade and smoke testing run in the same job with a &lt;code&gt;resource_group&lt;/code&gt;, keeping competing jobs in this project from changing the environment between the two commands. The lock does not cover other projects, manual changes, or other controllers.&lt;/li&gt;
 &lt;/ol&gt;
-&lt;p&gt;The environment-scoped kubeconfig is used only by its deployment job, not in rule evaluation. Set the correct current context and restrict each identity to its target namespace. Helm also needs access to release Secrets, workload resources, test Pods, and their logs.&lt;/p&gt;
+&lt;p&gt;Use the environment-scoped kubeconfig only in its deployment job, not when evaluating rules. Set the correct current context and restrict each identity to the target namespace. Helm also needs permission to manage release Secrets and workload resources, and to access test Pods and their logs.&lt;/p&gt;
 &lt;p&gt;The build is single-platform and assumes matching builder and node CPU architectures. For mixed architectures, use a tested multi-platform build, record its image index digest, and verify the target platforms.&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;Verification has several layers.&lt;/strong&gt; Liveness checks process health; readiness determines whether a Pod should receive traffic. The sample has no external dependencies, so both endpoints simply succeed. A real application&amp;rsquo;s probes must represent its actual startup and dependency behavior.&lt;/p&gt;
-&lt;p&gt;Helm waits for the resource readiness it understands. The subsequent &lt;code&gt;helm test&lt;/code&gt; creates an in-cluster Pod that calls the Service and checks the returned commit version. That does not test an external Ingress, TLS, user authentication, or a complete business transaction; add those checks where they matter.&lt;/p&gt;
+&lt;p&gt;Liveness checks process health, while readiness determines whether a Pod should receive traffic. The sample has no external dependencies, so both endpoints return success. Design a real application&amp;rsquo;s probes around its startup behavior and dependencies.&lt;/p&gt;
+&lt;p&gt;Helm waits for resources to meet its readiness criteria. The subsequent &lt;code&gt;helm test&lt;/code&gt; creates a Pod inside the cluster, calls the Service, and checks the returned commit version. It does not check an external Ingress, TLS, user authentication, or a complete business transaction. Add those checks where they are needed.&lt;/p&gt;
 &lt;p&gt;Helm tests use resources annotated &lt;code&gt;helm.sh/hook: test&lt;/code&gt;, with container exit status determining success. The sample keeps test Pods for &lt;code&gt;--logs&lt;/code&gt; and inspection, then removes the previous Pod before the next test run. &lt;a class=&#34;link&#34; href=&#34;https://helm.sh/docs/v3/topics/chart_tests/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Helm chart tests&lt;/a&gt;&lt;/p&gt;
 &lt;h2 id=&#34;6-failure-handling-health-concurrency-and-rollback-boundaries&#34;&gt;6. Failure handling: health, concurrency, and rollback boundaries
-&lt;/h2&gt;&lt;p&gt;A green pipeline proves that its defined checks passed. Recovery still depends on locating the failed layer.&lt;/p&gt;
+&lt;/h2&gt;&lt;p&gt;A green pipeline only tells you that its defined checks passed. When a release fails, you still need to find the failed layer before choosing a recovery action.&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
 &lt;tr&gt;
@@ -1940,13 +1940,13 @@
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;&lt;strong&gt;Rolling updates require spare capacity.&lt;/strong&gt; &lt;code&gt;maxUnavailable: 0&lt;/code&gt; and &lt;code&gt;maxSurge: 1&lt;/code&gt; retain old replicas while a replacement becomes ready, but insufficient capacity can still block the rollout. The policy does not guarantee database compatibility or error-free long-lived connections.&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;Helm 3 &lt;code&gt;--atomic&lt;/code&gt; is not a business transaction.&lt;/strong&gt; Failed upgrades attempt rollback and enable waiting. A failed first installation follows install cleanup behavior; there is no previous release to restore. &lt;a class=&#34;link&#34; href=&#34;https://helm.sh/docs/v3/helm/helm_upgrade/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;With &lt;code&gt;maxUnavailable: 0&lt;/code&gt; and &lt;code&gt;maxSurge: 1&lt;/code&gt;, old replicas remain while a replacement becomes ready. This requires spare capacity; without it, the rollout can stall. The policy also does not guarantee database compatibility or error-free long-lived connections.&lt;/p&gt;
+&lt;p&gt;In Helm 3, &lt;code&gt;--atomic&lt;/code&gt; attempts to roll back a failed upgrade and enables waiting. It does not make the deployment a business transaction. A failed first installation runs install cleanup because there is no previous release to restore. &lt;a class=&#34;link&#34; href=&#34;https://helm.sh/docs/v3/helm/helm_upgrade/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Helm 3 upgrade reference&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;The later &lt;code&gt;helm test&lt;/code&gt; command is outside that upgrade operation. If upgrade succeeds and smoke testing fails, the job fails while the new release remains installed. Choose an explicit recovery policy: manual rollback, tested automatic compensation, or a progressive delivery controller with broader release evaluation.&lt;/p&gt;
+&lt;p&gt;The later &lt;code&gt;helm test&lt;/code&gt; command runs separately from the upgrade. If the upgrade succeeds but the smoke test fails, the job fails and the new release stays installed. Handle that case explicitly through manual rollback, a tested automatic recovery policy, or a progressive delivery controller that evaluates more of the release process.&lt;/p&gt;
 &lt;p&gt;Helm 4 uses &lt;code&gt;--rollback-on-failure&lt;/code&gt; and changes waiting strategies. Pin the major version, inspect &lt;code&gt;helm upgrade --help&lt;/code&gt;, and test failure paths when migrating. &lt;a class=&#34;link&#34; href=&#34;https://helm.sh/docs/helm/helm_upgrade/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Helm 4 upgrade reference&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;Choose a &lt;strong&gt;known-good&lt;/strong&gt; revision after inspection:&lt;/p&gt;
+&lt;p&gt;Inspect the history and choose a revision known to work:&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
 &lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
 &lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
@@ -1967,19 +1967,19 @@
 &lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;helm &lt;span class=&#34;nb&#34;&gt;test&lt;/span&gt; demo -n demo-production --logs --timeout 2m
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
 &lt;/div&gt;
-&lt;/div&gt;&lt;p&gt;Rollback changes the cluster again and belongs inside the same concurrency and audit controls. Retain the old images and charts: a historical digest is useless for recovery if the registry has garbage-collected its content.&lt;/p&gt;
-&lt;p&gt;Helm does not undo database migrations, emitted messages, external API calls, or every CRD change. For schema evolution, use expand → migrate → contract: add a compatible structure, migrate data and callers, then remove the old structure once older versions no longer need it. Irreversible deletion in the deployment step makes recovery fragile.&lt;/p&gt;
-&lt;p&gt;&lt;strong&gt;Serialization also needs stale-deployment protection.&lt;/strong&gt; A resource group prevents simultaneous jobs but does not inherently enforce commit order. Even newest-first scheduling requires care because an older queued job may still execute later. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/resource_groups/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;/div&gt;&lt;p&gt;Rollback changes cluster state, so it needs the same concurrency and audit controls as deployment. Keep the old images and charts available. A recorded digest cannot restore an application if the registry has already garbage-collected its content.&lt;/p&gt;
+&lt;p&gt;Helm cannot undo database migrations, messages already sent, external API calls, or every CRD change. For schema changes, use expand → migrate → contract: add a compatible structure, migrate the data and callers, then remove the old structure when older versions no longer need it. Combining irreversible deletion with an application upgrade makes recovery difficult.&lt;/p&gt;
+&lt;p&gt;A resource group prevents simultaneous jobs but does not guarantee commit order, so an older deployment can still overwrite a newer one. Even with newest-first scheduling, an older queued job may run later. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/resource_groups/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Resource group documentation&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;Combine queue policy with outdated-deployment prevention and artifact identity checks before manual promotion. Automatically cancel only work that is safe to interrupt; stopping an in-progress deployment can leave state requiring inspection. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/environments/deployment_safety/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;Use an appropriate queue policy and outdated-deployment prevention, and check the commit and artifact before manually promoting a version. Automatically cancel only work that is safe to interrupt. Stopping a deployment midway can leave state that needs inspection. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/environments/deployment_safety/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Deployment safety&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;A manual job is an execution gate, not an independent approval policy. Protected environments and deployment approvals can restrict production actors and reviewers where the instance&amp;rsquo;s tier and version support them. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/environments/deployment_approvals/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;A manual job waits for someone to trigger it; it does not define a separate approval policy. Use protected environments and deployment approvals to restrict who can deploy and review production changes, where the instance&amp;rsquo;s tier and version support them. &lt;a class=&#34;link&#34; href=&#34;https://docs.gitlab.com/ci/environments/deployment_approvals/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Deployment approvals&lt;/a&gt;&lt;/p&gt;
 &lt;h2 id=&#34;7-moving-from-deployment-scripts-toward-gitops&#34;&gt;7. Moving from deployment scripts toward GitOps
-&lt;/h2&gt;&lt;p&gt;This example uses a push model: a CI job holds deployment credentials and invokes Helm against Kubernetes. It is direct, but Helm CLI does not remain running after the job to detect later configuration drift.&lt;/p&gt;
+&lt;/h2&gt;&lt;p&gt;This example uses a push model: a CI job holds deployment credentials and invokes Helm against Kubernetes. The process is direct, but Helm CLI exits when the job finishes. It does not keep checking for later configuration drift.&lt;/p&gt;
 &lt;p&gt;&lt;a href=&#34;https://SymphonyW.github.io/p/cicd-gitlab-ci-helm/push-vs-gitops.svg&#34; target=&#34;_blank&#34; rel=&#34;noopener noreferrer&#34;&gt;&lt;img src=&#34;https://SymphonyW.github.io/p/cicd-gitlab-ci-helm/push-vs-gitops.svg&#34; alt=&#34;CI push deployment versus GitOps reconciliation through a desired-state repository&#34; loading=&#34;lazy&#34; decoding=&#34;async&#34;&gt;&lt;/a&gt;
 &lt;/p&gt;
-&lt;p&gt;GitOps stores desired state in version control. CI publishes an image and updates a digest in a configuration repository; a controller such as Argo CD or Flux reconciles the reviewed state into the cluster. This separates build permissions from production change authority. &lt;a class=&#34;link&#34; href=&#34;https://argo-cd.readthedocs.io/en/stable/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;With GitOps, desired state lives in version control. CI publishes an image and updates its digest in a configuration repository. After review, a controller such as Argo CD or Flux reconciles that state into the cluster. Build permissions can then be separated from permission to change production. &lt;a class=&#34;link&#34; href=&#34;https://argo-cd.readthedocs.io/en/stable/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Argo CD documentation&lt;/a&gt;&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
@@ -2022,9 +2022,9 @@
 &lt;/tr&gt;
 &lt;/tbody&gt;
 &lt;/table&gt;
-&lt;p&gt;Helm and GitOps can work together, but a controller rendering a chart does not necessarily execute &lt;code&gt;helm install&lt;/code&gt; or maintain ordinary Helm release history. Argo CD uses Helm for template rendering and manages the application lifecycle itself. &lt;a class=&#34;link&#34; href=&#34;https://argo-cd.readthedocs.io/en/stable/user-guide/helm/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;A GitOps controller can render Helm charts without executing &lt;code&gt;helm install&lt;/code&gt; or maintaining the usual Helm release history. Argo CD uses Helm to render templates and manages the application lifecycle itself. &lt;a class=&#34;link&#34; href=&#34;https://argo-cd.readthedocs.io/en/stable/user-guide/helm/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Argo CD Helm integration&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;Give each resource a clear owner. Direct CI upgrades and continuous GitOps synchronization against different desired states can overwrite one another.&lt;/p&gt;
+&lt;p&gt;Decide which tool manages each resource. If CI upgrades a resource directly while a GitOps controller keeps applying a different desired state, they can overwrite each other&amp;rsquo;s changes.&lt;/p&gt;
 &lt;p&gt;Release strategies can grow with actual requirements:&lt;/p&gt;
 &lt;table&gt;
 &lt;thead&gt;
@@ -2058,11 +2058,11 @@
 &lt;/tbody&gt;
 &lt;/table&gt;
 &lt;p&gt;Helm can describe the resources involved, but a plain upgrade does not perform error-rate-based canary analysis. Add traffic management and progressive delivery controls when that requirement exists.&lt;/p&gt;
-&lt;p&gt;Artifact assurance can also evolve. Scanning checks known risks, an SBOM records components, provenance describes build inputs and process, and signature verification can constrain accepted publishers. Reports become deployment controls only when policies actually enforce them. &lt;a class=&#34;link&#34; href=&#34;https://docs.docker.com/build/metadata/attestations/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+&lt;p&gt;To check artifacts more thoroughly, scan for known risks, record components in an SBOM, and use provenance to document build inputs and the build process. Signature verification can restrict which publishers are accepted. These checks only block deployment when a policy enforces their results. &lt;a class=&#34;link&#34; href=&#34;https://docs.docker.com/build/metadata/attestations/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
     &gt;Docker build attestations&lt;/a&gt;&lt;/p&gt;
-&lt;p&gt;Observe more than pipeline success rate: time from commit to production, release-related failures, recovery time, flaky checks, and execution-environment failures all help identify where delivery needs improvement.&lt;/p&gt;
-&lt;p&gt;The example&amp;rsquo;s artifacts expire after 30 days. Long approval windows and recovery requirements need durable storage for chart packages, image digests, configuration commits, and verification results, plus a compatible registry retention policy. A complete delivery record should answer &lt;strong&gt;why this version was allowed, which artifact reached production, and how a working state can be restored.&lt;/strong&gt;&lt;/p&gt;
-&lt;p&gt;Official links support the mechanisms and parameters described here. For self-managed GitLab, verify availability against the actual instance version, tier, and CI Lint results.&lt;/p&gt;
+&lt;p&gt;Alongside pipeline success rate, track time from commit to production, release-related failures, and recovery time. Check whether pipeline failures come from the application, flaky tests, or the execution environment so that you know where to improve the process.&lt;/p&gt;
+&lt;p&gt;The example&amp;rsquo;s artifacts expire after 30 days. If approval or recovery may take longer, keep chart packages, image digests, configuration commits, and verification results in durable storage, with a registry retention policy that covers the required recovery window. Those records should let you establish why a version was approved, what actually reached production, and how to restore a working state.&lt;/p&gt;
+&lt;p&gt;Consult the linked official documentation for command behavior and parameters. For self-managed GitLab, also check the instance version, tier, and CI Lint results.&lt;/p&gt;
 </description>
         </item>
         
