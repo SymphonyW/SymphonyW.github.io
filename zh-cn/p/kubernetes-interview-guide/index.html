@@ -2,7 +2,7 @@
 <html lang="zh-cn" dir="ltr">
 <head>
     <meta charset='utf-8'>
-<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="把 40 道 Kubernetes 面试题串成一条完整链路：用图解理解集群架构、Pod 创建、调度与资源、Service 和 DNS，再用命令定位常见故障。">
+<meta name='viewport' content='width=device-width, initial-scale=1'><meta name='description' content="假设你有一个 Web 服务，希望它始终运行两个副本，发布新版本时尽量不中断访问，某个副本出问题后还能自动补上。只靠手工启动容器，你就得自己处理机器选择、进程重启、流量切换和版本替换。 Kubernetes 做的，就是把这些工作交给一组持续运行的管理程序。你描述“我想要什么”，它们不断检查并调整“现在是什么”。 本文根据《K8s实习生面试八股文》整理，覆盖原文的 40 道题。阅读时可以跟着同一个问题往下走：一个服务怎样从配置文件变成可访问的应用，出了问题又该去哪里找原因？ 文末保留命令速查和面试速记。 以下以 Linux 节点、常规 Deployment 和带 selector 的 ClusterIP Service 为主要例子；具体网络实现和默认行为需要结合集群版本与配置判断。 1. 先看清分工：谁决定，谁执行 1.1 声明式与调谐 Kubernetes，常缩写为 K8s，是一个声明式的容器编排系统。“声明式”可以用一个具体例子理解：你提交配置，说“这个应用需要两个副本”，而不是依次命令每台机器“启动容器、检查进程、坏了再补一个”。 这里有两个状态：配置里写的是期望状态，集群当前运行的情况是实际状态。控制器持续比较两者，发现缺口就采取动作。这个反复检查、调整的过程叫调谐（Reconcile）。 1.2 控制面与工作节点 一个集群可以先分成两部分：控制面管理整个集群，工作节点运行应用。 组件 主要位置 负责的事情 kube-apiserver 控制面 提供统一 API 入口，处理认证、鉴权、准入和资源读写 etcd 控制面存储 持久化保存集群资源对象及其状态 kube-controller-manager 控制面 运行多种控制器，持续让实际状态接近期望状态 kube-scheduler 控制面 为尚未绑定节点的 Pod 选择合适的节点 kubelet 工作节点 根据分配给本节点的 Pod 配置，协调容器运行和状态上报 containerd 等容器运行时 工作节点 拉取镜像、管理容器生命周期 kube-proxy，或替代实现 工作节点 实现 Service 所需的网络转发能力 etcd 可以理解为集群的“状态账本”，保存 Deployment、Service、ConfigMap 等 API 对象；它不替应用保存数据库里的业务记录。调度器、控制器和 kubelet 通常通过 API Server 观察、修改资源，并不各自直接读写 etcd。组件职责可以对照 Kubernetes 官方架构说明。">
 <title>Kubernetes ：从 Pod 创建到故障排查</title>
 
 <link rel='canonical' href='https://SymphonyW.github.io/zh-cn/p/kubernetes-interview-guide/'>
@@ -16,12 +16,12 @@
 </script>
 
 <meta property='og:title' content="Kubernetes ：从 Pod 创建到故障排查">
-<meta property='og:description' content="把 40 道 Kubernetes 面试题串成一条完整链路：用图解理解集群架构、Pod 创建、调度与资源、Service 和 DNS，再用命令定位常见故障。">
+<meta property='og:description' content="假设你有一个 Web 服务，希望它始终运行两个副本，发布新版本时尽量不中断访问，某个副本出问题后还能自动补上。只靠手工启动容器，你就得自己处理机器选择、进程重启、流量切换和版本替换。 Kubernetes 做的，就是把这些工作交给一组持续运行的管理程序。你描述“我想要什么”，它们不断检查并调整“现在是什么”。 本文根据《K8s实习生面试八股文》整理，覆盖原文的 40 道题。阅读时可以跟着同一个问题往下走：一个服务怎样从配置文件变成可访问的应用，出了问题又该去哪里找原因？ 文末保留命令速查和面试速记。 以下以 Linux 节点、常规 Deployment 和带 selector 的 ClusterIP Service 为主要例子；具体网络实现和默认行为需要结合集群版本与配置判断。 1. 先看清分工：谁决定，谁执行 1.1 声明式与调谐 Kubernetes，常缩写为 K8s，是一个声明式的容器编排系统。“声明式”可以用一个具体例子理解：你提交配置，说“这个应用需要两个副本”，而不是依次命令每台机器“启动容器、检查进程、坏了再补一个”。 这里有两个状态：配置里写的是期望状态，集群当前运行的情况是实际状态。控制器持续比较两者，发现缺口就采取动作。这个反复检查、调整的过程叫调谐（Reconcile）。 1.2 控制面与工作节点 一个集群可以先分成两部分：控制面管理整个集群，工作节点运行应用。 组件 主要位置 负责的事情 kube-apiserver 控制面 提供统一 API 入口，处理认证、鉴权、准入和资源读写 etcd 控制面存储 持久化保存集群资源对象及其状态 kube-controller-manager 控制面 运行多种控制器，持续让实际状态接近期望状态 kube-scheduler 控制面 为尚未绑定节点的 Pod 选择合适的节点 kubelet 工作节点 根据分配给本节点的 Pod 配置，协调容器运行和状态上报 containerd 等容器运行时 工作节点 拉取镜像、管理容器生命周期 kube-proxy，或替代实现 工作节点 实现 Service 所需的网络转发能力 etcd 可以理解为集群的“状态账本”，保存 Deployment、Service、ConfigMap 等 API 对象；它不替应用保存数据库里的业务记录。调度器、控制器和 kubelet 通常通过 API Server 观察、修改资源，并不各自直接读写 etcd。组件职责可以对照 Kubernetes 官方架构说明。">
 <meta property='og:url' content='https://SymphonyW.github.io/zh-cn/p/kubernetes-interview-guide/'>
 <meta property='og:site_name' content='Snow'>
 <meta property='og:type' content='article'><meta property='article:section' content='Post' /><meta property='article:tag' content='Kubernetes' /><meta property='article:tag' content='云原生' /><meta property='article:tag' content='容器' /><meta property='article:tag' content='面试' /><meta property='article:tag' content='故障排查' /><meta property='article:published_time' content='2026-10-20T20:25:00&#43;08:00'/><meta property='article:modified_time' content='2026-10-20T20:25:00&#43;08:00'/><meta property='og:image' content='https://SymphonyW.github.io/zh-cn/p/kubernetes-interview-guide/cluster-architecture.svg' />
 <meta name="twitter:title" content="Kubernetes ：从 Pod 创建到故障排查">
-<meta name="twitter:description" content="把 40 道 Kubernetes 面试题串成一条完整链路：用图解理解集群架构、Pod 创建、调度与资源、Service 和 DNS，再用命令定位常见故障。"><meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:description" content="假设你有一个 Web 服务，希望它始终运行两个副本，发布新版本时尽量不中断访问，某个副本出问题后还能自动补上。只靠手工启动容器，你就得自己处理机器选择、进程重启、流量切换和版本替换。 Kubernetes 做的，就是把这些工作交给一组持续运行的管理程序。你描述“我想要什么”，它们不断检查并调整“现在是什么”。 本文根据《K8s实习生面试八股文》整理，覆盖原文的 40 道题。阅读时可以跟着同一个问题往下走：一个服务怎样从配置文件变成可访问的应用，出了问题又该去哪里找原因？ 文末保留命令速查和面试速记。 以下以 Linux 节点、常规 Deployment 和带 selector 的 ClusterIP Service 为主要例子；具体网络实现和默认行为需要结合集群版本与配置判断。 1. 先看清分工：谁决定，谁执行 1.1 声明式与调谐 Kubernetes，常缩写为 K8s，是一个声明式的容器编排系统。“声明式”可以用一个具体例子理解：你提交配置，说“这个应用需要两个副本”，而不是依次命令每台机器“启动容器、检查进程、坏了再补一个”。 这里有两个状态：配置里写的是期望状态，集群当前运行的情况是实际状态。控制器持续比较两者，发现缺口就采取动作。这个反复检查、调整的过程叫调谐（Reconcile）。 1.2 控制面与工作节点 一个集群可以先分成两部分：控制面管理整个集群，工作节点运行应用。 组件 主要位置 负责的事情 kube-apiserver 控制面 提供统一 API 入口，处理认证、鉴权、准入和资源读写 etcd 控制面存储 持久化保存集群资源对象及其状态 kube-controller-manager 控制面 运行多种控制器，持续让实际状态接近期望状态 kube-scheduler 控制面 为尚未绑定节点的 Pod 选择合适的节点 kubelet 工作节点 根据分配给本节点的 Pod 配置，协调容器运行和状态上报 containerd 等容器运行时 工作节点 拉取镜像、管理容器生命周期 kube-proxy，或替代实现 工作节点 实现 Service 所需的网络转发能力 etcd 可以理解为集群的“状态账本”，保存 Deployment、Service、ConfigMap 等 API 对象；它不替应用保存数据库里的业务记录。调度器、控制器和 kubelet 通常通过 API Server 观察、修改资源，并不各自直接读写 etcd。组件职责可以对照 Kubernetes 官方架构说明。"><meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:image" content='https://SymphonyW.github.io/zh-cn/p/kubernetes-interview-guide/cluster-architecture.svg' />
     <link rel="shortcut icon" href="/favicon.ico" />
 
@@ -109,7 +109,7 @@
     <div class="article-details">
     
     <h1 class="article-title">Kubernetes ：从 Pod 创建到故障排查</h1>
-    <p class="article-subtitle">把 40 道 Kubernetes 面试题串成一条完整链路：用图解理解集群架构、Pod 创建、调度与资源、Service 和 DNS，再用命令定位常见故障。</p>
+    
     <div class="article-meta">
         
             <time datetime="2026-10-20T20:25:00&#43;08:00">2026 年 10 月 20 日</time>
